@@ -280,7 +280,7 @@ async function loadLiveData(isRefresh) {
 
 document.addEventListener('DOMContentLoaded', async () => {
   // Hard gate: no session → go to login BEFORE any data or UI renders
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session } } = await sb.auth.getSession();
   if (!session) { window.location.href = 'login.html'; return; }
 
   // Inject the status banner at the very top of the page
