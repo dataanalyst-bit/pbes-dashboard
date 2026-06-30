@@ -220,14 +220,14 @@ async function loadLiveData(isRefresh) {
 
   try {
     // Attach the current Supabase session token; the server verifies it.
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await sb.auth.getSession();
     if (!session) { window.location.href = 'login.html'; return; }
 
     const res = await fetch(DATA_API + '?_t=' + Date.now(), {
       headers: { 'Authorization': 'Bearer ' + session.access_token }
     });
     if (res.status === 401) {            // token rejected → force re-login
-      await supabase.auth.signOut();
+      await sb.auth.signOut();
       window.location.href = 'login.html';
       return;
     }
