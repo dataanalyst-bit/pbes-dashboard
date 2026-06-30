@@ -1,12 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase.js"></script>
-<script src="auth.js"></script>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PBES School Analytics 2026-27</title>
+
+<!-- Supabase client must load before our auth/data code -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase.js"></script>
+<script src="auth.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 <style>
@@ -182,8 +184,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);font-si
  * The dashboard will fetch fresh data every time it loads and
  * every AUTO_REFRESH_SECONDS while it stays open.
  *****************************************************************/
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby2Oy8BxYaXAI7ja5QmqPNwJpuZ_hsCivPoO0gM-_KRaLb1bVjTIwBM5dqappty89O3IA/exec';
-// Auto-refresh interval in seconds. 120 = 2 minutes. Set to 0 to disable.
+const DATA_API = '/api/data';   // server-side proxy — no Apps Script URL in the browser
 const AUTO_REFRESH_SECONDS = 120;
 
 // ---- Global data arrays (populated by fetch, read by renderAll) ----
@@ -215,19 +216,21 @@ function showLoadOk(genAt, ms) {
 
 // ---- Core fetch function ----
 async function loadLiveData(isRefresh) {
-  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.indexOf('PASTE_YOUR') === 0) {
-    showLoadError('Apps Script URL not set — open this HTML file in a text editor and paste your Web App URL into APPS_SCRIPT_URL on line 10.');
-    return;
-  }
-
   if (!isRefresh) showLoading();
 
   try {
-    // Add a cache-busting timestamp so the browser never serves a stale response
-    const sep = APPS_SCRIPT_URL.indexOf('?') === -1 ? '?' : '&';
-    const url = APPS_SCRIPT_URL + sep + '_t=' + Date.now();
+    // Attach the current Supabase session token; the server verifies it.
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { window.location.href = 'login.html'; return; }
 
-    const res  = await fetch(url);
+    const res = await fetch(DATA_API + '?_t=' + Date.now(), {
+      headers: { 'Authorization': 'Bearer ' + session.access_token }
+    });
+    if (res.status === 401) {            // token rejected → force re-login
+      await supabase.auth.signOut();
+      window.location.href = 'login.html';
+      return;
+    }
     const data = await res.json();
 
     if (data.error) {
@@ -275,7 +278,11 @@ async function loadLiveData(isRefresh) {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  // Hard gate: no session → go to login BEFORE any data or UI renders
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) { window.location.href = 'login.html'; return; }
+
   // Inject the status banner at the very top of the page
   document.body.insertAdjacentHTML('afterbegin',
     '<div id="live-status-banner" style="' +
@@ -292,8 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 </head>
-<body onload="checkLogin()">
-
+<body>
 <header class="hdr">
   <div class="hdr-in">
     <div class="logo-row">
