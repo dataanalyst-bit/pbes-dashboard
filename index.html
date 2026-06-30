@@ -1,5 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase.js"></script>
+<script src="auth.js"></script>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -289,7 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 </head>
-<body>
+<body onload="checkLogin()">
 
 <header class="hdr">
   <div class="hdr-in">
