@@ -282,6 +282,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Hard gate: no session → go to login BEFORE any data or UI renders
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { window.location.href = 'login.html'; return; }
+  // ── Lock the branch selector for principals (branch-restricted accounts) ──
+  const userBranch = session.user?.app_metadata?.branch || null;
+  if (userBranch) {
+    const sel = document.getElementById('sel-branch');
+    if (sel) {
+      [...sel.options].forEach(opt => { if (opt.value !== userBranch) opt.remove(); });
+      sel.value = userBranch;
+      sel.disabled = true;
+      sel.style.opacity = '0.7';
+      sel.style.cursor = 'not-allowed';
+    }
+    fBranch = userBranch;
+  }
 
   // Inject the status banner at the very top of the page
   document.body.insertAdjacentHTML('afterbegin',
