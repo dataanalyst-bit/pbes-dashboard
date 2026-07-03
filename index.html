@@ -174,6 +174,12 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);font-si
 .divider{height:1px;background:var(--bor);margin:12px 0}
 .no-data{text-align:center;padding:36px;color:var(--txm);font-style:italic}
 
+/* Clamp long free-text cells in drill-down tables — click to expand */
+.clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer;line-height:1.45;}
+.clamp2.open{display:block;-webkit-line-clamp:unset;overflow:visible;}
+.clamp2::after{content:'▾ tap to expand';display:block;color:#1E4FD8;font-weight:700;font-size:9.5px;margin-top:1px;}
+.clamp2.open::after{content:'▴ collapse';}
+
 @media(max-width:1200px){.k5,.k6{grid-template-columns:repeat(3,1fr)}.r3{grid-template-columns:1fr 1fr}.r12,.r21,.r32{grid-template-columns:1fr}}
 @media(max-width:768px){.content,.fb-in,.hdr-in{padding-left:14px;padding-right:14px}.k4,.k5,.k6{grid-template-columns:1fr 1fr}.r2,.r3{grid-template-columns:1fr}}
 </style>
@@ -1109,7 +1115,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="card" style="margin-bottom:16px;">
     <div class="ch"><h3>🏆 Grievance Performance Scorecard — Branch Ranking</h3><span class="fnote">Resolution rate, satisfaction, speed &amp; overdue — combined</span></div>
     <div class="cb-0" style="overflow-x:auto"><table class="dt">
-      <thead><tr><th>Rank</th><th>Branch</th><th>Total Cases</th><th>Resolved</th><th>Resolution %</th><th>Satisfied %</th><th>Overdue</th><th>Avg Days to Close</th><th>Score</th></tr></thead>
+      <thead><tr><th>Rank</th><th>Branch</th><th>Total Cases</th><th>Resolved</th><th>Resolution %</th><th>Action Sentiment</th><th>Case Severity</th><th>Overdue</th><th>Avg Days to Close</th><th>Score</th></tr></thead>
       <tbody id="gr-rank-tbody"></tbody>
     </table></div>
   </div>
@@ -2250,19 +2256,19 @@ function renderAdmin(){
 }
 
 // Admin performance scorecard — replaces "Overdue & In-Progress Critical Tasks"
-function renderAdminPerformance(rows,BRANCHES,isDone,isIP,isHoldOpen,overdueDays){
-  const el=document.getElementById('admin-perf');
-  if(!el) return;
-  const stats=BRANCHES.map(b=>{
+const stats=BRANCHES.map(b=>{
     const br=rows.filter(r=>r.Branch===b);
     const tot=br.length;
     const dn=br.filter(isDone).length;
-    const od=br.filter(r=>overdueDays(r)!==null&&!isDone(r)).length;
+    const odRows=br.filter(r=>overdueDays(r)!==null&&!isDone(r));
+    const od=odRows.length;
+    const avgOdDays=od>0?odRows.reduce((a,r)=>a+(overdueDays(r)||0),0)/od:0;
     const comp=tot>0?+(dn/tot*100).toFixed(1):0;
-    const odRate=tot>0?+(od/tot*100).toFixed(1):0;
-    // performance score: completion weighted, penalised for overdue
-    const score=Math.max(0,Math.round(comp-odRate*1.5));
-    return {branch:b,tot,dn,od,comp,odRate,score};
+    // Unified dept formula: Score = ClosureRate×0.6 + Speed×0.4
+    // Speed = 100 − avgOverdueDays×2 (floored at 0; no overdue → 100)
+    const speed=Math.max(0,100-avgOdDays*2);
+    const score=Math.round(comp*0.6+speed*0.4);
+    return {branch:b,tot,dn,od,avgOdDays:+avgOdDays.toFixed(0),comp,speed:+speed.toFixed(0),score};
   }).filter(s=>s.tot>0).sort((a,b)=>b.score-a.score);
   const medals=['🥇','🥈','🥉'];
   el.innerHTML=stats.map((s,i)=>{
@@ -2541,40 +2547,88 @@ function renderGrievance(){
   document.getElementById('gr-all-fn').textContent = rows.length+' records'+(rows.length>200?' (showing first 200 — use View All)':'');
 }
 
+// ── Lightweight lexicon sentiment for grievance text (runs fully client-side) ──
+// Description → case severity (how serious the complaint reads)
+// Action Taken → resolution quality (how strong/complete the response reads)
+const GV_NEG_DESC=['slap','hit','beat','hurt','injur','bleed','blood','unsafe','danger','abus','harass',
+  'bully','target','threat','scared','afraid','fear','distress','cry','angry','anger','fight','wound',
+  'accident','fell','slip','lost','stolen','steal','miss','complain','scold','yell','shout','rude',
+  'inappropriate','negligen','ignore','discomfort','uncomfortable','sick','pain','worry','worried',
+  'serious','escalat','transfer certificate','withdraw','strict action','not satisfied','unhappy'];
+const GV_POS_ACTION=['resolved','solved','sorted','informed','spoke','spoken','discussed','explained',
+  'counsel','warned','warning','meeting','arranged','follow-up','followup','follow up','taken care',
+  'addressed','apolog','assured','reassured','confirmed','appreciated','satisfied','thanked','monitor',
+  'action taken','cctv','checked','verified','shared','updated','instructed','ensured','provided','fixed'];
+const GV_WEAK_ACTION=['pending','yet to','waiting','no response','not responded','no action','not done',
+  'will be','to be','escalated','not yet','awaiting','unable','denied','refused'];
+
+function gvScoreText(text,lexicon){
+  const t=String(text||'').toLowerCase();
+  if(!t||t==='–'||t==='nan') return 0;
+  let hits=0; lexicon.forEach(w=>{ if(t.indexOf(w)!==-1) hits++; });
+  return hits;
+}
+// Returns {severity:0–100, actionQ:0–100} for one record
+function gvSentiment(r){
+  const negD=gvScoreText(r.Description,GV_NEG_DESC);
+  const posA=gvScoreText(r.ActionTaken,GV_POS_ACTION);
+  const wkA =gvScoreText(r.ActionTaken,GV_WEAK_ACTION);
+  const hasAction=r.ActionTaken&&r.ActionTaken!=='–'&&!/^nan$/i.test(r.ActionTaken);
+  // severity: 0 hits→0 … 4+ hits→100 (capped)
+  const severity=Math.min(100,negD*25);
+  // action quality: positive hits push up, weak/no-action pulls down; no action text at all = 20
+  let actionQ;
+  if(!hasAction) actionQ=20;
+  else actionQ=Math.max(0,Math.min(100,50+posA*15-wkA*25));
+  return {severity,actionQ};
+}  
+  
 function renderGrievRanking(rows, ALLB){
   const tbody=document.getElementById('gr-rank-tbody');
   if(!tbody)return;
   const stats=ALLB.map(b=>{
     const br=rows.filter(r=>r.Branch===b);
     const total=br.length;
+    if(total===0) return null;
     const resolved=br.filter(r=>_isResolved(r.Status)).length;
-    const resPct=total?resolved/total*100:0;
-    const satRated=br.filter(r=>r.ParentSatisfaction&&r.ParentSatisfaction!=='–'&&!/^nan$/i.test(r.ParentSatisfaction));
-    const satYes=satRated.filter(r=>_isSatisfied(r.ParentSatisfaction)).length;
-    const satPct=satRated.length?satYes/satRated.length*100:0;
+    const resPct=resolved/total*100;
+    // ── Sentiment analysis on Description + Action Taken ──
+    let sevSum=0,actSum=0,sevHighHandled=0,sevHighCount=0;
+    br.forEach(r=>{
+      const s=gvSentiment(r);
+      sevSum+=s.severity; actSum+=s.actionQ;
+      if(s.severity>=50){ sevHighCount++; if(s.actionQ>=60&&_isResolved(r.Status)) sevHighHandled++; }
+    });
+    const avgSeverity=+(sevSum/total).toFixed(0);          // how tough this branch's cases are
+    const actionSent=+(actSum/total).toFixed(0);           // avg response-quality sentiment
+    const toughHandled=sevHighCount>0?+(sevHighHandled/sevHighCount*100).toFixed(0):100; // % severe cases well-resolved
+    // ── Overdue ──
     const overdue=br.filter(r=>_isOverdue(r)).length;
-    const ovPct=total?overdue/total*100:0;
-    // Avg days to close (Date -> ClosureDate)
-    let days=[],sum=0;
+    const ovPct=overdue/total*100;
+    // ── Closure speed (Date → Closure Date) ──
+    let days=[];
     br.forEach(r=>{ if(r.Date&&r.ClosureDate&&r.Date!=='–'&&r.ClosureDate!=='–'){
       const d1=new Date(r.Date),d2=new Date(r.ClosureDate);
       if(!isNaN(d1)&&!isNaN(d2)){const dd=(d2-d1)/86400000; if(dd>=0&&dd<400)days.push(dd);}}});
     const avgDays=days.length?(days.reduce((a,c)=>a+c,0)/days.length):null;
-    // Composite score: resolution (40%) + satisfaction (35%) + low overdue (15%) + speed (10%)
-    const speedScore=avgDays===null?70:Math.max(0,100-avgDays*3);
-    const score=Math.round(resPct*0.40 + satPct*0.35 + (100-ovPct)*0.15 + speedScore*0.10);
-    return {branch:b,total,resolved,resPct,satPct,overdue,avgDays,score};
-  }).filter(s=>s.total>0).sort((a,b)=>b.score-a.score);
+    // ── Composite Score ──
+    // ActionSentiment 30% + ToughCaseHandling 20% + (100−Overdue%) 25% + Resolution 25%
+    const score=Math.round(actionSent*0.30 + toughHandled*0.20 + (100-ovPct)*0.25 + resPct*0.25);
+    return {branch:b,total,resolved,resPct,avgSeverity,actionSent,toughHandled,overdue,avgDays,score};
+  }).filter(Boolean).sort((a,b)=>b.score-a.score);
 
   const medals=['🥇','🥈','🥉','4️⃣','5️⃣'];
   tbody.innerHTML = stats.map((s,i)=>{
     const scoreColor=s.score>=85?'#059669':s.score>=70?'#D97706':'#DC2626';
-    return `<tr style="cursor:pointer" onclick="fBranch='${s.branch}';document.getElementById('fb')&&(document.getElementById('fb').value='${s.branch}');renderGrievance();">
+    const actColor=s.actionSent>=70?'#059669':s.actionSent>=50?'#D97706':'#DC2626';
+    const sevColor=s.avgSeverity>=50?'#DC2626':s.avgSeverity>=25?'#D97706':'#059669';
+    return `<tr style="cursor:pointer" onclick="viewGrievByBranchStatus('${s.branch}','Resolved')">
       <td style="font-size:18px;text-align:center">${medals[i]||(i+1)}</td>
       <td><span class="bd b${s.branch}"></span> <strong>${s.branch}</strong></td>
       <td>${fi(s.total)}</td><td>${fi(s.resolved)}</td>
       <td><strong style="color:${s.resPct>=90?'#059669':s.resPct>=75?'#D97706':'#DC2626'}">${s.resPct.toFixed(1)}%</strong></td>
-      <td><strong style="color:${s.satPct>=85?'#059669':'#D97706'}">${s.satPct.toFixed(0)}%</strong></td>
+      <td><strong style="color:${actColor}">${s.actionSent}</strong><small style="color:#94A3B8;display:block;font-size:9px;">action-taken sentiment</small></td>
+      <td><strong style="color:${sevColor}">${s.avgSeverity}</strong><small style="color:#94A3B8;display:block;font-size:9px;">${s.toughHandled}% severe handled</small></td>
       <td>${s.overdue>0?`<span style="color:#DC2626;font-weight:700">${s.overdue}</span>`:'0'}</td>
       <td>${s.avgDays===null?'–':s.avgDays.toFixed(1)+'d'}</td>
       <td><span style="display:inline-block;min-width:42px;padding:3px 8px;border-radius:8px;background:${scoreColor};color:#fff;font-weight:800;text-align:center">${s.score}</span></td></tr>`;
@@ -2747,32 +2801,36 @@ function renderPurchaseManagerPerf(rows,BRANCHES){
   // Performance = delivery progress + data/documentation quality.
   //   Delivery score: % delivered (stuck/in-progress backlog drags this down)
   //   Documentation score: % of records with all key fields filled (item, spec, dept, qty/amount, status, priority)
+// Unified dept formula: Score = DeliveredRate×0.6 + Speed×0.4
+  // Overdue = open (In Progress/Ordered/Pending) request older than 14 days since raised
+  // (uses real Due / Target Date automatically once the team fills them).
+  const AGE_LIMIT=14;
+  function odDaysOf(r){
+    if(r.Due!==undefined&&r.Due!=='–'&&!isNaN(+r.Due)&&+r.Due>0) return +r.Due;
+    const today=new Date();
+    if(r.TargetDate&&r.TargetDate!=='–'){
+      const td=new Date(r.TargetDate);
+      if(!isNaN(td)&&td<today) return Math.round((today-td)/86400000);
+    }
+    if(r.Date&&r.Date!=='–'){
+      const d=new Date(r.Date);
+      if(!isNaN(d)){const age=Math.round((today-d)/86400000); if(age>AGE_LIMIT)return age-AGE_LIMIT;}
+    }
+    return 0;
+  }
   const stats=BRANCHES.map(b=>{
     const br=rows.filter(r=>r.Branch===b);
     const tot=br.length;
     if(tot===0) return null;
-    let complete=0;
-    br.forEach(r=>{
-      let filled=0;
-      if(r.Item&&r.Item!=='–') filled++;
-      if(r.Spec&&r.Spec!=='–'&&!/^nan$/i.test(r.Spec)) filled++;
-      if(r.Dept&&r.Dept!=='–') filled++;
-      if((r.Amount&&r.Amount!=='–'&&!isNaN(+r.Amount))||(r.Qty&&r.Qty!=='–'&&!/^nan$/i.test(String(r.Qty)))) filled++;
-      if(r.PurchaseStatus&&r.PurchaseStatus!=='–') filled++;
-      if(r.Priority&&r.Priority!=='–') filled++;
-      if(filled>=5) complete++;  // 5 of 6 key fields = well documented
-    });
     const delivered=br.filter(r=>/delivered/i.test(r.PurchaseStatus||'')).length;
-    const inProg=br.filter(r=>/in progress|ordered/i.test(r.PurchaseStatus||'')).length;
-    const pending=br.filter(r=>/pending/i.test(r.PurchaseStatus||'')).length;
-    const docScore=tot>0?(complete/tot*100):0;       // documentation quality
-    const delivScore=tot>0?(delivered/tot*100):0;     // delivery progress
-    // Stuck backlog penalty: pending items hurt more than in-progress
-    const backlogPenalty=tot>0?((inProg*0.5+pending*1.0)/tot*100):0;
-    // Composite: 50% documentation + 35% delivery + 15% (low backlog)
-    const score=Math.round(Math.max(0, docScore*0.50 + delivScore*0.35 + (100-backlogPenalty)*0.15));
-    return {branch:b,tot,complete,docScore:+docScore.toFixed(1),delivered,inProg,pending,
-            delivScore:+delivScore.toFixed(1),score};
+    const openRows=br.filter(r=>/in progress|ordered|pending|not started/i.test(r.PurchaseStatus||''));
+    const odRows=openRows.filter(r=>odDaysOf(r)>0);
+    const avgOd=odRows.length?odRows.reduce((a,r)=>a+odDaysOf(r),0)/odRows.length:0;
+    const delivPct=+(delivered/tot*100).toFixed(1);
+    const speed=Math.max(0,100-avgOd*2);
+    const score=Math.round(delivPct*0.6+speed*0.4);
+    return {branch:b,tot,delivered,open:openRows.length,overdue:odRows.length,
+            avgOd:+avgOd.toFixed(0),delivPct,speed:+speed.toFixed(0),score};
   }).filter(Boolean).sort((a,b)=>b.score-a.score);
   const medals=['🥇','🥈','🥉'];
   el.innerHTML=stats.map((s,i)=>{
@@ -3726,12 +3784,40 @@ function renderRankings(){
   });
 
   // ── Row 6: Purchase Progress — current status ──
+ // ── Row 6: Purchase Progress — based on In Progress count + overdue ageing ──
+  // Overdue = open request (In Progress/Ordered) that has a positive "Due" value,
+  // OR a past Target Date, OR (fallback while those columns are empty) is older
+  // than 14 days since it was raised.
+  const PUR_OVERDUE_AGE_DAYS=14;
+  function purOverdueDays(r){
+    if(r.Due!==undefined&&r.Due!=='–'&&!isNaN(+r.Due)&&+r.Due>0) return +r.Due;
+    const today=new Date();
+    if(r.TargetDate&&r.TargetDate!=='–'){
+      const td=new Date(r.TargetDate);
+      if(!isNaN(td)&&td<today) return Math.round((today-td)/86400000);
+    }
+    if(r.Date&&r.Date!=='–'){
+      const d=new Date(r.Date);
+      if(!isNaN(d)){
+        const age=Math.round((today-d)/86400000);
+        if(age>PUR_OVERDUE_AGE_DAYS) return age-PUR_OVERDUE_AGE_DAYS;
+      }
+    }
+    return 0;
+  }
   const purStats={};
   ALLB.forEach(b=>{
     const rows=(typeof PUR_DATA!=='undefined'?PUR_DATA:[]).filter(r=>r.Branch===b);
-    const done=rows.filter(r=>r.PurchaseStatus==='Completed').length;
-    const pending=rows.filter(r=>r.PurchaseStatus==='In Progress'||r.PurchaseStatus==='Not Started'||r.PurchaseStatus==='Order Placed').length;
-    purStats[b]={total:rows.length,done,pending};
+    const delivered=rows.filter(r=>/delivered/i.test(r.PurchaseStatus||'')).length;
+    const openRows=rows.filter(r=>/in progress|ordered|pending|not started/i.test(r.PurchaseStatus||''));
+    const overdueRows=openRows.filter(r=>purOverdueDays(r)>0);
+    const total=rows.length;
+    const openPct=total>0?openRows.length/total*100:0;
+    const overduePct=total>0?overdueRows.length/total*100:0;
+    const avgOd=overdueRows.length?overdueRows.reduce((a,r)=>a+purOverdueDays(r),0)/overdueRows.length:0;
+    // Score penalises In-Progress backlog and overdue ageing equally
+    const score=total>0?Math.max(0,Math.round(100-openPct*0.5-overduePct*0.5)):null;
+    purStats[b]={total,delivered,open:openRows.length,overdue:overdueRows.length,avgOd:+avgOd.toFixed(0),score};
   });
 
   // Helper: find branch(es) with max numeric value
@@ -3822,14 +3908,16 @@ function renderRankings(){
   }
 
   // Row: Purchase Progress — higher completion % is better
+// Row: Purchase Progress — score from In-Progress backlog + overdue (higher is better)
   {
-    const valMap={}; ALLB.forEach(b=>{valMap[b]=purStats[b].total>0?+(purStats[b].done/purStats[b].total*100).toFixed(1):null;});
+    const valMap={}; ALLB.forEach(b=>{valMap[b]=purStats[b].score;});
     const win=winners(valMap);
     html+=`<tr style="background:#F8FAFF;"><td style="padding:10px 14px;font-size:12.5px;font-weight:600;border-bottom:1px solid #E0E8FF;color:#0F172A;">🛒 Purchase Progress</td>`;
     ALLB.forEach(b=>{
       const d=purStats[b];
-      if(d.total===0){html+=cell('<span style="color:#94A3B8;">No data</span>',false);return;}
-      html+=cell(`<span style="font-weight:700;color:#1E4FD8">${d.done}/${d.total}</span><small style="color:#94A3B8;display:block;font-size:10px;">${d.pending} pending</small>`,win.includes(b));
+      if(d.total===0||d.score===null){html+=cell('<span style="color:#94A3B8;">No data</span>',false);return;}
+      const color=d.score>=80?'#059669':d.score>=60?'#D97706':'#DC2626';
+      html+=cell(`<span style="font-weight:800;color:${color};font-size:14px;">${d.score}</span><small style="color:#94A3B8;display:block;font-size:10px;">${d.open} in prog · ${d.overdue} overdue${d.overdue>0?' (~'+d.avgOd+'d)':''}</small><small style="color:#94A3B8;display:block;font-size:10px;">${d.delivered}/${d.total} delivered</small>`,win.includes(b));
     });
     html+=`<td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;">${winnerBadge(win)}</td></tr>`;
   }
@@ -3842,7 +3930,7 @@ function renderRankings(){
     winners(Object.fromEntries(ALLB.map(b=>[b,hrStats[b]&&hrStats[b].avgDays!=null?hrStats[b].avgDays:null])),false),
     winners(Object.fromEntries(ALLB.map(b=>[b,adminStats[b].total>0?adminStats[b].pct:null]))),
     winners(Object.fromEntries(ALLB.map(b=>[b,vigStats[b].open])),false),
-    winners(Object.fromEntries(ALLB.map(b=>[b,purStats[b].total>0?+(purStats[b].done/purStats[b].total*100).toFixed(1):null]))),
+    winners(Object.fromEntries(ALLB.map(b=>[b,purStats[b].score]))),
   ].forEach(arr=>arr.forEach(b=>winCounts[b]++));
 
   const ranked=ALLB.slice().sort((a,b)=>winCounts[b]-winCounts[a]);
@@ -4121,7 +4209,11 @@ function renderModalTable() {
         if (c.pill) val = makePill(String(val), c.pill);
         else if (c.score) val = makeScoreBadge(parseFloat(val));
         else if (c.date) val = fmtDispDate(val);
-        return `<td style="padding:9px 13px;font-size:12px;border-bottom:1px solid #E0E8FF;vertical-align:top;max-width:${c.maxW||'none'};word-wrap:break-word;">${val}</td>`;
+        else if (typeof val === 'string' && val.length > 140) {
+          // Long free-text (Description / Action Taken / Remarks): clamp to 2 lines, click to expand
+          val = `<div class="clamp2" onclick="event.stopPropagation();this.classList.toggle('open')">${val}</div>`;
+        }
+        return `<td style="padding:9px 13px;font-size:12px;border-bottom:1px solid #E0E8FF;vertical-align:top;max-width:${c.maxW||'260px'};word-wrap:break-word;">${val}</td>`;
       }).join('') + '</tr>';
     }).join('');
   }
