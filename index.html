@@ -2256,7 +2256,10 @@ function renderAdmin(){
 }
 
 // Admin performance scorecard — replaces "Overdue & In-Progress Critical Tasks"
-const stats=BRANCHES.map(b=>{
+function renderAdminPerformance(rows,BRANCHES,isDone,isIP,isHoldOpen,overdueDays){
+  const el=document.getElementById('admin-perf');
+  if(!el)return;
+  const stats=BRANCHES.map(b=>{
     const br=rows.filter(r=>r.Branch===b);
     const tot=br.length;
     const dn=br.filter(isDone).length;
@@ -2279,7 +2282,7 @@ const stats=BRANCHES.map(b=>{
       <div style="font-size:22px;width:32px;text-align:center;">${rankBadge}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-weight:700;font-size:13.5px;color:#0F172A;"><span class="bd b${s.branch}"></span>${s.branch}</div>
-        <div style="font-size:11px;color:#64748B;margin-top:2px;">${s.dn}/${s.tot} done · ${s.comp}% completion · ${s.od} overdue</div>
+        <div style="font-size:11px;color:#64748B;margin-top:2px;">✅ ${s.dn}/${s.tot} closed (${s.comp}%) · ⏰ ${s.od} overdue${s.od>0?' (avg '+s.avgOdDays+'d)':''} · ⚡ speed ${s.speed}/100</div>
         <div style="background:#E0E8FF;border-radius:5px;height:6px;margin-top:5px;overflow:hidden;"><div style="background:${sc};width:${Math.max(s.score,2)}%;height:6px;"></div></div>
       </div>
       <div style="text-align:center;"><div style="background:${scBg};color:${sc};font-weight:800;font-size:15px;padding:5px 12px;border-radius:10px;">${s.score}</div><div style="font-size:9px;color:#94A3B8;margin-top:2px;">SCORE</div></div>
