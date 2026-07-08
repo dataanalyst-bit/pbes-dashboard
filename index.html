@@ -674,7 +674,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     <!-- HR Ranking & Awards -->
   <div class="card" style="margin-bottom:16px;">
-    <div class="ch"><h3>🏆 Recruiter Rankings &amp; Awards</h3><span class="fnote">Ranked by positions closed, speed &amp; open backlog · click a row to view records</span></div>
+    <div class="ch"><h3>🏆 Recruiter Rankings &amp; Awards</h3><span class="fnote">Score = positions closed (volume) 60% + recruiting speed 40% · resigned staff excluded · click a row to view records</span></div>
     <div class="cb-0" style="overflow-x:auto"><table class="dt">
       <thead><tr><th>Rank</th><th>Recruiter</th><th>Closed</th><th>Open</th><th>Closure %</th><th>Avg Days</th><th>Award</th></tr></thead>
       <tbody id="hr-rank-tbody"></tbody>
@@ -2920,7 +2920,11 @@ const HR_COLORS = {
   'Swathi Priya':'#7C3AED','Preethi':'#DC2626','Stella':'#0D9488'
 };
 const HR_NAMES = ['Kavitha','Priya','Navya','Swathi Priya','Preethi','Stella'];
-const HR_BRANCH_MAP = {Pocharam:'Kavitha',Boduppal:'Priya',Keesara:'Navya',Gowdavalli:'Swathi Priya',Bachupally:['Preethi','Stella']};
+// Recruiters who have LEFT the organization: hidden from performance ranking & scorecard,
+// but the positions they posted (open or closed) still count in the KPI totals.
+// To bring someone back or add a new leaver, just edit this list.
+const HR_RESIGNED_LIST = ['Priya'];
+const HR_BRANCH_MAP = {Pocharam:'Kavitha',Boduppal:[],Keesara:'Navya',Gowdavalli:'Swathi Priya',Bachupally:['Preethi','Stella']};
 
 function renderHR(){
   const bl=fBranch==='ALL'?'All Recruiters':fBranch;
@@ -2929,8 +2933,12 @@ function renderHR(){
   setTxt('hr-chart-fn',bl);
 
   const allRecHR=(typeof HR_RECORDS!=='undefined'&&Array.isArray(HR_RECORDS))?HR_RECORDS:[];
-  // Discover recruiters live from the data (fallback to known names)
-  let recruiterNames=[...new Set(allRecHR.map(r=>r.HR).filter(h=>h&&h!=='–'))];
+  // Recruiters who have resigned/left: excluded from PERFORMANCE ranking & scorecard,
+  // but their posted positions STILL count in the position totals (they remain open/closed work).
+  const HR_RESIGNED=(typeof HR_RESIGNED_LIST!=='undefined')?HR_RESIGNED_LIST:['Priya'];
+  const isResigned=h=>HR_RESIGNED.some(x=>String(x).trim().toLowerCase()===String(h).trim().toLowerCase());
+  // Discover recruiters live from the data (fallback to known names); drop resigned from the performer list
+  let recruiterNames=[...new Set(allRecHR.map(r=>r.HR).filter(h=>h&&h!=='–'))].filter(h=>!isResigned(h));
   if(recruiterNames.length===0) recruiterNames=HR_NAMES.slice();
 
   const isClosed=s=>/closed|filled/i.test(String(s||''));
@@ -2977,10 +2985,18 @@ function renderHR(){
     return LIVE_KPI[h]&&LIVE_KPI[h].branch===fBranch;
   }); if(activeHRs.length===0) activeHRs=recruiterNames.filter(h=>LIVE_KPI[h]&&LIVE_KPI[h].branch===fBranch); }
 
-  // KPI totals (LIVE)
-  let totPos=0,totClosed=0,totOpen=0,totHold=0,totDays=0;
-  activeHRs.forEach(h=>{ const k=LIVE_KPI[h]; if(!k)return; totPos+=k.total; totClosed+=k.closed; totOpen+=k.open; totHold+=k.hold; });
-  const dtcAll=allRecHR.filter(r=>activeHRs.includes(r.HR)&&isClosed(r.Status)&&r.DaysToClose!=='–'&&!isNaN(+r.DaysToClose)).map(r=>+r.DaysToClose).filter(v=>!isNaN(v)&&v>=0);
+  // KPI totals (LIVE) — count EVERY position (incl. resigned recruiters' posted roles),
+  // filtered only by branch. Priya resigned but her open "Western Music" role still counts.
+  const inBranch=r=>{
+    if(fBranch==='ALL') return true;
+    if(r.Branch===fBranch) return true;
+    // records with no/other branch fall under their recruiter's main branch
+    return false;
+  };
+  const kpiRows=allRecHR.filter(inBranch);
+  let totPos=kpiRows.length, totClosed=0, totOpen=0, totHold=0, totDays=0;
+  kpiRows.forEach(r=>{ if(isClosed(r.Status))totClosed++; else if(isOpen(r.Status))totOpen++; else if(isHold(r.Status))totHold++; });
+  const dtcAll=kpiRows.filter(r=>isClosed(r.Status)&&r.DaysToClose!=='–'&&!isNaN(+r.DaysToClose)).map(r=>+r.DaysToClose).filter(v=>!isNaN(v)&&v>=0);
   if(dtcAll.length){ totDays=+(dtcAll.reduce((a,b)=>a+b,0)/dtcAll.length).toFixed(1); }
   const compRate=totPos>0?+(totClosed/totPos*100).toFixed(1):0;
   setTxt('hr-total',fi(totPos));
@@ -3163,13 +3179,16 @@ function renderHRRanking(){
   const allRec=(typeof HR_RECORDS!=='undefined'&&Array.isArray(HR_RECORDS))?HR_RECORDS:[];
   const isClosed=s=>/closed|filled/i.test(String(s||''));
   const isOpen=s=>/^open$/i.test(String(s||'').trim());
-  const names=[...new Set(allRec.map(r=>r.HR).filter(h=>h&&h!=='–'))];
+  const HR_RESIGNED=(typeof HR_RESIGNED_LIST!=='undefined')?HR_RESIGNED_LIST:['Priya'];
+  const isResigned=h=>HR_RESIGNED.some(x=>String(x).trim().toLowerCase()===String(h).trim().toLowerCase());
+  // Resigned recruiters are excluded from ranking (their positions still count in KPIs elsewhere)
+  const names=[...new Set(allRec.map(r=>r.HR).filter(h=>h&&h!=='–'))].filter(h=>!isResigned(h));
   function branchOf(h){
     const rows=allRec.filter(r=>r.HR===h); const cnt={};
     rows.forEach(r=>{const b=r.Branch||'–'; if(b!=='–'&&b!=='All Branches')cnt[b]=(cnt[b]||0)+1;});
     const keys=Object.keys(cnt); return keys.length?keys.reduce((a,b)=>cnt[a]>=cnt[b]?a:b):'–';
   }
-  const stats=names.map(h=>{
+  const base=names.map(h=>{
     const rows=allRec.filter(r=>r.HR===h);
     const closed=rows.filter(r=>isClosed(r.Status)).length;
     const open=rows.filter(r=>isOpen(r.Status)).length;
@@ -3177,16 +3196,27 @@ function renderHRRanking(){
     const days=rows.filter(r=>isClosed(r.Status)).map(r=>parseFloat(r.DaysToClose)).filter(n=>!isNaN(n)&&n>=0);
     const avgDays=days.length?+(days.reduce((a,c)=>a+c,0)/days.length).toFixed(1):null;
     const closurePct=total>0?+(closed/total*100).toFixed(1):0;
-    const speedScore=avgDays===null?60:Math.max(0,100-avgDays*2.5);
-    const volScore=Math.min(100,closed*1.5);
-    const score=Math.round(closurePct*0.5+speedScore*0.3+volScore*0.2);
-    return {hr:h,branch:branchOf(h),closed,open,closurePct,avgDays,score};
-  }).sort((a,b)=>b.score-a.score);
+    return {hr:h,branch:branchOf(h),closed,open,closurePct,avgDays};
+  });
+  // ── RANKING per management: "how quick they recruit AND average number of positions closed" ──
+  // Score = Volume (positions closed) 60%  +  Speed (avg days to close) 40%.
+  // Volume is scaled against the top closer so high-volume recruiters (e.g. Swathi) rank fairly.
+  // Speed credit is dampened for very small samples so a 1-close recruiter can't top the list on speed alone.
+  const maxClosed=Math.max(1,...base.map(s=>s.closed));
+  const stats=base.map(s=>{
+    const volScore=s.closed/maxClosed*100;                                  // relative volume
+    const ad=s.avgDays;
+    const rawSpeed=(ad===null)?55:(ad<=7?100:Math.max(0,100-(ad-7)*2.2));    // faster = higher
+    const volConfidence=Math.min(1,s.closed/10);                            // full speed credit at 10+ closes
+    const speedScore=rawSpeed*volConfidence;
+    const score=Math.round(volScore*0.6+speedScore*0.4);
+    return {...s,volScore:Math.round(volScore),speedScore:Math.round(speedScore),score};
+  }).sort((a,b)=>b.score-a.score || b.closed-a.closed);
 
-  const medals=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣'];
+  const medals=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣'];
   const awards=['🏆 Top Recruiter','⚡ Speed Star','💪 High Closer'];
   tbody.innerHTML=stats.map((s,i)=>{
-    const scoreColor=s.score>=80?'#059669':s.score>=60?'#D97706':'#DC2626';
+    const scoreColor=s.score>=75?'#059669':s.score>=50?'#D97706':'#DC2626';
     const award=i<3?`<span style="background:#FEF9C3;color:#A16207;padding:3px 8px;border-radius:10px;font-size:10px;font-weight:700;">${awards[i]}</span>`:'';
     return `<tr style="cursor:pointer" onclick="viewHRByRecruiter('${s.hr.replace(/'/g,"\\\\'")}','ALL')">
       <td style="font-size:17px;text-align:center">${medals[i]||(i+1)}</td>
