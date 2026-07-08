@@ -2897,23 +2897,9 @@ function viewOwnerUpload(owner,mode){
 // HR ANALYTICS
 // ════════════════════════════════════════════
 
-const HR_KPI = {
-  'Kavitha':     {hiring_speed:4.4, vcr:4.0, avg_closing:5.0, compliance:4.6, overall:4.6, rating:'Excellent', branch:'Pocharam',  closed:52, open:8},
-  'Priya':       {hiring_speed:4.9, vcr:5.0, avg_closing:4.0, compliance:4.9, overall:4.6, rating:'Excellent', branch:'Boduppal',   closed:45, open:1},
-  'Navya':       {hiring_speed:3.1, vcr:4.0, avg_closing:2.0, compliance:4.5, overall:3.0, rating:'Average',   branch:'Keesara',    closed:25, open:3},
-  'Swathi Priya':{hiring_speed:3.7, vcr:4.0, avg_closing:4.0, compliance:4.5, overall:4.0, rating:'Good',      branch:'Gowdavalli', closed:42, open:9},
-  'Preethi':     {hiring_speed:2.7, vcr:4.0, avg_closing:3.0, compliance:4.5, overall:3.3, rating:'Average',   branch:'Bachupally', closed:24, open:5},
-  'Stella':      {hiring_speed:4.2, vcr:4.0, avg_closing:2.0, compliance:4.2, overall:3.3, rating:'Average',   branch:'Bachupally', closed:13, open:2},
-};
+// (removed unused hardcoded HR_KPI — all HR data is now computed live from HR_RECORDS)
 
-const HR_MONTHLY = {
-  'Kavitha':     {January:8,February:15,March:9,April:12,May:8,June:0,July:0,August:0,September:0,October:0,November:0,December:0},
-  'Priya':       {January:16,February:6,March:13,April:10,May:0,June:0,July:0,August:0,September:0,October:0,November:0,December:0},
-  'Navya':       {January:4,February:6,March:9,April:2,May:0,June:2,July:0,August:0,September:0,October:0,November:0,December:0},
-  'Swathi Priya':{January:4,February:10,March:9,April:10,May:4,June:2,July:0,August:0,September:0,October:0,November:1,December:0},
-  'Preethi':     {January:2,February:1,March:14,April:4,May:2,June:1,July:0,August:0,September:0,October:0,November:0,December:0},
-  'Stella':      {January:0,February:0,March:1,April:6,May:3,June:2,July:0,August:0,September:0,October:0,November:0,December:0},
-};
+// (removed unused hardcoded HR_MONTHLY — computed live now)
 
 const HR_COLORS = {
   'Kavitha':'#059669','Priya':'#1E4FD8','Navya':'#D97706',
@@ -3017,6 +3003,11 @@ function renderHR(){
   };
   const tbodyEl=document.getElementById('hr-scorecard-tbody');
   if(tbodyEl){
+    if(activeHRs.length===0){
+      // e.g. Boduppal — its only recruiter (Priya) has resigned. Positions still count in the KPIs above.
+      const bl=fBranch==='ALL'?'this selection':fBranch;
+      tbodyEl.innerHTML=`<tr><td colspan="9" style="padding:18px;text-align:center;color:#94A3B8;font-size:12.5px;">No active recruiter for ${bl} — the previous recruiter has resigned. Posted positions still count in the totals above and in Open/Pending.</td></tr>`;
+    } else {
     tbodyEl.innerHTML=activeHRs.map((h,i)=>{
       const k=LIVE_KPI[h]; if(!k)return'';
       const bg=i%2===0?'#fff':'#F8FAFF';
@@ -3038,6 +3029,7 @@ function renderHR(){
         <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:700;color:${k.open>5?'#DC2626':'#D97706'};font-size:13px;">${k.open}</td>
       </tr>`;
     }).join('');
+    }
   }
 
   // Monthly chart - stacked by HR (LIVE from ClosedDate)
