@@ -237,7 +237,14 @@ async function loadLiveData(isRefresh) {
       window.location.href = 'login.html';
       return;
     }
-    const data = await res.json();
+    const txt = await res.text();
+let data;
+try { data = JSON.parse(txt); }
+catch (e) {
+  showLoadError('Data server busy (HTTP ' + res.status + ') — retrying in 5 seconds…');
+  setTimeout(() => loadLiveData(true), 5000);
+  return;
+}  
 
     if (data.error) {
       showLoadError('Server error: ' + data.message +
