@@ -416,11 +416,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   </div>
 
   <div class="row r2">
-    <div class="card"><div class="ch"><h3>🏫 Branch Completion Rate</h3><span class="fnote">Current month · calls made ÷ total students</span></div><div class="cb" id="ov-branch-bars"></div></div>
+    <div class="card"><div class="ch"><h3>🏫 Branch Completion Rate</h3><span class="fnote">Previous month · calls made ÷ total students</span></div><div class="cb" id="ov-branch-bars"></div></div>
     <div class="card"><div class="ch"><h3>📊 Call Status Breakdown</h3></div><div class="cb"><div class="cw sm"><canvas id="ov-status"></canvas></div></div></div>
   </div>
   <div class="row r3">
-    <div class="card"><div class="ch"><h3>📊 Avg Observation Score by Observer Type</h3><span class="fnote">Click a bar to view those observations</span></div>
+    <div class="card"><div class="ch"><h3>📊 Avg Observation Score by Observer Type</h3><span class="fnote">By selected branch &amp; month · click a bar to view</span></div>
       <div class="cb"><div class="cw tall"><canvas id="ov-obstype"></canvas></div></div>
     </div>
     <div class="card"><div class="ch"><h3>🏗️ Admin Task Status</h3><span class="fnote">Click a slice to view tasks</span></div><div class="cb"><div class="cw sm"><canvas id="ov-admin-chart"></canvas></div></div></div>
@@ -436,6 +436,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="card" style="margin-bottom:16px;">
     <div class="ch">
       <h3>🏆 Branch Performance Scorecard — Head-to-Head Comparison</h3>
+      <span class="fnote">Care Call &amp; Observation rows use PREVIOUS month · resigned HRs excluded from Hiring Speed</span>
       <span style="font-size:11px;background:#FFFBEB;border:1px solid rgba(217,119,6,.25);color:#D97706;padding:3px 10px;border-radius:6px;font-weight:600;" id="rank-tag">🥇 Rankings &amp; Awards — Current / Latest Month Per Branch</span>
     </div>
     <div class="cb" style="overflow-x:auto;">
@@ -475,7 +476,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="kc purple" onclick="viewCareRecords('In Progress')" style="cursor:pointer;" title="Click to view In Progress records"><div class="kc-ico">🔄</div><div class="kc-lbl">In Progress</div><div class="kc-val" id="cc-ip">–</div><div class="kc-sub" id="cc-ip-s">–</div></div>
   </div>
   <div class="row r2">
-    <div class="card"><div class="ch"><h3>🏫 Branch Completion Rate Comparison</h3></div><div class="cb" id="care-bars"></div></div>
+    <div class="card"><div class="ch"><h3>🏫 Branch Completion Rate Comparison</h3><span class="fnote">Current month by default · follows Branch &amp; Month dropdowns</span></div><div class="cb" id="care-bars"></div></div>
     <div class="card"><div class="ch"><h3>📈 Completion Rate Trend (Month-wise)</h3></div><div class="cb"><div class="cw tall"><canvas id="care-trend"></canvas></div></div></div>
   </div>
   <!-- Quick View: Pending & In Progress records, live-filtered by branch/month -->
@@ -661,7 +662,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   <!-- Recruiter Speed (full width) -->
   <div class="row" style="margin-bottom:16px;">
     <div class="card">
-      <div class="ch"><h3>⚡ Recruiter Speed Analysis — Days to Close</h3></div>
+      <div class="ch"><h3>⚡ Recruiter Speed Analysis — Days to Close</h3><span class="fnote">Closed positions only · days = Closed Date − Post Date · open positions shown as ageing · click a row to view</span></div>
       <div class="cb" style="font-size:11px;color:#64748B;padding:0 4px 6px;">Fast ≤7 days · Medium 8–21 days · Slow &gt;21 days — ranked by avg. closure speed</div>
       <div class="cb" style="overflow-x:auto;">
         <table style="width:100%;border-collapse:collapse;min-width:480px;" id="hr-speed-table">
@@ -887,7 +888,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   </div>
 
   <div class="row r2">
-    <div class="card"><div class="ch"><h3>🏫 Branch-wise Observation Values</h3><span class="fnote" id="obs-bars-fn">All Branches</span></div><div class="cb"><div class="cw tall"><canvas id="obs-bars-chart"></canvas></div></div></div>
+    <div class="card"><div class="ch"><h3>🏫 Branch-wise Observation Values — Teacher Grand Avg</h3><span class="fnote" id="obs-bars-fn">All Branches</span></div><div class="cb"><div class="cw tall"><canvas id="obs-bars-chart"></canvas></div></div></div>
     <div class="card"><div class="ch"><h3>👁️ Observer Type Split by Branch</h3></div><div class="cb"><div class="cw tall"><canvas id="obs-type-branch"></canvas></div></div></div>
   </div>
   <div class="card"><div class="ch"><h3>📊 Branch × Month Observation Comparison</h3><span class="fnote" id="obs-fn">All Branches · All Months</span></div>
@@ -899,7 +900,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       <button onclick="viewAllObservations()" style="padding:8px 18px;background:#1E4FD8;color:#fff;border:none;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">👁️ View All Observation Records →</button>
     </div>
     <div class="row r2">
-    <div class="card"><div class="ch"><h3>📊 Avg Observation Score by Observer Type</h3><span class="fnote">By selected branch &amp; month · click a bar to view</span></div><div class="cb"><div class="cw tall"><canvas id="obs-observer-type"></canvas></div></div></div>
+    <div class="card"><div class="ch"><h3>📊 Observer Completion by Type — Required vs Done</h3><span class="fnote">Working Days × quota (2/day leadership · 1/day HOD) · follows Branch &amp; Month dropdowns</span></div><div class="cb"><div class="cw tall"><canvas id="obs-observer-type"></canvas></div></div></div>
   </div>
 </div>
 
@@ -966,7 +967,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     </div></div>
   </div>
   <div class="card">
-    <div class="ch"><h3>🏆 Admin Performance — Branch Scorecard</h3>
+    <div class="ch"><h3>🏆 Admin Performance — Branch Closing Speed Scorecard</h3>
+      <span class="fnote">Score = Done%×0.6 + On-Schedule%×0.4 − overdue ageing · uses Days Due + Completion Date</span>
       <button onclick="openAdminAllTasks()" style="margin-left:auto;padding:7px 16px;background:#1E4FD8;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">📋 View All Tasks →</button>
     </div>
     <div class="cb" style="padding:0;">
@@ -1026,10 +1028,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="sh-l"><span class="sh-ico">🛡️</span><div><h2>Vigilance & Safety Tracker</h2><p id="vig-tag" class="sh-sub">All Branches · All Months</p></div></div>
     <span class="fnote" id="vig-fn">All Branches</span>
   </div>
-  <div class="krow k3">
+  <div class="krow k4">
     <div class="kc red" onclick="viewVigilanceRecords('Open')" style="cursor:pointer;" title="Click to view Open issues"><div class="kc-ico">🔴</div><div class="kc-lbl">Open Issues</div><div class="kc-val" id="vig-open">–</div><div class="kc-sub" id="vig-open-s">Action needed — click to view</div></div>
     <div class="kc green" onclick="viewVigilanceRecords('Closed')" style="cursor:pointer;" title="Click to view Closed issues"><div class="kc-ico">✅</div><div class="kc-lbl">Closed</div><div class="kc-val" id="vig-closed">–</div><div class="kc-sub" id="vig-closed-s">–</div></div>
     <div class="kc purple" onclick="viewVigilanceRecords('Critical')" style="cursor:pointer;" title="Click to view Critical risk issues"><div class="kc-ico">⚡</div><div class="kc-lbl">Critical Risk (Open)</div><div class="kc-val" id="vig-critical">–</div><div class="kc-sub">Highest severity — click to view</div></div>
+    <div class="kc amber" onclick="viewVigilanceRecords('AwaitingAdmin')" style="cursor:pointer;" title="Vigilance closed but Admin Status not yet updated"><div class="kc-ico">🧑‍💼</div><div class="kc-lbl">Awaiting Admin Update</div><div class="kc-val" id="vig-awaiting">–</div><div class="kc-sub" id="vig-awaiting-s">Admin Status pending — click to view</div></div>
+  </div>
+  <div class="row r2">
+    <div class="card"><div class="ch"><h3>🧑‍💼 Admin Follow-up Status by Branch</h3><span class="fnote">Admin Status column · filled by Admins only · click to view</span></div><div class="cb"><div class="cw tall"><canvas id="vig-admin-br"></canvas></div></div></div>
+    <div class="card"><div class="ch"><h3>🏆 Branch Safety Performance Score</h3><span class="fnote">Closure 50% · Admin Follow-Up 30% · On-Time 20% · uses Visit / Target / Completion dates &amp; Over Due</span></div><div class="cb-0" id="vig-safety-perf"></div></div>
   </div>
   <div class="row r2">
     <div class="card"><div class="ch"><h3>🏫 Issue Status by Branch</h3></div><div class="cb"><div class="cw tall"><canvas id="vig-br"></canvas></div></div></div>
@@ -1037,7 +1044,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   </div>
   <div class="card"><div class="ch"><h3>🚨 Open & Critical Issues — Board Attention Required</h3><span class="fnote" id="vig-table-fn">All Branches · All Months</span></div>
     <div class="cb-0" style="overflow-x:auto"><table class="dt">
-      <thead><tr><th>Branch</th><th>Visit Date</th><th>Area</th><th>Issue</th><th>Risk</th><th>Status</th><th>Overdue</th></tr></thead>
+      <thead><tr><th>Branch</th><th>Visit Date</th><th>Area</th><th>Issue</th><th>Risk</th><th>Vigilance Status</th><th>Admin Status</th><th>Branch Remarks</th><th>Overdue</th></tr></thead>
       <tbody id="vig-tbody"></tbody>
     </table></div>
   </div>
@@ -1095,7 +1102,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="row r2">
     <div class="card"><div class="ch"><h3>📦 Purchase Status by Branch</h3></div><div class="cb"><div class="cw tall"><canvas id="pur-st"></canvas></div></div></div>
     <div class="card">
-    <div class="ch"><h3>🏆 Purchase Manager Performance — Data Quality by Branch</h3><span class="fnote">% of fully-documented requests · click a branch to drill in</span></div>
+    <div class="ch"><h3>🏆 Purchase Manager Performance by Branch</h3><span class="fnote">Status 50% · Timeliness (Target Date / Date / Due) 40% · Documentation 10% · click a branch to drill in</span></div>
     <div class="cb" style="padding:0;"><div id="pur-mgr-perf"></div></div>
   </div>
   </div>
@@ -1340,6 +1347,19 @@ function getLatestMonth(branch){
   for(let i=MONTHS.length-1;i>=0;i--){ if(monthsWithData.includes(MONTHS[i])) return MONTHS[i]; }
   return monthsWithData[0]||MONTHS[MONTHS.length-1];
 }
+// Previous CALENDAR month (July → June). Falls back to the latest month with data
+// BEFORE the current calendar month if the exact previous month has no data yet.
+const _CAL_MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+function getPrevCalendarMonth(){ return _CAL_MONTHS[(new Date().getMonth()+11)%12]; }
+function getPrevMonth(branch){
+  const has=m=>TRACKER.some(d=>d.branch===branch&&d.month===m&&d.calls>0);
+  const prev=getPrevCalendarMonth();
+  if(has(prev)) return prev;
+  const curName=_CAL_MONTHS[new Date().getMonth()];
+  let curIdx=MONTHS.indexOf(curName); if(curIdx<0) curIdx=MONTHS.length;
+  for(let i=curIdx-1;i>=0;i--){ if(has(MONTHS[i])) return MONTHS[i]; }
+  return null;
+}
 function scColor(v){return v>=3.5?'#059669':v>=3?'#D97706':'#DC2626';}
 
 // ════════════════════════════════════════════
@@ -1363,7 +1383,7 @@ function fmtDispDate(v){
 const _ADMIN_COLS=[
   {key:'Branch',label:'Branch'},{key:'TaskID',label:'Task ID'},{key:'Task',label:'Task',maxW:'180px'},
   {key:'StartDate',label:'Start Date',date:true},{key:'Status',label:'Status',pill:true},
-  {key:'Deadline',label:'Deadline',date:true},{key:'DaysDue',label:'Days Due'},
+  {key:'Deadline',label:'Deadline',date:true},{key:'CompletionDate',label:'Completion Date',date:true},{key:'DaysDue',label:'Days Due'},
   {key:'Priority',label:'Priority',pill:true},{key:'CreatedBy',label:'Created By'},
   {key:'Description',label:'Description',maxW:'220px'},{key:'Remarks',label:'Remarks',maxW:'200px'}
 ];
@@ -1447,11 +1467,12 @@ function renderOverview(){
     setTxt('ov-sat-s', satYes+' of '+satRated.length+' satisfied');
   }
 
-  // 🏫 Branch Completion Rate — CURRENT (latest) month only, calls/students (not overall)
+  // 🏫 Branch Completion Rate — PREVIOUS month only (July → June), calls/students
   let html='';
   const SB=window._STUDENTS_BY_BRANCH||{};
   BRANCHES.forEach(b=>{
-    const lm=getLatestMonth(b);
+    const lm=getPrevMonth(b);
+    if(!lm)return;
     const rec=TRACKER.find(r=>r.branch===b&&r.month===lm&&r.calls>0);
     if(!rec)return;
     const students=+SB[b]||rec.students||0;
@@ -1466,9 +1487,11 @@ function renderOverview(){
 
   mkChart('ov-status',dnutCfg(['Resolved','In Progress','Pending'],[s.resolved,s.ip,s.pending],['#059669','#3B82F6','#D97706']));
 
-  // ── Avg Observation Score by Observer Role (grouped, all branches, click-to-view) ──
+  // ── Avg Observation Score by Observer Role (respects BRANCH + MONTH dropdowns, click-to-view) ──
   {
-    const ALLOBS=(typeof OBS_DATA!=='undefined'&&Array.isArray(OBS_DATA))?OBS_DATA:[];
+    const _mmOV={March:'Mar-2026',April:'Apr-2026',May:'May-2026',June:'Jun-2026',July:'Jul-2026',August:'Aug-2026',September:'Sep-2026',October:'Oct-2026',November:'Nov-2026',December:'Dec-2026',January:'Jan-2027',February:'Feb-2027'};
+    const ALLOBS=((typeof OBS_DATA!=='undefined'&&Array.isArray(OBS_DATA))?OBS_DATA:[])
+      .filter(r=>(fBranch==='ALL'||r.Branch===fBranch)&&(fMonth==='ALL'||r.Month===_mmOV[fMonth]));
     // Group the 20+ raw observer types into meaningful roles
     function roleOf(t){
       t=(t||'').trim();
@@ -1526,12 +1549,12 @@ function renderOverview(){
   {
     const PUR=(typeof PUR_DATA!=='undefined'&&Array.isArray(PUR_DATA))?PUR_DATA:[];
     const pDel=PUR.filter(r=>/delivered/i.test(r.PurchaseStatus||'')).length;
-    const pProg=PUR.filter(r=>/in progress|ordered/i.test(r.PurchaseStatus||'')).length;
-    const pPend=PUR.filter(r=>/pending/i.test(r.PurchaseStatus||'')).length;
-    window._OV_PURSTATUS=['Delivered','In Progress','Pending'];
+    const pProg=PUR.filter(r=>/in progress/i.test(r.PurchaseStatus||'')).length;
+    const pOrd=PUR.filter(r=>/ordered|order placed/i.test(r.PurchaseStatus||'')).length;
+    window._OV_PURSTATUS=['Delivered','In Progress','Ordered'];
     mkChart('ov-pur-chart',{type:'doughnut',
-      data:{labels:['Delivered','In Progress','Pending'],datasets:[{data:[pDel,pProg,pPend],
-        backgroundColor:['#059669','#3B82F6','#D97706'],borderWidth:2,borderColor:'#fff'}]},
+      data:{labels:['Delivered','In Progress','Ordered'],datasets:[{data:[pDel,pProg,pOrd],
+        backgroundColor:['#059669','#3B82F6','#0D9488'],borderWidth:2,borderColor:'#fff'}]},
       options:{responsive:true,maintainAspectRatio:false,
         onClick:(evt,els)=>{ if(!els||!els.length)return; viewPurchaseOverviewStatus(window._OV_PURSTATUS[els[0].index]); },
         plugins:{legend:{display:true,position:'right',labels:{font:{size:10},padding:6}},
@@ -1577,7 +1600,9 @@ function viewObsByType(obsType){
 }
 // Grouped role drill-down (matches the Avg Score by Role chart)
 function viewObsByRole(role){
-  const OBS=(typeof OBS_DATA!=='undefined'&&Array.isArray(OBS_DATA))?OBS_DATA:[];
+  const _mmVR={March:'Mar-2026',April:'Apr-2026',May:'May-2026',June:'Jun-2026',July:'Jul-2026',August:'Aug-2026',September:'Sep-2026',October:'Oct-2026',November:'Nov-2026',December:'Dec-2026',January:'Jan-2027',February:'Feb-2027'};
+  const OBS=((typeof OBS_DATA!=='undefined'&&Array.isArray(OBS_DATA))?OBS_DATA:[])
+    .filter(r=>(fBranch==='ALL'||r.Branch===fBranch)&&(fMonth==='ALL'||r.Month===_mmVR[fMonth]));
   function roleOf(t){
     t=(t||'').trim();
     if(/principal/i.test(t)) return 'Principal';
@@ -1606,16 +1631,14 @@ function viewPurchaseOverviewStatus(status){
   const PUR=(typeof PUR_DATA!=='undefined'&&Array.isArray(PUR_DATA))?PUR_DATA:[];
   let rows;
   if(status==='Delivered') rows=PUR.filter(r=>/delivered/i.test(r.PurchaseStatus||''));
-  else if(status==='In Progress') rows=PUR.filter(r=>/in progress|ordered/i.test(r.PurchaseStatus||''));
-  else rows=PUR.filter(r=>/pending/i.test(r.PurchaseStatus||''));
+  else if(status==='In Progress') rows=PUR.filter(r=>/in progress/i.test(r.PurchaseStatus||''));
+  else rows=PUR.filter(r=>/ordered|order placed/i.test(r.PurchaseStatus||''));
   openModal(`🛒 Purchase — ${status}`,`${rows.length} records · all branches`,rows,_PUR_COLS);
 }
 function viewVigOverviewStatus(status){
   const VIG=(typeof VIG_DATA!=='undefined'&&Array.isArray(VIG_DATA))?VIG_DATA:[];
   const rows=VIG.filter(r=>(r.Status||'')===status);
-  const cols=[{key:'Branch',label:'Branch'},{key:'VisitDate',label:'Visit Date',date:true},{key:'Area',label:'Area'},
-    {key:'Issue',label:'Issue',maxW:'240px'},{key:'RiskLevel',label:'Risk',pill:true},{key:'Status',label:'Status',pill:true}];
-  openModal(`🛡️ Vigilance — ${status}`,`${rows.length} issues · all branches`,rows,cols);
+  openModal(`🛡️ Vigilance — ${status}`,`${rows.length} issues · all branches`,rows,_VIG_COLS);
 }
 
 // ════════════════════════════════════════════
@@ -1764,24 +1787,26 @@ function renderObservations(){
   document.getElementById('obs-ni').textContent=ni||'–';
   document.getElementById('obs-ni-s').textContent=tot>0?fp((ni/tot)*100)+' need support':'–';
 
-  // ── Branch-wise Observation Values (always shows all branches, highlights selected) ──
+  // ── Branch-wise Observation Values — UNIQUE teachers' Grand Avg from the All_Teacher sheet ──
   const bBranches=['Keesara','Pocharam','Boduppal','Bachupally','Gowdavalli'];
+  const _AT=(typeof ALL_TEACHER!=='undefined'&&Array.isArray(ALL_TEACHER))?ALL_TEACHER:[];
   const bAgg={};
   bBranches.forEach(b=>{
-    const br=ALLOBS.filter(r=>r.Branch===b&&(fMonth==='ALL'||r.Month===MO_MAP[fMonth]));
-    const brSc=br.filter(r=>r.Score!=='–'&&!isNaN(parseFloat(r.Score)));
+    const br=_AT.filter(r=>r.Branch===b);
+    const brSc=br.filter(r=>{const v=parseFloat(r.GrandAvg);return !isNaN(v)&&v>0;});
+    const val=r=>parseFloat(r.GrandAvg);
     bAgg[b]={
       total:br.length,
-      excel:brSc.filter(r=>+r.Score>=4).length,
-      sat:brSc.filter(r=>+r.Score>=3&&+r.Score<4).length,
-      ni:brSc.filter(r=>+r.Score<3).length,
+      excel:brSc.filter(r=>val(r)>=4).length,
+      sat:brSc.filter(r=>val(r)>=3&&val(r)<4).length,
+      ni:brSc.filter(r=>val(r)<3).length,
     };
   });
   const bLabels=fBranch==='ALL'?bBranches:[fBranch];
   mkChart('obs-bars-chart',{type:'bar',
     data:{labels:bLabels,datasets:[
-    {label:'Total Obs',  data:bLabels.map(b=>(bAgg[b]||{}).total||0), backgroundColor:bLabels.map(b=>BC[b]),borderRadius:6,borderSkipped:false,barPercentage:.55},
-    {label:'Excellent (≥4)', data:bLabels.map(b=>(bAgg[b]||{}).excel||0),backgroundColor:'#059669',borderRadius:5,borderSkipped:false,barPercentage:.55},
+    {label:'Unique Teachers',  data:bLabels.map(b=>(bAgg[b]||{}).total||0), backgroundColor:bLabels.map(b=>BC[b]),borderRadius:6,borderSkipped:false,barPercentage:.55},
+    {label:'Excellent (Grand Avg ≥4)', data:bLabels.map(b=>(bAgg[b]||{}).excel||0),backgroundColor:'#059669',borderRadius:5,borderSkipped:false,barPercentage:.55},
     {label:'Satisfactory (3–4)',data:bLabels.map(b=>(bAgg[b]||{}).sat||0),backgroundColor:'#D97706',borderRadius:5,borderSkipped:false,barPercentage:.55},
     {label:'Needs Imp (<3)',data:bLabels.map(b=>(bAgg[b]||{}).ni||0), backgroundColor:'#DC2626',borderRadius:5,borderSkipped:false,barPercentage:.55},
   ]},options:{responsive:true,maintainAspectRatio:true,
@@ -1789,30 +1814,21 @@ function renderObservations(){
       if(!elements||!elements.length)return;
       const branch=bLabels[elements[0].index];
       const di=elements[0].datasetIndex;
-      let rows=(typeof OBS_DATA!=='undefined'?OBS_DATA:[]).filter(r=>r.Branch===branch);
       let label=branch, bandFilter=null;
-      if(di===1){bandFilter=s=>s>=4;label+=' — Excellent (≥4)';}
+      if(di===1){bandFilter=s=>s>=4;label+=' — Excellent (Grand Avg ≥4)';}
       else if(di===2){bandFilter=s=>s>=3&&s<4;label+=' — Satisfactory (3–4)';}
       else if(di===3){bandFilter=s=>s<3;label+=' — Needs Improvement (<3)';}
-      else label+=' — All Teachers (grand avg)';
-      // Aggregate by UNIQUE teacher: grand average score across their observations
-      const byTeacher={};
-      rows.forEach(r=>{
-        const t=(r.Teacher||'–').trim(); if(t==='–'||/^nan$/i.test(t))return;
-        const sc=parseFloat(r.Score); if(isNaN(sc))return;
-        if(!byTeacher[t]) byTeacher[t]={teacher:t,sum:0,n:0,subjects:new Set()};
-        byTeacher[t].sum+=sc; byTeacher[t].n++;
-        if(r.Subject&&r.Subject!=='–') byTeacher[t].subjects.add(r.Subject);
-      });
-      let teachers=Object.values(byTeacher).map(o=>({
-        Teacher:o.teacher, AvgScore:+(o.sum/o.n).toFixed(2), Observations:o.n,
-        Subjects:Array.from(o.subjects).join(', ')||'–', Branch:branch}));
-      if(bandFilter) teachers=teachers.filter(o=>bandFilter(o.AvgScore));
-      teachers.sort((a,b)=>b.AvgScore-a.AvgScore);
-      const cols=[{key:'Branch',label:'Branch'},{key:'Teacher',label:'Teacher',maxW:'180px'},
-        {key:'AvgScore',label:'Grand Avg Score',score:true},{key:'Observations',label:'# Obs'},
-        {key:'Subjects',label:'Subjects',maxW:'260px'}];
-      openModal('🏫 '+label,`${teachers.length} unique teachers · grand average per teacher`,teachers,cols);
+      else label+=' — All Teachers (All_Teacher sheet)';
+      const AT2=(typeof ALL_TEACHER!=='undefined'&&Array.isArray(ALL_TEACHER))?ALL_TEACHER:[];
+      let teachers=AT2.filter(r=>r.Branch===branch).map(r=>({
+        Branch:r.Branch,Teacher:r.Teacher,Designation:r.Designation,Subject:r.Subject,
+        GrandAvg:r.GrandAvg}));
+      if(bandFilter) teachers=teachers.filter(o=>{const v=parseFloat(o.GrandAvg);return !isNaN(v)&&bandFilter(v);});
+      teachers.sort((a,b)=>(parseFloat(b.GrandAvg)||0)-(parseFloat(a.GrandAvg)||0));
+      const cols=[{key:'Branch',label:'Branch'},{key:'Teacher',label:'Teacher',maxW:'200px'},
+        {key:'Designation',label:'Designation',maxW:'150px'},{key:'Subject',label:'Subject'},
+        {key:'GrandAvg',label:'Grand Avg Score',score:true}];
+      openModal('🏫 '+label,`${teachers.length} unique teachers · from All_Teacher sheet`,teachers,cols);
     },
     plugins:{
       legend:{display:true,position:'bottom',labels:{padding:14,font:{size:11.5}}},
@@ -1827,7 +1843,7 @@ function renderObservations(){
     scales:{
       x:{grid:{display:false},ticks:{font:{size:11.5},padding:4}},
       y:{beginAtZero:true,grid:{color:'#E0E8FF'},ticks:{maxTicksLimit:6,font:{size:11}},
-         title:{display:true,text:'Number of Observations',font:{size:11},color:'#64748B'}}
+         title:{display:true,text:'Number of Teachers',font:{size:11},color:'#64748B'}}
     }
   }});
 
@@ -1902,53 +1918,74 @@ function renderObservations(){
       <td${scls} style="font-weight:800;color:${scColor(r.avg)}">${r.avg}</td></tr>`;
   }).join('');
 
-  // ── Avg Observation Score by Observer Type (respects BRANCH + MONTH dropdowns) ──
+  // ── Observer COMPLETION by Type — Working Days × required/day vs Actual done ──
+  // Requirement: leadership roles (Principal/VP/HM/Incharge/Coordinators) = 2 obs/working day,
+  // HODs = 1 obs/working day. Completion% = Actual ÷ (WorkingDays × quota). Respects dropdowns.
   const _mmOT={March:'Mar-2026',April:'Apr-2026',May:'May-2026',June:'Jun-2026',July:'Jul-2026',August:'Aug-2026',September:'Sep-2026',October:'Oct-2026',November:'Nov-2026',December:'Dec-2026',January:'Jan-2027',February:'Feb-2027'};
-  const ALLOBS_OT=(typeof OBS_DATA!=='undefined'&&Array.isArray(OBS_DATA))
-    ? OBS_DATA.filter(r=>(fBranch==='ALL'||r.Branch===fBranch)&&(fMonth==='ALL'||r.Month===_mmOT[fMonth]))
-    : [];
-  const otTypes=[
-    {key:'principal',label:'Principal',color:'#1E4FD8'},
-    {key:'vp',label:'VP',color:'#7C3AED'},
-    {key:'hm',label:'HM',color:'#0D9488'},
-    {key:'hods',label:'HODs',color:'#059669'},
-    {key:'coords',label:'Coordinators',color:'#D97706'}
-  ];
-  const otAgg={};
-  otTypes.forEach(t=>otAgg[t.key]={sum:0,cnt:0});
-  ALLOBS_OT.forEach(r=>{
-    const k=classifyObserver(r.ObsType);
-    if(otAgg[k]&&r.Score!=='–'&&!isNaN(parseFloat(r.Score))){ otAgg[k].sum+=parseFloat(r.Score); otAgg[k].cnt++; }
-  });
-  const otAvg=otTypes.map(t=>otAgg[t.key].cnt>0?+(otAgg[t.key].sum/otAgg[t.key].cnt).toFixed(2):0);
-  mkChart('obs-observer-type',{type:'bar',data:{
-    labels:otTypes.map(t=>t.label),
-    datasets:[{
-      label:'Avg Score',
-      data:otAvg,
-      backgroundColor:otTypes.map(t=>t.color),
-      borderRadius:6,borderSkipped:false,barPercentage:.6
-    }]
-  },options:{responsive:true,maintainAspectRatio:true,
-    onClick:(evt,elements)=>{
-      if(!elements||!elements.length)return;
-      const typeKey=otTypes[elements[0].index].key;
-      const typeLabel=otTypes[elements[0].index].label;
-      const rows=ALLOBS_OT.filter(r=>classifyObserver(r.ObsType)===typeKey);
-      const cols=[{key:'Branch',label:'Branch'},{key:'Month',label:'Month'},{key:'Date',label:'Date',date:true},
-        {key:'Teacher',label:'Teacher',maxW:'160px'},{key:'Subject',label:'Subject'},
-        {key:'ObsType',label:'Observer'},{key:'Score',label:'Score',score:true},{key:'Remarks',label:'Observation',maxW:'320px'}];
-      openModal('📊 '+typeLabel+' — Observations',`${rows.length} records · avg ${otAvg[elements[0].index]}`,rows,cols);
-    },
-    plugins:{legend:{display:false},
-      tooltip:{callbacks:{label:c=>'Avg Score: '+c.raw+' ('+otAgg[otTypes[c.dataIndex].key].cnt+' obs)'}},
-      datalabels:{anchor:'end',align:'top',font:{weight:'800',size:12},color:'#0F172A',
-        formatter:(v,ctx)=>v>0?v.toFixed(2):''}
-    },
-    scales:{x:{grid:{display:false},ticks:{font:{size:11.5}}},
-      y:{beginAtZero:true,max:5,grid:{color:'#E0E8FF'},ticks:{stepSize:1,font:{size:11}},
-         title:{display:true,text:'Average Score (out of 5)',font:{size:11},color:'#64748B'}}}
-  }});
+  {
+    const MC_OT=(typeof MONTH_CONFIG!=='undefined'&&MONTH_CONFIG)?MONTH_CONFIG:{};
+    const cfgBranches=(fBranch==='ALL')?Object.keys(MC_OT):[fBranch];
+    const quotaOfRole=k=>k==='hods'?1:2;
+    const otTypes=[
+      {key:'principal',label:'Principal',color:'#1E4FD8'},
+      {key:'vp',label:'VP',color:'#7C3AED'},
+      {key:'hm',label:'HM',color:'#0D9488'},
+      {key:'hods',label:'HODs',color:'#059669'},
+      {key:'coords',label:'Coordinators',color:'#D97706'}
+    ];
+    const otAgg={}; otTypes.forEach(t=>otAgg[t.key]={required:0,actual:0,wd:0});
+    cfgBranches.forEach(b=>{
+      const cfg=MC_OT[b]||{};
+      const monthKeys=(fMonth!=='ALL'&&_mmOT[fMonth])?[_mmOT[fMonth]]:Object.keys(cfg);
+      // count distinct exact observer types per role that exist in this branch (any month)
+      const branchRoleTypes={principal:new Set(),vp:new Set(),hm:new Set(),hods:new Set(),coords:new Set()};
+      ALLOBS.filter(r=>r.Branch===b).forEach(r=>{
+        const t=String(r.ObsType||'').trim(); if(!t||t==='–'||/^nan$/i.test(t))return;
+        branchRoleTypes[classifyObserver(t)].add(t);
+      });
+      monthKeys.forEach(mk=>{
+        const wd=parseInt(cfg[mk],10); if(isNaN(wd)||wd<=0)return;
+        const obsHere=ALLOBS.filter(r=>r.Branch===b&&r.Month===mk);
+        otTypes.forEach(t=>{
+          const nTypes=branchRoleTypes[t.key].size;
+          if(nTypes===0)return;
+          otAgg[t.key].wd+=wd;
+          otAgg[t.key].required+=wd*quotaOfRole(t.key)*nTypes;
+          otAgg[t.key].actual+=obsHere.filter(r=>classifyObserver(r.ObsType)===t.key).length;
+        });
+      });
+    });
+    const otShown=otTypes.filter(t=>otAgg[t.key].required>0);
+    const otPct=otShown.map(t=>Math.min(100,Math.round(otAgg[t.key].actual/otAgg[t.key].required*100)));
+    const ALLOBS_OT=ALLOBS.filter(r=>(fBranch==='ALL'||r.Branch===fBranch)&&(fMonth==='ALL'||r.Month===_mmOT[fMonth]));
+    mkChart('obs-observer-type',{type:'bar',data:{
+      labels:otShown.map(t=>t.label),
+      datasets:[{
+        label:'Completion %',
+        data:otPct,
+        backgroundColor:otPct.map(p=>p>=80?'#059669':p>=50?'#D97706':'#DC2626'),
+        borderRadius:6,borderSkipped:false,barPercentage:.6
+      }]
+    },options:{responsive:true,maintainAspectRatio:true,
+      onClick:(evt,elements)=>{
+        if(!elements||!elements.length)return;
+        const t=otShown[elements[0].index];
+        const rows=ALLOBS_OT.filter(r=>classifyObserver(r.ObsType)===t.key);
+        const cols=[{key:'Branch',label:'Branch'},{key:'Month',label:'Month'},{key:'Date',label:'Date',date:true},
+          {key:'Teacher',label:'Teacher',maxW:'160px'},{key:'Subject',label:'Subject'},
+          {key:'ObsType',label:'Observer'},{key:'Score',label:'Score',score:true},{key:'Remarks',label:'Observation',maxW:'320px'}];
+        openModal('📊 '+t.label+' — Observations Done',`${otAgg[t.key].actual} done / ${otAgg[t.key].required} required`,rows,cols);
+      },
+      plugins:{legend:{display:false},
+        tooltip:{callbacks:{label:c=>{const t=otShown[c.dataIndex];return `${otAgg[t.key].actual} done / ${otAgg[t.key].required} required (${quotaOfRole(t.key)}/day per observer)`;}}},
+        datalabels:{anchor:'end',align:'top',font:{weight:'800',size:12},color:'#0F172A',
+          formatter:(v,ctx)=>{const t=otShown[ctx.dataIndex];return v+'%\n('+otAgg[t.key].actual+'/'+otAgg[t.key].required+')';}}
+      },
+      scales:{x:{grid:{display:false},ticks:{font:{size:11.5}}},
+        y:{beginAtZero:true,max:110,grid:{color:'#E0E8FF'},ticks:{callback:v=>v+'%',font:{size:11}},
+           title:{display:true,text:'Completion % (done ÷ required)',font:{size:11},color:'#64748B'}}}
+    }});
+  }
 
   // ── Monthly per branch (now shows all 4 months, filtered by branch) ──
   const ml2=['Mar-2026','Apr-2026','May-2026','Jun-2026'];
@@ -2277,20 +2314,17 @@ function renderAdmin(){
 function renderAdminPerformance(rows,BRANCHES,isDone,isIP,isHoldOpen,overdueDays){
   const el=document.getElementById('admin-perf');
   if(!el)return;
+  // Closing-speed formula (shared with Executive scorecard):
+  //   Score = CompletionRate×0.6 + OnSchedule×0.4 − ageing penalty (½pt per avg overdue day, max 15)
+  //   Days Due drives it: "Completed" / "Overdue (n days)" / "Due in n days";
+  //   Completion Date vs Deadline adds the early/late-finish detail once admins fill it.
   const stats=BRANCHES.map(b=>{
     const br=rows.filter(r=>r.Branch===b);
-    const tot=br.length;
-    const dn=br.filter(isDone).length;
-    const odRows=br.filter(r=>overdueDays(r)!==null&&!isDone(r));
-    const od=odRows.length;
-    const avgOdDays=od>0?odRows.reduce((a,r)=>a+(overdueDays(r)||0),0)/od:0;
-    const comp=tot>0?+(dn/tot*100).toFixed(1):0;
-    // Unified dept formula: Score = ClosureRate×0.6 + Speed×0.4
-    // Speed = 100 − avgOverdueDays×2 (floored at 0; no overdue → 100)
-    const speed=Math.max(0,100-avgOdDays*2);
-    const score=Math.round(comp*0.6+speed*0.4);
-    return {branch:b,tot,dn,od,avgOdDays:+avgOdDays.toFixed(0),comp,speed:+speed.toFixed(0),score};
-  }).filter(s=>s.tot>0).sort((a,b)=>b.score-a.score);
+    const st=adminSpeedStats(br);
+    if(st.total===0) return null;
+    return {branch:b,tot:st.total,dn:st.done,od:st.overdue,avgOdDays:st.avgOd,
+            comp:st.pct,onSch:st.onSchedulePct,avgEarly:st.avgEarly,score:st.score};
+  }).filter(Boolean).sort((a,b)=>b.score-a.score);
   const medals=['🥇','🥈','🥉'];
   el.innerHTML=stats.map((s,i)=>{
     const sc=s.score>=85?'#059669':s.score>=70?'#D97706':'#DC2626';
@@ -2300,7 +2334,7 @@ function renderAdminPerformance(rows,BRANCHES,isDone,isIP,isHoldOpen,overdueDays
       <div style="font-size:22px;width:32px;text-align:center;">${rankBadge}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-weight:700;font-size:13.5px;color:#0F172A;"><span class="bd b${s.branch}"></span>${s.branch}</div>
-        <div style="font-size:11px;color:#64748B;margin-top:2px;">✅ ${s.dn}/${s.tot} closed (${s.comp}%) · ⏰ ${s.od} overdue${s.od>0?' (avg '+s.avgOdDays+'d)':''} · ⚡ speed ${s.speed}/100</div>
+        <div style="font-size:11px;color:#64748B;margin-top:2px;">✅ ${s.dn}/${s.tot} done (${s.comp}%) · 📅 ${s.onSch}% on schedule · ⏰ ${s.od} overdue${s.od>0?' (avg '+s.avgOdDays+'d)':''}${s.avgEarly!==null?' · 🏁 '+Math.abs(s.avgEarly)+'d '+(s.avgEarly>=0?'early':'late')+' (Completion Date)':''}</div>
         <div style="background:#E0E8FF;border-radius:5px;height:6px;margin-top:5px;overflow:hidden;"><div style="background:${sc};width:${Math.max(s.score,2)}%;height:6px;"></div></div>
       </div>
       <div style="text-align:center;"><div style="background:${scBg};color:${sc};font-weight:800;font-size:15px;padding:5px 12px;border-radius:10px;">${s.score}</div><div style="font-size:9px;color:#94A3B8;margin-top:2px;">SCORE</div></div>
@@ -2356,6 +2390,83 @@ function renderVigilance(){
   _setV('vig-open-s',(tot>0?fp(open_/tot*100)+' — ':'')+'Action needed');
   _setV('vig-critical',critical);
 
+  // ── Admin monitoring KPIs (Admin Status is filled by Admins only) ──
+  const _isAdmDone=r=>/closed|done|completed|resolved/i.test(String(r.AdminStatus||''));
+  const _admFilled=r=>{const s=String(r.AdminStatus||'').trim();return s&&s!=='–'&&!/^nan$/i.test(s);};
+  const awaitingAdmin=rows.filter(r=>r.Status==='Closed'&&!_isAdmDone(r)).length;
+  _setV('vig-awaiting',awaitingAdmin);
+  _setV('vig-awaiting-s',closed>0?fp((closed-awaitingAdmin)/closed*100)+' of closed verified by admin — click to view':'Admin Status pending — click to view');
+
+  // ── Admin Follow-up Status by Branch (Admin Closed / Admin Open / Not Updated) ──
+  {
+    const vb=fBranch==='ALL'?BRANCHES:[fBranch];
+    const rowsOf=b=>ALLVIG.filter(r=>r.Branch===b&&(fMonth==='ALL'||r.Month===fMonth));
+    const aClosed=vb.map(b=>rowsOf(b).filter(_isAdmDone).length);
+    const aOpen  =vb.map(b=>rowsOf(b).filter(r=>_admFilled(r)&&!_isAdmDone(r)).length);
+    const aBlank =vb.map(b=>rowsOf(b).filter(r=>!_admFilled(r)).length);
+    window._VIG_ADM_BR=vb;
+    mkChart('vig-admin-br',{type:'bar',data:{
+      labels:vb.map((b,i)=>`${b}\n(${aClosed[i]+aOpen[i]+aBlank[i]})`),
+      datasets:[
+        {label:'Admin Closed',      data:aClosed,backgroundColor:'#059669',borderRadius:4,stack:'s'},
+        {label:'Admin Open',        data:aOpen,  backgroundColor:'#DC2626',borderRadius:4,stack:'s'},
+        {label:'Not Updated by Admin',data:aBlank,backgroundColor:'#94A3B8',borderRadius:4,stack:'s'},
+      ]
+    },options:{responsive:true,maintainAspectRatio:true,
+      onClick:(evt,elements)=>{
+        if(!elements||!elements.length)return;
+        const b=window._VIG_ADM_BR[elements[0].index];
+        const band=['AdminClosed','AdminOpen','AdminBlank'][elements[0].datasetIndex];
+        let rws=ALLVIG.filter(r=>r.Branch===b&&(fMonth==='ALL'||r.Month===fMonth));
+        if(band==='AdminClosed') rws=rws.filter(_isAdmDone);
+        else if(band==='AdminOpen') rws=rws.filter(r=>_admFilled(r)&&!_isAdmDone(r));
+        else rws=rws.filter(r=>!_admFilled(r));
+        openModal(`🧑‍💼 ${b} — ${band==='AdminClosed'?'Admin Closed':band==='AdminOpen'?'Admin Open':'Not Updated by Admin'}`,`${rws.length} issues`,rws,_VIG_COLS);
+      },
+      plugins:{legend:{display:true},tooltip:{mode:'index',intersect:false},
+        datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]>0,anchor:'center',align:'center',
+          font:{weight:'800',size:12},color:'#fff',formatter:v=>v>0?v:''}
+      },
+      scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,grid:{color:'#E0E8FF'},ticks:{maxTicksLimit:5}}}
+    }});
+  }
+
+  // ── Branch Safety Performance Score (Closure 50% + Admin Follow-Up 30% + On-Time 20%) ──
+  {
+    const perfEl=document.getElementById('vig-safety-perf');
+    if(perfEl){
+      const vb=fBranch==='ALL'?BRANCHES:[fBranch];
+      const stats=vb.map(b=>{
+        const rws=ALLVIG.filter(r=>r.Branch===b&&(fMonth==='ALL'||r.Month===fMonth));
+        const st=vigSafetyStats(rws);
+        // avg closure time (Completion Date − Visit Date) when Completion Date is filled
+        const cdRows=rws.filter(r=>r.CompletionDate&&r.CompletionDate!=='–'&&r.VisitDate&&r.VisitDate!=='–');
+        let avgClose=null;
+        if(cdRows.length){
+          const ds=cdRows.map(r=>{const c=new Date(r.CompletionDate),v=new Date(r.VisitDate);return (isNaN(c)||isNaN(v))?null:Math.max(0,Math.round((c-v)/86400000));}).filter(x=>x!==null);
+          if(ds.length) avgClose=Math.round(ds.reduce((a,x)=>a+x,0)/ds.length);
+        }
+        return st.total>0?{branch:b,...st,avgClose}:null;
+      }).filter(Boolean).sort((a,b)=>b.score-a.score);
+      const medals=['🥇','🥈','🥉'];
+      perfEl.innerHTML=stats.map((s,i)=>{
+        const sc=s.score>=80?'#059669':s.score>=60?'#D97706':'#DC2626';
+        const scBg=s.score>=80?'#ECFDF5':s.score>=60?'#FFFBEB':'#FEF2F2';
+        const rankBadge=medals[i]||('<span style="color:#CBD5E1;font-weight:800;">'+(i+1)+'</span>');
+        return `<div style="display:flex;align-items:center;gap:14px;padding:12px 14px;border-bottom:1px solid #F1F5F9;cursor:pointer;" onclick="viewVigByBranch('${s.branch}')">
+          <div style="font-size:22px;width:32px;text-align:center;">${rankBadge}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:700;font-size:13.5px;color:#0F172A;"><span class="bd b${s.branch}"></span>${s.branch}</div>
+            <div style="font-size:11px;color:#64748B;margin-top:2px;">✅ ${s.closed}/${s.total} closed (${s.closurePct}%) · 🧑‍💼 admin verified ${s.adminPct}% · ⏱️ on-time ${s.onTimePct}%</div>
+            <div style="font-size:10.5px;color:#94A3B8;margin-top:1px;">${s.open} open · ${s.awaitingAdmin} awaiting admin${s.avgClose!==null?' · avg close '+s.avgClose+'d (Completion − Visit)':''}</div>
+            <div style="background:#E0E8FF;border-radius:5px;height:6px;margin-top:5px;overflow:hidden;"><div style="background:${sc};width:${Math.max(s.score,2)}%;height:6px;"></div></div>
+          </div>
+          <div style="text-align:center;"><div style="background:${scBg};color:${sc};font-weight:800;font-size:15px;padding:5px 12px;border-radius:10px;">${s.score}</div><div style="font-size:9px;color:#94A3B8;margin-top:2px;">SAFETY SCORE</div></div>
+        </div>`;
+      }).join('')||'<div style="padding:20px;text-align:center;color:#94A3B8;">No vigilance data</div>';
+    }
+  }
+
   // ── Issue Status by Branch (stacked) ──
   const vigBranches=fBranch==='ALL'?BRANCHES:[fBranch];
   const vbLabels=vigBranches.map(b=>{
@@ -2375,10 +2486,7 @@ function renderVigilance(){
       const statusMap=['Open','Closed'];
       const status=statusMap[elements[0].datasetIndex];
       const rows=ALLVIG.filter(r=>r.Branch===branch&&r.Status===status&&(fMonth==='ALL'||r.Month===fMonth));
-      const cols=[{key:'Branch',label:'Branch'},{key:'VisitDate',label:'Visit Date',date:true},{key:'Area',label:'Area'},
-        {key:'Issue',label:'Issue',maxW:'240px'},{key:'Action',label:'Action',maxW:'200px'},{key:'Owner',label:'Owner'},
-        {key:'TargetDate',label:'Target Date',date:true},{key:'OverDue',label:'Overdue'},{key:'RiskLevel',label:'Risk',pill:true},{key:'Status',label:'Status',pill:true}];
-      openModal(`🛡️ ${branch} — ${status}`,`${rows.length} issues`,rows,cols);
+      openModal(`🛡️ ${branch} — ${status}`,`${rows.length} issues`,rows,_VIG_COLS);
     },
     plugins:{legend:{display:true},tooltip:{mode:'index',intersect:false},
       datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]>0,anchor:'center',align:'center',
@@ -2403,10 +2511,7 @@ function renderVigilance(){
       const branch=vigBranches[elements[0].index];
       const risk=RISKS[elements[0].datasetIndex];
       const rows=ALLVIG.filter(r=>r.Branch===branch&&r.RiskLevel===risk&&(fMonth==='ALL'||r.Month===fMonth));
-      const cols=[{key:'Branch',label:'Branch'},{key:'VisitDate',label:'Visit Date',date:true},{key:'Area',label:'Area'},
-        {key:'Issue',label:'Issue',maxW:'240px'},{key:'Action',label:'Action',maxW:'200px'},{key:'Owner',label:'Owner'},
-        {key:'TargetDate',label:'Target Date',date:true},{key:'OverDue',label:'Overdue'},{key:'RiskLevel',label:'Risk',pill:true},{key:'Status',label:'Status',pill:true}];
-      openModal(`🛡️ ${branch} — ${risk} Risk`,`${rows.length} issues`,rows,cols);
+      openModal(`🛡️ ${branch} — ${risk} Risk`,`${rows.length} issues`,rows,_VIG_COLS);
     },
     plugins:{legend:{display:true},tooltip:{mode:'index',intersect:false},
       datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]>0,anchor:'center',align:'center',
@@ -2425,33 +2530,50 @@ function renderVigilance(){
     });
   const tbody=document.getElementById('vig-tbody');
   if(tableRows.length===0){
-    tbody.innerHTML='<tr><td colspan="7" class="no-data">No open or in-progress issues for selected filter 🎉</td></tr>';
+    tbody.innerHTML='<tr><td colspan="9" class="no-data">No open or in-progress issues for selected filter 🎉</td></tr>';
   }else{
     tbody.innerHTML=tableRows.map(r=>{
       const riskPill=RISK_PILL[r.RiskLevel]||'pa';
       const statusPill=STATUS_PILL_V[r.Status]||'pa';
-      return `<tr><td><span class="bd b${r.Branch}"></span> ${r.Branch}</td><td>${r.VisitDate||'–'}</td><td>${r.Area}</td><td style="max-width:320px;">${r.Issue}</td>
+      const admS=String(r.AdminStatus||'–');
+      const admPill=/closed|done|completed|resolved/i.test(admS)?'pg':/open/i.test(admS)?'pr':'pa';
+      const brRem=(r.BranchRemarks&&r.BranchRemarks!=='–'&&!/^nan$/i.test(r.BranchRemarks))?r.BranchRemarks:'–';
+      return `<tr><td><span class="bd b${r.Branch}"></span> ${r.Branch}</td><td>${r.VisitDate||'–'}</td><td>${r.Area}</td><td style="max-width:280px;">${r.Issue}</td>
         <td><span class="pill ${riskPill}">${r.RiskLevel}</span></td>
         <td><span class="pill ${statusPill}">${r.Status}</span></td>
+        <td><span class="pill ${admPill}">${admS==='–'||/^nan$/i.test(admS)?'Not Updated':admS}</span></td>
+        <td style="max-width:180px;font-size:11px;color:#64748B;">${brRem}</td>
         <td>${r.OverDue}</td></tr>`;
     }).join('');
   }
 }
 
-// Quick-view drilldown for Vigilance KPI cards (Closed/In Progress/Open/Critical), respects branch+month filter
+// Shared Vigilance drill-down columns — now include Admin Status, Branch Remarks & Completion Date
+const _VIG_COLS=[
+  {key:'Branch',label:'Branch'},{key:'VisitDate',label:'Visit Date',date:true},{key:'Area',label:'Area'},
+  {key:'Issue',label:'Issue',maxW:'220px'},{key:'Action',label:'Action Required',maxW:'180px'},
+  {key:'Owner',label:'Owner'},{key:'TargetDate',label:'Target Date',date:true},
+  {key:'CompletionDate',label:'Completion Date',date:true},{key:'OverDue',label:'Overdue'},
+  {key:'RiskLevel',label:'Risk',pill:true},{key:'Status',label:'Vigilance Status',pill:true},
+  {key:'AdminStatus',label:'Admin Status',pill:true},{key:'BranchRemarks',label:'Branch Remarks',maxW:'200px'},
+];
+// Quick-view drilldown for Vigilance KPI cards (Closed/Open/Critical/AwaitingAdmin), respects branch+month filter
 function viewVigilanceRecords(filterKey){
   const ALLVIG=(typeof VIG_DATA!=='undefined'&&Array.isArray(VIG_DATA))?VIG_DATA:[];
   let rows=ALLVIG.filter(r=>(fBranch==='ALL'||r.Branch===fBranch)&&(fMonth==='ALL'||r.Month===fMonth));
+  const isAdmDone=r=>/closed|done|completed|resolved/i.test(String(r.AdminStatus||''));
   if(filterKey==='Critical') rows=rows.filter(r=>r.RiskLevel==='Critical');
+  else if(filterKey==='AwaitingAdmin') rows=rows.filter(r=>r.Status==='Closed'&&!isAdmDone(r));
   else rows=rows.filter(r=>r.Status===filterKey);
-  const cols=[
-    {key:'Branch',label:'Branch'},{key:'VisitDate',label:'Visit Date',date:true},{key:'Area',label:'Area'},
-    {key:'Issue',label:'Issue',maxW:'240px'},{key:'Action',label:'Action Required',maxW:'200px'},
-    {key:'Owner',label:'Owner'},{key:'TargetDate',label:'Target Date',date:true},{key:'OverDue',label:'Overdue'},
-    {key:'RiskLevel',label:'Risk',pill:true},{key:'Status',label:'Status',pill:true},
-  ];
   const bl=fBranch==='ALL'?'All Branches':fBranch, ml=fMonth==='ALL'?'All Months':fMonth+' 2026';
-  openModal(`🛡️ Vigilance — ${filterKey}`,`${rows.length.toLocaleString('en-IN')} records · ${bl} · ${ml}`,rows,cols);
+  const label=filterKey==='AwaitingAdmin'?'Awaiting Admin Update':filterKey;
+  openModal(`🛡️ Vigilance — ${label}`,`${rows.length.toLocaleString('en-IN')} records · ${bl} · ${ml}`,rows,_VIG_COLS);
+}
+// All issues for one branch (from the Safety Performance ranking)
+function viewVigByBranch(branch){
+  const ALLVIG=(typeof VIG_DATA!=='undefined'&&Array.isArray(VIG_DATA))?VIG_DATA:[];
+  const rows=ALLVIG.filter(r=>r.Branch===branch&&(fMonth==='ALL'||r.Month===fMonth));
+  openModal(`🛡️ ${branch} — All Vigilance Issues`,`${rows.length} records`,rows,_VIG_COLS);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2738,7 +2860,7 @@ function renderPurchase(){
   const isDelivered=r=>/delivered/i.test(r.PurchaseStatus||'');
   const isOrdered=r=>/ordered|order placed/i.test(r.PurchaseStatus||'');
   const isRejected=r=>/rejected|cancel/i.test(r.PurchaseStatus||'');
-  const isInProg=r=>/in progress|pending/i.test(r.PurchaseStatus||'');
+  const isInProg=r=>/in progress/i.test(r.PurchaseStatus||'');
 
   const delivered=BRANCHES.map(b=>_pRows.filter(r=>r.Branch===b&&isDelivered(r)).length);
   const ordered=  BRANCHES.map(b=>_pRows.filter(r=>r.Branch===b&&isOrdered(r)).length);
@@ -2815,17 +2937,13 @@ function renderPurchase(){
   renderPurchaseManagerPerf(_pRows,BRANCHES);
 }
 
-// Purchase Manager data-quality / performance per branch (replaces Approval Status chart)
+// Purchase Manager Performance per branch
+// Weights per management: Purchase Status 50% + Timeliness (Target Date / Date / Due) 40% + Documentation 10%.
+// Statuses are Delivered / Ordered / In Progress only (no "Pending" in the sheet).
 function renderPurchaseManagerPerf(rows,BRANCHES){
   const el=document.getElementById('pur-mgr-perf');
   if(!el) return;
-  // Performance = delivery progress + data/documentation quality.
-  //   Delivery score: % delivered (stuck/in-progress backlog drags this down)
-  //   Documentation score: % of records with all key fields filled (item, spec, dept, qty/amount, status, priority)
-// Unified dept formula: Score = DeliveredRate×0.6 + Speed×0.4
-  // Overdue = open (In Progress/Ordered/Pending) request older than 14 days since raised
-  // (uses real Due / Target Date automatically once the team fills them).
-  const AGE_LIMIT=14;
+  const AGE_LIMIT=14; // an open request older than this (with no Target/Due data) counts as overdue
   function odDaysOf(r){
     if(r.Due!==undefined&&r.Due!=='–'&&!isNaN(+r.Due)&&+r.Due>0) return +r.Due;
     const today=new Date();
@@ -2843,15 +2961,25 @@ function renderPurchaseManagerPerf(rows,BRANCHES){
     const br=rows.filter(r=>r.Branch===b);
     const tot=br.length;
     if(tot===0) return null;
-    const delivered=br.filter(r=>/delivered/i.test(r.PurchaseStatus||'')).length;
-    const openRows=br.filter(r=>/in progress|ordered|pending|not started/i.test(r.PurchaseStatus||''));
+    const st=r=>String(r.PurchaseStatus||'').trim();
+    const delivered=br.filter(r=>/^delivered/i.test(st(r))).length;
+    const ordered  =br.filter(r=>/^order/i.test(st(r))).length;
+    const inProg   =br.filter(r=>/^in progress/i.test(st(r))).length;
+    // 1) STATUS score (50%): Delivered=100, Ordered=60, In Progress=30 credit
+    const statusScore=+(((delivered*100+ordered*60+inProg*30)/tot)).toFixed(1);
+    // 2) TIMELINESS score (40%): % of requests NOT overdue, minus ageing penalty
+    const openRows=br.filter(r=>/^in progress|^order/i.test(st(r)));
     const odRows=openRows.filter(r=>odDaysOf(r)>0);
     const avgOd=odRows.length?odRows.reduce((a,r)=>a+odDaysOf(r),0)/odRows.length:0;
-    const delivPct=+(delivered/tot*100).toFixed(1);
-    const speed=Math.max(0,100-avgOd*2);
-    const score=Math.round(delivPct*0.6+speed*0.4);
-    return {branch:b,tot,delivered,open:openRows.length,overdue:odRows.length,
-            avgOd:+avgOd.toFixed(0),delivPct,speed:+speed.toFixed(0),score};
+    const onTimePct=+(((tot-odRows.length)/tot)*100).toFixed(1);
+    const timeScore=Math.max(0,+(onTimePct-Math.min(20,avgOd*0.5)).toFixed(1));
+    // 3) DOCUMENTATION score (10%): fully-documented requests
+    const docOk=br.filter(r=>['Item','Dept','Priority','PurchaseStatus'].every(k=>r[k]&&r[k]!=='–')
+      &&((r.Qty&&r.Qty!=='–')||(r.Amount&&r.Amount!=='–'))).length;
+    const docScore=+((docOk/tot)*100).toFixed(1);
+    const score=Math.round(statusScore*0.5+timeScore*0.4+docScore*0.1);
+    return {branch:b,tot,delivered,ordered,inProg,overdue:odRows.length,avgOd:+avgOd.toFixed(0),
+            statusScore,timeScore,docOk,docScore,score};
   }).filter(Boolean).sort((a,b)=>b.score-a.score);
   const medals=['🥇','🥈','🥉'];
   el.innerHTML=stats.map((s,i)=>{
@@ -2862,7 +2990,8 @@ function renderPurchaseManagerPerf(rows,BRANCHES){
       <div style="font-size:22px;width:32px;text-align:center;">${rankBadge}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-weight:700;font-size:13.5px;color:#0F172A;"><span class="bd b${s.branch}"></span>${s.branch}</div>
-        <div style="font-size:11px;color:#64748B;margin-top:2px;">📄 ${s.complete}/${s.tot} documented (${s.docScore}%) · ✅ ${s.delivered} delivered · ⏳ ${s.inProg} in progress · ${s.pending} pending</div>
+        <div style="font-size:11px;color:#64748B;margin-top:2px;">✅ ${s.delivered} delivered · 📦 ${s.ordered} ordered · 🔄 ${s.inProg} in progress · ⏰ ${s.overdue} overdue${s.overdue>0?' (~'+s.avgOd+'d)':''}</div>
+        <div style="font-size:10.5px;color:#94A3B8;margin-top:1px;">status ${s.statusScore} ×50% · timeliness ${s.timeScore} ×40% · docs ${s.docScore}% ×10%</div>
         <div style="background:#E0E8FF;border-radius:5px;height:6px;margin-top:5px;overflow:hidden;"><div style="background:${qc};width:${Math.max(s.score,2)}%;height:6px;"></div></div>
       </div>
       <div style="text-align:center;"><div style="background:${qcBg};color:${qc};font-weight:800;font-size:15px;padding:5px 12px;border-radius:10px;">${s.score}</div><div style="font-size:9px;color:#94A3B8;margin-top:2px;">PERF SCORE</div></div>
@@ -2876,7 +3005,7 @@ function viewPurchaseByBranchStatus(branch,status){
   let rows=ALL.filter(r=>r.Branch===branch);
   if(status==='Delivered') rows=rows.filter(r=>/delivered/i.test(r.PurchaseStatus||''));
   else if(status==='Ordered') rows=rows.filter(r=>/ordered|order placed/i.test(r.PurchaseStatus||''));
-  else if(status==='In Progress') rows=rows.filter(r=>/in progress|pending/i.test(r.PurchaseStatus||''));
+  else if(status==='In Progress') rows=rows.filter(r=>/^in progress/i.test(String(r.PurchaseStatus||'').trim()));
   else if(status==='Rejected') rows=rows.filter(r=>/rejected|cancel/i.test(r.PurchaseStatus||''));
   const cols=[{key:'Branch',label:'Branch'},{key:'Date',label:'Date',date:true},{key:'Item',label:'Item',maxW:'200px'},
     {key:'Spec',label:'Specification',maxW:'160px'},{key:'Dept',label:'Dept'},{key:'Qty',label:'Qty'},
@@ -2952,7 +3081,7 @@ function renderHR(){
     const open=rows.filter(r=>isOpen(r.Status)).length;
     const hold=rows.filter(r=>isHold(r.Status)).length;
     const total=rows.length;
-    const dtc=rows.filter(r=>isClosed(r.Status)&&r.DaysToClose!=='–'&&!isNaN(+r.DaysToClose)).map(r=>+r.DaysToClose).filter(v=>!isNaN(v)&&v>=0);
+    const dtc=rows.filter(r=>isClosed(r.Status)).map(r=>hrCloseDays(r)).filter(v=>v!==null&&v>=0);
     const avgDays=dtc.length?+(dtc.reduce((a,b)=>a+b,0)/dtc.length).toFixed(1):null;
     // Closed per active month (rough): closed / number of distinct closed-months
     const closedMonths=new Set(rows.filter(r=>isClosed(r.Status)&&r.ClosedDate!=='–').map(r=>String(r.ClosedDate).slice(0,7)));
@@ -2961,8 +3090,9 @@ function renderHR(){
     const vcr=total>0?+(closed/total*5).toFixed(1):0;                                   // closure rate → /5
     const hiring_speed=avgDays===null?0:(avgDays<=7?5:avgDays<=12?4.5:avgDays<=18?4:avgDays<=25?3.5:avgDays<=35?3:avgDays<=50?2.5:2);
     const compliance=4.5;                                                               // not tracked in sheet
-    const closeScore=Math.min(5,closed/12*5);                                           // volume → /5
-    const overall=+(((vcr*0.35)+(hiring_speed*0.30)+(closeScore*0.20)+(compliance*0.15))).toFixed(1);
+    const closeScore=Math.min(5,+(avgClosing/12*5));                                    // avg closings per month → /5 (12/mo = 5)
+    // Management weights: Hiring Speed 40% · Vacancy Closure Rate 10% · Avg Closing/Month 40% · Compliance 10%
+    const overall=+(((hiring_speed*0.40)+(vcr*0.10)+(closeScore*0.40)+(compliance*0.10))).toFixed(1);
     const rating=overall>=4.5?'Excellent':overall>=3.8?'Good':overall>=3?'Average':'Needs Focus';
     LIVE_KPI[h]={hiring_speed,vcr,avg_closing:avgClosing,compliance,overall,rating,
       branch:branchOf(h),closed,open,hold,total,avgDays};
@@ -3069,41 +3199,50 @@ function renderHR(){
   const allRec=(typeof HR_RECORDS!=='undefined')?HR_RECORDS:[];
   const speedBody=document.getElementById('hr-speed-tbody');
   if(speedBody){
+    // CLOSED positions only. Days = Closed Date − Post Date (sheet value only as fallback),
+    // so open positions carrying a formula-filled "Days to Close" no longer pollute the analysis.
+    // Open positions are shown separately with their current ageing (today − Post Date).
     const recStats=activeHRs.map(h=>{
-      const closed=allRec.filter(r=>r.HR===h&&r.Status==='Closed'&&r.DaysToClose!=='–');
-      const dtc=closed.map(r=>+r.DaysToClose).filter(v=>!isNaN(v)&&v>=0);
+      const rows=allRec.filter(r=>r.HR===h);
+      const closedRows=rows.filter(r=>isClosed(r.Status));
+      const dtc=closedRows.map(r=>hrCloseDays(r)).filter(v=>v!==null&&v>=0);
       const fast=dtc.filter(v=>v<=7).length;
       const med=dtc.filter(v=>v>7&&v<=21).length;
       const slow=dtc.filter(v=>v>21).length;
-      const avg=dtc.length>0?(dtc.reduce((a,b)=>a+b,0)/dtc.length):0;
-      return {h,fast,med,slow,avg:+avg.toFixed(1),total:dtc.length};
-    }).sort((a,b)=>a.avg-b.avg);
+      const avg=dtc.length>0?(dtc.reduce((a,b)=>a+b,0)/dtc.length):null;
+      const openRows=rows.filter(r=>isOpen(r.Status));
+      const today=new Date();
+      const ages=openRows.map(r=>{const pd=new Date(r.PostDate);return isNaN(pd)?null:Math.max(0,Math.round((today-pd)/86400000));}).filter(v=>v!==null);
+      const avgAge=ages.length?Math.round(ages.reduce((a,b)=>a+b,0)/ages.length):null;
+      return {h,fast,med,slow,avg:avg===null?null:+avg.toFixed(1),total:dtc.length,
+              open:openRows.length,avgAge};
+    }).sort((a,b)=>(a.avg===null?1e9:a.avg)-(b.avg===null?1e9:b.avg));
 
     speedBody.innerHTML=recStats.map((s,i)=>{
       const bg=i%2===0?'#fff':'#F8FAFF';
-      const avgColor=s.avg<=7?'#059669':s.avg<=21?'#D97706':'#DC2626';
+      const avgColor=s.avg===null?'#94A3B8':s.avg<=7?'#059669':s.avg<=21?'#D97706':'#DC2626';
       const fastW=s.total>0?Math.round(s.fast/s.total*100):0;
       const medW=s.total>0?Math.round(s.med/s.total*100):0;
       const slowW=s.total>0?Math.round(s.slow/s.total*100):0;
-      const bar=`<div style="display:flex;height:6px;border-radius:3px;overflow:hidden;margin:3px 0;">
+      const bar=s.total>0?`<div style="display:flex;height:6px;border-radius:3px;overflow:hidden;margin:3px 0;">
         <div style="width:${fastW}%;background:#059669;"></div>
         <div style="width:${medW}%;background:#D97706;"></div>
         <div style="width:${slowW}%;background:#DC2626;"></div>
-      </div>`;
-      return `<tr style="background:${bg};">
-        <td style="padding:8px 12px;font-size:12.5px;font-weight:700;border-bottom:1px solid #E0E8FF;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${HR_COLORS[s.h]||'#64748B'};margin-right:6px;"></span>${s.h}</td>
+      </div>`:'';
+      return `<tr style="background:${bg};cursor:pointer;" onclick="viewHRByRecruiter('${s.h.replace(/'/g,"\\'")}','Closed')" title="Click to view ${s.h}'s closed positions">
+        <td style="padding:8px 12px;font-size:12.5px;font-weight:700;border-bottom:1px solid #E0E8FF;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${HR_COLORS[s.h]||'#64748B'};margin-right:6px;"></span>${s.h}<small style="color:#94A3B8;display:block;font-size:9px;">${s.total} closed</small></td>
         <td style="padding:8px 12px;text-align:center;border-bottom:1px solid #E0E8FF;"><span style="font-weight:800;color:#059669;">${s.fast}</span><small style="color:#94A3B8;display:block;font-size:9.5px;">${fastW}%</small>${bar}</td>
         <td style="padding:8px 12px;text-align:center;border-bottom:1px solid #E0E8FF;"><span style="font-weight:700;color:#D97706;">${s.med}</span><small style="color:#94A3B8;display:block;font-size:9.5px;">${medW}%</small></td>
         <td style="padding:8px 12px;text-align:center;border-bottom:1px solid #E0E8FF;"><span style="font-weight:700;color:#DC2626;">${s.slow}</span><small style="color:#94A3B8;display:block;font-size:9.5px;">${slowW}%</small></td>
-        <td style="padding:8px 12px;text-align:center;border-bottom:1px solid #E0E8FF;"><span style="font-size:15px;font-weight:800;color:${avgColor};">${s.avg}d</span></td>
+        <td style="padding:8px 12px;text-align:center;border-bottom:1px solid #E0E8FF;">${s.avg===null?'<span style="color:#94A3B8;font-size:11px;">no closures</span>':`<span style="font-size:15px;font-weight:800;color:${avgColor};">${s.avg}d</span>`}<small style="color:${s.open>0?'#DC2626':'#94A3B8'};display:block;font-size:9.5px;font-weight:600;">${s.open} open${s.avgAge!==null?' · aging '+s.avgAge+'d':''}</small></td>
       </tr>`;
     }).join('');
   }
 
   // Avg Days to Close per recruiter — compact horizontal bar chart
   const recStatsSorted=activeHRs.map(h=>{
-    const closed=allRec.filter(r=>r.HR===h&&r.Status==='Closed'&&r.DaysToClose!=='–');
-    const dtc=closed.map(r=>+r.DaysToClose).filter(v=>!isNaN(v)&&v>=0);
+    const closed=allRec.filter(r=>r.HR===h&&isClosed(r.Status));
+    const dtc=closed.map(r=>hrCloseDays(r)).filter(v=>v!==null&&v>=0);
     const avg=dtc.length>0?(dtc.reduce((a,b)=>a+b,0)/dtc.length):0;
     return {h,avg:+avg.toFixed(1)};
   }).sort((a,b)=>a.avg-b.avg);
@@ -3192,7 +3331,7 @@ function renderHRRanking(){
     const closed=rows.filter(r=>isClosed(r.Status)).length;
     const open=rows.filter(r=>isOpen(r.Status)).length;
     const total=rows.length;
-    const days=rows.filter(r=>isClosed(r.Status)).map(r=>parseFloat(r.DaysToClose)).filter(n=>!isNaN(n)&&n>=0);
+    const days=rows.filter(r=>isClosed(r.Status)).map(r=>hrCloseDays(r)).filter(n=>n!==null&&n>=0);
     const avgDays=days.length?+(days.reduce((a,c)=>a+c,0)/days.length).toFixed(1):null;
     const closurePct=total>0?+(closed/total*100).toFixed(1):0;
     return {hr:h,branch:branchOf(h),closed,open,closurePct,avgDays};
@@ -3738,32 +3877,92 @@ function switchTab(id){
   window.scrollTo(0,0);
   renderAll();
 }
+// ── Shared performance helpers (used by scorecard + department dashboards) ──
+// Days to close a position: Closed Date − Post Date (real dates), sheet value as fallback.
+function hrCloseDays(r){
+  const pd=new Date(r.PostDate), cd=new Date(r.ClosedDate);
+  if(r.PostDate&&r.PostDate!=='–'&&r.ClosedDate&&r.ClosedDate!=='–'&&!isNaN(pd)&&!isNaN(cd)){
+    const d=Math.round((cd-pd)/86400000);
+    if(d>=0) return d;
+  }
+  const n=parseFloat(r.DaysToClose);
+  return isNaN(n)||n<0?null:n;
+}
+// Admin closing-speed stats from Days Due text + Completion Date vs Deadline.
+function adminSpeedStats(rows){
+  const total=rows.length;
+  if(total===0) return {total:0,score:null};
+  const parseOd=r=>{const m=String(r.DaysDue||'').match(/overdue\s*\((\d+)/i);return m?parseInt(m[1],10):(/overdue/i.test(String(r.DaysDue||''))?1:null);};
+  const completed=rows.filter(r=>/^completed$/i.test(String(r.DaysDue||'').trim())||/done|completed/i.test(r.Status||'')).length;
+  const odRows=rows.filter(r=>parseOd(r)!==null&&!/done|completed/i.test(r.Status||''));
+  const onTrack=rows.filter(r=>/due in/i.test(String(r.DaysDue||''))||/not started/i.test(String(r.DaysDue||''))).length;
+  const avgOd=odRows.length?odRows.reduce((a,r)=>a+(parseOd(r)||0),0)/odRows.length:0;
+  const compPct=+(completed/total*100).toFixed(1);
+  const onSchedulePct=+(((total-odRows.length)/total)*100).toFixed(1);
+  // Early/late finish from Completion Date vs Deadline (only rows where admins filled it)
+  const cdRows=rows.filter(r=>r.CompletionDate&&r.CompletionDate!=='–'&&r.Deadline&&r.Deadline!=='–');
+  let avgEarly=null;
+  if(cdRows.length){
+    const diffs=cdRows.map(r=>{const c=new Date(r.CompletionDate),d=new Date(r.Deadline);return (isNaN(c)||isNaN(d))?null:Math.round((d-c)/86400000);}).filter(v=>v!==null);
+    if(diffs.length) avgEarly=+(diffs.reduce((a,b)=>a+b,0)/diffs.length).toFixed(1); // +ve = finished early
+  }
+  const penalty=Math.min(15,avgOd*0.5);
+  const score=Math.max(0,Math.round(compPct*0.6+onSchedulePct*0.4-penalty));
+  return {total,done:completed,overdue:odRows.length,onTrack,avgOd:+avgOd.toFixed(0),avgEarly,
+          pct:compPct,onSchedulePct,score};
+}
+// Vigilance safety stats: officer Status + Admin Status follow-up + Over Due timeliness.
+function vigSafetyStats(rows){
+  const total=rows.length;
+  const open_=rows.filter(r=>r.Status==='Open').length;
+  const closed=rows.filter(r=>r.Status==='Closed').length;
+  const isAdmDone=r=>/closed|done|completed|resolved/i.test(String(r.AdminStatus||''));
+  const adminClosed=rows.filter(isAdmDone).length;
+  // "Awaiting admin": vigilance says Closed but Admin Status not yet updated/closed
+  const awaitingAdmin=rows.filter(r=>r.Status==='Closed'&&!isAdmDone(r)).length;
+  const onTime=rows.filter(r=>/on time/i.test(String(r.OverDue||''))).length;
+  const odDays=rows.map(r=>{const m=String(r.OverDue||'').match(/(\d+)\s*day/i);return m?parseInt(m[1],10):0;});
+  const avgOd=odDays.length?+(odDays.reduce((a,b)=>a+b,0)/Math.max(1,odDays.filter(d=>d>0).length||1)).toFixed(1):0;
+  const closurePct=total>0?+(closed/total*100).toFixed(1):0;
+  const adminPct=closed>0?+(adminClosed/closed*100).toFixed(1):0;
+  const onTimePct=total>0?+(onTime/total*100).toFixed(1):0;
+  const score=total>0?Math.round(closurePct*0.5+adminPct*0.3+onTimePct*0.2):null;
+  return {total,open:open_,closed,adminClosed,awaitingAdmin,onTime,onTimePct,closurePct,adminPct,score};
+}
+
 function renderRankings(){
   const tbody=document.getElementById('rank-tbody');
   if(!tbody)return;
   const ALLB=['Keesara','Pocharam','Bachupally','Boduppal','Gowdavalli'];
   const MO_MAP={March:'Mar-2026',April:'Apr-2026',May:'May-2026',June:'Jun-2026',July:'Jul-2026',August:'Aug-2026',September:'Sep-2026',October:'Oct-2026',November:'Nov-2026',December:'Dec-2026',January:'Jan-2027',February:'Feb-2027'};
 
-  // Latest month with care-call data, per branch
-  const latestMonth={};
-  ALLB.forEach(b=>{latestMonth[b]=getLatestMonth(b);});
+  // PREVIOUS month with care-call data, per branch (July → June)
+  const prevMonth={};
+  ALLB.forEach(b=>{prevMonth[b]=getPrevMonth(b);});
 
-  // ── Row 1: Care Call Rate (latest month per branch) ──
+  // ── Row 1: Care Call Rate (PREVIOUS month per branch) ──
   const careStats={};
   ALLB.forEach(b=>{
-    const rec=TRACKER.find(d=>d.branch===b&&d.month===latestMonth[b]&&d.calls>0);
+    const rec=prevMonth[b]?TRACKER.find(d=>d.branch===b&&d.month===prevMonth[b]&&d.calls>0):null;
     careStats[b]=rec?{pct:rec.comp,resolved:rec.resolved,calls:rec.calls,students:rec.students,month:rec.month}:null;
   });
 
-  // ── Row 2 & 3: Observations — latest available obs month per branch ──
+  // ── Row 2 & 3: Observations — PREVIOUS month per branch (July → June) ──
+  // Falls back to the latest observed month BEFORE the current calendar month.
+  function prevObsMonthKey(branchObs){
+    const presentMonths=new Set(branchObs.map(r=>r.Month));
+    const prevKey=MO_MAP[getPrevCalendarMonth()];
+    if(prevKey&&presentMonths.has(prevKey)) return prevKey;
+    let curIdx=MONTHS.indexOf(_CAL_MONTHS[new Date().getMonth()]); if(curIdx<0)curIdx=MONTHS.length;
+    for(let i=curIdx-1;i>=0;i--){ if(presentMonths.has(MO_MAP[MONTHS[i]])) return MO_MAP[MONTHS[i]]; }
+    return null;
+  }
   const obsStats={};
   ALLB.forEach(b=>{
     const branchObs=(typeof OBS_DATA!=='undefined'?OBS_DATA:[]).filter(r=>r.Branch===b);
     if(branchObs.length===0){obsStats[b]=null;return;}
-    // find latest month present for this branch (by MONTHS order)
-    const presentMonths=new Set(branchObs.map(r=>r.Month));
-    let latestObsMonth=null;
-    for(let i=MONTHS.length-1;i>=0;i--){ if(presentMonths.has(MO_MAP[MONTHS[i]])){latestObsMonth=MO_MAP[MONTHS[i]];break;} }
+    const latestObsMonth=prevObsMonthKey(branchObs);
+    if(!latestObsMonth){obsStats[b]=null;return;}
     const rows=branchObs.filter(r=>r.Month===latestObsMonth);
     const scored=rows.filter(r=>r.Score!=='–'&&!isNaN(parseFloat(r.Score)));
     const avg=scored.length>0?(scored.reduce((a,r)=>a+parseFloat(r.Score),0)/scored.length):0;
@@ -3771,8 +3970,8 @@ function renderRankings(){
     obsStats[b]={avg:+avg.toFixed(2),total:rows.length,excel,excelPct:rows.length>0?+(excel/rows.length*100).toFixed(1):0,month:latestObsMonth};
   });
 
-  // ── Observation Completion % per branch (current/latest month, ALL observer types) ──
-  // For each branch: required = working_days(month) × Σ quota over every observer type
+  // ── Observation Completion % per branch (PREVIOUS month, ALL observer types) ──
+  // For each branch: required = working_days(prev month) × Σ quota over every observer type
   // present in that branch (2/day leadership, 1/day each HOD); actual = total obs done.
   const obsCompletionStats={};
   ALLB.forEach(b=>{
@@ -3780,12 +3979,14 @@ function renderRankings(){
     const cfg=MC[b]||{};
     const branchObs=(typeof OBS_DATA!=='undefined'?OBS_DATA:[]).filter(r=>r.Branch===b);
     if(branchObs.length===0||!cfg){obsCompletionStats[b]=null;return;}
-    // latest month that has BOTH working-day config (>0) and observations
+    // previous calendar month first; else latest earlier month with BOTH working days and observations
     let useMonth=null;
-    for(let i=MONTHS.length-1;i>=0;i--){
-      const mk=MO_MAP[MONTHS[i]];
-      const wd=parseInt(cfg[mk],10);
-      if(!isNaN(wd)&&wd>0 && branchObs.some(r=>r.Month===mk)){ useMonth=mk; break; }
+    const _pk=MO_MAP[getPrevCalendarMonth()];
+    const _ok=mk=>{const wd=parseInt(cfg[mk],10);return !isNaN(wd)&&wd>0&&branchObs.some(r=>r.Month===mk);};
+    if(_pk&&_ok(_pk)) useMonth=_pk;
+    else{
+      let curIdx=MONTHS.indexOf(_CAL_MONTHS[new Date().getMonth()]); if(curIdx<0)curIdx=MONTHS.length;
+      for(let i=curIdx-1;i>=0;i--){ const mk=MO_MAP[MONTHS[i]]; if(_ok(mk)){useMonth=mk;break;} }
     }
     if(!useMonth){obsCompletionStats[b]=null;return;}
     const wd=parseInt(cfg[useMonth],10);
@@ -3800,67 +4001,35 @@ function renderRankings(){
   });
 
   // ── HR Hiring Speed (avg days to close, lower is better) ──
+  // Resigned recruiters (HR_RESIGNED_LIST, e.g. Priya) are EXCLUDED from this ranking row.
+  // Days = Closed Date − Post Date when both dates are valid (sheet Days-to-Close as fallback).
+  const _hrResigned=(typeof HR_RESIGNED_LIST!=='undefined')?HR_RESIGNED_LIST:['Priya'];
+  const _isHrResigned=h=>_hrResigned.some(x=>String(x).trim().toLowerCase()===String(h||'').trim().toLowerCase());
   const hrStats={};
   ALLB.forEach(b=>{
-    const rows=(typeof HR_RECORDS!=='undefined'?HR_RECORDS:[]).filter(r=>r.Branch===b);
+    const rows=(typeof HR_RECORDS!=='undefined'?HR_RECORDS:[]).filter(r=>r.Branch===b&&!_isHrResigned(r.HR));
     const closed=rows.filter(r=>/closed|filled/i.test(r.Status||''));
-    const days=closed.map(r=>{const n=parseFloat(r.DaysToClose);return isNaN(n)?null:n;}).filter(n=>n!==null&&n>=0);
+    const days=closed.map(r=>hrCloseDays(r)).filter(n=>n!==null&&n>=0);
     const avgDays=days.length?+(days.reduce((a,c)=>a+c,0)/days.length).toFixed(1):null;
     hrStats[b]={closed:closed.length,total:rows.length,avgDays};
   });
 
-  // ── Row 4: Admin Completion (current overall status, all tasks) ──
+  // ── Row 4: Admin Closing Speed — from Days Due (Completed / Overdue (n days) / Due in n days)
+  // and Completion Date vs Deadline when filled.
+  // Score = CompletionRate×0.6 + OnSchedule×0.4 − overdue-ageing penalty (½pt per avg overdue day, max 15)
   const adminStats={};
   ALLB.forEach(b=>{
     const rows=(typeof ADMIN_DATA!=='undefined'?ADMIN_DATA:[]).filter(r=>r.Branch===b);
-    const done=rows.filter(r=>r.Status==='Done').length;
-    adminStats[b]={pct:rows.length>0?+(done/rows.length*100).toFixed(1):0,done,total:rows.length};
+    const st=adminSpeedStats(rows);
+    adminStats[b]=st;
   });
 
-  // ── Row 5: Safety (Open Issues) — current Vigilance status ──
+  // ── Row 5: Safety Score — Vigilance Status (officer) + Admin Status (admin follow-up) + On-Time
+  // Score = Closure%×0.5 + AdminFollowUp%×0.3 + OnTime%×0.2  (higher is better)
   const vigStats={};
   ALLB.forEach(b=>{
     const rows=(typeof VIG_DATA!=='undefined'?VIG_DATA:[]).filter(r=>r.Branch===b);
-    const open_=rows.filter(r=>r.Status==='Open').length;
-    const closed=rows.filter(r=>r.Status==='Closed').length;
-    vigStats[b]={open:open_,closed};
-  });
-
-  // ── Row 6: Purchase Progress — current status ──
- // ── Row 6: Purchase Progress — based on In Progress count + overdue ageing ──
-  // Overdue = open request (In Progress/Ordered) that has a positive "Due" value,
-  // OR a past Target Date, OR (fallback while those columns are empty) is older
-  // than 14 days since it was raised.
-  const PUR_OVERDUE_AGE_DAYS=14;
-  function purOverdueDays(r){
-    if(r.Due!==undefined&&r.Due!=='–'&&!isNaN(+r.Due)&&+r.Due>0) return +r.Due;
-    const today=new Date();
-    if(r.TargetDate&&r.TargetDate!=='–'){
-      const td=new Date(r.TargetDate);
-      if(!isNaN(td)&&td<today) return Math.round((today-td)/86400000);
-    }
-    if(r.Date&&r.Date!=='–'){
-      const d=new Date(r.Date);
-      if(!isNaN(d)){
-        const age=Math.round((today-d)/86400000);
-        if(age>PUR_OVERDUE_AGE_DAYS) return age-PUR_OVERDUE_AGE_DAYS;
-      }
-    }
-    return 0;
-  }
-  const purStats={};
-  ALLB.forEach(b=>{
-    const rows=(typeof PUR_DATA!=='undefined'?PUR_DATA:[]).filter(r=>r.Branch===b);
-    const delivered=rows.filter(r=>/delivered/i.test(r.PurchaseStatus||'')).length;
-    const openRows=rows.filter(r=>/in progress|ordered|pending|not started/i.test(r.PurchaseStatus||''));
-    const overdueRows=openRows.filter(r=>purOverdueDays(r)>0);
-    const total=rows.length;
-    const openPct=total>0?openRows.length/total*100:0;
-    const overduePct=total>0?overdueRows.length/total*100:0;
-    const avgOd=overdueRows.length?overdueRows.reduce((a,r)=>a+purOverdueDays(r),0)/overdueRows.length:0;
-    // Score penalises In-Progress backlog and overdue ageing equally
-    const score=total>0?Math.max(0,Math.round(100-openPct*0.5-overduePct*0.5)):null;
-    purStats[b]={total,delivered,open:openRows.length,overdue:overdueRows.length,avgOd:+avgOd.toFixed(0),score};
+    vigStats[b]=vigSafetyStats(rows);
   });
 
   // Helper: find branch(es) with max numeric value
@@ -3923,44 +4092,30 @@ function renderRankings(){
     html+=`<td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;">${winnerBadge(win)}</td></tr>`;
   }
 
-  // Row: Admin Completion
+  // Row: Admin Closing Speed — Score = Completion×0.6 + OnSchedule×0.4 − overdue-ageing penalty
   {
-    const valMap={}; ALLB.forEach(b=>{valMap[b]=adminStats[b].total>0?adminStats[b].pct:null;});
+    const valMap={}; ALLB.forEach(b=>{valMap[b]=adminStats[b].total>0?adminStats[b].score:null;});
     const win=winners(valMap);
-    html+=`<tr style="background:#F8FAFF;"><td style="padding:10px 14px;font-size:12.5px;font-weight:600;border-bottom:1px solid #E0E8FF;color:#0F172A;">🏗️ Admin Completion</td>`;
+    html+=`<tr style="background:#F8FAFF;"><td style="padding:10px 14px;font-size:12.5px;font-weight:600;border-bottom:1px solid #E0E8FF;color:#0F172A;">🏗️ Admin Closing Speed</td>`;
     ALLB.forEach(b=>{
       const d=adminStats[b];
       if(d.total===0){html+=cell('<span style="color:#94A3B8;">No data</span>',false);return;}
-      const color=d.pct>=80?'#059669':d.pct>=50?'#D97706':'#DC2626';
-      html+=cell(`<span style="font-weight:700;color:${color}">${d.pct}%</span><small style="color:#94A3B8;display:block;font-size:10px;">${d.done}/${d.total} tasks</small>`,win.includes(b));
+      const color=d.score>=80?'#059669':d.score>=60?'#D97706':'#DC2626';
+      html+=cell(`<span style="font-weight:800;color:${color};font-size:15px;">${d.score}</span><small style="color:#94A3B8;display:block;font-size:10px;">${d.done}/${d.total} done · ${d.overdue} overdue${d.overdue>0?' (~'+d.avgOd+'d)':''}</small>${d.avgEarly!==null?`<small style="color:#94A3B8;display:block;font-size:10px;">avg ${Math.abs(d.avgEarly)}d ${d.avgEarly>=0?'early':'late'} vs deadline</small>`:''}`,win.includes(b));
     });
     html+=`<td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;">${winnerBadge(win)}</td></tr>`;
   }
 
-  // Row: Safety (Open Issues) — fewer open is better
+  // Row: Safety Score — Closure×0.5 + Admin Follow-Up×0.3 + On-Time×0.2 (higher is better)
   {
-    const valMap={}; ALLB.forEach(b=>{valMap[b]=vigStats[b].open;});
-    const win=winners(valMap,false);
-    html+=`<tr><td style="padding:10px 14px;font-size:12.5px;font-weight:600;border-bottom:1px solid #E0E8FF;color:#0F172A;">🛡️ Safety (Open Issues)</td>`;
+    const valMap={}; ALLB.forEach(b=>{valMap[b]=vigStats[b].total>0?vigStats[b].score:null;});
+    const win=winners(valMap);
+    html+=`<tr><td style="padding:10px 14px;font-size:12.5px;font-weight:600;border-bottom:1px solid #E0E8FF;color:#0F172A;">🛡️ Safety Score</td>`;
     ALLB.forEach(b=>{
       const d=vigStats[b];
-      const color=d.open===0?'#059669':d.open<=2?'#D97706':'#DC2626';
-      html+=cell(`<span style="font-weight:700;color:${color}">${d.open} Open</span><small style="color:#94A3B8;display:block;font-size:10px;">${d.closed} closed</small>`,win.includes(b));
-    });
-    html+=`<td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;">${winnerBadge(win)}</td></tr>`;
-  }
-
-  // Row: Purchase Progress — higher completion % is better
-// Row: Purchase Progress — score from In-Progress backlog + overdue (higher is better)
-  {
-    const valMap={}; ALLB.forEach(b=>{valMap[b]=purStats[b].score;});
-    const win=winners(valMap);
-    html+=`<tr style="background:#F8FAFF;"><td style="padding:10px 14px;font-size:12.5px;font-weight:600;border-bottom:1px solid #E0E8FF;color:#0F172A;">🛒 Purchase Progress</td>`;
-    ALLB.forEach(b=>{
-      const d=purStats[b];
-      if(d.total===0||d.score===null){html+=cell('<span style="color:#94A3B8;">No data</span>',false);return;}
+      if(d.total===0){html+=cell('<span style="color:#94A3B8;">No data</span>',false);return;}
       const color=d.score>=80?'#059669':d.score>=60?'#D97706':'#DC2626';
-      html+=cell(`<span style="font-weight:800;color:${color};font-size:14px;">${d.score}</span><small style="color:#94A3B8;display:block;font-size:10px;">${d.open} in prog · ${d.overdue} overdue${d.overdue>0?' (~'+d.avgOd+'d)':''}</small><small style="color:#94A3B8;display:block;font-size:10px;">${d.delivered}/${d.total} delivered</small>`,win.includes(b));
+      html+=cell(`<span style="font-weight:800;color:${color};font-size:15px;">${d.score}</span><small style="color:#94A3B8;display:block;font-size:10px;">${d.open} open · ${d.closed} closed</small><small style="color:#94A3B8;display:block;font-size:10px;">admin verified ${d.adminPct}%${d.awaitingAdmin>0?' · '+d.awaitingAdmin+' awaiting admin':''}</small>`,win.includes(b));
     });
     html+=`<td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;">${winnerBadge(win)}</td></tr>`;
   }
@@ -3971,9 +4126,8 @@ function renderRankings(){
     winners(Object.fromEntries(ALLB.map(b=>[b,careStats[b]?careStats[b].pct:null]))),
     winners(Object.fromEntries(ALLB.map(b=>[b,obsCompletionStats[b]?obsCompletionStats[b].pct:null]))),
     winners(Object.fromEntries(ALLB.map(b=>[b,hrStats[b]&&hrStats[b].avgDays!=null?hrStats[b].avgDays:null])),false),
-    winners(Object.fromEntries(ALLB.map(b=>[b,adminStats[b].total>0?adminStats[b].pct:null]))),
-    winners(Object.fromEntries(ALLB.map(b=>[b,vigStats[b].open])),false),
-    winners(Object.fromEntries(ALLB.map(b=>[b,purStats[b].score]))),
+    winners(Object.fromEntries(ALLB.map(b=>[b,adminStats[b].total>0?adminStats[b].score:null]))),
+    winners(Object.fromEntries(ALLB.map(b=>[b,vigStats[b].total>0?vigStats[b].score:null]))),
   ].forEach(arr=>arr.forEach(b=>winCounts[b]++));
 
   const ranked=ALLB.slice().sort((a,b)=>winCounts[b]-winCounts[a]);
@@ -4042,17 +4196,23 @@ function renderCare(){
     document.getElementById('cc-ip-tbody').innerHTML=quickRowsHtml(ipRows,'#7C3AED');
   }
 
-  // Branch bars
+  // Branch bars — CURRENT month by default; a Month selection in the dropdown overrides it
   let html='';
-  BRANCHES.forEach(b=>{
-    const d=bc[b];if(!d||d.calls===0)return;
-    const pc=d.pct>=95?'pbg':d.pct>=85?'pba':'pbr';
-    const vc=d.pct>=95?'#059669':d.pct>=85?'#D97706':'#DC2626';
+  const _careSB=window._STUDENTS_BY_BRANCH||{};
+  const careCmpBranches=fBranch==='ALL'?BRANCHES:[fBranch];
+  careCmpBranches.forEach(b=>{
+    const useMonth=fMonth!=='ALL'?fMonth:getLatestMonth(b);
+    const rec=TRACKER.find(r=>r.branch===b&&r.month===useMonth&&r.calls>0);
+    if(!rec)return;
+    const students=+_careSB[b]||rec.students||0;
+    const pct=students>0?+(Math.min(rec.calls/students*100,100).toFixed(1)):0;
+    const pc=pct>=95?'pbg':pct>=85?'pba':'pbr';
+    const vc=pct>=95?'#059669':pct>=85?'#D97706':'#DC2626';
     html+=`<div class="bcb">
       <div class="bcb-name"><span class="bd b${b}"></span>${b}</div>
-      <div class="bcb-track"><div class="bcb-fill ${pc}" style="width:${Math.min(d.pct,100)}%"></div></div>
-      <div class="bcb-val" style="color:${vc}">${d.pct}%</div>
-      <div class="bcb-sub">${fi(d.calls)}/${fi(d.students)}</div></div>`;
+      <div class="bcb-track"><div class="bcb-fill ${pc}" style="width:${Math.min(pct,100)}%"></div></div>
+      <div class="bcb-val" style="color:${vc}">${pct}%</div>
+      <div class="bcb-sub">${useMonth.slice(0,3)}: ${fi(rec.calls)}/${fi(students)}</div></div>`;
   });
   document.getElementById('care-bars').innerHTML=html||'<div class="no-data">No data for this filter</div>';
 
@@ -4063,7 +4223,7 @@ function renderCare(){
     const mi=MONTHS.indexOf(r.month);
     if(mi>=0&&r.calls>0)td[r.branch][mi]=r.comp;
   });
-  mkChart('care-trend',lineCfg(MONTHS,BRANCHES.map(b=>({
+  mkChart('care-trend',lineCfg(MONTHS.map(m=>m.slice(0,3)),BRANCHES.map(b=>({
     label:b,data:td[b],borderColor:BC[b],backgroundColor:BC[b]+'22',
     fill:false,tension:0.3,pointRadius:5,pointBackgroundColor:BC[b],spanGaps:true
   }))));
@@ -4644,22 +4804,26 @@ function viewAdminByBranch(branch){
 // ═══════════════════════════════════════════════════════
 
 function viewPurchaseRecords(filterType) {
+  // KPI click-to-view — shows ONLY the records matching the clicked KPI status.
   let rows = (typeof PUR_DATA !== 'undefined') ? PUR_DATA : [];
   const branch = document.getElementById('sel-branch').value;
   if (branch !== 'ALL') rows = rows.filter(r => r.Branch === branch);
   let titleSuffix = '';
-  if (filterType === 'ApprovalPending') { rows = rows.filter(r => r.Approval === 'Pending'); titleSuffix = ' — Approval Pending'; }
-  else if (filterType === 'InProgressOrdered') { rows = rows.filter(r => r.PurchaseStatus === 'In Progress' || r.PurchaseStatus === 'Order Placed'); titleSuffix = ' — In Progress / Order Placed'; }
-  else if (filterType === 'WorkDone') { rows = rows.filter(r => r.WorkCompletion === 'Done'); titleSuffix = ' — Work Completed'; }
-  else if (filterType === 'WorkNotStarted') { rows = rows.filter(r => r.WorkCompletion === 'Not Started'); titleSuffix = ' — Work Not Started'; }
+  const st = r => String(r.PurchaseStatus || '').trim();
+  if (filterType === 'Delivered')        { rows = rows.filter(r => /^delivered/i.test(st(r)));               titleSuffix = ' — Delivered'; }
+  else if (filterType === 'Ordered')     { rows = rows.filter(r => /^order/i.test(st(r)));                   titleSuffix = ' — Ordered'; }
+  else if (filterType === 'In Progress') { rows = rows.filter(r => /^in progress/i.test(st(r)));             titleSuffix = ' — In Progress'; }
+  else if (filterType === 'Rejected')    { rows = rows.filter(r => /rejected|cancel/i.test(st(r)));          titleSuffix = ' — Rejected'; }
+  else if (filterType === 'InProgressOrdered') { rows = rows.filter(r => /^in progress|^order/i.test(st(r))); titleSuffix = ' — In Progress / Ordered'; }
+  // no/unknown filter → all records
   const cols = [
-    {key:'Branch', label:'Branch'}, {key:'Date', label:'Date'},
+    {key:'Branch', label:'Branch'}, {key:'Date', label:'Date', date:true},
     {key:'Item', label:'Item / Particulars', maxW:'200px'},
     {key:'Spec', label:'Specification', maxW:'140px'},
     {key:'Dept', label:'Dept'},
-    {key:'Approval', label:'Approval', pill:true},
     {key:'PurchaseStatus', label:'Purchase Status', pill:true},
-    {key:'WorkCompletion', label:'Work Completion'},
+    {key:'TargetDate', label:'Target Date', date:true},
+    {key:'Due', label:'Due'},
     {key:'Priority', label:'Priority'},
     {key:'RaisedBy', label:'Raised By'},
     {key:'Remarks', label:'Remarks', maxW:'200px'},
