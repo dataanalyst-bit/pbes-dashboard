@@ -420,7 +420,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="card"><div class="ch"><h3>📊 Call Status Breakdown</h3></div><div class="cb"><div class="cw sm"><canvas id="ov-status"></canvas></div></div></div>
   </div>
   <div class="row r3">
-    <div class="card"><div class="ch"><h3>📊 Avg Observation Score by Observer Type</h3><span class="fnote">By selected branch &amp; month · click a bar to view</span></div>
+    <div class="card"><div class="ch"><h3>📊 Observer Completion by Type — Required vs Done</h3><span class="fnote">Working Days × quota (2/day leadership · 1/day HOD) · follows Branch &amp; Month dropdowns</span></div>
       <div class="cb"><div class="cw tall"><canvas id="ov-obstype"></canvas></div></div>
     </div>
     <div class="card"><div class="ch"><h3>🏗️ Admin Task Status</h3><span class="fnote">Click a slice to view tasks</span></div><div class="cb"><div class="cw sm"><canvas id="ov-admin-chart"></canvas></div></div></div>
@@ -456,12 +456,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       </table>
     </div>
   </div>
-  <div class="card"><div class="ch"><h3>🎯 Key Management Insights</h3></div><div class="cb">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      <div class="ins ins-s"><span>✅</span><p><strong>Pocharam & Keesara lead</strong> with 99% care call completion in April & March respectively. Bachupally improved to 98.4% in April.</p></div>
-      <div class="ins ins-d"><span>🚨</span><p><strong>Fire safety open issues</strong>: Pocharam (94d overdue), Keesara (64d), Boduppal (33d) — Board immediate action required.</p></div>
-      <div class="ins ins-i"><span>📈</span><p><strong>Keesara leads</strong> teacher observations: avg 3.59/5, 101 Excellent ratings out of 208 observations across both months.</p></div>
-      <div class="ins ins-w"><span>⚠️</span><p><strong>Bachupally admin</strong> at 44.8% completion and 12 purchase approvals pending — needs urgent management escalation.</p></div>
+  <div class="card"><div class="ch"><h3>🎯 Key Management Insights</h3><span class="fnote">Computed live from every department on each data refresh · updates automatically</span></div><div class="cb">
+    <div id="ov-insights" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="ins ins-i"><span>⏳</span><p>Computing insights from live data…</p></div>
     </div>
   </div></div>
 </div>
@@ -1487,12 +1484,13 @@ function renderOverview(){
 
   mkChart('ov-status',dnutCfg(['Resolved','In Progress','Pending'],[s.resolved,s.ip,s.pending],['#059669','#3B82F6','#D97706']));
 
-  // ── Avg Observation Score by Observer Role (respects BRANCH + MONTH dropdowns, click-to-view) ──
+  // ── Observer COMPLETION by Type — Required vs Done (Executive Overview) ──
+  // Required = Working Days × quota × number of observers of that role in the branch.
+  // Quota: 2 obs/working day for leadership (Principal/VP/HM/Incharge/Coordinators), 1/day for HODs.
+  // Follows the BRANCH + MONTH dropdowns. Click a bar to view the observations done.
   {
     const _mmOV={March:'Mar-2026',April:'Apr-2026',May:'May-2026',June:'Jun-2026',July:'Jul-2026',August:'Aug-2026',September:'Sep-2026',October:'Oct-2026',November:'Nov-2026',December:'Dec-2026',January:'Jan-2027',February:'Feb-2027'};
-    const ALLOBS=((typeof OBS_DATA!=='undefined'&&Array.isArray(OBS_DATA))?OBS_DATA:[])
-      .filter(r=>(fBranch==='ALL'||r.Branch===fBranch)&&(fMonth==='ALL'||r.Month===_mmOV[fMonth]));
-    // Group the 20+ raw observer types into meaningful roles
+    const ALLOBS=(typeof OBS_DATA!=='undefined'&&Array.isArray(OBS_DATA))?OBS_DATA:[];
     function roleOf(t){
       t=(t||'').trim();
       if(/principal/i.test(t)) return 'Principal';
@@ -1503,29 +1501,46 @@ function renderOverview(){
       if(/hod|head of dep/i.test(t)) return 'HODs';
       return 'Other';
     }
+    const quotaOfRole=k=>k==='HODs'?1:2;
     const ROLE_ORDER=['Principal','VP','HM','Incharge','Coordinators','HODs','Other'];
-    const byRole={};
-    ALLOBS.forEach(r=>{
-      const role=roleOf(r.ObsType);
-      const sc=parseFloat(r.Score);
-      if(!byRole[role]) byRole[role]={sum:0,n:0};
-      if(!isNaN(sc)){ byRole[role].sum+=sc; byRole[role].n++; }
+    const MC_OV=(typeof MONTH_CONFIG!=='undefined'&&MONTH_CONFIG)?MONTH_CONFIG:{};
+    const cfgBranches=(fBranch==='ALL')?Object.keys(MC_OV):[fBranch];
+    const agg={}; ROLE_ORDER.forEach(k=>agg[k]={required:0,actual:0});
+    cfgBranches.forEach(b=>{
+      const cfg=MC_OV[b]||{};
+      const monthKeys=(fMonth!=='ALL'&&_mmOV[fMonth])?[_mmOV[fMonth]]:Object.keys(cfg);
+      // distinct exact observer types per role present in this branch (any month)
+      const branchRoleTypes={}; ROLE_ORDER.forEach(k=>branchRoleTypes[k]=new Set());
+      ALLOBS.filter(r=>r.Branch===b).forEach(r=>{
+        const t=String(r.ObsType||'').trim(); if(!t||t==='–'||/^nan$/i.test(t))return;
+        branchRoleTypes[roleOf(t)].add(t);
+      });
+      monthKeys.forEach(mk=>{
+        const wd=parseInt(cfg[mk],10); if(isNaN(wd)||wd<=0)return;
+        const obsHere=ALLOBS.filter(r=>r.Branch===b&&r.Month===mk);
+        ROLE_ORDER.forEach(k=>{
+          const nTypes=branchRoleTypes[k].size;
+          if(nTypes===0)return;
+          agg[k].required+=wd*quotaOfRole(k)*nTypes;
+          agg[k].actual+=obsHere.filter(r=>roleOf(r.ObsType)===k).length;
+        });
+      });
     });
-    const roles=ROLE_ORDER.filter(r=>byRole[r]&&byRole[r].n>0)
-      .map(r=>({role:r,avg:byRole[r].sum/byRole[r].n,n:byRole[r].n}));
-    window._OV_OBSROLES=roles.map(r=>r.role);
+    const roles=ROLE_ORDER.filter(k=>agg[k].required>0);
+    const pct=roles.map(k=>Math.min(100,Math.round(agg[k].actual/agg[k].required*100)));
+    window._OV_OBSROLES=roles;
     mkChart('ov-obstype',{type:'bar',
-      data:{labels:roles.map(r=>r.role),datasets:[{label:'Avg Score',
-        data:roles.map(r=>+r.avg.toFixed(2)),
-        backgroundColor:roles.map(r=>r.avg>=3.5?'#059669':r.avg>=3?'#D97706':'#DC2626'),
+      data:{labels:roles,datasets:[{label:'Completion %',
+        data:pct,
+        backgroundColor:pct.map(p=>p>=80?'#059669':p>=50?'#D97706':'#DC2626'),
         borderRadius:6,maxBarThickness:48}]},
       options:{responsive:true,maintainAspectRatio:false,
         onClick:(evt,els)=>{ if(!els||!els.length)return; viewObsByRole(window._OV_OBSROLES[els[0].index]); },
         plugins:{legend:{display:false},
-          tooltip:{callbacks:{label:c=>{const r=roles[c.dataIndex];return `Avg ${r.avg.toFixed(2)} from ${r.n} observations`;}}},
-          datalabels:{display:true,anchor:'end',align:'top',color:'#1E293B',font:{size:12,weight:'bold'},
-            formatter:(v,c)=>{const r=roles[c.dataIndex];return v.toFixed(2)+'\n('+r.n+')';}}},
-        scales:{y:{beginAtZero:true,max:5,title:{display:true,text:'Average Score (/5)'},grid:{color:'#E0E8FF'}},
+          tooltip:{callbacks:{label:c=>{const k=roles[c.dataIndex];return `${agg[k].actual} done / ${agg[k].required} required (${quotaOfRole(k)}/day per observer)`;}}},
+          datalabels:{display:true,anchor:'end',align:'top',color:'#1E293B',font:{size:11,weight:'bold'},
+            formatter:(v,c)=>{const k=roles[c.dataIndex];return v+'%\n('+agg[k].actual+'/'+agg[k].required+')';}}},
+        scales:{y:{beginAtZero:true,max:110,title:{display:true,text:'Completion % (done ÷ required)'},grid:{color:'#E0E8FF'},ticks:{callback:v=>v+'%'}},
           x:{ticks:{font:{size:11,weight:'600'}},grid:{display:false}}}}});
   }
 
@@ -3877,6 +3892,157 @@ function switchTab(id){
   window.scrollTo(0,0);
   renderAll();
 }
+// ═══════════════════════════════════════════════════════
+// 🎯 KEY MANAGEMENT INSIGHTS — computed live from every department
+// Priority: 🚨 danger → ⚠️ warning → 📈 info → ✅ success. Top 8 shown.
+// ═══════════════════════════════════════════════════════
+function renderInsights(){
+  const el=document.getElementById('ov-insights');
+  if(!el) return;
+  const out=[]; // {sev:0..3, cls, icon, html}
+  const add=(sev,icon,html)=>out.push({sev,icon,html,
+    cls:sev===0?'ins-d':sev===1?'ins-w':sev===2?'ins-i':'ins-s'});
+  const SB=window._STUDENTS_BY_BRANCH||{};
+  const ALLB=['Keesara','Pocharam','Bachupally','Boduppal','Gowdavalli'];
+
+  try{ // ── 1. CARE CALLS — previous-month completion leaders & laggards ──
+    const per=[];
+    ALLB.forEach(b=>{
+      const m=getPrevMonth(b); if(!m)return;
+      const rec=TRACKER.find(r=>r.branch===b&&r.month===m&&r.calls>0); if(!rec)return;
+      const students=+SB[b]||rec.students||0;
+      const pct=students>0?+(Math.min(rec.calls/students*100,100).toFixed(1)):0;
+      per.push({b,m,pct,calls:rec.calls,students});
+    });
+    if(per.length){
+      per.sort((a,b)=>b.pct-a.pct);
+      const top=per[0];
+      add(3,'✅',`<strong>${top.b} leads ${top.m} care calls</strong> at ${top.pct}% completion (${fi(top.calls)}/${fi(top.students)} students).`);
+      const lag=per.filter(p=>p.pct<85);
+      if(lag.length) add(1,'⚠️',`<strong>Care call gap in ${lag.map(p=>p.b+' ('+p.pct+'%)').join(', ')}</strong> for ${lag[0].m} — push Grievance Officers to cover remaining students.`);
+    }
+  }catch(e){console.error('ins care',e);}
+
+  try{ // ── 2. VIGILANCE — open critical/high risk + awaiting admin ──
+    const VIG=(typeof VIG_DATA!=='undefined'&&Array.isArray(VIG_DATA))?VIG_DATA:[];
+    const openHi=VIG.filter(r=>r.Status==='Open'&&(r.RiskLevel==='Critical'||r.RiskLevel==='High'));
+    if(openHi.length){
+      const byB={}; openHi.forEach(r=>byB[r.Branch]=(byB[r.Branch]||0)+1);
+      add(0,'🚨',`<strong>${openHi.length} open Critical/High safety issue${openHi.length>1?'s':''}</strong>: ${Object.entries(byB).map(([b,n])=>b+' ('+n+')').join(', ')} — board attention required.`);
+    }
+    const isAdmDone=r=>/closed|done|completed|resolved/i.test(String(r.AdminStatus||''));
+    const waitByB={}; let waitTot=0;
+    VIG.forEach(r=>{ if(r.Status==='Closed'&&!isAdmDone(r)){ waitByB[r.Branch]=(waitByB[r.Branch]||0)+1; waitTot++; }});
+    if(waitTot>0){
+      const worst=Object.entries(waitByB).sort((a,b)=>b[1]-a[1]);
+      add(1,'🧑‍💼',`<strong>${waitTot} vigilance-closed issues await Admin Status update</strong> — worst: ${worst.slice(0,2).map(([b,n])=>b+' ('+n+')').join(', ')}. Admins must verify &amp; close them.`);
+    } else if(VIG.length){
+      add(3,'✅',`<strong>Admin follow-up complete</strong> — every vigilance-closed issue has been verified by Admins.`);
+    }
+  }catch(e){console.error('ins vig',e);}
+
+  try{ // ── 3. ADMIN — closing-speed laggard + overdue ageing ──
+    const ADM=(typeof ADMIN_DATA!=='undefined'&&Array.isArray(ADMIN_DATA))?ADMIN_DATA:[];
+    const st=ALLB.map(b=>({b,...adminSpeedStats(ADM.filter(r=>r.Branch===b))})).filter(s=>s.total>0);
+    if(st.length){
+      st.sort((a,b)=>a.score-b.score);
+      const worst=st[0], best=st[st.length-1];
+      if(worst.score<70) add(1,'🏗️',`<strong>${worst.b} admin closing speed at ${worst.score}/100</strong> — ${worst.overdue} overdue task${worst.overdue!==1?'s':''} averaging ${worst.avgOd}d late. Escalate deadline reviews.`);
+      add(2,'📈',`<strong>${best.b} sets the admin pace</strong>: ${best.score}/100 speed score, ${best.done}/${best.total} tasks done${best.overdue===0?', zero overdue':''}.`);
+    }
+  }catch(e){console.error('ins admin',e);}
+
+  try{ // ── 4. HR — aging open positions + branch without recruiter ──
+    const HRR=(typeof HR_RECORDS!=='undefined'&&Array.isArray(HR_RECORDS))?HR_RECORDS:[];
+    const today=new Date();
+    const openAging=HRR.filter(r=>/^open$/i.test(String(r.Status||'').trim())).map(r=>{
+      const pd=new Date(r.PostDate);
+      return {r,age:isNaN(pd)?0:Math.round((today-pd)/86400000)};
+    }).filter(o=>o.age>30);
+    if(openAging.length){
+      const byB={}; openAging.forEach(o=>{const b=o.r.Branch||'–'; byB[b]=(byB[b]||0)+1;});
+      const oldest=openAging.sort((a,b)=>b.age-a.age)[0];
+      add(1,'⏳',`<strong>${openAging.length} position${openAging.length>1?'s':''} open &gt;30 days</strong> (oldest: ${oldest.r.Position||'–'} at ${oldest.r.Branch}, ${oldest.age}d) — ${Object.entries(byB).map(([b,n])=>b+' ('+n+')').join(', ')}. Review recruiter pipelines.`);
+    }
+    const RES=(typeof HR_RESIGNED_LIST!=='undefined')?HR_RESIGNED_LIST:[];
+    if(RES.length){
+      const resOpen=HRR.filter(r=>RES.some(x=>String(x).toLowerCase()===String(r.HR||'').trim().toLowerCase())&&/^open$/i.test(String(r.Status||'').trim()));
+      if(resOpen.length){
+        const bs=[...new Set(resOpen.map(r=>r.Branch))].join(', ');
+        add(1,'👤',`<strong>${resOpen.length} open position${resOpen.length>1?'s':''} ${resOpen.length>1?'belong':'belongs'} to resigned recruiter${RES.length>1?'s':''} (${RES.join(', ')})</strong> at ${bs} — reassign to an active recruiter.`);
+      }
+    }
+  }catch(e){console.error('ins hr',e);}
+
+  try{ // ── 5. OBSERVATIONS — weakest observer role completion + teacher quality ──
+    const OBS=(typeof OBS_DATA!=='undefined'&&Array.isArray(OBS_DATA))?OBS_DATA:[];
+    const MC=(typeof MONTH_CONFIG!=='undefined'&&MONTH_CONFIG)?MONTH_CONFIG:{};
+    const roleOf=t=>{t=String(t||'');if(t.includes('Principal'))return'Principal';if(t.includes('VP'))return'VP';if(t.includes('HM'))return'HM';if(t.includes('HOD'))return'HODs';return'Coordinators';};
+    const agg={};
+    Object.keys(MC).forEach(b=>{
+      const cfg=MC[b]||{};
+      const roleTypes={}; OBS.filter(r=>r.Branch===b).forEach(r=>{const t=String(r.ObsType||'').trim();if(!t||t==='–')return;const k=roleOf(t);(roleTypes[k]=roleTypes[k]||new Set()).add(t);});
+      Object.keys(cfg).forEach(mk=>{
+        const wd=parseInt(cfg[mk],10); if(isNaN(wd)||wd<=0)return;
+        const here=OBS.filter(r=>r.Branch===b&&r.Month===mk);
+        Object.keys(roleTypes).forEach(k=>{
+          if(!agg[k])agg[k]={required:0,actual:0};
+          agg[k].required+=wd*(k==='HODs'?1:2)*roleTypes[k].size;
+          agg[k].actual+=here.filter(r=>roleOf(r.ObsType)===k).length;
+        });
+      });
+    });
+    const roles=Object.entries(agg).filter(([,v])=>v.required>0)
+      .map(([k,v])=>({k,pct:Math.round(v.actual/v.required*100),a:v.actual,q:v.required}))
+      .sort((a,b)=>a.pct-b.pct);
+    if(roles.length&&roles[0].pct<60)
+      add(1,'📋',`<strong>${roles[0].k} observation completion only ${roles[0].pct}%</strong> (${roles[0].a}/${roles[0].q} required) — remind ${roles[0].k} of the daily observation quota.`);
+    const AT=(typeof ALL_TEACHER!=='undefined'&&Array.isArray(ALL_TEACHER))?ALL_TEACHER:[];
+    const ni={}; AT.forEach(r=>{const v=parseFloat(r.GrandAvg); if(!isNaN(v)&&v>0&&v<3) ni[r.Branch]=(ni[r.Branch]||0)+1;});
+    const niTot=Object.values(ni).reduce((a,b)=>a+b,0);
+    if(niTot>0){
+      const worst=Object.entries(ni).sort((a,b)=>b[1]-a[1]);
+      add(2,'🎓',`<strong>${niTot} teacher${niTot>1?'s':''} with Grand Avg below 3.0</strong> — most in ${worst.slice(0,2).map(([b,n])=>b+' ('+n+')').join(', ')}. Plan coaching/support sessions.`);
+    }
+  }catch(e){console.error('ins obs',e);}
+
+  try{ // ── 6. PURCHASE — aging open requests ──
+    const PUR=(typeof PUR_DATA!=='undefined'&&Array.isArray(PUR_DATA))?PUR_DATA:[];
+    const today=new Date();
+    const aging=PUR.filter(r=>/^in progress|^order/i.test(String(r.PurchaseStatus||'').trim())).map(r=>{
+      let od=0;
+      if(r.Due!=='–'&&!isNaN(+r.Due)&&+r.Due>0) od=+r.Due;
+      else if(r.TargetDate&&r.TargetDate!=='–'){const td=new Date(r.TargetDate); if(!isNaN(td)&&td<today) od=Math.round((today-td)/86400000);}
+      else if(r.Date&&r.Date!=='–'){const d=new Date(r.Date); if(!isNaN(d)){const age=Math.round((today-d)/86400000); if(age>14) od=age-14;}}
+      return {r,od};
+    }).filter(o=>o.od>0);
+    if(aging.length){
+      const byB={}; aging.forEach(o=>{byB[o.r.Branch]=(byB[o.r.Branch]||0)+1;});
+      add(1,'🛒',`<strong>${aging.length} purchase request${aging.length>1?'s':''} overdue/aging</strong>: ${Object.entries(byB).sort((a,b)=>b[1]-a[1]).map(([b,n])=>b+' ('+n+')').join(', ')} — chase vendors or update Target Dates.`);
+    }
+  }catch(e){console.error('ins pur',e);}
+
+  try{ // ── 7. GRIEVANCE — unresolved parent cases ──
+    const GR=(typeof GRIEVANCE_DATA!=='undefined'&&Array.isArray(GRIEVANCE_DATA))?GRIEVANCE_DATA:[];
+    const open=GR.filter(r=>r.Status&&!/resolved/i.test(r.Status)&&!/^nan$/i.test(r.Status));
+    const sev=open.filter(r=>/high|critical/i.test(String(r.Severity||'')));
+    if(sev.length){
+      const byB={}; sev.forEach(r=>byB[r.Branch]=(byB[r.Branch]||0)+1);
+      add(0,'📣',`<strong>${sev.length} high-severity parent grievance${sev.length>1?'s':''} unresolved</strong>: ${Object.entries(byB).map(([b,n])=>b+' ('+n+')').join(', ')} — resolve before satisfaction scores slip.`);
+    } else if(open.length){
+      add(2,'📨',`<strong>${open.length} parent grievance${open.length>1?'s':''} still open</strong> of ${GR.length} total — keep closure momentum.`);
+    }
+  }catch(e){console.error('ins griev',e);}
+
+  // ── Render: severity order, top 8, always at least one success line ──
+  out.sort((a,b)=>a.sev-b.sev);
+  let show=out.slice(0,8);
+  if(!show.some(i=>i.sev===3)&&out.some(i=>i.sev===3)) show[show.length-1]=out.find(i=>i.sev===3);
+  el.innerHTML=show.length
+    ? show.map(i=>`<div class="ins ${i.cls}"><span>${i.icon}</span><p>${i.html}</p></div>`).join('')
+    : '<div class="ins ins-i"><span>ℹ️</span><p>No live data loaded yet — insights appear after the data source responds.</p></div>';
+}
+
 // ── Shared performance helpers (used by scorecard + department dashboards) ──
 // Days to close a position: Closed Date − Post Date (real dates), sheet value as fallback.
 function hrCloseDays(r){
@@ -4306,7 +4472,7 @@ function renderCare(){
 function _origRenderAll(){
   // Each render is isolated: if one throws on unexpected live data, the rest still render.
   const steps=[
-    ['Overview',renderOverview],['GrievanceOfficer',renderGrievanceOfficer],['Rankings',renderRankings],
+    ['Overview',renderOverview],['GrievanceOfficer',renderGrievanceOfficer],['Rankings',renderRankings],['Insights',renderInsights],
     ['Care',renderCare],['Observations',renderObservations],['Admin',renderAdmin],
     ['Vigilance',renderVigilance],['Purchase',renderPurchase],['HR',renderHR],
     ['Admissions',renderAdmissions],['Grievance',renderGrievance]
@@ -4740,7 +4906,7 @@ function viewAllObservations() {
 // ADMIN TRACKER — Full table by branch
 // ═══════════════════════════════════════════════════════
 
-// View All Tasks with Status + Day/Due filter chips (Point 4)
+// View All Tasks with Status + Day/Due filter chips (Point  4)
 var _admFilterStatus='ALL', _admFilterDue='ALL';
 function openAdminAllTasks(){
   _admFilterStatus='ALL'; _admFilterDue='ALL';
