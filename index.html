@@ -1538,8 +1538,8 @@ function renderOverview(){
         onClick:(evt,els)=>{ if(!els||!els.length)return; viewObsByRole(window._OV_OBSROLES[els[0].index]); },
         plugins:{legend:{display:false},
           tooltip:{callbacks:{label:c=>{const k=roles[c.dataIndex];return `${agg[k].actual} done / ${agg[k].required} required (${quotaOfRole(k)}/day per observer)`;}}},
-          datalabels:{display:true,anchor:'end',align:'top',color:'#1E293B',font:{size:11,weight:'bold'},
-            formatter:(v,c)=>{const k=roles[c.dataIndex];return v+'%\n('+agg[k].actual+'/'+agg[k].required+')';}}},
+          datalabels:{display:true,anchor:'end',align:'top',color:'#1E293B',font:{size:12,weight:'bold'},
+            formatter:v=>v+'%'}},
         scales:{y:{beginAtZero:true,max:110,title:{display:true,text:'Completion % (done ÷ required)'},grid:{color:'#E0E8FF'},ticks:{callback:v=>v+'%'}},
           x:{ticks:{font:{size:11,weight:'600'}},grid:{display:false}}}}});
   }
@@ -1994,7 +1994,7 @@ function renderObservations(){
       plugins:{legend:{display:false},
         tooltip:{callbacks:{label:c=>{const t=otShown[c.dataIndex];return `${otAgg[t.key].actual} done / ${otAgg[t.key].required} required (${quotaOfRole(t.key)}/day per observer)`;}}},
         datalabels:{anchor:'end',align:'top',font:{weight:'800',size:12},color:'#0F172A',
-          formatter:(v,ctx)=>{const t=otShown[ctx.dataIndex];return v+'%\n('+otAgg[t.key].actual+'/'+otAgg[t.key].required+')';}}
+          formatter:v=>v+'%'}
       },
       scales:{x:{grid:{display:false},ticks:{font:{size:11.5}}},
         y:{beginAtZero:true,max:110,grid:{color:'#E0E8FF'},ticks:{callback:v=>v+'%',font:{size:11}},
@@ -4906,7 +4906,7 @@ function viewAllObservations() {
 // ADMIN TRACKER — Full table by branch
 // ═══════════════════════════════════════════════════════
 
-// View All Tasks with Status + Day/Due filter chips (Point  4)
+// View All Tasks with Status + Day/Due filter chips (Point 4)
 var _admFilterStatus='ALL', _admFilterDue='ALL';
 function openAdminAllTasks(){
   _admFilterStatus='ALL'; _admFilterDue='ALL';
@@ -5002,7 +5002,7 @@ function viewPurchaseRecords(filterType) {
 // INSTALL CHART CLICK HANDLERS after render
 // ═══════════════════════════════════════════════════════
 function renderAll() {
-  // Reset click-install flags so handlers reattach after chart recreation
+  // Reset click-install flags so handlers reattach after  chart recreation
   grievanceChartClickInstalled = false;
   vigChartClickInstalled = false;
   // Close grievance panel when filters change
