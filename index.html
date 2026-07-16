@@ -198,7 +198,8 @@ let GO_DATA = [], GRIEVANCE_DATA = [], ADM_TRENDS = [], MONTH_CONFIG = {}, ALL_T
     HR_RECORDS = [], VIG_DATA = [], TRACKER = [],
     ADM1_DATA = [], ADM2_DATA = [], LEAD_DATES = [],
     LEAD_SUMMARY = {}, OWNER_STATS = [], COMBINED_ADM = [],
-    COMBINED_SUMMARY = {}, OWNER_QUALITY = {};
+    COMBINED_SUMMARY = {}, OWNER_QUALITY = {},
+    AVIS_DATA = [], DATE_WINDOWS = null;
 let _liveDataLoaded = false;
 
 // ---- Status banner helpers ----
@@ -278,6 +279,8 @@ catch (e) {
     if (data.COMBINED_ADM)     COMBINED_ADM     = data.COMBINED_ADM;
     if (data.COMBINED_SUMMARY) COMBINED_SUMMARY = data.COMBINED_SUMMARY;
     if (data.OWNER_QUALITY)    OWNER_QUALITY    = data.OWNER_QUALITY;
+    if (data.AVIS_DATA)        AVIS_DATA        = data.AVIS_DATA;
+    if (data.DATE_WINDOWS)     DATE_WINDOWS     = data.DATE_WINDOWS;
 
     _liveDataLoaded = true;
     showLoadOk(data.generatedAt, data.computeMs);
@@ -373,7 +376,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       <option value="December">December 2026</option>
       <option value="January">January 2027</option>
       <option value="February">February 2027</option>
-      <option value="July">July 2026</option>
     </select>
     <div class="fsep"></div>
     <div class="fbadge"><span class="fbadge-dot"></span><span id="fbadge-txt">Showing: All Branches · All Months</span></div>
@@ -389,6 +391,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   <button class="tb" onclick="showTab('purchase',this)">🛒 Purchase</button>
   <button class="tb" onclick="showTab('hr',this)">👥 HR Analytics</button>
   <button class="tb" onclick="showTab('admissions',this)">🎓 Admissions 2026-27</button>
+  <button class="tb" onclick="showTab('avis',this)">🏫 Akshara Vaagdevi</button>
   <button class="tb" onclick="showTab('grievance',this)">📣 Grievance</button>
 </div></nav>
 
@@ -725,21 +728,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div style="font-size:11px;font-weight:800;letter-spacing:.5px;color:#059669;text-transform:uppercase;margin:0 0 8px 2px;display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:3px;background:#059669;display:inline-block;"></span>🎓 Admissions (Portal-confirmed)</div>
   <div class="krow k6" style="margin-bottom:18px;">
     <div class="kc green clickable" onclick="viewConfirmedAdmissions()" title="Click to view by branch"><div class="kc-ico">🎓</div><div class="kc-lbl">Confirmed (Portal)</div><div class="kc-val" id="adm-confirmed">–</div><div class="kc-sub" id="adm-confirmed-s">EXTRAEDGE stage-08: –</div></div>
-    <div class="kc green"><div class="kc-ico">📅</div><div class="kc-lbl">Today</div><div class="kc-val" id="adm-today">–</div><div class="kc-sub">New enrollments</div></div>
-    <div class="kc green"><div class="kc-ico">📆</div><div class="kc-lbl">This Week</div><div class="kc-val" id="adm-thisweek">–</div><div class="kc-sub">Mon–today</div></div>
-    <div class="kc green"><div class="kc-ico">📆</div><div class="kc-lbl">Last Week</div><div class="kc-val" id="adm-lastweek">–</div><div class="kc-sub">Previous week</div></div>
-    <div class="kc green"><div class="kc-ico">📈</div><div class="kc-lbl">This Month</div><div class="kc-val" id="adm-thismonth">–</div><div class="kc-sub">Month to date</div></div>
-    <div class="kc green"><div class="kc-ico">📊</div><div class="kc-lbl">Last Month</div><div class="kc-val" id="adm-lastmonth">–</div><div class="kc-sub">Previous month</div></div>
+    <div class="kc green clickable" onclick="viewAdmWindow('today')" title="Click to view records"><div class="kc-ico">📅</div><div class="kc-lbl">Today</div><div class="kc-val" id="adm-today">–</div><div class="kc-sub">New enrollments · click to view</div></div>
+    <div class="kc green clickable" onclick="viewAdmWindow('thisWeek')" title="Click to view records"><div class="kc-ico">📆</div><div class="kc-lbl">This Week</div><div class="kc-val" id="adm-thisweek">–</div><div class="kc-sub">Mon–today · click to view</div></div>
+    <div class="kc green clickable" onclick="viewAdmWindow('lastWeek')" title="Click to view records"><div class="kc-ico">📆</div><div class="kc-lbl">Last Week</div><div class="kc-val" id="adm-lastweek">–</div><div class="kc-sub">Mon–Sun · click to view</div></div>
+    <div class="kc green clickable" onclick="viewAdmWindow('thisM')" title="Click to view records"><div class="kc-ico">📈</div><div class="kc-lbl">This Month</div><div class="kc-val" id="adm-thismonth">–</div><div class="kc-sub">Month to date · click to view</div></div>
+    <div class="kc green clickable" onclick="viewAdmWindow('lastM')" title="Click to view records"><div class="kc-ico">📊</div><div class="kc-lbl">Last Month</div><div class="kc-val" id="adm-lastmonth">–</div><div class="kc-sub">Previous month · click to view</div></div>
   </div>
   <!-- ═══ LEADS — blue/indigo family ═══ -->
   <div style="font-size:11px;font-weight:800;letter-spacing:.5px;color:#1E4FD8;text-transform:uppercase;margin:0 0 8px 2px;display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:3px;background:#1E4FD8;display:inline-block;"></span>📋 Leads (EXTRAEDGE)</div>
   <div class="krow k6">
     <div class="kc blue"><div class="kc-ico">📋</div><div class="kc-lbl">Total Leads</div><div class="kc-val" id="adm-totleads">–</div><div class="kc-sub" id="adm-totleads-s">All-time</div></div>
-    <div class="kc blue"><div class="kc-ico">📞</div><div class="kc-lbl">Today</div><div class="kc-val" id="lead-today">–</div><div class="kc-sub">New today</div></div>
-    <div class="kc blue"><div class="kc-ico">📆</div><div class="kc-lbl">This Week</div><div class="kc-val" id="lead-thisweek">–</div><div class="kc-sub">Mon–today</div></div>
-    <div class="kc blue"><div class="kc-ico">📆</div><div class="kc-lbl">Last Week</div><div class="kc-val" id="lead-lastweek">–</div><div class="kc-sub">Previous week</div></div>
-    <div class="kc blue"><div class="kc-ico">📈</div><div class="kc-lbl">This Month</div><div class="kc-val" id="lead-thismonth">–</div><div class="kc-sub">Month to date</div></div>
-    <div class="kc blue"><div class="kc-ico">📊</div><div class="kc-lbl">Last Month</div><div class="kc-val" id="lead-lastmonth">–</div><div class="kc-sub">Previous month</div></div>
+    <div class="kc blue clickable" onclick="viewLeadWindow('today')" title="Click to view records"><div class="kc-ico">📞</div><div class="kc-lbl">Today</div><div class="kc-val" id="lead-today">–</div><div class="kc-sub">New today · click to view</div></div>
+    <div class="kc blue clickable" onclick="viewLeadWindow('thisWeek')" title="Click to view records"><div class="kc-ico">📆</div><div class="kc-lbl">This Week</div><div class="kc-val" id="lead-thisweek">–</div><div class="kc-sub">Mon–today · click to view</div></div>
+    <div class="kc blue clickable" onclick="viewLeadWindow('lastWeek')" title="Click to view records"><div class="kc-ico">📆</div><div class="kc-lbl">Last Week</div><div class="kc-val" id="lead-lastweek">–</div><div class="kc-sub">Mon–Sun · click to view</div></div>
+    <div class="kc blue clickable" onclick="viewLeadWindow('thisM')" title="Click to view records"><div class="kc-ico">📈</div><div class="kc-lbl">This Month</div><div class="kc-val" id="lead-thismonth">–</div><div class="kc-sub">Month to date · click to view</div></div>
+    <div class="kc blue clickable" onclick="viewLeadWindow('lastM')" title="Click to view records"><div class="kc-ico">📊</div><div class="kc-lbl">Last Month</div><div class="kc-val" id="lead-lastmonth">–</div><div class="kc-sub">Previous month · click to view</div></div>
   </div>
 
   <!-- DC/NS Admissions table -->
@@ -750,12 +753,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         <thead><tr style="background:#EEF2FF;">
           <th style="padding:9px 12px;text-align:left;font-size:10.5px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Branch</th>
           <th style="padding:9px 12px;text-align:center;font-size:10.5px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Total Confirmed</th>
+          <th style="padding:9px 12px;text-align:center;font-size:10.5px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Total Leads</th>
           <th style="padding:9px 12px;text-align:center;font-size:10.5px;font-weight:700;color:#D97706;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Walk-In Leads</th>
           <th style="padding:9px 12px;text-align:center;font-size:10.5px;font-weight:700;color:#D97706;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Walk-In Admissions</th>
           <th style="padding:9px 12px;text-align:center;font-size:10.5px;font-weight:700;color:#D97706;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Walk-In %</th>
           <th style="padding:9px 12px;text-align:center;font-size:10.5px;font-weight:700;color:#059669;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Digital Leads</th>
           <th style="padding:9px 12px;text-align:center;font-size:10.5px;font-weight:700;color:#059669;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Digital Admissions</th>
           <th style="padding:9px 12px;text-align:center;font-size:10.5px;font-weight:700;color:#059669;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Digital %</th>
+          <th style="padding:9px 12px;text-align:center;font-size:10.5px;font-weight:700;color:#64748B;text-transform:uppercase;border-bottom:2px solid #E0E8FF;" title="Referral / Event / Tele-calling / blank channel — previously miscounted as Walk-In">Other Leads</th>
         </tr></thead>
         <tbody id="adm-dcns-tbody"></tbody>
       </table>
@@ -852,6 +857,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     <button onclick="viewCombinedAdmissions('Both')" style="padding:8px 14px;background:#ECFDF5;color:#059669;border:1.5px solid #A7F3D0;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">🔗 Matched in Both</button>
     <button onclick="viewCombinedAdmissions('PortalOnly')" style="padding:8px 14px;background:#EFF6FF;color:#1E4FD8;border:1.5px solid #BFDBFE;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">🏫 Portal Only (no Lead match)</button>
     <button onclick="viewCombinedAdmissions('LeadsOnly')" style="padding:8px 14px;background:#FFFBEB;color:#D97706;border:1.5px solid #FDE68A;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">📞 Leads Only (not in Portal)</button>
+  </div>
+</div>
+
+<!-- ═══ AKSHARA VAAGDEVI INTERNATIONAL SCHOOL (AVIS) — Admissions ═══ -->
+<div id="pane-avis" class="pane">
+  <div class="sh">
+    <div class="sh-l"><span class="sh-ico">🏫</span><div><h2>Akshara Vaagdevi International School — Admissions</h2><p class="sh-sub" id="avis-tag">Live from the AKSHARA VAAGDEVI INTERNATIONAL SCHOOL sheet · AY 2026-27</p></div></div>
+    <span class="fnote">Separate campus — branch/month filters don't apply here</span>
+  </div>
+
+  <!-- KPI Row 1: totals + time windows (ALL click-to-view) -->
+  <div style="font-size:11px;font-weight:800;letter-spacing:.5px;color:#7C3AED;text-transform:uppercase;margin:0 0 8px 2px;display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:3px;background:#7C3AED;display:inline-block;"></span>🎓 Admissions (Portal entries by Created Date)</div>
+  <div class="krow k6" style="margin-bottom:18px;">
+    <div class="kc purple clickable" onclick="viewAvisWindow('all')" title="Click to view all records"><div class="kc-ico">🎓</div><div class="kc-lbl">Total Admissions</div><div class="kc-val" id="avis-total">–</div><div class="kc-sub">All records · click to view</div></div>
+    <div class="kc purple clickable" onclick="viewAvisWindow('today')" title="Click to view records"><div class="kc-ico">📅</div><div class="kc-lbl">Today</div><div class="kc-val" id="avis-today">–</div><div class="kc-sub">New entries · click to view</div></div>
+    <div class="kc purple clickable" onclick="viewAvisWindow('thisWeek')" title="Click to view records"><div class="kc-ico">📆</div><div class="kc-lbl">This Week</div><div class="kc-val" id="avis-thisweek">–</div><div class="kc-sub">Mon–today · click to view</div></div>
+    <div class="kc purple clickable" onclick="viewAvisWindow('lastWeek')" title="Click to view records"><div class="kc-ico">📆</div><div class="kc-lbl">Last Week</div><div class="kc-val" id="avis-lastweek">–</div><div class="kc-sub">Mon–Sun · click to view</div></div>
+    <div class="kc purple clickable" onclick="viewAvisWindow('thisM')" title="Click to view records"><div class="kc-ico">📈</div><div class="kc-lbl">This Month</div><div class="kc-val" id="avis-thismonth">–</div><div class="kc-sub">Month to date · click to view</div></div>
+    <div class="kc purple clickable" onclick="viewAvisWindow('lastM')" title="Click to view records"><div class="kc-ico">📊</div><div class="kc-lbl">Last Month</div><div class="kc-val" id="avis-lastmonth">–</div><div class="kc-sub">Previous month · click to view</div></div>
+  </div>
+
+  <!-- KPI Row 2: quality / joining -->
+  <div class="krow k4" style="margin-bottom:18px;">
+    <div class="kc teal clickable" onclick="viewAvisJoined(true)" title="Click to view records"><div class="kc-ico">✅</div><div class="kc-lbl">Joined (Date of Joining)</div><div class="kc-val" id="avis-joined">–</div><div class="kc-sub">Joining date filled · click to view</div></div>
+    <div class="kc amber clickable" onclick="viewAvisJoined(false)" title="Click to view records"><div class="kc-ico">⏳</div><div class="kc-lbl">Yet to Join</div><div class="kc-val" id="avis-notjoined">–</div><div class="kc-sub">No joining date yet · click to view</div></div>
+    <div class="kc blue clickable" onclick="viewAvisTopClass()" title="Click to view records"><div class="kc-ico">🏆</div><div class="kc-lbl">Top Class</div><div class="kc-val" id="avis-topclass">–</div><div class="kc-sub" id="avis-topclass-s">Most admissions · click to view</div></div>
+    <div class="kc indigo"><div class="kc-ico">🗓️</div><div class="kc-lbl">Latest Entry</div><div class="kc-val" id="avis-latest" style="font-size:19px;">–</div><div class="kc-sub">Most recent Created Date</div></div>
+  </div>
+
+  <div class="row r2">
+    <div class="card"><div class="ch"><h3>🏫 Class-wise Admissions</h3><span class="fnote">Click a bar to view the students</span></div><div class="cb"><div class="cw tall"><canvas id="avis-class-chart"></canvas></div></div></div>
+    <div class="card"><div class="ch"><h3>📈 Monthly Admission Trend</h3><span class="fnote">By Created Date · click a bar to view</span></div><div class="cb"><div class="cw tall"><canvas id="avis-month-chart"></canvas></div></div></div>
+  </div>
+
+  <div style="margin:14px 0;">
+    <button onclick="viewAvisWindow('all')" style="padding:8px 18px;background:#7C3AED;color:#fff;border:none;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">🏫 View All Akshara Vaagdevi Records →</button>
   </div>
 </div>
 
@@ -1294,6 +1335,103 @@ function applyFilters(){
 // ── HELPERS ──
 function fi(n){return Math.round(n).toLocaleString('en-IN')}
 function fp(n){return n.toFixed(1)+'%'}
+
+// ═══ MONTH_CONFIG helpers (v6 — role-based working days) ═══
+// MONTH_CONFIG[branch][month] is now an OBJECT: {Role: workingDays, ...}
+// (old flat number format is still supported for backwards compatibility).
+function mcRoles(cfg,mk){
+  if(!cfg) return null;
+  const v=cfg[mk];
+  if(v===undefined||v===null) return null;
+  if(typeof v==='object') return v;                       // role-based (v6)
+  const n=parseInt(v,10);
+  return isNaN(n)?null:{'__ALL__':n};                     // legacy flat format
+}
+// Max working days configured for the month (used where a single number is needed)
+function mcMaxWD(cfg,mk){
+  const r=mcRoles(cfg,mk); if(!r) return 0;
+  let mx=0; Object.keys(r).forEach(k=>{const n=parseInt(r[k],10); if(!isNaN(n)&&n>mx)mx=n;});
+  return mx;
+}
+// Normalise role names so "Academic Coord" matches "Academic Coordinator",
+// "HOD-Math" matches "HOD Math" / "Maths HOD", etc.
+function mcNorm(s){
+  return String(s||'').toLowerCase()
+    .replace(/coordinators?/g,'coordinator').replace(/\bcoord\b\.?/g,'coordinator')
+    .replace(/head of department/g,'hod').replace(/head of dept\.?/g,'hod')
+    .replace(/\bmaths\b/g,'math')
+    .replace(/[^a-z0-9]/g,'');
+}
+// Working days for a SPECIFIC observer type in a branch+month.
+// Exact/fuzzy match against the config roles; falls back to the month max.
+function mcRoleWD(cfg,mk,obsType){
+  const r=mcRoles(cfg,mk); if(!r) return 0;
+  if(r.__ALL__!==undefined) return parseInt(r.__ALL__,10)||0;
+  const t=mcNorm(obsType);
+  if(t){
+    // exact normalised match first
+    for(const k of Object.keys(r)){ if(mcNorm(k)===t) return parseInt(r[k],10)||0; }
+    // containment match (either direction)
+    let best=-1;
+    for(const k of Object.keys(r)){
+      const nk=mcNorm(k);
+      if(nk && (nk.indexOf(t)!==-1 || t.indexOf(nk)!==-1)){
+        const n=parseInt(r[k],10)||0; if(n>best)best=n;
+      }
+    }
+    if(best>=0) return best;
+  }
+  return mcMaxWD(cfg,mk);
+}
+
+// ═══ DATE WINDOW helper (v6) ═══
+// Uses the SERVER-computed windows (spreadsheet timezone) when available,
+// falling back to client-side IST math. Rows are BUCKETED (not just counted)
+// so every KPI card is click-to-view.
+function getDateWindows(){
+  if(DATE_WINDOWS && DATE_WINDOWS.today) return DATE_WINDOWS;
+  // fallback: compute in IST on the client
+  const IST=5.5*60*60*1000, nowMs=Date.now();
+  const dIST=new Date(nowMs+IST);
+  const iso=d=>d.toISOString().slice(0,10);
+  const today=iso(dIST);
+  const dow=(dIST.getUTCDay()+6)%7;
+  const ws=new Date(dIST); ws.setUTCDate(dIST.getUTCDate()-dow);
+  const lws=new Date(ws); lws.setUTCDate(ws.getUTCDate()-7);
+  const lwe=new Date(ws); lwe.setUTCDate(ws.getUTCDate()-1);
+  const lm=new Date(dIST); lm.setUTCDate(15); lm.setUTCMonth(lm.getUTCMonth()-1);
+  return {today:today,weekStart:iso(ws),lastWeekStart:iso(lws),lastWeekEnd:iso(lwe),
+          thisMonth:today.slice(0,7),lastMonth:lm.toISOString().slice(0,7)};
+}
+// Bucket rows into the five windows. Returns {today:[],thisWeek:[],lastWeek:[],thisM:[],lastM:[]}
+function bucketByWindow(rows,dateField){
+  const W=getDateWindows();
+  const out={today:[],thisWeek:[],lastWeek:[],thisM:[],lastM:[]};
+  rows.forEach(r=>{
+    const ds=String(r[dateField]||'');
+    if(!ds||ds==='–'||ds.length<10) return;
+    const d=ds.slice(0,10);
+    if(d===W.today) out.today.push(r);
+    if(d>=W.weekStart && d<=W.today) out.thisWeek.push(r);
+    if(d>=W.lastWeekStart && d<=W.lastWeekEnd) out.lastWeek.push(r);
+    if(d.slice(0,7)===W.thisMonth) out.thisM.push(r);
+    if(d.slice(0,7)===W.lastMonth) out.lastM.push(r);
+  });
+  return out;
+}
+// Human label for each window (used in modal subtitles)
+function windowLabel(key){
+  const W=getDateWindows();
+  const f=s=>{ if(!s)return'–'; const d=new Date(s); return isNaN(d)?s:d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'}); };
+  switch(key){
+    case 'today':    return 'Today · '+f(W.today);
+    case 'thisWeek': return 'This Week · '+f(W.weekStart)+' – '+f(W.today);
+    case 'lastWeek': return 'Last Week · '+f(W.lastWeekStart)+' – '+f(W.lastWeekEnd);
+    case 'thisM':    return 'This Month · '+W.thisMonth;
+    case 'lastM':    return 'Last Month · '+W.lastMonth;
+  }
+  return key;
+}
 function filtT(){
   // Inject FIXED live student counts into TRACKER rows (always from the per-branch map,
   // never month-dependent — Pocharam/Bachupally/Keesara B3, Boduppal I3 on the trackers).
@@ -1516,12 +1654,15 @@ function renderOverview(){
         branchRoleTypes[roleOf(t)].add(t);
       });
       monthKeys.forEach(mk=>{
-        const wd=parseInt(cfg[mk],10); if(isNaN(wd)||wd<=0)return;
+        if(mcMaxWD(cfg,mk)<=0)return;
         const obsHere=ALLOBS.filter(r=>r.Branch===b&&r.Month===mk);
         ROLE_ORDER.forEach(k=>{
-          const nTypes=branchRoleTypes[k].size;
-          if(nTypes===0)return;
-          agg[k].required+=wd*quotaOfRole(k)*nTypes;
+          if(branchRoleTypes[k].size===0)return;
+          // v6: Required uses each observer type's OWN working days from Month_Config
+          branchRoleTypes[k].forEach(t=>{
+            const wdT=mcRoleWD(cfg,mk,t); if(wdT<=0)return;
+            agg[k].required+=wdT*quotaOfRole(k);
+          });
           agg[k].actual+=obsHere.filter(r=>roleOf(r.ObsType)===k).length;
         });
       });
@@ -1959,13 +2100,16 @@ function renderObservations(){
         branchRoleTypes[classifyObserver(t)].add(t);
       });
       monthKeys.forEach(mk=>{
-        const wd=parseInt(cfg[mk],10); if(isNaN(wd)||wd<=0)return;
+        const wdMax=mcMaxWD(cfg,mk); if(wdMax<=0)return;
         const obsHere=ALLOBS.filter(r=>r.Branch===b&&r.Month===mk);
         otTypes.forEach(t=>{
-          const nTypes=branchRoleTypes[t.key].size;
-          if(nTypes===0)return;
-          otAgg[t.key].wd+=wd;
-          otAgg[t.key].required+=wd*quotaOfRole(t.key)*nTypes;
+          if(branchRoleTypes[t.key].size===0)return;
+          otAgg[t.key].wd+=wdMax;
+          // v6: per-observer-type working days from role-based Month_Config
+          branchRoleTypes[t.key].forEach(ot=>{
+            const wdT=mcRoleWD(cfg,mk,ot); if(wdT<=0)return;
+            otAgg[t.key].required+=wdT*quotaOfRole(t.key);
+          });
           otAgg[t.key].actual+=obsHere.filter(r=>classifyObserver(r.ObsType)===t.key).length;
         });
       });
@@ -2065,7 +2209,7 @@ function renderObsCompletion(){
     const cfg=MC[b]||{};
     const monthKeys=selMonthKeys||Object.keys(cfg);
     monthKeys.forEach(mk=>{
-      const wd=parseInt(cfg[mk],10); if(isNaN(wd)||wd<=0) return;
+      if(mcMaxWD(cfg,mk)<=0) return;
       const obsHere=OBS.filter(r=>r.Branch===b && r.Month===mk);
       allTypes.forEach(t=>{
         // Required only counts for a type if that type exists in this branch's observations
@@ -2073,8 +2217,10 @@ function renderObsCompletion(){
         const doneHere=obsHere.filter(r=>String(r.ObsType||'').trim()===t).length;
         const typeExistsInBranch=OBS.some(r=>r.Branch===b && String(r.ObsType||'').trim()===t);
         if(!typeExistsInBranch) return;
-        agg[t].wd+=wd;
-        agg[t].required+=wd*agg[t].quota;
+        // v6: THIS observer type's working days from the role-based Month_Config
+        const wdT=mcRoleWD(cfg,mk,t); if(wdT<=0) return;
+        agg[t].wd+=wdT;
+        agg[t].required+=wdT*agg[t].quota;
         agg[t].actual+=doneHere;
       });
     });
@@ -2105,12 +2251,14 @@ function renderObsCompletion(){
     selBranches.forEach(b=>{
       const cfg=MC[b]||{};
       const monthKeys=selMonthKeys||Object.keys(cfg);
-      const totWd=monthKeys.reduce((s,mk)=>{const w=parseInt(cfg[mk],10);return s+(isNaN(w)?0:w);},0);
-      if(totWd<=0) return;
+      if(monthKeys.reduce((s,mk)=>s+mcMaxWD(cfg,mk),0)<=0) return;
       // Only the observer types that exist for this branch
       const branchTypes=allTypes.filter(t=>OBS.some(r=>r.Branch===b && String(r.ObsType||'').trim()===t));
       branchTypes.forEach(t=>{
         const q=quotaOf(t);
+        // v6: sum THIS type's working days across the selected months (role-based config)
+        const totWd=monthKeys.reduce((s,mk)=>s+mcRoleWD(cfg,mk,t),0);
+        if(totWd<=0) return;
         const req=totWd*q;
         const act=OBS.filter(r=>r.Branch===b&&monthKeys.includes(r.Month)&&String(r.ObsType||'').trim()===t).length;
         if(req===0) return;
@@ -3434,6 +3582,125 @@ const ADM_BRANCHES = ['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam']
 // Static snapshot KPIs from PBES Admissions Update Report (12-06-2026)
 const ADM_SNAPSHOT = {confirmed:1470, today:5, yesterday:11, mtd:95};
 
+// ── v6: click-to-view for the Today/Week/Month KPI cards ──
+function viewAdmWindow(key){
+  const bk=window._KPI_ADM_BUCKETS||{}; const rows=(bk[key]||[]).slice()
+    .sort((a,b)=>String(b.AdmDate).localeCompare(String(a.AdmDate)));
+  const cols=[{key:'Branch',label:'Branch'},{key:'Student',label:'Student',maxW:'200px'},
+    {key:'Class',label:'Class'},{key:'Section',label:'Section'},
+    {key:'AdmDate',label:'Date',date:true},{key:'Source',label:'Portal'}];
+  openModal('🎓 Admissions — '+windowLabel(key), rows.length+' enrollments · '+ (fBranch==='ALL'?'All Branches':fBranch), rows, cols);
+}
+function viewLeadWindow(key){
+  const bk=window._KPI_LEAD_BUCKETS||{}; const rows=(bk[key]||[]).slice()
+    .sort((a,b)=>String(b.Date).localeCompare(String(a.Date)));
+  const cols=[{key:'Branch',label:'Branch'},{key:'Student',label:'Student',maxW:'200px'},
+    {key:'Date',label:'Created On',date:true},{key:'Owner',label:'Counsellor'},
+    {key:'Channel',label:'Channel',pill:true},{key:'Stage',label:'Stage',maxW:'190px'}];
+  openModal('📋 Leads — '+windowLabel(key), rows.length+' leads · '+ (fBranch==='ALL'?'All Branches':fBranch), rows, cols);
+}
+
+// ════════════════════════════════════════════
+// AKSHARA VAAGDEVI INTERNATIONAL SCHOOL (AVIS)
+// Separate campus tab — full KPI set, everything click-to-view.
+// Time-window KPIs use CREATED DATE (reliable portal entry timestamp).
+// ════════════════════════════════════════════
+const AVIS_COLS=[
+  {key:'StudentId',label:'Student ID'},{key:'Student',label:'Student',maxW:'200px'},
+  {key:'Class',label:'Class'},{key:'Section',label:'Section'},
+  {key:'Father',label:'Father',maxW:'160px'},{key:'Mother',label:'Mother',maxW:'160px'},
+  {key:'Mobile',label:'Mobile'},
+  {key:'CreatedDate',label:'Created',date:true},
+  {key:'JoinDate',label:'Joined',date:true},
+  {key:'AdmDate',label:'Adm Date',date:true}
+];
+function avisRows(){ return (typeof AVIS_DATA!=='undefined'&&Array.isArray(AVIS_DATA))?AVIS_DATA:[]; }
+
+function renderAVIS(){
+  const rows=avisRows();
+  if(!document.getElementById('avis-total')) return;
+  setTxt('avis-total', fi(rows.length));
+
+  // Time-window buckets on Created Date (server-computed windows)
+  const bk=bucketByWindow(rows,'CreatedDate');
+  window._AVIS_BUCKETS=bk;
+  setTxt('avis-today',    fi(bk.today.length));
+  setTxt('avis-thisweek', fi(bk.thisWeek.length));
+  setTxt('avis-lastweek', fi(bk.lastWeek.length));
+  setTxt('avis-thismonth',fi(bk.thisM.length));
+  setTxt('avis-lastmonth',fi(bk.lastM.length));
+
+  // Joined / not joined
+  const joined=rows.filter(r=>r.JoinDate&&r.JoinDate!=='–');
+  setTxt('avis-joined', fi(joined.length));
+  setTxt('avis-notjoined', fi(rows.length-joined.length));
+
+  // Latest entry
+  const latest=rows.map(r=>r.CreatedDate).filter(d=>d&&d!=='–').sort().pop();
+  setTxt('avis-latest', latest?fmtDispDate(latest):'–');
+
+  // Class-wise
+  const clsAgg={};
+  rows.forEach(r=>{const c=String(r.Class||'–').trim()||'–'; clsAgg[c]=(clsAgg[c]||0)+1;});
+  const CLS_ORDER=['Nursery','PP1','PP2','Grade I','Grade II','Grade III','Grade IV','Grade V','Grade VI','Grade VII','Grade VIII','Grade IX','Grade X'];
+  const clsKeys=Object.keys(clsAgg).sort((a,b)=>{
+    const ai=CLS_ORDER.indexOf(a), bi=CLS_ORDER.indexOf(b);
+    if(ai>=0&&bi>=0)return ai-bi; if(ai>=0)return -1; if(bi>=0)return 1; return a.localeCompare(b);
+  });
+  let top=null; clsKeys.forEach(c=>{ if(!top||clsAgg[c]>clsAgg[top]) top=c; });
+  setTxt('avis-topclass', top||'–');
+  if(top) setTxt('avis-topclass-s', clsAgg[top]+' admissions · click to view');
+  window._AVIS_TOPCLASS=top;
+  window._AVIS_CLSKEYS=clsKeys;
+  mkChart('avis-class-chart',{type:'bar',
+    data:{labels:clsKeys,datasets:[{label:'Admissions',data:clsKeys.map(c=>clsAgg[c]),
+      backgroundColor:'#7C3AED',borderRadius:6,maxBarThickness:42}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      onClick:(evt,els)=>{ if(!els||!els.length)return; viewAvisClass(window._AVIS_CLSKEYS[els[0].index]); },
+      plugins:{legend:{display:false},
+        datalabels:{display:true,anchor:'end',align:'top',color:'#1E293B',font:{size:11,weight:'bold'},formatter:v=>v>0?v:''}},
+      scales:{y:{beginAtZero:true,grid:{color:'#E0E8FF'}},
+        x:{ticks:{font:{size:10.5,weight:'600'},maxRotation:45,minRotation:0},grid:{display:false}}}}});
+
+  // Monthly trend by Created Date
+  const moAgg={};
+  rows.forEach(r=>{const d=String(r.CreatedDate||''); if(d.length>=7&&d!=='–') moAgg[d.slice(0,7)]=(moAgg[d.slice(0,7)]||0)+1;});
+  const moKeys=Object.keys(moAgg).sort();
+  const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const moLabels=moKeys.map(k=>MN[parseInt(k.slice(5,7),10)-1]+' '+k.slice(0,4));
+  window._AVIS_MOKEYS=moKeys;
+  mkChart('avis-month-chart',{type:'bar',
+    data:{labels:moLabels,datasets:[{label:'Admissions',data:moKeys.map(k=>moAgg[k]),
+      backgroundColor:'#0D9488',borderRadius:6,maxBarThickness:48}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      onClick:(evt,els)=>{ if(!els||!els.length)return; viewAvisMonth(window._AVIS_MOKEYS[els[0].index]); },
+      plugins:{legend:{display:false},
+        datalabels:{display:true,anchor:'end',align:'top',color:'#1E293B',font:{size:11,weight:'bold'},formatter:v=>v>0?v:''}},
+      scales:{y:{beginAtZero:true,grid:{color:'#E0E8FF'}},x:{grid:{display:false}}}}});
+}
+
+// ── AVIS drill-downs (mandatory click-to-view) ──
+function viewAvisWindow(key){
+  const rows=key==='all'
+    ? avisRows().slice().sort((a,b)=>String(b.CreatedDate).localeCompare(String(a.CreatedDate)))
+    : ((window._AVIS_BUCKETS||{})[key]||[]).slice().sort((a,b)=>String(b.CreatedDate).localeCompare(String(a.CreatedDate)));
+  const sub=key==='all'?rows.length+' total records':rows.length+' records · '+windowLabel(key);
+  openModal('🏫 Akshara Vaagdevi — '+(key==='all'?'All Admissions':windowLabel(key)), sub, rows, AVIS_COLS);
+}
+function viewAvisJoined(joined){
+  const rows=avisRows().filter(r=>joined?(r.JoinDate&&r.JoinDate!=='–'):!(r.JoinDate&&r.JoinDate!=='–'));
+  openModal('🏫 Akshara Vaagdevi — '+(joined?'Joined Students':'Yet to Join'), rows.length+' records', rows, AVIS_COLS);
+}
+function viewAvisClass(cls){
+  const rows=avisRows().filter(r=>String(r.Class||'–').trim()===cls);
+  openModal('🏫 Akshara Vaagdevi — '+cls, rows.length+' admissions', rows, AVIS_COLS);
+}
+function viewAvisTopClass(){ if(window._AVIS_TOPCLASS) viewAvisClass(window._AVIS_TOPCLASS); }
+function viewAvisMonth(ym){
+  const rows=avisRows().filter(r=>String(r.CreatedDate||'').slice(0,7)===ym);
+  openModal('🏫 Akshara Vaagdevi — '+ym, rows.length+' admissions (by Created Date)', rows, AVIS_COLS);
+}
+
 function renderAdmissions(){
   const bl=fBranch==='ALL'?'All Branches':fBranch;
   document.getElementById('adm-fn').textContent=bl;
@@ -3461,75 +3728,51 @@ function renderAdmissions(){
   setTxt('adm-totleads', fi(totalLeadsAll));
   setTxt('adm-totleads-s', 'EXTRAEDGE leads');
 
-  // ── Date-window KPIs (IST) for Admissions and Leads ──
+  // ── Date-window KPIs (v6) ──
+  // Windows come from the SERVER (spreadsheet timezone) via DATE_WINDOWS,
+  // so numbers are identical for every viewer. Rows are bucketed, not just
+  // counted → every KPI card is CLICK-TO-VIEW (mandatory).
   (function(){
-    const IST_OFFSET = 5.5*60*60*1000;
-    function istStr(ms){ const t=new Date(ms+IST_OFFSET); return isNaN(t.getTime())?'':t.toISOString().slice(0,10); }
-    const nowMs=Date.now();
-    const todayStr=istStr(nowMs);
-    const nowIST=new Date(nowMs+IST_OFFSET);
-    // This week = Monday..today (IST)
-    const dow=(nowIST.getUTCDay()+6)%7; // 0=Mon
-    const weekStart=new Date(nowIST); weekStart.setUTCDate(nowIST.getUTCDate()-dow);
-    const weekStartStr=weekStart.toISOString().slice(0,10);
-    const lastWeekStart=new Date(weekStart); lastWeekStart.setUTCDate(weekStart.getUTCDate()-7);
-    const lastWeekStartStr=lastWeekStart.toISOString().slice(0,10);
-    const lastWeekEnd=new Date(weekStart); lastWeekEnd.setUTCDate(weekStart.getUTCDate()-1);
-    const lastWeekEndStr=lastWeekEnd.toISOString().slice(0,10);
-    const thisMonth=todayStr.slice(0,7);
-    // last month
-    const lm=new Date(nowIST); lm.setUTCDate(1); lm.setUTCMonth(lm.getUTCMonth()-1);
-    const lastMonth=lm.toISOString().slice(0,7);
-
-    function inWindow(rows, dateField){
-      let today=0,thisWeek=0,lastWeek=0,thisM=0,lastM=0;
-      rows.forEach(r=>{
-        const ds=r[dateField];
-        if(!ds||ds==='–'||ds.length<10) return;
-        if(ds===todayStr) today++;
-        if(ds>=weekStartStr && ds<=todayStr) thisWeek++;
-        if(ds>=lastWeekStartStr && ds<=lastWeekEndStr) lastWeek++;
-        if(ds.slice(0,7)===thisMonth) thisM++;
-        if(ds.slice(0,7)===lastMonth) lastM++;
-      });
-      return {today,thisWeek,lastWeek,thisM,lastM};
-    }
-
-    // Admissions: combine A1 + A2 portal dates
+    // Admissions: combine A1 + A2 portal records (already carry Student/Class/Source)
     const admRows=[...A1.filter(r=>activeBranches.includes(r.Branch)),
                    ...A2.filter(r=>activeBranches.includes(r.Branch))]
                   .filter(r=>r.AdmDate&&r.AdmDate!=='–');
-    const a=inWindow(admRows,'AdmDate');
-    setTxt('adm-today', fi(a.today));
-    setTxt('adm-thisweek', fi(a.thisWeek));
-    setTxt('adm-lastweek', fi(a.lastWeek));
-    setTxt('adm-thismonth', fi(a.thisM));
-    setTxt('adm-lastmonth', fi(a.lastM));
+    const aBk=bucketByWindow(admRows,'AdmDate');
+    window._KPI_ADM_BUCKETS=aBk;
+    setTxt('adm-today',    fi(aBk.today.length));
+    setTxt('adm-thisweek', fi(aBk.thisWeek.length));
+    setTxt('adm-lastweek', fi(aBk.lastWeek.length));
+    setTxt('adm-thismonth',fi(aBk.thisM.length));
+    setTxt('adm-lastmonth',fi(aBk.lastM.length));
 
-    // Leads: from LEAD_DATES (Created On)
+    // Leads: LEAD_DATES (Created On) — now enriched with Student/Owner/Channel/Stage
     const LD=(typeof LEAD_DATES!=='undefined'&&Array.isArray(LEAD_DATES))?LEAD_DATES:[];
     const leadRows=LD.filter(r=>activeBranches.includes(r.Branch));
-    const l=inWindow(leadRows,'Date');
-    setTxt('lead-today', fi(l.today));
-    setTxt('lead-thisweek', fi(l.thisWeek));
-    setTxt('lead-lastweek', fi(l.lastWeek));
-    setTxt('lead-thismonth', fi(l.thisM));
-    setTxt('lead-lastmonth', fi(l.lastM));
+    const lBk=bucketByWindow(leadRows,'Date');
+    window._KPI_LEAD_BUCKETS=lBk;
+    setTxt('lead-today',    fi(lBk.today.length));
+    setTxt('lead-thisweek', fi(lBk.thisWeek.length));
+    setTxt('lead-lastweek', fi(lBk.lastWeek.length));
+    setTxt('lead-thismonth',fi(lBk.thisM.length));
+    setTxt('lead-lastmonth',fi(lBk.lastM.length));
   })();
 
   // ── DC/NS Admissions Table ──
   const dcnsTbody=document.getElementById('adm-dcns-tbody');
-  let dcnsTotal={confirmed:0,leads:0,digital:0,walkin:0,digitalAdm:0,walkinAdm:0};
+  let dcnsTotal={confirmed:0,leads:0,digital:0,walkin:0,other:0,digitalAdm:0,walkinAdm:0};
   const dcnsRows=activeBranches.map((b,i)=>{
     const ls=LS[b]||{};
     const confirmed=A1.filter(r=>r.Branch===b).length + A2.filter(r=>r.Branch===b).length;
     const totalLeads=ls.total_leads||0;
     const rate=totalLeads>0?(confirmed/totalLeads*100):0;
     const digitalLeads=ls.digital_leads||0, walkinLeads=ls.walkin_leads||0;
+    // v6: Other bucket (referral/event/blank channels) — no longer miscounted as Walk-In,
+    // so Digital + Walk-In + Other = Total Leads, always.
+    const otherLeads=(ls.other_leads!==undefined)?ls.other_leads:Math.max(0,totalLeads-digitalLeads-walkinLeads);
     const digitalAdm=ls.digital_adm||0, walkinAdm=ls.walkin_adm||0;
     const digitalPct=ls.digital_pct||0, walkinPct=ls.walkin_pct||0;
     dcnsTotal.confirmed+=confirmed; dcnsTotal.leads+=totalLeads;
-    dcnsTotal.digital+=digitalLeads; dcnsTotal.walkin+=walkinLeads;
+    dcnsTotal.digital+=digitalLeads; dcnsTotal.walkin+=walkinLeads; dcnsTotal.other+=otherLeads;
     dcnsTotal.digitalAdm+=digitalAdm; dcnsTotal.walkinAdm+=walkinAdm;
     const bg=i%2===0?'#fff':'#F8FAFF';
     const rateColor=rate>=25?'#059669':rate>=15?'#D97706':'#DC2626';
@@ -3538,12 +3781,14 @@ function renderAdmissions(){
     return `<tr style="background:${bg};">
       <td style="padding:9px 12px;font-size:12.5px;font-weight:700;border-bottom:1px solid #E0E8FF;"><span class="bd b${b}"></span> ${b}</td>
       <td style="padding:9px 12px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:800;font-size:13px;color:#059669;">${confirmed}</td>
+      <td style="padding:9px 12px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:700;font-size:12.5px;color:#1E4FD8;">${totalLeads.toLocaleString('en-IN')}</td>
       <td style="padding:9px 12px;text-align:center;border-bottom:1px solid #E0E8FF;font-size:12.5px;color:#D97706;">${walkinLeads.toLocaleString('en-IN')}</td>
       <td style="padding:9px 12px;text-align:center;border-bottom:1px solid #E0E8FF;font-size:12.5px;font-weight:700;color:#D97706;">${walkinAdm.toLocaleString('en-IN')}</td>
       <td style="padding:9px 12px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:800;font-size:13px;color:${walkColor};">${walkinPct.toFixed(2)}%</td>
       <td style="padding:9px 12px;text-align:center;border-bottom:1px solid #E0E8FF;font-size:12.5px;color:#059669;">${digitalLeads.toLocaleString('en-IN')}</td>
       <td style="padding:9px 12px;text-align:center;border-bottom:1px solid #E0E8FF;font-size:12.5px;font-weight:700;color:#059669;">${digitalAdm.toLocaleString('en-IN')}</td>
       <td style="padding:9px 12px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:800;font-size:13px;color:${digColor};">${digitalPct.toFixed(2)}%</td>
+      <td style="padding:9px 12px;text-align:center;border-bottom:1px solid #E0E8FF;font-size:12.5px;color:#64748B;">${otherLeads.toLocaleString('en-IN')}</td>
     </tr>`;
   }).join('');
   const totalRate=dcnsTotal.leads>0?(dcnsTotal.confirmed/dcnsTotal.leads*100):0;
@@ -3552,12 +3797,14 @@ function renderAdmissions(){
   const totalRow=`<tr style="background:#FEF9C3;font-weight:800;">
     <td style="padding:9px 12px;font-size:12.5px;border-bottom:2px solid #E0E8FF;">Total</td>
     <td style="padding:9px 12px;text-align:center;border-bottom:2px solid #E0E8FF;color:#059669;">${dcnsTotal.confirmed}</td>
+    <td style="padding:9px 12px;text-align:center;border-bottom:2px solid #E0E8FF;color:#1E4FD8;">${dcnsTotal.leads.toLocaleString('en-IN')}</td>
     <td style="padding:9px 12px;text-align:center;border-bottom:2px solid #E0E8FF;color:#D97706;">${dcnsTotal.walkin.toLocaleString('en-IN')}</td>
     <td style="padding:9px 12px;text-align:center;border-bottom:2px solid #E0E8FF;color:#D97706;">${dcnsTotal.walkinAdm.toLocaleString('en-IN')}</td>
     <td style="padding:9px 12px;text-align:center;border-bottom:2px solid #E0E8FF;">${totalWalkPct.toFixed(2)}%</td>
     <td style="padding:9px 12px;text-align:center;border-bottom:2px solid #E0E8FF;color:#059669;">${dcnsTotal.digital.toLocaleString('en-IN')}</td>
     <td style="padding:9px 12px;text-align:center;border-bottom:2px solid #E0E8FF;color:#059669;">${dcnsTotal.digitalAdm.toLocaleString('en-IN')}</td>
     <td style="padding:9px 12px;text-align:center;border-bottom:2px solid #E0E8FF;">${totalDigPct.toFixed(2)}%</td>
+    <td style="padding:9px 12px;text-align:center;border-bottom:2px solid #E0E8FF;color:#64748B;">${dcnsTotal.other.toLocaleString('en-IN')}</td>
   </tr>`;
   dcnsTbody.innerHTML=dcnsRows+(activeBranches.length>1?totalRow:'');
 
@@ -3983,11 +4230,15 @@ function renderInsights(){
       const cfg=MC[b]||{};
       const roleTypes={}; OBS.filter(r=>r.Branch===b).forEach(r=>{const t=String(r.ObsType||'').trim();if(!t||t==='–')return;const k=roleOf(t);(roleTypes[k]=roleTypes[k]||new Set()).add(t);});
       Object.keys(cfg).forEach(mk=>{
-        const wd=parseInt(cfg[mk],10); if(isNaN(wd)||wd<=0)return;
+        if(mcMaxWD(cfg,mk)<=0)return;
         const here=OBS.filter(r=>r.Branch===b&&r.Month===mk);
         Object.keys(roleTypes).forEach(k=>{
           if(!agg[k])agg[k]={required:0,actual:0};
-          agg[k].required+=wd*(k==='HODs'?1:2)*roleTypes[k].size;
+          // v6: role-based working days per observer type
+          roleTypes[k].forEach(t=>{
+            const wdT=mcRoleWD(cfg,mk,t); if(wdT<=0)return;
+            agg[k].required+=wdT*(k==='HODs'?1:2);
+          });
           agg[k].actual+=here.filter(r=>roleOf(r.ObsType)===k).length;
         });
       });
@@ -4148,19 +4399,20 @@ function renderRankings(){
     // previous calendar month first; else latest earlier month with BOTH working days and observations
     let useMonth=null;
     const _pk=MO_MAP[getPrevCalendarMonth()];
-    const _ok=mk=>{const wd=parseInt(cfg[mk],10);return !isNaN(wd)&&wd>0&&branchObs.some(r=>r.Month===mk);};
+    const _ok=mk=>mcMaxWD(cfg,mk)>0&&branchObs.some(r=>r.Month===mk);
     if(_pk&&_ok(_pk)) useMonth=_pk;
     else{
       let curIdx=MONTHS.indexOf(_CAL_MONTHS[new Date().getMonth()]); if(curIdx<0)curIdx=MONTHS.length;
       for(let i=curIdx-1;i>=0;i--){ const mk=MO_MAP[MONTHS[i]]; if(_ok(mk)){useMonth=mk;break;} }
     }
     if(!useMonth){obsCompletionStats[b]=null;return;}
-    const wd=parseInt(cfg[useMonth],10);
+    const wd=mcMaxWD(cfg,useMonth);
     // every observer type present in this branch (any month) → its per-day quota
     const quotaOf=t=>/hod|head of dep/i.test(String(t||''))?1:2;
     const typesInBranch={};
     branchObs.forEach(r=>{const t=String(r.ObsType||'').trim(); if(t&&t!=='–'&&!/^nan$/i.test(t)) typesInBranch[t]=quotaOf(t);});
-    let required=0; Object.keys(typesInBranch).forEach(t=>{ required+=wd*typesInBranch[t]; });
+    // v6: each type's OWN working days from the role-based Month_Config
+    let required=0; Object.keys(typesInBranch).forEach(t=>{ required+=mcRoleWD(cfg,useMonth,t)*typesInBranch[t]; });
     const actual=branchObs.filter(r=>r.Month===useMonth).length;
     const pct=required>0?Math.min(100,+(actual/required*100).toFixed(1)):0;
     obsCompletionStats[b]={pct,actual,required,month:useMonth,wd,types:Object.keys(typesInBranch).length};
@@ -4475,7 +4727,7 @@ function _origRenderAll(){
     ['Overview',renderOverview],['GrievanceOfficer',renderGrievanceOfficer],['Rankings',renderRankings],['Insights',renderInsights],
     ['Care',renderCare],['Observations',renderObservations],['Admin',renderAdmin],
     ['Vigilance',renderVigilance],['Purchase',renderPurchase],['HR',renderHR],
-    ['Admissions',renderAdmissions],['Grievance',renderGrievance]
+    ['Admissions',renderAdmissions],['AVIS',renderAVIS],['Grievance',renderGrievance]
   ];
   steps.forEach(function(s){
     try{ s[1](); }
@@ -5030,6 +5282,3 @@ function renderAll() {
 </script>
 </body>
 </html>
-
-
-       
