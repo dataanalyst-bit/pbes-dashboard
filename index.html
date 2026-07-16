@@ -879,15 +879,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   </div>
 
   <!-- KPI Row 2: quality / joining -->
-  <div class="krow k3" style="margin-bottom:18px;">
+  <div class="krow k4" style="margin-bottom:18px;">
     <div class="kc teal clickable" onclick="viewAvisJoined(true)" title="Click to view records"><div class="kc-ico">✅</div><div class="kc-lbl">Joined (Date of Joining)</div><div class="kc-val" id="avis-joined">–</div><div class="kc-sub">Joining date filled · click to view</div></div>
     <div class="kc amber clickable" onclick="viewAvisJoined(false)" title="Click to view records"><div class="kc-ico">⏳</div><div class="kc-lbl">Yet to Join</div><div class="kc-val" id="avis-notjoined">–</div><div class="kc-sub">No joining date yet · click to view</div></div>
     <div class="kc blue clickable" onclick="viewAvisTopClass()" title="Click to view records"><div class="kc-ico">🏆</div><div class="kc-lbl">Top Class</div><div class="kc-val" id="avis-topclass">–</div><div class="kc-sub" id="avis-topclass-s">Most admissions · click to view</div></div>
-      </div>
+    <div class="kc indigo"><div class="kc-ico">🗓️</div><div class="kc-lbl">Latest Entry</div><div class="kc-val" id="avis-latest" style="font-size:19px;">–</div><div class="kc-sub">Most recent Created Date</div></div>
+  </div>
 
-  <div class="row">
+  <div class="row r2">
     <div class="card"><div class="ch"><h3>🏫 Class-wise Admissions</h3><span class="fnote">Click a bar to view the students</span></div><div class="cb"><div class="cw tall"><canvas id="avis-class-chart"></canvas></div></div></div>
-     </div>
+    <div class="card"><div class="ch"><h3>📈 Monthly Admission Trend</h3><span class="fnote">By Date of Admission · click a bar to view</span></div><div class="cb"><div class="cw tall"><canvas id="avis-month-chart"></canvas></div></div></div>
+  </div>
 
   <div style="margin:14px 0;">
     <button onclick="viewAvisWindow('all')" style="padding:8px 18px;background:#7C3AED;color:#fff;border:none;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">🏫 View All Akshara Vaagdevi Records →</button>
@@ -3633,7 +3635,9 @@ function renderAVIS(){
   setTxt('avis-joined', fi(joined.length));
   setTxt('avis-notjoined', fi(rows.length-joined.length));
 
- 
+  // Latest entry
+  const latest=rows.map(r=>r.CreatedDate).filter(d=>d&&d!=='–').sort().pop();
+  setTxt('avis-latest', latest?fmtDispDate(latest):'–');
 
   // Class-wise
   const clsAgg={};
@@ -3706,7 +3710,21 @@ function viewAvisClass(cls){
   openModal('🏫 Akshara Vaagdevi — '+cls, rows.length+' admissions', rows, AVIS_COLS);
 }
 function viewAvisTopClass(){ if(window._AVIS_TOPCLASS) viewAvisClass(window._AVIS_TOPCLASS); }
+function viewAvisMonth(ym){
 
+    const rows=avisRows().filter(r=>{
+
+        if(!r.AdmDate || r.AdmDate==="–") return false;
+
+        const d=new Date(r.AdmDate);
+
+        if(isNaN(d)) return false;
+
+        const key=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+
+        return key===ym;
+
+    });
 
     openModal(
         '🏫 Akshara Vaagdevi — '+ym,
