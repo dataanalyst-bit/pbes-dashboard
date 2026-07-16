@@ -888,7 +888,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   <div class="row r2">
     <div class="card"><div class="ch"><h3>🏫 Class-wise Admissions</h3><span class="fnote">Click a bar to view the students</span></div><div class="cb"><div class="cw tall"><canvas id="avis-class-chart"></canvas></div></div></div>
-    <div class="card"><div class="ch"><h3>📈 Monthly Admission Trend</h3><span class="fnote">By Created Date · click a bar to view</span></div><div class="cb"><div class="cw tall"><canvas id="avis-month-chart"></canvas></div></div></div>
+    <div class="card"><div class="ch"><h3>📈 Monthly Admission Trend</h3><span class="fnote">By Date of Admission · click a bar to view</span></div><div class="cb"><div class="cw tall"><canvas id="avis-month-chart"></canvas></div></div></div>
   </div>
 
   <div style="margin:14px 0;">
@@ -3663,8 +3663,22 @@ function renderAVIS(){
         x:{ticks:{font:{size:10.5,weight:'600'},maxRotation:45,minRotation:0},grid:{display:false}}}}});
 
   // Monthly trend by Created Date
-  const moAgg={};
-  rows.forEach(r=>{const d=String(r.CreatedDate||''); if(d.length>=7&&d!=='–') moAgg[d.slice(0,7)]=(moAgg[d.slice(0,7)]||0)+1;});
+  // Monthly trend by Admission Date
+const moAgg={};
+
+rows.forEach(r=>{
+
+    if(!r.AdmDate || r.AdmDate==="–") return;
+
+    const d=new Date(r.AdmDate);
+
+    if(isNaN(d)) return;
+
+    const key=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+
+    moAgg[key]=(moAgg[key]||0)+1;
+
+});
   const moKeys=Object.keys(moAgg).sort();
   const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const moLabels=moKeys.map(k=>MN[parseInt(k.slice(5,7),10)-1]+' '+k.slice(0,4));
@@ -3697,8 +3711,27 @@ function viewAvisClass(cls){
 }
 function viewAvisTopClass(){ if(window._AVIS_TOPCLASS) viewAvisClass(window._AVIS_TOPCLASS); }
 function viewAvisMonth(ym){
-  const rows=avisRows().filter(r=>String(r.CreatedDate||'').slice(0,7)===ym);
-  openModal('🏫 Akshara Vaagdevi — '+ym, rows.length+' admissions (by Created Date)', rows, AVIS_COLS);
+
+    const rows=avisRows().filter(r=>{
+
+        if(!r.AdmDate || r.AdmDate==="–") return false;
+
+        const d=new Date(r.AdmDate);
+
+        if(isNaN(d)) return false;
+
+        const key=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+
+        return key===ym;
+
+    });
+
+    openModal(
+        '🏫 Akshara Vaagdevi — '+ym,
+        rows.length+' admissions (by Date of Admission)',
+        rows,
+        AVIS_COLS
+    );
 }
 
 function renderAdmissions(){
