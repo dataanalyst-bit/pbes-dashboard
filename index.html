@@ -729,8 +729,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="krow k6" style="margin-bottom:18px;">
     <div class="kc green clickable" onclick="viewConfirmedAdmissions()" title="Click to view by branch"><div class="kc-ico">🎓</div><div class="kc-lbl">Confirmed (Portal)</div><div class="kc-val" id="adm-confirmed">–</div><div class="kc-sub" id="adm-confirmed-s">EXTRAEDGE stage-08: –</div></div>
     <div class="kc green clickable" onclick="viewAdmWindow('today')" title="Click to view records"><div class="kc-ico">📅</div><div class="kc-lbl">Today</div><div class="kc-val" id="adm-today">–</div><div class="kc-sub">New enrollments · click to view</div></div>
-    <div class="kc green clickable" onclick="viewAdmWindow('thisWeek')" title="Click to view records"><div class="kc-ico">📆</div><div class="kc-lbl">This Week</div><div class="kc-val" id="adm-thisweek">–</div><div class="kc-sub">Mon–today · click to view</div></div>
-    <div class="kc green clickable" onclick="viewAdmWindow('lastWeek')" title="Click to view records"><div class="kc-ico">📆</div><div class="kc-lbl">Last Week</div><div class="kc-val" id="adm-lastweek">–</div><div class="kc-sub">Mon–Sun · click to view</div></div>
+    <div class="kc green clickable" onclick="viewAdmWindow('thisWeek')" title="Click to view records"><div class="kc-ico">📆</div><div class="kc-lbl">This Week</div><div class="kc-val" id="adm-thisweek">–</div><div class="kc-sub">Sun–today · click to view</div></div>
+    <div class="kc green clickable" onclick="viewAdmWindow('lastWeek')" title="Click to view records"><div class="kc-ico">📆</div><div class="kc-lbl">Last Week</div><div class="kc-val" id="adm-lastweek">–</div><div class="kc-sub">Sun–Sat · click to view</div></div>
     <div class="kc green clickable" onclick="viewAdmWindow('thisM')" title="Click to view records"><div class="kc-ico">📈</div><div class="kc-lbl">This Month</div><div class="kc-val" id="adm-thismonth">–</div><div class="kc-sub">Month to date · click to view</div></div>
     <div class="kc green clickable" onclick="viewAdmWindow('lastM')" title="Click to view records"><div class="kc-ico">📊</div><div class="kc-lbl">Last Month</div><div class="kc-val" id="adm-lastmonth">–</div><div class="kc-sub">Previous month · click to view</div></div>
   </div>
@@ -739,8 +739,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="krow k6">
     <div class="kc blue"><div class="kc-ico">📋</div><div class="kc-lbl">Total Leads</div><div class="kc-val" id="adm-totleads">–</div><div class="kc-sub" id="adm-totleads-s">All-time</div></div>
     <div class="kc blue clickable" onclick="viewLeadWindow('today')" title="Click to view records"><div class="kc-ico">📞</div><div class="kc-lbl">Today</div><div class="kc-val" id="lead-today">–</div><div class="kc-sub">New today · click to view</div></div>
-    <div class="kc blue clickable" onclick="viewLeadWindow('thisWeek')" title="Click to view records"><div class="kc-ico">📆</div><div class="kc-lbl">This Week</div><div class="kc-val" id="lead-thisweek">–</div><div class="kc-sub">Mon–today · click to view</div></div>
-    <div class="kc blue clickable" onclick="viewLeadWindow('lastWeek')" title="Click to view records"><div class="kc-ico">📆</div><div class="kc-lbl">Last Week</div><div class="kc-val" id="lead-lastweek">–</div><div class="kc-sub">Mon–Sun · click to view</div></div>
+    <div class="kc blue clickable" onclick="viewLeadWindow('thisWeek')" title="Click to view records"><div class="kc-ico">📆</div><div class="kc-lbl">This Week</div><div class="kc-val" id="lead-thisweek">–</div><div class="kc-sub">Sun–today · click to view</div></div>
+    <div class="kc blue clickable" onclick="viewLeadWindow('lastWeek')" title="Click to view records"><div class="kc-ico">📆</div><div class="kc-lbl">Last Week</div><div class="kc-val" id="lead-lastweek">–</div><div class="kc-sub">Sun–Sat · click to view</div></div>
     <div class="kc blue clickable" onclick="viewLeadWindow('thisM')" title="Click to view records"><div class="kc-ico">📈</div><div class="kc-lbl">This Month</div><div class="kc-val" id="lead-thismonth">–</div><div class="kc-sub">Month to date · click to view</div></div>
     <div class="kc blue clickable" onclick="viewLeadWindow('lastM')" title="Click to view records"><div class="kc-ico">📊</div><div class="kc-lbl">Last Month</div><div class="kc-val" id="lead-lastmonth">–</div><div class="kc-sub">Previous month · click to view</div></div>
   </div>
@@ -871,8 +871,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="krow k6" style="margin-bottom:18px;">
     <div class="kc purple clickable" onclick="viewAvisWindow('all')" title="Click to view all records"><div class="kc-ico">🎓</div><div class="kc-lbl">Total Admissions</div><div class="kc-val" id="avis-total">–</div><div class="kc-sub">All records · click to view</div></div>
     <div class="kc purple clickable" onclick="viewAvisWindow('today')" title="Click to view records"><div class="kc-ico">📅</div><div class="kc-lbl">Today</div><div class="kc-val" id="avis-today">–</div><div class="kc-sub">New entries · click to view</div></div>
-    <div class="kc purple clickable" onclick="viewAvisWindow('thisWeek')" title="Click to view records"><div class="kc-ico">📆</div><div class="kc-lbl">This Week</div><div class="kc-val" id="avis-thisweek">–</div><div class="kc-sub">Mon–today · click to view</div></div>
-    <div class="kc purple clickable" onclick="viewAvisWindow('lastWeek')" title="Click to view records"><div class="kc-ico">📆</div><div class="kc-lbl">Last Week</div><div class="kc-val" id="avis-lastweek">–</div><div class="kc-sub">Mon–Sun · click to view</div></div>
+    <div class="kc purple clickable" onclick="viewAvisWindow('thisWeek')" title="Click to view records"><div class="kc-ico">📆</div><div class="kc-lbl">This Week</div><div class="kc-val" id="avis-thisweek">–</div><div class="kc-sub">Sun–today · click to view</div></div>
+    <div class="kc purple clickable" onclick="viewAvisWindow('lastWeek')" title="Click to view records"><div class="kc-ico">📆</div><div class="kc-lbl">Last Week</div><div class="kc-val" id="avis-lastweek">–</div><div class="kc-sub">Sun–Sat · click to view</div></div>
     <div class="kc purple clickable" onclick="viewAvisWindow('thisM')" title="Click to view records"><div class="kc-ico">📈</div><div class="kc-lbl">This Month</div><div class="kc-val" id="avis-thismonth">–</div><div class="kc-sub">Month to date · click to view</div></div>
     <div class="kc purple clickable" onclick="viewAvisWindow('lastM')" title="Click to view records"><div class="kc-ico">📊</div><div class="kc-lbl">Last Month</div><div class="kc-val" id="avis-lastmonth">–</div><div class="kc-sub">Previous month · click to view</div></div>
   </div>
@@ -1393,8 +1393,8 @@ function getDateWindows(){
   const dIST=new Date(nowMs+IST);
   const iso=d=>d.toISOString().slice(0,10);
   const today=iso(dIST);
-  const dow=(dIST.getUTCDay()+6)%7;
-  const ws=new Date(dIST); ws.setUTCDate(dIST.getUTCDate()-dow);
+  const dow=dIST.getUTCDay();               // Sun=0 … Sat=6  (matches Power BI WEEKNUM type 1)
+  const ws=new Date(dIST); ws.setUTCDate(dIST.getUTCDate()-dow);   // Sunday of this week
   const lws=new Date(ws); lws.setUTCDate(ws.getUTCDate()-7);
   const lwe=new Date(ws); lwe.setUTCDate(ws.getUTCDate()-1);
   const lm=new Date(dIST); lm.setUTCDate(15); lm.setUTCMonth(lm.getUTCMonth()-1);
