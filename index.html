@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PBES School Analytics 2026-27</title>     
+<title>PBES School Analytics 2026-27</title>
 
 <!-- Supabase client must load before our auth/data code   -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -760,7 +760,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           <th style="padding:9px 12px;text-align:center;font-size:10.5px;font-weight:700;color:#059669;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Digital Leads</th>
           <th style="padding:9px 12px;text-align:center;font-size:10.5px;font-weight:700;color:#059669;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Digital Admissions</th>
           <th style="padding:9px 12px;text-align:center;font-size:10.5px;font-weight:700;color:#059669;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Digital %</th>
-          <th style="padding:9px 12px;text-align:center;font-size:10.5px;font-weight:700;color:#64748B;text-transform:uppercase;border-bottom:2px solid #E0E8FF;" title="Referral / Event / Tele-calling / blank channel — previously miscounted as Walk-In">Other Leads</th>
         </tr></thead>
         <tbody id="adm-dcns-tbody"></tbody>
       </table>
@@ -879,11 +878,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   </div>
 
   <!-- KPI Row 2: quality / joining -->
-  <div class="krow k4" style="margin-bottom:18px;">
+  <div class="krow k3" style="margin-bottom:18px;">
     <div class="kc teal clickable" onclick="viewAvisJoined(true)" title="Click to view records"><div class="kc-ico">✅</div><div class="kc-lbl">Joined (Date of Joining)</div><div class="kc-val" id="avis-joined">–</div><div class="kc-sub">Joining date filled · click to view</div></div>
     <div class="kc amber clickable" onclick="viewAvisJoined(false)" title="Click to view records"><div class="kc-ico">⏳</div><div class="kc-lbl">Yet to Join</div><div class="kc-val" id="avis-notjoined">–</div><div class="kc-sub">No joining date yet · click to view</div></div>
     <div class="kc blue clickable" onclick="viewAvisTopClass()" title="Click to view records"><div class="kc-ico">🏆</div><div class="kc-lbl">Top Class</div><div class="kc-val" id="avis-topclass">–</div><div class="kc-sub" id="avis-topclass-s">Most admissions · click to view</div></div>
-    <div class="kc indigo"><div class="kc-ico">🗓️</div><div class="kc-lbl">Latest Entry</div><div class="kc-val" id="avis-latest" style="font-size:19px;">–</div><div class="kc-sub">Most recent Created Date</div></div>
   </div>
 
   <div class="row r2">
@@ -3237,28 +3235,52 @@ function renderHR(){
     const keys=Object.keys(cnt);
     return keys.length?keys.reduce((a,b)=>cnt[a]>=cnt[b]?a:b):'–';
   }
+  // ── HR KPI — replicates the HR Google-Sheet dashboard formulas exactly ──
+  // HIRING SPEED  (sheet col B): per CLOSED requisition, score its "Days to Close" on the
+  //   band ≤10→5, ≤15→4.5, ≤20→4, ≤25→3.5, ≤30→3, ≤35→2.5, ≤40→2, else 1 — then AVERAGE.
+  // AVG CLOSING/MONTH (sheet col D): (total closed ÷ active months) mapped ≥8→5, ≥6→4,
+  //   ≥4→3, ≥2→2, else 1.  Active months = current month − start month + 1.
+  // OVERALL = Hiring Speed·40% + Avg Closing/Month·40% + Vacancy Closure·10% + Compliance·10%.
+  const hsBand=d=>d<=10?5:d<=15?4.5:d<=20?4:d<=25?3.5:d<=30?3:d<=35?2.5:d<=40?2:1;
+  const acmBand=pm=>pm>=8?5:pm>=6?4:pm>=4?3:pm>=2?2:1;
+  // Start month per recruiter (from the HR sheet's AA:AB helper table). Year is the 2026 cycle.
+  const HR_START_MONTH={'kavitha':1,'priya':1,'navya':1,'swathi priya':1,'preethi':1,'stella':3,'divya':6};
+  const _W=getDateWindows();
+  const _curAbs=(()=>{ const t=(_W&&_W.today)?_W.today:new Date().toISOString().slice(0,10);
+    const y=+t.slice(0,4), m=+t.slice(5,7); return y*12+m; })();
   const LIVE_KPI={};
   recruiterNames.forEach(h=>{
     const rows=allRecHR.filter(r=>r.HR===h);
-    const closed=rows.filter(r=>isClosed(r.Status)).length;
+    const closedRows=rows.filter(r=>isClosed(r.Status));
+    const closed=closedRows.length;
     const open=rows.filter(r=>isOpen(r.Status)).length;
     const hold=rows.filter(r=>isHold(r.Status)).length;
     const total=rows.length;
-    const dtc=rows.filter(r=>isClosed(r.Status)).map(r=>hrCloseDays(r)).filter(v=>v!==null&&v>=0);
+
+    // Hiring Speed: score EACH closed req from its days-to-close, then average (sheet col B)
+    const dtc=closedRows.map(r=>hrCloseDays(r)).filter(v=>v!==null&&v>=0);
     const avgDays=dtc.length?+(dtc.reduce((a,b)=>a+b,0)/dtc.length).toFixed(1):null;
-    // Closed per active month (rough): closed / number of distinct closed-months
-    const closedMonths=new Set(rows.filter(r=>isClosed(r.Status)&&r.ClosedDate!=='–').map(r=>String(r.ClosedDate).slice(0,7)));
-    const avgClosing=closedMonths.size?+(closed/closedMonths.size).toFixed(1):closed;
-    // Derived 1-5 scores
-    const vcr=total>0?+(closed/total*5).toFixed(1):0;                                   // closure rate → /5
-    const hiring_speed=avgDays===null?0:(avgDays<=7?5:avgDays<=12?4.5:avgDays<=18?4:avgDays<=25?3.5:avgDays<=35?3:avgDays<=50?2.5:2);
-    const compliance=4.5;                                                               // not tracked in sheet
-    const closeScore=Math.min(5,+(avgClosing/12*5));                                    // avg closings per month → /5 (12/mo = 5)
-    // Management weights: Hiring Speed 40% · Vacancy Closure Rate 10% · Avg Closing/Month 40% · Compliance 10%
-    const overall=+(((hiring_speed*0.40)+(vcr*0.10)+(closeScore*0.40)+(compliance*0.10))).toFixed(1);
-    const rating=overall>=4.5?'Excellent':overall>=3.8?'Good':overall>=3?'Average':'Needs Focus';
-    LIVE_KPI[h]={hiring_speed,vcr,avg_closing:avgClosing,compliance,overall,rating,
-      branch:branchOf(h),closed,open,hold,total,avgDays};
+    const hiring_speed=dtc.length?+(dtc.map(hsBand).reduce((a,b)=>a+b,0)/dtc.length).toFixed(1):0;
+
+    // Avg Closing/Month: closed ÷ active-months → banded score (sheet col D)
+    let startM=HR_START_MONTH[String(h).trim().toLowerCase()], startAbs;
+    if(startM){ startAbs=2026*12+startM; }
+    else{ // fallback: earliest post-date month in this recruiter's data
+      const ms=rows.map(r=>String(r.PostDate||'')).filter(s=>s&&s!=='–'&&s.length>=7)
+                   .map(s=>(+s.slice(0,4))*12+(+s.slice(5,7)));
+      startAbs=ms.length?Math.min(...ms):_curAbs;
+    }
+    const activeMonths=Math.max(1,_curAbs-startAbs+1);
+    const perMonth=+(closed/activeMonths).toFixed(1);          // raw closings per month (e.g. 10.4)
+    const closeScore=acmBand(perMonth);                        // 1-5 score shown in the column (matches sheet)
+
+    // Vacancy Closure Rate → /5 ;  Compliance not in raw data → held at 4.5 (10% weight)
+    const vcr=total>0?+(closed/total*5).toFixed(1):0;
+    const compliance=4.5;
+    const overall=+(((hiring_speed*0.40)+(closeScore*0.40)+(vcr*0.10)+(compliance*0.10))).toFixed(1);
+    const rating=overall>=4.3?'Excellent':overall>=3.5?'Good':overall>=2.8?'Average':'Needs Focus';
+    LIVE_KPI[h]={hiring_speed,vcr,avg_closing:closeScore,avg_closing_raw:perMonth,active_months:activeMonths,
+      compliance,overall,rating,branch:branchOf(h),closed,open,hold,total,avgDays};
   });
 
   // Which recruiters to show based on branch filter
@@ -3321,7 +3343,7 @@ function renderHR(){
           <span style="display:inline-flex;align-items:center;gap:4px;"><span style="font-weight:800;font-size:14px;color:${k.hiring_speed>=4?'#059669':k.hiring_speed>=3?'#D97706':'#DC2626'}">${k.hiring_speed}</span><span style="color:#94A3B8;font-size:10px;">/5</span></span>
         </td>
         <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:700;font-size:14px;color:${k.vcr>=4.5?'#059669':'#D97706'}">${k.vcr}</td>
-        <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:700;font-size:14px;">${k.avg_closing}</td>
+        <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:700;font-size:14px;" title="${k.avg_closing_raw} closings/month over ${k.active_months} active month(s) → score ${k.avg_closing}/5"><span style="color:${k.avg_closing>=4?'#059669':k.avg_closing>=3?'#D97706':'#DC2626'}">${k.avg_closing}</span><span style="color:#94A3B8;font-size:10px;"> /5</span></td>
         <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:700;font-size:14px;color:${k.compliance>=4.5?'#059669':'#D97706'}">${k.compliance}</td>
         <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;"><span style="font-size:18px;font-weight:900;color:${scoreColor}">${k.overall}</span></td>
         <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;"><span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;${badge};">${rIcon} ${k.rating}</span></td>
@@ -3635,10 +3657,6 @@ function renderAVIS(){
   setTxt('avis-joined', fi(joined.length));
   setTxt('avis-notjoined', fi(rows.length-joined.length));
 
-  // Latest entry
-  const latest=rows.map(r=>r.CreatedDate).filter(d=>d&&d!=='–').sort().pop();
-  setTxt('avis-latest', latest?fmtDispDate(latest):'–');
-
   // Class-wise
   const clsAgg={};
   rows.forEach(r=>{const c=String(r.Class||'–').trim()||'–'; clsAgg[c]=(clsAgg[c]||0)+1;});
@@ -3662,23 +3680,21 @@ function renderAVIS(){
       scales:{y:{beginAtZero:true,grid:{color:'#E0E8FF'}},
         x:{ticks:{font:{size:10.5,weight:'600'},maxRotation:45,minRotation:0},grid:{display:false}}}}});
 
-  // Monthly trend by Created Date
-  // Monthly trend by Admission Date
-const moAgg={};
-
-rows.forEach(r=>{
-
-    if(!r.AdmDate || r.AdmDate==="–") return;
-
-    const d=new Date(r.AdmDate);
-
-    if(isNaN(d)) return;
-
-    const key=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
-
-    moAgg[key]=(moAgg[key]||0)+1;
-
-});
+  // Monthly trend by DATE OF ADMISSION (server already parsed the mixed
+  // dd-mm-yyyy / dd-Mon-yyyy formats day-first, so months are now correct).
+  // Guards: ignore blanks, drop any month AFTER the current month (no future
+  // admissions), and drop stray ancient values before the 2024-25 cycle.
+  const _wm=getDateWindows();
+  const curYM=(_wm&&_wm.thisMonth)?_wm.thisMonth:(new Date().toISOString().slice(0,7));
+  const FLOOR_YM='2024-01';
+  const moAgg={}; let _skipped=0;
+  rows.forEach(r=>{
+    const d=String(r.AdmDate||'');
+    if(d.length<7||d==='–') return;              // no admission date recorded
+    const ym=d.slice(0,7);
+    if(ym>curYM || ym<FLOOR_YM){ _skipped++; return; }   // future / ancient outlier
+    moAgg[ym]=(moAgg[ym]||0)+1;
+  });
   const moKeys=Object.keys(moAgg).sort();
   const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const moLabels=moKeys.map(k=>MN[parseInt(k.slice(5,7),10)-1]+' '+k.slice(0,4));
@@ -3711,27 +3727,8 @@ function viewAvisClass(cls){
 }
 function viewAvisTopClass(){ if(window._AVIS_TOPCLASS) viewAvisClass(window._AVIS_TOPCLASS); }
 function viewAvisMonth(ym){
-
-    const rows=avisRows().filter(r=>{
-
-        if(!r.AdmDate || r.AdmDate==="–") return false;
-
-        const d=new Date(r.AdmDate);
-
-        if(isNaN(d)) return false;
-
-        const key=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
-
-        return key===ym;
-
-    });
-
-    openModal(
-        '🏫 Akshara Vaagdevi — '+ym,
-        rows.length+' admissions (by Date of Admission)',
-        rows,
-        AVIS_COLS
-    );
+  const rows=avisRows().filter(r=>String(r.AdmDate||'').slice(0,7)===ym);
+  openModal('🏫 Akshara Vaagdevi — '+ym, rows.length+' admissions (by Date of Admission)', rows, AVIS_COLS);
 }
 
 function renderAdmissions(){
@@ -3821,7 +3818,6 @@ function renderAdmissions(){
       <td style="padding:9px 12px;text-align:center;border-bottom:1px solid #E0E8FF;font-size:12.5px;color:#059669;">${digitalLeads.toLocaleString('en-IN')}</td>
       <td style="padding:9px 12px;text-align:center;border-bottom:1px solid #E0E8FF;font-size:12.5px;font-weight:700;color:#059669;">${digitalAdm.toLocaleString('en-IN')}</td>
       <td style="padding:9px 12px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:800;font-size:13px;color:${digColor};">${digitalPct.toFixed(2)}%</td>
-      <td style="padding:9px 12px;text-align:center;border-bottom:1px solid #E0E8FF;font-size:12.5px;color:#64748B;">${otherLeads.toLocaleString('en-IN')}</td>
     </tr>`;
   }).join('');
   const totalRate=dcnsTotal.leads>0?(dcnsTotal.confirmed/dcnsTotal.leads*100):0;
@@ -3837,7 +3833,6 @@ function renderAdmissions(){
     <td style="padding:9px 12px;text-align:center;border-bottom:2px solid #E0E8FF;color:#059669;">${dcnsTotal.digital.toLocaleString('en-IN')}</td>
     <td style="padding:9px 12px;text-align:center;border-bottom:2px solid #E0E8FF;color:#059669;">${dcnsTotal.digitalAdm.toLocaleString('en-IN')}</td>
     <td style="padding:9px 12px;text-align:center;border-bottom:2px solid #E0E8FF;">${totalDigPct.toFixed(2)}%</td>
-    <td style="padding:9px 12px;text-align:center;border-bottom:2px solid #E0E8FF;color:#64748B;">${dcnsTotal.other.toLocaleString('en-IN')}</td>
   </tr>`;
   dcnsTbody.innerHTML=dcnsRows+(activeBranches.length>1?totalRow:'');
 
