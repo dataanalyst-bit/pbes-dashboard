@@ -1806,10 +1806,10 @@ function renderGrievanceOfficer(){
   const GO = (typeof GO_DATA !== 'undefined' && Array.isArray(GO_DATA)) ? GO_DATA : [];
   if(GO.length === 0){ goCard.style.display='none'; return; }
   goCard.style.display = '';
-  const BRANCH_COLORS = { Boduppal:'#1E4FD8', Keesara:'#059669', Pocharam:'#D97706', Bachupally:'#DC2626' };
-  const MONTH_ORDER   = ['March','April','May','June'];
+  const BRANCH_COLORS = { Boduppal:'#1E4FD8', Keesara:'#059669', Pocharam:'#D97706', Bachupally:'#7C3AED', Gowdavalli:'#0D9488' };
+  const MONTH_ORDER   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   const summaryRow = document.getElementById('go-summary-row');
-  const branches   = ['Boduppal','Keesara','Pocharam','Bachupally'];
+  const branches   = ['Boduppal','Keesara','Pocharam','Bachupally','Gowdavalli'];
   summaryRow.innerHTML = branches.map(function(b){
     const rows = GO.filter(function(r){ return r.branch===b; });
     if(!rows.length) return '';
@@ -1854,16 +1854,48 @@ function renderGrievanceOfficer(){
       +'<span style="font-size:11px;color:#64748B;">'+r.officer+'</span></td>'
       +'<td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;font-weight:600;">'+r.month+'</td>'
       +'<td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">'+r.total_calls.toLocaleString('en-IN')+'</td>'
-      +'<td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">'
-      +(r.wrong_grievance>0?'<span style="color:#DC2626;font-weight:700;">'+r.wrong_grievance+'</span> <small style="color:#94A3B8;">('+Math.round(r.wrong_grievance/r.total_calls*100)+'%)</small>':'<span style="color:#059669;">&#10003;</span>')+'</td>'
-      +'<td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">'
-      +(r.empty_status>0?'<span style="color:#D97706;font-weight:700;">'+r.empty_status+'</span> <small style="color:#94A3B8;">('+Math.round(r.empty_status/r.total_calls*100)+'%)</small>':'<span style="color:#059669;">&#10003;</span>')+'</td>'
-      +'<td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">'
-      +(r.empty_date>0?'<span style="color:#7C3AED;font-weight:700;">'+r.empty_date+'</span>':'<span style="color:#059669;">&#10003;</span>')+'</td>'
+      +'<td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;'+(r.wrong_grievance>0?'cursor:pointer;':'')+'"'+(r.wrong_grievance>0?' onclick="viewGOIssue(\''+r.branch+'\',\''+r.month+'\',\'wrong_grievance\')" title="Click to view these entries"':'')+'>'
+      +(r.wrong_grievance>0?'<span style="color:#DC2626;font-weight:700;text-decoration:underline dotted;">'+r.wrong_grievance+'</span> <small style="color:#94A3B8;">('+Math.round(r.wrong_grievance/r.total_calls*100)+'%)</small>':'<span style="color:#059669;">&#10003;</span>')+'</td>'
+      +'<td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;'+(r.empty_status>0?'cursor:pointer;':'')+'"'+(r.empty_status>0?' onclick="viewGOIssue(\''+r.branch+'\',\''+r.month+'\',\'empty_status\')" title="Click to view these entries"':'')+'>'
+      +(r.empty_status>0?'<span style="color:#D97706;font-weight:700;text-decoration:underline dotted;">'+r.empty_status+'</span> <small style="color:#94A3B8;">('+Math.round(r.empty_status/r.total_calls*100)+'%)</small>':'<span style="color:#059669;">&#10003;</span>')+'</td>'
+      +'<td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;'+(r.empty_date>0?'cursor:pointer;':'')+'"'+(r.empty_date>0?' onclick="viewGOIssue(\''+r.branch+'\',\''+r.month+'\',\'empty_date\')" title="Click to view these entries"':'')+'>'
+      +(r.empty_date>0?'<span style="color:#7C3AED;font-weight:700;text-decoration:underline dotted;">'+r.empty_date+'</span>':'<span style="color:#059669;">&#10003;</span>')+'</td>'
       +'<td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">'
       +'<span style="background:'+qBg+';color:'+qColor+';font-weight:800;font-size:13px;padding:3px 10px;border-radius:20px;">'+r.quality_score+'%</span>'+bar+'</td></tr>';
   });
   tbody.innerHTML=html;
+}
+
+// Drill-down for the three data-quality columns → lists the exact offending care-call
+// entries (respects the branch + month of the clicked row), using the same rules the
+// server uses to count them so the modal count always matches the cell number.
+function viewGOIssue(branch, month, type){
+  const ALL=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
+  let rows=ALL.filter(function(r){ return r.Branch===branch && r.Month===month; });
+  let title, sub;
+  if(type==='wrong_grievance'){
+    rows=rows.filter(function(r){ var g=String(r.GrievanceRaw||'').trim(); return g && g!=='nan' && g!=='None' && r.Grievance==='Other'; });
+    title='⚠ Wrong Grievance — '+branch+' · '+month;
+    sub='Grievance value not in the standard list · '+rows.length+' entr'+(rows.length===1?'y':'ies');
+  } else if(type==='empty_status'){
+    rows=rows.filter(function(r){ var s=String(r.StatusRaw||'').trim(); return !s || s==='nan' || s==='None'; });
+    title='⏳ Empty Status — '+branch+' · '+month;
+    sub='Call status left blank · '+rows.length+' entr'+(rows.length===1?'y':'ies');
+  } else { // empty_date
+    rows=rows.filter(function(r){ return !r.Date || r.Date==='–'; });
+    title='📅 Empty Date — '+branch+' · '+month;
+    sub='Call date left blank · '+rows.length+' entr'+(rows.length===1?'y':'ies');
+  }
+  const cols=[
+    {key:'Student',label:'Student'},
+    {key:'Class',label:'Class'},
+    {key:'RollNo',label:'Roll No'},
+    {key:'Date',label:'Date',date:true},
+    {key:'GrievanceRaw',label:'Grievance'},
+    {key:'StatusRaw',label:'Status'},
+    {key:'Remarks',label:'Remarks',maxW:'320px'}
+  ];
+  openModal(title, sub, rows, cols);
 }
 
 // Quick-view drilldown for Care Call KPI cards (Pending / In Progress), respects current branch+month filter
@@ -5309,4 +5341,4 @@ function renderAll() {
 }
 </script>
 </body>
-</html>  
+</html>
