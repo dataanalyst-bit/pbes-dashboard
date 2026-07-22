@@ -340,7 +340,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     </div>
     <div class="hdr-right">
       <div class="live-pill"><span class="ldot"></span> Active</div>
-      <div class="hdr-stat"><div class="v" id="hv-students">7,303</div><div class="l">Students</div></div>
+      <div class="hdr-stat"><div class="v" id="hv-students">—</div><div class="l">Students</div></div>
       <div class="live-pill"><span class="ldot"></span> Active</div>
 <a href="reset-password.html" style="color:rgba(255,255,255,.85);font-size:11px;text-decoration:underline;margin-left:4px;">Change Password</a>
       <div class="hdr-stat"><div class="v" id="hv-calls">–</div><div class="l">Calls Made</div></div>
@@ -402,7 +402,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="sh"><div class="sh-l"><h2>Executive Overview</h2><span class="tag" id="ov-tag">All Branches · All Months</span></div></div>
   <!-- Row 1: Core operational KPIs -->
   <div class="krow k5">
-    <div class="kc blue clickable" onclick="viewStudentsByBranch()" title="Click to view branch-wise student count"><div class="kc-ico">👦</div><div class="kc-lbl">Total Students</div><div class="kc-val" id="ov-stu">7,303</div><div class="kc-sub">4 active campuses · click to view</div></div>
+    <div class="kc blue clickable" onclick="viewStudentsByBranch()" title="Click to view branch-wise student count"><div class="kc-ico">👦</div><div class="kc-lbl">Total Students</div><div class="kc-val" id="ov-stu">—</div><div class="kc-sub">4 active campuses · click to view</div></div>
     <div class="kc green clickable" onclick="viewCallsByBranch()" title="Click to view branch-wise calls made"><div class="kc-ico">📞</div><div class="kc-lbl">Calls Made</div><div class="kc-val" id="ov-calls">–</div><div class="kc-sub" id="ov-calls-s">–</div></div>
     <div class="kc teal clickable" onclick="viewConfirmedAdmissions()" title="Click to view admissions by branch"><div class="kc-ico">🎓</div><div class="kc-lbl">Confirmed Admissions</div><div class="kc-val" id="ov-adm-portal">–</div><div class="kc-sub" id="ov-adm-portal-s">Portal confirmed</div></div>
     <div class="kc indigo"><div class="kc-ico">👁️</div><div class="kc-lbl">Teacher Observations</div><div class="kc-val" id="ov-obs">–</div><div class="kc-sub" id="ov-obs-s">Total recorded</div></div>
@@ -632,7 +632,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="kc blue clickable" onclick="viewHRKpi('ALL')" title="Click to view all positions"><div class="kc-ico">📋</div><div class="kc-lbl">Total Positions</div><div class="kc-val" id="hr-total">–</div><div class="kc-sub">All recruiters · click to view</div></div>
     <div class="kc green clickable" onclick="viewHRKpi('Closed')" title="Click to view closed positions"><div class="kc-ico">✅</div><div class="kc-lbl">Closed Positions</div><div class="kc-val" id="hr-closed">–</div><div class="kc-sub" id="hr-closed-s">– closure rate</div></div>
     <div class="kc amber clickable" onclick="viewHRKpi('Open')" title="Click to view open positions"><div class="kc-ico">⏳</div><div class="kc-lbl">Open / Pending</div><div class="kc-val" id="hr-open">–</div><div class="kc-sub" id="hr-open-s">Requires follow-up · click to view</div></div>
-    <div class="kc teal clickable" onclick="viewHRKpi('Closed')" title="Click to view closed positions with days"><div class="kc-ico">⚡</div><div class="kc-lbl">Avg Days to Close</div><div class="kc-val" id="hr-avgdays">–</div><div class="kc-sub">Days per position · click to view</div></div>
+    <div class="kc teal clickable" onclick="viewHRKpi('Closed')" title="Click to view closed positions"><div class="kc-ico">📆</div><div class="kc-lbl">Avg Closing / Month</div><div class="kc-val" id="hr-avgdays">–</div><div class="kc-sub">Closed ÷ active months · click to view</div></div>
   </div>
 
   <!-- HR Performance Table -->
@@ -684,7 +684,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="card" style="margin-bottom:16px;">
     <div class="ch"><h3>🏆 Recruiter Rankings &amp; Awards</h3><span class="fnote">Score = positions closed (volume) 60% + recruiting speed 40% · resigned staff excluded · click a row to view records</span></div>
     <div class="cb-0" style="overflow-x:auto"><table class="dt">
-      <thead><tr><th>Rank</th><th>Recruiter</th><th>Closed</th><th>Open</th><th>Closure %</th><th>Avg Days</th><th>Award</th></tr></thead>
+      <thead><tr><th>Rank</th><th>Recruiter</th><th>Closed</th><th>Open</th><th>Avg Days</th><th>Fast Closure %</th><th>Slow Closures</th><th>Score</th></tr></thead>
       <tbody id="hr-rank-tbody"></tbody>
     </table></div>
   </div>
@@ -766,43 +766,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     </div>
   </div>
 
-  <!-- Combined Admission Analysis: Portal (Digital Campus / NeverSkip) + EXTRAEDGE Leads cross-matched -->
-  <div style="background:linear-gradient(135deg,#F0FDF4,#EFF6FF);border:1px solid #BBF7D0;border-radius:12px;padding:14px 18px;margin-bottom:16px;">
-    <div style="font-size:12.5px;font-weight:800;color:#059669;margin-bottom:4px;">🔗 Combined Admission Analysis — Portal Records Cross-Matched with EXTRAEDGE Leads</div>
-    <div style="font-size:11.5px;color:#64748B;line-height:1.6;">Every confirmed admission from <strong>Admission1 + Admission2</strong> (Digital Campus / NeverSkip Portal) is matched against the <strong>Touched Leads</strong> sheet using primary mobile, secondary mobile, WhatsApp number, email ID, father's/mother's contact &amp; email. This reveals: admissions present in the Portal but missing from Leads (no EXTRAEDGE lead record), admissions present in Leads (Stage = 08-Admission Completed) but missing from the Portal (not yet synced), and admissions confirmed in both — for which we can identify the Lead Owner / Counsellor.</div>
-  </div>
-
-  <div class="krow k4">
-    <div class="kc green"><div class="kc-ico">🔗</div><div class="kc-lbl">Matched in Both</div><div class="kc-val" id="cadm-both">–</div><div class="kc-sub">Portal + EXTRAEDGE Leads</div></div>
-    <div class="kc blue"><div class="kc-ico">🏫</div><div class="kc-lbl">Portal Only</div><div class="kc-val" id="cadm-portal-only">–</div><div class="kc-sub">No matching lead record</div></div>
-    <div class="kc amber"><div class="kc-ico">📞</div><div class="kc-lbl">Leads Only</div><div class="kc-val" id="cadm-leads-only">–</div><div class="kc-sub">Admission Completed, not in Portal yet</div></div>
-    <div class="kc teal"><div class="kc-ico">🎓</div><div class="kc-lbl">Total Combined</div><div class="kc-val" id="cadm-total">–</div><div class="kc-sub">Unique admissions identified</div></div>
-  </div>
-
-  
-
-  <!-- Data Quality / Process Gap Analysis -->
-  <div style="background:linear-gradient(135deg,#FEF2F2,#FFFBEB);border:1px solid #FECACA;border-radius:12px;padding:14px 18px;margin-bottom:16px;">
-    <div style="font-size:12.5px;font-weight:800;color:#DC2626;margin-bottom:4px;">⚠️ Data Quality — Process Gap Analysis</div>
-    <div style="font-size:11.5px;color:#64748B;line-height:1.6;">Process: every admission must originate as a <strong>LeadId in EXTRAEDGE</strong>, progress to <strong>Stage 08-Admission Completed</strong>, then be uploaded to <strong>Digital Campus / NeverSkip Portal</strong>. Two gap types are tracked below: (1) <strong>"Not Uploaded to Portal"</strong> — Lead Owner marked the admission complete in EXTRAEDGE but the student record doesn't exist in the Portal yet; (2) <strong>"No LeadId Found"</strong> — student is enrolled in the Portal but no matching EXTRAEDGE lead (by phone, email, or name+branch) was found, so the Lead Owner is unidentifiable.</div>
-  </div>
-
-  <div class="card" style="margin-bottom:16px;">
-    <div class="ch"><h3>📋 Lead Owner — Portal Upload Compliance</h3><span class="fnote">% of each counsellor's completed admissions still missing from the Portal</span></div>
-    <div class="cb" style="overflow-x:auto;">
-      <table style="width:100%;border-collapse:collapse;min-width:640px;">
-        <thead><tr style="background:#EEF2FF;">
-          <th style="padding:9px 12px;text-align:left;font-size:10.5px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Lead Owner</th>
-          <th style="padding:9px 12px;text-align:center;font-size:10.5px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Branch</th>
-          <th style="padding:9px 12px;text-align:center;font-size:10.5px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Admissions Completed (EXTRAEDGE)</th>
-          <th style="padding:9px 12px;text-align:center;font-size:10.5px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Uploaded to Portal</th>
-          <th style="padding:9px 12px;text-align:center;font-size:10.5px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Not Uploaded</th>
-          <th style="padding:9px 12px;text-align:center;font-size:10.5px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Not Uploaded %</th>
-        </tr></thead>
-        <tbody id="dq-owner-tbody"></tbody>
-      </table>
-    </div>
-  </div>
+  <!-- (Combined Admission Analysis + Process Gap + Monthly Portal chart relocated below Counsellor-Wise Report) -->
 
   
 
@@ -846,6 +810,31 @@ document.addEventListener('DOMContentLoaded', async () => {
       </table>
     </div>
   </div>
+
+  <!-- ▼ Combined Admission Analysis (relocated below Counsellor-Wise Report) ▼ -->
+  <div style="background:linear-gradient(135deg,#F0FDF4,#EFF6FF);border:1px solid #BBF7D0;border-radius:12px;padding:14px 18px;margin-bottom:16px;">
+    <div style="font-size:12.5px;font-weight:800;color:#059669;margin-bottom:4px;">🔗 Combined Admission Analysis — Portal Records Cross-Matched with EXTRAEDGE Leads</div>
+    <div style="font-size:11.5px;color:#64748B;line-height:1.6;">Every confirmed admission from <strong>Admission1 + Admission2</strong> (Digital Campus / NeverSkip Portal) is matched against the <strong>Touched Leads</strong> sheet using primary mobile, secondary mobile, WhatsApp number, email ID, father's/mother's contact &amp; email. This reveals: admissions present in the Portal but missing from Leads (no EXTRAEDGE lead record), admissions present in Leads (Stage = 08-Admission Completed) but missing from the Portal (not yet synced), and admissions confirmed in both — for which we can identify the Lead Owner / Counsellor.</div>
+  </div>
+
+  <div class="krow k4">
+    <div class="kc green"><div class="kc-ico">🔗</div><div class="kc-lbl">Matched in Both</div><div class="kc-val" id="cadm-both">–</div><div class="kc-sub">Portal + EXTRAEDGE Leads</div></div>
+    <div class="kc blue"><div class="kc-ico">🏫</div><div class="kc-lbl">Portal Only</div><div class="kc-val" id="cadm-portal-only">–</div><div class="kc-sub">No matching lead record</div></div>
+    <div class="kc amber"><div class="kc-ico">📞</div><div class="kc-lbl">Leads Only</div><div class="kc-val" id="cadm-leads-only">–</div><div class="kc-sub">Admission Completed, not in Portal yet</div></div>
+    <div class="kc teal"><div class="kc-ico">🎓</div><div class="kc-lbl">Total Combined</div><div class="kc-val" id="cadm-total">–</div><div class="kc-sub">Unique admissions identified</div></div>
+  </div>
+
+  <!-- Data Quality / Process Gap Analysis -->
+  <div style="background:linear-gradient(135deg,#FEF2F2,#FFFBEB);border:1px solid #FECACA;border-radius:12px;padding:14px 18px;margin-bottom:16px;">
+    <div style="font-size:12.5px;font-weight:800;color:#DC2626;margin-bottom:4px;">⚠️ Data Quality — Process Gap Analysis</div>
+    <div style="font-size:11.5px;color:#64748B;line-height:1.6;">Process: every admission must originate as a <strong>LeadId in EXTRAEDGE</strong>, progress to <strong>Stage 08-Admission Completed</strong>, then be uploaded to <strong>Digital Campus / NeverSkip Portal</strong>. Two gap types are tracked below: (1) <strong>"Not Uploaded to Portal"</strong> — Lead Owner marked the admission complete in EXTRAEDGE but the student record doesn't exist in the Portal yet; (2) <strong>"No LeadId Found"</strong> — student is enrolled in the Portal but no matching EXTRAEDGE lead (by phone, email, or name+branch) was found, so the Lead Owner is unidentifiable.</div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;" id="adm-portal-monthly-card">
+    <div class="ch"><h3>📈 Monthly Admissions 2026-27 — Portal Data</h3><span class="fnote" id="adm-portal-monthly-fn">Digital Campus + NeverSkip confirmed enrollments by admission month · click a bar to view</span></div>
+    <div class="cb"><div class="cw tall"><canvas id="adm-portal-monthly-chart"></canvas></div></div>
+  </div>
+  <!-- ▲ end relocated Combined Admission Analysis ▲ -->
 
   <!-- Stage Funnel -->
   
@@ -937,6 +926,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     </div>
     <div class="row r2">
     <div class="card"><div class="ch"><h3>📊 Observer Completion by Type — Required vs Done</h3><span class="fnote">Working Days × quota (2/day leadership · 1/day HOD) · follows Branch &amp; Month dropdowns</span></div><div class="cb"><div class="cw tall"><canvas id="obs-observer-type"></canvas></div></div></div>
+    <div class="card"><div class="ch"><h3>🌟 Best Teachers — Top Grand Averages</h3><span class="fnote" id="obs-best-fn">Highest grand-avg teachers · click a bar for full records</span></div><div class="cb"><div class="cw tall"><canvas id="obs-best-chart"></canvas></div><div id="obs-best-insight" style="margin-top:10px;font-size:11.5px;color:#334155;line-height:1.55;"></div></div></div>
   </div>
 </div>
 
@@ -1947,6 +1937,30 @@ function viewCareRecords(statusFilter){
 // ════════════════════════════════════════════
 // OBSERVATIONS
 // ════════════════════════════════════════════
+// ── Teacher observation helpers: count per teacher + clickable link + full-record drill ──
+function _escAttr(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function _obsCountForTeacher(branch,teacher){
+  const OBS=(typeof OBS_DATA!=='undefined'&&Array.isArray(OBS_DATA))?OBS_DATA:[];
+  const t=String(teacher||'').trim().toLowerCase();
+  return OBS.filter(r=>r.Branch===branch&&String(r.Teacher||'').trim().toLowerCase()===t).length;
+}
+function _obsLink(branch,teacher){
+  const cnt=_obsCountForTeacher(branch,teacher);
+  if(!cnt) return '0';
+  return '<span style="cursor:pointer;color:#1E4FD8;font-weight:700;text-decoration:underline dotted" title="Click to view all observations for this teacher" onclick="event.stopPropagation();viewTeacherObs(this.dataset.b,this.dataset.t)" data-b="'+_escAttr(branch)+'" data-t="'+_escAttr(teacher)+'">'+cnt+'</span>';
+}
+function viewTeacherObs(branch,teacher){
+  const OBS=(typeof OBS_DATA!=='undefined'&&Array.isArray(OBS_DATA))?OBS_DATA:[];
+  const t=String(teacher||'').trim().toLowerCase();
+  const rows=OBS.filter(r=>r.Branch===branch&&String(r.Teacher||'').trim().toLowerCase()===t)
+    .sort((a,b)=>String(a.Month).localeCompare(String(b.Month)));
+  const cols=[{key:'Branch',label:'Branch'},{key:'Month',label:'Month'},{key:'Date',label:'Date',date:true},
+    {key:'Teacher',label:'Teacher',maxW:'160px'},{key:'Class',label:'Class'},{key:'Subject',label:'Subject'},
+    {key:'ObsType',label:'Observer'},{key:'Score',label:'Score',score:true},
+    {key:'Remarks',label:'Observation & Remarks',maxW:'380px'}];
+  openModal('📋 '+teacher+' — All Observations',`${branch} · ${rows.length} observation(s) with full details & remarks`,rows,cols);
+}
+
 function renderObservations(){
   const bl=fBranch==='ALL'?'All Branches':fBranch, ml=fMonth==='ALL'?'All Months':fMonth+' 2026';
   document.getElementById('obs-tag').textContent=bl+' · '+ml;
@@ -1970,8 +1984,13 @@ function renderObservations(){
   document.getElementById('obs-tot').textContent=tot||'–';
   document.getElementById('obs-tot-s').textContent=sc>0?sc+' scored observations':'–';
   document.getElementById('obs-avg').textContent=avg||'–';
-  document.getElementById('obs-ni').textContent=ni||'–';
-  document.getElementById('obs-ni-s').textContent=tot>0?fp((ni/tot)*100)+' need support':'–';
+  // Needs Improvement (<3) = UNIQUE teachers whose GRAND AVERAGE < 3 (from All_Teacher sheet),
+  // not individual observation rows. Grand avg is month-independent, so only branch filter applies.
+  const _ATni=(typeof ALL_TEACHER!=='undefined'&&Array.isArray(ALL_TEACHER))?ALL_TEACHER:[];
+  const _niScope=_ATni.filter(r=>(fBranch==='ALL'||r.Branch===fBranch)).filter(r=>{const v=parseFloat(r.GrandAvg);return !isNaN(v)&&v>0;});
+  const uniqNI=_niScope.filter(r=>parseFloat(r.GrandAvg)<3).length;
+  document.getElementById('obs-ni').textContent=uniqNI||'0';
+  document.getElementById('obs-ni-s').textContent=_niScope.length>0?fp((uniqNI/_niScope.length)*100)+' of teachers':'–';
 
   // ── Branch-wise Observation Values — UNIQUE teachers' Grand Avg from the All_Teacher sheet ──
   const bBranches=['Keesara','Pocharam','Boduppal','Bachupally','Gowdavalli'];
@@ -2008,13 +2027,14 @@ function renderObservations(){
       const AT2=(typeof ALL_TEACHER!=='undefined'&&Array.isArray(ALL_TEACHER))?ALL_TEACHER:[];
       let teachers=AT2.filter(r=>r.Branch===branch).map(r=>({
         Branch:r.Branch,Teacher:r.Teacher,Designation:r.Designation,Subject:r.Subject,
-        GrandAvg:r.GrandAvg}));
+        GrandAvg:r.GrandAvg,Observations:_obsLink(r.Branch,r.Teacher)}));
       if(bandFilter) teachers=teachers.filter(o=>{const v=parseFloat(o.GrandAvg);return !isNaN(v)&&bandFilter(v);});
       teachers.sort((a,b)=>(parseFloat(b.GrandAvg)||0)-(parseFloat(a.GrandAvg)||0));
       const cols=[{key:'Branch',label:'Branch'},{key:'Teacher',label:'Teacher',maxW:'200px'},
         {key:'Designation',label:'Designation',maxW:'150px'},{key:'Subject',label:'Subject'},
-        {key:'GrandAvg',label:'Grand Avg Score',score:true}];
-      openModal('🏫 '+label,`${teachers.length} unique teachers · from All_Teacher sheet`,teachers,cols);
+        {key:'GrandAvg',label:'Grand Avg Score',score:true},
+        {key:'Observations',label:'Total Observations'}];
+      openModal('🏫 '+label,`${teachers.length} unique teachers · click a Total Observations count for full records`,teachers,cols);
     },
     plugins:{
       legend:{display:true,position:'bottom',labels:{padding:14,font:{size:11.5}}},
@@ -2155,7 +2175,7 @@ function renderObservations(){
         backgroundColor:otPct.map(p=>p>=80?'#059669':p>=50?'#D97706':'#DC2626'),
         borderRadius:6,borderSkipped:false,barPercentage:.6
       }]
-    },options:{responsive:true,maintainAspectRatio:true,
+    },options:{responsive:true,maintainAspectRatio:true,layout:{padding:{top:24}},
       onClick:(evt,elements)=>{
         if(!elements||!elements.length)return;
         const t=otShown[elements[0].index];
@@ -2167,7 +2187,7 @@ function renderObservations(){
       },
       plugins:{legend:{display:false},
         tooltip:{callbacks:{label:c=>{const t=otShown[c.dataIndex];return `${otAgg[t.key].actual} done / ${otAgg[t.key].required} required (${quotaOfRole(t.key)}/day per observer)`;}}},
-        datalabels:{anchor:'end',align:'top',font:{weight:'800',size:12},color:'#0F172A',
+        datalabels:{display:true,clip:false,anchor:'end',align:'top',offset:2,font:{weight:'800',size:12},color:'#0F172A',
           formatter:v=>v+'%'}
       },
       scales:{x:{grid:{display:false},ticks:{font:{size:11.5}}},
@@ -2192,6 +2212,7 @@ function renderObservations(){
 
   renderObsCompletion();
   renderTeacherGrandAvg();
+  renderBestTeachers();
 }
 
 // Observer Tracker — Observation Completion % per role per branch
@@ -2266,11 +2287,11 @@ function renderObsCompletion(){
       data:{labels:typesWithData,datasets:[{label:'Completion %',data:compPct,
         backgroundColor:compPct.map(p=>p>=80?'#059669':p>=50?'#D97706':'#DC2626'),
         borderRadius:5,maxBarThickness:40}]},
-      options:{responsive:true,maintainAspectRatio:false,
+      options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:26}},
         onClick:(evt,els)=>{ if(!els||!els.length)return; viewObsByExactType(window._OBSCOMP_TYPES[els[0].index]); },
         plugins:{legend:{display:false},
           tooltip:{callbacks:{label:c=>{const t=typesWithData[c.dataIndex];return `${agg[t].actual} done / ${agg[t].required} required (${agg[t].quota}/day)`;}}},
-          datalabels:{display:true,anchor:'end',align:'top',color:'#1E293B',font:{size:10,weight:'bold'},formatter:v=>v+'%'}},
+          datalabels:{display:true,clip:false,anchor:'end',align:'top',offset:2,color:'#1E293B',font:{size:11,weight:'bold'},formatter:v=>v+'%'}},
         scales:{y:{beginAtZero:true,max:110,title:{display:true,text:'Completion %'},grid:{color:'#E0E8FF'},ticks:{callback:v=>v+'%'}},
           x:{ticks:{font:{size:9.5,weight:'600'},maxRotation:60,minRotation:45},grid:{display:false}}}}});
   }
@@ -2366,6 +2387,44 @@ function renderTeacherGrandAvg(){
         x:{ticks:{font:{size:11.5,weight:'600'}},grid:{display:false}}}}});
 }
 
+// Best Teachers — top grand-avg performers (respects branch filter), click bar → full records
+function renderBestTeachers(){
+  const el=document.getElementById('obs-best-chart');
+  if(!el) return;
+  const AT=(typeof ALL_TEACHER!=='undefined'&&Array.isArray(ALL_TEACHER))?ALL_TEACHER:[];
+  const scope=AT.filter(r=>(fBranch==='ALL'||r.Branch===fBranch))
+    .map(r=>({Branch:r.Branch,Teacher:r.Teacher,Designation:r.Designation,Subject:r.Subject,
+      ga:parseFloat(r.GrandAvg),obs:_obsCountForTeacher(r.Branch,r.Teacher)}))
+    .filter(r=>!isNaN(r.ga)&&r.ga>0);
+  const fn=document.getElementById('obs-best-fn');
+  const ins=document.getElementById('obs-best-insight');
+  if(!scope.length){ if(fn)fn.textContent='No teacher grand-avg data'; mkChart('obs-best-chart',{type:'bar',data:{labels:[],datasets:[]},options:{responsive:true,maintainAspectRatio:true}}); if(ins)ins.innerHTML=''; return; }
+  // Rank by grand avg, then by number of observations (more observed = more reliable)
+  const top=scope.slice().sort((a,b)=>b.ga-a.ga||b.obs-a.obs).slice(0,10);
+  window._BEST_TEACHERS=top;
+  if(fn) fn.textContent=(fBranch==='ALL'?'All Branches':fBranch)+' · top '+top.length+' by grand avg · click a bar';
+  mkChart('obs-best-chart',{type:'bar',
+    data:{labels:top.map(t=>t.Teacher),datasets:[{label:'Grand Avg',data:top.map(t=>+t.ga.toFixed(2)),
+      backgroundColor:top.map(t=>t.ga>=4.5?'#059669':t.ga>=4?'#22C55E':t.ga>=3?'#D97706':'#DC2626'),
+      borderRadius:5,maxBarThickness:26}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:true,
+      onClick:(evt,els)=>{ if(!els||!els.length)return; const t=window._BEST_TEACHERS[els[0].index]; if(t) viewTeacherObs(t.Branch,t.Teacher); },
+      plugins:{legend:{display:false},
+        tooltip:{callbacks:{label:c=>{const t=top[c.dataIndex];return t.ga.toFixed(2)+'/5 · '+t.obs+' observations · '+(t.Designation||'')+' ('+t.Branch+')';}}},
+        datalabels:{display:true,clip:false,anchor:'end',align:'right',offset:3,color:'#0F172A',font:{size:10.5,weight:'bold'},formatter:v=>v.toFixed(2)}},
+      layout:{padding:{right:34}},
+      scales:{x:{beginAtZero:true,max:5,grid:{color:'#E0E8FF'},ticks:{stepSize:1}},
+        y:{grid:{display:false},ticks:{font:{size:10.5,weight:'600'}}}}}});
+  // Impactful analysis line
+  const best=top[0];
+  const branchAvg=+(scope.reduce((s,r)=>s+r.ga,0)/scope.length).toFixed(2);
+  const exemplary=scope.filter(r=>r.ga>=4.95).length;
+  const above4=scope.filter(r=>r.ga>=4).length;
+  if(ins) ins.innerHTML='🏅 <strong>'+best.Teacher+'</strong> ('+best.Branch+') leads at <strong>'+best.ga.toFixed(2)+'/5</strong> across '+best.obs+' observations. '
+    +'<strong>'+above4+'</strong> of '+scope.length+' teachers ('+fp(above4/scope.length*100)+') score ≥4.0, and <strong>'+exemplary+'</strong> are perfect 5.0. '
+    +'Cohort grand-avg is <strong>'+branchAvg+'/5</strong>.';
+}
+
 function viewTeacherGrandAvg(bandKey){
   const AT=(typeof ALL_TEACHER!=='undefined'&&Array.isArray(ALL_TEACHER))?ALL_TEACHER:[];
   const tests={
@@ -2377,12 +2436,15 @@ function viewTeacherGrandAvg(bandKey){
   const ranges={Exemplary:'5.0',Proficient:'4.0–4.9',Developing:'3.0–3.9',Inadequate:'0–2.9'};
   const test=tests[bandKey]||(()=>false);
   const rows=AT.filter(r=>{const v=parseFloat(r.GrandAvg);return !isNaN(v)&&test(v)&&(fBranch==='ALL'||r.Branch===fBranch);})
-    .sort((a,b)=>parseFloat(b.GrandAvg)-parseFloat(a.GrandAvg));
+    .sort((a,b)=>parseFloat(b.GrandAvg)-parseFloat(a.GrandAvg))
+    .map(r=>({Branch:r.Branch,Teacher:r.Teacher,Designation:r.Designation,Subject:r.Subject,
+      GrandAvg:r.GrandAvg,Observations:_obsLink(r.Branch,r.Teacher)}));
   const bl=fBranch==='ALL'?'All Branches':fBranch;
   const cols=[{key:'Branch',label:'Branch'},{key:'Teacher',label:'Teacher',maxW:'200px'},
     {key:'Designation',label:'Designation',maxW:'160px'},{key:'Subject',label:'Subject'},
-    {key:'GrandAvg',label:'Grand Avg Score',score:true}];
-  openModal(`📊 ${bandKey} (${ranges[bandKey]||''}) — Teachers`,`${rows.length} teachers · ${bl}`,rows,cols);
+    {key:'GrandAvg',label:'Grand Avg Score',score:true},
+    {key:'Observations',label:'Total Observations'}];
+  openModal(`📊 ${bandKey} (${ranges[bandKey]||''}) — Teachers`,`${rows.length} teachers · ${bl} · click a Total Observations count for full records`,rows,cols);
 }
 
 
@@ -3344,7 +3406,10 @@ function renderHR(){
   setTxt('hr-closed-s',compRate+'% closure rate');
   setTxt('hr-open',fi(totOpen));
   setTxt('hr-open-s',totHold>0?totHold+' on hold · click to view':'Requires follow-up · click to view');
-  setTxt('hr-avgdays',totDays||'–');
+  // Avg Closing/Month = mean of each active recruiter's (closed ÷ active-months) rate.
+  const _cpmRates=activeHRs.map(h=>LIVE_KPI[h]&&LIVE_KPI[h].avg_closing_raw).filter(v=>typeof v==='number'&&isFinite(v)&&v>0);
+  const avgClosePM=_cpmRates.length?+(_cpmRates.reduce((a,b)=>a+b,0)/_cpmRates.length).toFixed(1):0;
+  setTxt('hr-avgdays',avgClosePM||'–');
   // expose for click-to-view + ranking
   window._HR_ACTIVE=activeHRs; window._HR_LIVE_KPI=LIVE_KPI;
 
@@ -3545,18 +3610,27 @@ function renderHRRanking(){
   }
   const base=names.map(h=>{
     const rows=allRec.filter(r=>r.HR===h);
-    const closed=rows.filter(r=>isClosed(r.Status)).length;
+    const closedRows=rows.filter(r=>isClosed(r.Status));
+    const closed=closedRows.length;
     const open=rows.filter(r=>isOpen(r.Status)).length;
     const total=rows.length;
-    const days=rows.filter(r=>isClosed(r.Status)).map(r=>hrCloseDays(r)).filter(n=>n!==null&&n>=0);
+    // Days-to-close: use the sheet's "Days to Close" column (r.DaysToClose) as the source of
+    // truth — the earlier recompute from Post→Closed dates was giving wrong averages.
+    const days=closedRows.map(r=>{
+      const n=parseFloat(r.DaysToClose);
+      if(!isNaN(n)&&n>=0) return n;
+      const c=hrCloseDays(r); return (c!==null&&c>=0)?c:null;
+    }).filter(n=>n!==null);
     const avgDays=days.length?+(days.reduce((a,c)=>a+c,0)/days.length).toFixed(1):null;
+    const fast=days.filter(d=>d<=15).length;                 // closed within 15 days
+    const slow=days.filter(d=>d>30).length;                  // took more than 30 days
+    const fastPct=days.length?Math.round(fast/days.length*100):0;
     const closurePct=total>0?+(closed/total*100).toFixed(1):0;
-    return {hr:h,branch:branchOf(h),closed,open,closurePct,avgDays};
+    return {hr:h,branch:branchOf(h),closed,open,closurePct,avgDays,fastPct,slow,samples:days.length};
   });
-  // ── RANKING per management: "how quick they recruit AND average number of positions closed" ──
-  // Score = Volume (positions closed) 60%  +  Speed (avg days to close) 40%.
-  // Volume is scaled against the top closer so high-volume recruiters (e.g. Swathi) rank fairly.
-  // Speed credit is dampened for very small samples so a 1-close recruiter can't top the list on speed alone.
+  // ── Scoring (per management): Volume (positions closed) 60% + Recruitment Speed 40% ──
+  // Volume is scaled against the top closer; speed rewards faster avg days, dampened for
+  // very small samples so a 1-close recruiter can't top the list on speed alone.
   const maxClosed=Math.max(1,...base.map(s=>s.closed));
   const stats=base.map(s=>{
     const volScore=s.closed/maxClosed*100;                                  // relative volume
@@ -3569,17 +3643,18 @@ function renderHRRanking(){
   }).sort((a,b)=>b.score-a.score || b.closed-a.closed);
 
   const medals=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣'];
-  const awards=['🏆 Top Recruiter','⚡ Speed Star','💪 High Closer'];
   tbody.innerHTML=stats.map((s,i)=>{
     const scoreColor=s.score>=75?'#059669':s.score>=50?'#D97706':'#DC2626';
-    const award=i<3?`<span style="background:#FEF9C3;color:#A16207;padding:3px 8px;border-radius:10px;font-size:10px;font-weight:700;">${awards[i]}</span>`:'';
+    const adColor=s.avgDays===null?'#94A3B8':s.avgDays<=15?'#059669':s.avgDays<=30?'#D97706':'#DC2626';
+    const fpColor=s.fastPct>=60?'#059669':s.fastPct>=30?'#D97706':'#DC2626';
     return `<tr style="cursor:pointer" onclick="viewHRByRecruiter('${s.hr.replace(/'/g,"\\\\'")}','ALL')">
       <td style="font-size:17px;text-align:center">${medals[i]||(i+1)}</td>
       <td><strong>${s.hr}</strong><br><small style="color:#94A3B8;font-size:10px;">${s.branch}</small></td>
-      <td>${fi(s.closed)}</td><td>${s.open>0?`<span style="color:#DC2626;font-weight:600">${s.open}</span>`:'0'}</td>
-      <td><strong style="color:${s.closurePct>=85?'#059669':'#D97706'}">${s.closurePct}%</strong></td>
-      <td>${s.avgDays===null?'–':s.avgDays+'d'}</td>
-      <td>${award||`<span style="display:inline-block;min-width:36px;padding:2px 8px;border-radius:8px;background:${scoreColor};color:#fff;font-weight:800;font-size:11px;text-align:center">${s.score}</span>`}</td></tr>`;
+      <td><strong>${fi(s.closed)}</strong></td><td>${s.open>0?`<span style="color:#DC2626;font-weight:600">${s.open}</span>`:'0'}</td>
+      <td><strong style="color:${adColor}">${s.avgDays===null?'–':s.avgDays+'d'}</strong></td>
+      <td><strong style="color:${fpColor}">${s.fastPct}%</strong> <small style="color:#94A3B8;">≤15d</small></td>
+      <td>${s.slow>0?`<span style="color:#DC2626;font-weight:600">${s.slow}</span>`:'0'} <small style="color:#94A3B8;">&gt;30d</small></td>
+      <td><span style="display:inline-block;min-width:36px;padding:2px 8px;border-radius:8px;background:${scoreColor};color:#fff;font-weight:800;font-size:11px;text-align:center">${s.score}</span></td></tr>`;
   }).join('');
 }
 
@@ -3910,7 +3985,7 @@ function renderAdmissions(){
     .sort((a,b)=>b[1].not_uploaded_pct-a[1].not_uploaded_pct);
 
   const dqTbody=document.getElementById('dq-owner-tbody');
-  dqTbody.innerHTML=dqOwners.map(([owner,v],i)=>{
+  if(dqTbody) dqTbody.innerHTML=dqOwners.map(([owner,v],i)=>{
     const bg=i%2===0?'#fff':'#F8FAFF';
     const pctColor=v.not_uploaded_pct>=40?'#DC2626':v.not_uploaded_pct>=25?'#D97706':'#059669';
     return `<tr style="background:${bg};cursor:pointer;" title="Click cells to view uploaded / not-uploaded records">
@@ -4033,6 +4108,57 @@ function renderAdmissions(){
   }});
 
   renderAdmissionTrends();
+  renderPortalMonthly();
+}
+
+// Monthly portal admissions (Admission1 + Admission2 confirmed enrollments) by admission month.
+// Respects the branch filter; caps at the current month and drops stray pre-2024 outliers.
+function renderPortalMonthly(){
+  const el=document.getElementById('adm-portal-monthly-chart');
+  if(!el) return;
+  const A1=(typeof ADM1_DATA!=='undefined'&&Array.isArray(ADM1_DATA))?ADM1_DATA:[];
+  const A2=(typeof ADM2_DATA!=='undefined'&&Array.isArray(ADM2_DATA))?ADM2_DATA:[];
+  const all=A1.concat(A2).filter(r=>fBranch==='ALL'||r.Branch===fBranch);
+  const W=(typeof getDateWindows==='function')?getDateWindows():null;
+  const curYM=(W&&W.thisMonth)?W.thisMonth:(new Date().toISOString().slice(0,7));
+  const FLOOR='2024-01';
+  const agg={};
+  all.forEach(r=>{
+    const d=String(r.AdmDate||'');
+    if(d.length<7||d==='–') return;
+    const ym=d.slice(0,7);
+    if(ym>curYM||ym<FLOOR) return;
+    agg[ym]=(agg[ym]||0)+1;
+  });
+  const keys=Object.keys(agg).sort();
+  const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const labels=keys.map(k=>MN[+k.slice(5,7)-1]+' '+k.slice(0,4));
+  window._PORTAL_MO_KEYS=keys;
+  const fn=document.getElementById('adm-portal-monthly-fn');
+  const totalDated=keys.reduce((s,k)=>s+agg[k],0);
+  if(fn) fn.textContent=(fBranch==='ALL'?'All Branches':fBranch)+' · '+totalDated.toLocaleString('en-IN')+' portal admissions dated · click a bar to view';
+  mkChart('adm-portal-monthly-chart',{type:'bar',
+    data:{labels:labels,datasets:[{label:'Portal Admissions',data:keys.map(k=>agg[k]),
+      backgroundColor:'#0D9488',borderRadius:5,maxBarThickness:46}]},
+    options:{responsive:true,maintainAspectRatio:true,layout:{padding:{top:22}},
+      onClick:(evt,els)=>{ if(!els||!els.length)return; viewPortalMonth(window._PORTAL_MO_KEYS[els[0].index]); },
+      plugins:{legend:{display:false},
+        tooltip:{callbacks:{label:c=>c.parsed.y.toLocaleString('en-IN')+' admissions'}},
+        datalabels:{display:true,clip:false,anchor:'end',align:'top',offset:2,color:'#0F172A',font:{size:10.5,weight:'bold'},formatter:v=>v>0?v:''}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:10.5},maxRotation:60,minRotation:45}},
+        y:{beginAtZero:true,grid:{color:'#E0E8FF'},ticks:{precision:0,maxTicksLimit:6}}}}});
+}
+
+function viewPortalMonth(ym){
+  const A1=(typeof ADM1_DATA!=='undefined'&&Array.isArray(ADM1_DATA))?ADM1_DATA:[];
+  const A2=(typeof ADM2_DATA!=='undefined'&&Array.isArray(ADM2_DATA))?ADM2_DATA:[];
+  const rows=A1.concat(A2).filter(r=>(fBranch==='ALL'||r.Branch===fBranch)&&String(r.AdmDate||'').slice(0,7)===ym);
+  const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const lbl=ym?MN[+ym.slice(5,7)-1]+' '+ym.slice(0,4):ym;
+  const cols=[{key:'Branch',label:'Branch'},{key:'Student',label:'Student',maxW:'200px'},
+    {key:'Class',label:'Class'},{key:'Section',label:'Section'},
+    {key:'AdmDate',label:'Date of Admission',date:true},{key:'Source',label:'Source'}];
+  openModal('🏫 Portal Admissions — '+lbl,`${rows.length} confirmed enrollment(s)`,rows,cols);
 }
 
 // ── Admission Trends & Forecast (from ADM_TRENDS sheet) ──
@@ -4814,6 +4940,7 @@ document.body.insertAdjacentHTML('beforeend', `
         <input id="modal-search" type="text" placeholder="🔍 Search records..." 
           style="padding:7px 14px;border-radius:8px;border:1.5px solid rgba(255,255,255,.3);background:rgba(255,255,255,.15);color:#fff;font-size:12.5px;font-family:Inter,sans-serif;outline:none;min-width:200px;"
           oninput="filterModalTable(this.value)">
+        <button onclick="exportModalCSV()" title="Download these records as CSV" style="background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.35);color:#fff;border-radius:8px;padding:7px 14px;cursor:pointer;font-weight:700;font-family:Inter,sans-serif;font-size:12.5px;">⬇ Export CSV</button>
         <button onclick="closeModal()" style="background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.3);color:#fff;border-radius:8px;padding:7px 14px;cursor:pointer;font-weight:600;font-family:Inter,sans-serif;font-size:12.5px;">✕ Close</button>
       </div>
     </div>
@@ -4850,6 +4977,28 @@ function openModal(title, sub, rows, columns) {
   renderModalTable();
   document.getElementById('drill-modal').style.display = 'block';
   document.body.style.overflow = 'hidden';
+}
+
+// Export the currently open modal's records to CSV (respects the active search filter).
+function exportModalCSV(){
+  const cols=(window._modalColumns||[]).filter(c=>c && c.key);
+  let rows=(typeof modalAllRows!=='undefined'&&Array.isArray(modalAllRows))?modalAllRows:[];
+  const sv=(typeof modalSearchVal!=='undefined'&&modalSearchVal)?modalSearchVal:'';
+  if(sv) rows=rows.filter(r=>cols.some(c=>String(r[c.key]||'').toLowerCase().includes(sv)));
+  if(!rows.length){ alert('No records to export.'); return; }
+  const strip=v=>String(v==null?'':v).replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/\s+/g,' ').trim();
+  const esc=v=>{ const s=strip(v); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+  const header=cols.map(c=>esc(c.label||c.key)).join(',');
+  const body=rows.map(r=>cols.map(c=>esc(r[c.key])).join(',')).join('\n');
+  const csv='\ufeff'+header+'\n'+body;   // BOM for Excel
+  const titleEl=document.getElementById('modal-title');
+  const base=(titleEl?titleEl.textContent:'export').replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'_').slice(0,60)||'export';
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=base+'_'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
 function closeModal() {
@@ -4995,7 +5144,7 @@ function drillCareByGrievance(category) {
   grievAllRows = rows;
   grievPage = 1;
   grievSearch = '';
-  grievStatusF = 'ALL';
+  grievStatusF = 'ALL';  
 
   document.getElementById('griev-search').value = '';
   document.getElementById('griev-status-filter').value = 'ALL';
@@ -5172,8 +5321,19 @@ function viewObsRecords(filter){
   let rows = (typeof OBS_DATA !== 'undefined') ? OBS_DATA.slice() : [];
   let title='👁️ Teacher Observations';
   if(filter==='NeedsImprovement'){
-    rows=rows.filter(r=>r.Score!=='–'&&parseFloat(r.Score)<3);
-    title='⚠️ Needs Improvement (Score < 3)';
+    // Unique teachers whose GRAND AVERAGE < 3 (from All_Teacher sheet), branch-filtered.
+    const AT=(typeof ALL_TEACHER!=='undefined'&&Array.isArray(ALL_TEACHER))?ALL_TEACHER:[];
+    let tRows=AT.filter(r=>{const v=parseFloat(r.GrandAvg);return !isNaN(v)&&v>0&&v<3;});
+    if(branch!=='ALL') tRows=tRows.filter(r=>r.Branch===branch);
+    tRows=tRows.map(r=>({Branch:r.Branch,Teacher:r.Teacher,Designation:r.Designation,Subject:r.Subject,
+      GrandAvg:r.GrandAvg,Observations:_obsLink(r.Branch,r.Teacher)}))
+      .sort((a,b)=>(parseFloat(a.GrandAvg)||0)-(parseFloat(b.GrandAvg)||0));
+    const cols=[{key:'Branch',label:'Branch'},{key:'Teacher',label:'Teacher',maxW:'200px'},
+      {key:'Designation',label:'Designation',maxW:'150px'},{key:'Subject',label:'Subject'},
+      {key:'GrandAvg',label:'Grand Avg Score',score:true},
+      {key:'Observations',label:'Total Observations'}];
+    openModal('⚠️ Needs Improvement — Grand Avg < 3',`${tRows.length} unique teachers · click a Total Observations cell in the Grand-Avg charts for full records`,tRows,cols);
+    return;
   } else if(filter && filter!=='ALL' && filter!=='Total'){
     // treat as branch name
     rows=rows.filter(r=>r.Branch===filter);
