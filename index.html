@@ -402,7 +402,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="sh"><div class="sh-l"><h2>Executive Overview</h2><span class="tag" id="ov-tag">All Branches · All Months</span></div></div>
   <!-- Row 1: Core operational KPIs -->
   <div class="krow k5">
-    <div class="kc blue clickable" onclick="viewStudentsByBranch()" title="Click to view branch-wise student count"><div class="kc-ico">👦</div><div class="kc-lbl">Total Students</div><div class="kc-val" id="ov-stu">—</div><div class="kc-sub">4 active campuses · click to view</div></div>
+    <div class="kc blue clickable" onclick="viewStudentsByBranch()" title="Click to view branch-wise student count"><div class="kc-ico">👦</div><div class="kc-lbl">Total Students</div><div class="kc-val" id="ov-stu">—</div><div class="kc-sub">5 active campuses + Akshara · click to view</div></div>
     <div class="kc green clickable" onclick="viewCallsByBranch()" title="Click to view branch-wise calls made"><div class="kc-ico">📞</div><div class="kc-lbl">Calls Made</div><div class="kc-val" id="ov-calls">–</div><div class="kc-sub" id="ov-calls-s">–</div></div>
     <div class="kc teal clickable" onclick="viewConfirmedAdmissions()" title="Click to view admissions by branch"><div class="kc-ico">🎓</div><div class="kc-lbl">Confirmed Admissions</div><div class="kc-val" id="ov-adm-portal">–</div><div class="kc-sub" id="ov-adm-portal-s">Portal confirmed</div></div>
     <div class="kc indigo"><div class="kc-ico">👁️</div><div class="kc-lbl">Teacher Observations</div><div class="kc-val" id="ov-obs">–</div><div class="kc-sub" id="ov-obs-s">Total recorded</div></div>
@@ -617,10 +617,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     </div>
   </div>
 
+  <!-- Care Calls — Insight Summary & Data-Driven Decisions -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="ch"><h3>🧭 Care Call Summary — Insights &amp; Data-Driven Decisions</h3><span class="fnote" id="care-summary-fn">Per-branch call quality, resolution &amp; recommended actions</span></div>
+    <div class="cb" id="care-summary-report" style="padding:14px 18px;"></div>
+  </div>
+
   </div>
 </div>
-
-<!-- ═══ HR ANALYTICS ═══ -->
 <div id="pane-hr" class="pane">
   <div class="sh">
     <div class="sh-l"><span class="sh-ico">👥</span><div><h2>HR Analytics</h2><p id="hr-tag" class="sh-sub">Recruitment Performance 2026–27</p></div></div>
@@ -682,7 +686,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     <!-- HR Ranking & Awards -->
   <div class="card" style="margin-bottom:16px;">
-    <div class="ch"><h3>🏆 Recruiter Rankings &amp; Awards</h3><span class="fnote">Score = positions closed (volume) 60% + recruiting speed 40% · resigned staff excluded · click a row to view records</span></div>
+    <div class="ch"><h3>🏆 Recruiter Rankings &amp; Awards</h3><span class="fnote">Ranked by HR Overall Score (Hiring Speed 40% + Avg Closing/Month 40% + Vacancy Closure 10% + Compliance 10%) · resigned staff excluded · click a row to view records</span></div>
     <div class="cb-0" style="overflow-x:auto"><table class="dt">
       <thead><tr><th>Rank</th><th>Recruiter</th><th>Closed</th><th>Open</th><th>Avg Days</th><th>Fast Closure %</th><th>Slow Closures</th><th>Score</th></tr></thead>
       <tbody id="hr-rank-tbody"></tbody>
@@ -779,7 +783,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   <!-- Counsellor-wise Report Table -->
   <!-- Admission Trends & Forecast -->
   <div class="card" style="margin-bottom:16px;">
-    <div class="ch"><h3>📈 Admission Trends &amp; Forecast (by Academic Year)</h3><span class="fnote">Monthly admissions across academic years (Oct–Sep) · dashed line = forecast · click a point to view</span></div>
+    <div class="ch"><h3>📈 Admission Trends &amp; Forecast (by Academic Year)</h3><span class="fnote">Monthly admissions across academic years (Oct–Sep) · red dash = current-year forecast · purple dash = next-year (2027-28) prediction · click a point to view</span></div>
     <div class="cb"><div class="cw tall"><canvas id="adm-trends-chart"></canvas></div></div>
     <div class="cb" id="adm-trends-summary" style="padding:8px 14px 14px;font-size:11.5px;color:#64748B;"></div>
     <div class="ch" style="border-top:1px solid #E0E8FF;margin-top:4px;"><h3 style="font-size:14px;">📊 Total Admissions by Academic Year</h3><span class="fnote">Full-year totals (Oct–Sep) · click a bar to view records</span></div>
@@ -788,6 +792,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       <thead><tr><th>Academic Year</th><th>Total Admissions</th><th>vs Previous Year</th></tr></thead>
       <tbody id="adm-yeartotal-tbody"></tbody>
     </table></div>
+    <div class="cb" id="adm-suggestions" style="padding:6px 14px 14px;"></div>
   </div>
 
   <div class="card" style="margin-bottom:16px;">
@@ -933,8 +938,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 <!-- ═══ ADMIN ═══ -->
 <div id="pane-admin" class="pane">
   <div class="sh"><div class="sh-l"><h2>Admin Infrastructure Tracker</h2><span class="tag" id="admin-tag">All Branches · Tasks</span></div></div>
-  <div class="krow k4">
-    <div class="kc blue"><div class="kc-ico">📋</div><div class="kc-lbl">Total Tasks</div><div class="kc-val" id="admin-total">–</div><div class="kc-sub" id="admin-total-s">–</div></div>
+  <div class="krow k5">
+    <div class="kc teal clickable" onclick="viewAdminClosedWeek('last')" title="Click to view tasks closed last week"><div class="kc-ico">📆</div><div class="kc-lbl">Last Week Closed</div><div class="kc-val" id="admin-lwc">–</div><div class="kc-sub" id="admin-lwc-s">Sun–Sat · click to view</div></div>
+    <div class="kc blue clickable" onclick="viewAdminClosedWeek('this')" title="Click to view tasks closed this week"><div class="kc-ico">🗓️</div><div class="kc-lbl">Current Week Closed</div><div class="kc-val" id="admin-cwc">–</div><div class="kc-sub" id="admin-cwc-s">Sun–today · click to view</div></div>
     <div class="kc green"><div class="kc-ico">✅</div><div class="kc-lbl">Done</div><div class="kc-val" id="admin-done">–</div><div class="kc-sub" id="admin-pct-s">–</div></div>
     <div class="kc amber" onclick="viewAdminRecords('In Progress')" style="cursor:pointer;" title="Click to view In Progress tasks"><div class="kc-ico">🔄</div><div class="kc-lbl">In Progress</div><div class="kc-val" id="admin-ip">–</div><div class="kc-sub">Ongoing — click to view</div></div>
     <div class="kc red" onclick="viewAdminRecords('Hold/Open')" style="cursor:pointer;" title="Click to view Hold/Open tasks"><div class="kc-ico">⏸️</div><div class="kc-lbl">Hold / Open</div><div class="kc-val" id="admin-hold">–</div><div class="kc-sub" id="admin-hold-s">Click to view</div></div>
@@ -1723,7 +1729,14 @@ function renderOverview(){
 function viewConfirmedAdmissions(){
   const CADM=(typeof COMBINED_ADM!=='undefined'&&Array.isArray(COMBINED_ADM))?COMBINED_ADM:[];
   // Portal-confirmed = records present in Portal (InPortal true)
-  const rows=CADM.filter(r=>r.InPortal).sort((a,b)=>String(a.Branch).localeCompare(String(b.Branch)));
+  let rows=CADM.filter(r=>r.InPortal).sort((a,b)=>String(a.Branch).localeCompare(String(b.Branch)));
+  // Akshara Vaagdevi (separate campus) admissions from AVIS_DATA
+  const AV=(typeof AVIS_DATA!=='undefined'&&Array.isArray(AVIS_DATA))?AVIS_DATA:[];
+  const avisRows=AV.filter(r=>r&&r.Student&&r.Student!=='–').map(r=>({
+    Branch:'Akshara Vaagdevi',Student:r.Student,Class:r.Class,Section:r.Section,
+    AdmDate:r.AdmDate,Source:'Akshara',LeadChannel:'–',LeadOwner:'–',InLeads:'–'}));
+  const portalCount=rows.length;
+  rows=rows.concat(avisRows);
   const cols=[{key:'Branch',label:'Branch'},{key:'Student',label:'Student',maxW:'190px'},
     {key:'Class',label:'Class'},{key:'Section',label:'Section'},{key:'AdmDate',label:'Adm Date',date:true},
     {key:'Source',label:'Portal'},{key:'LeadChannel',label:'Channel'},
@@ -1731,7 +1744,8 @@ function viewConfirmedAdmissions(){
   // Build per-branch summary line for the subtitle
   const ALLB=['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam'];
   const counts=ALLB.map(b=>{const n=rows.filter(r=>r.Branch===b).length;return n>0?`${b}: ${n}`:null;}).filter(Boolean);
-  openModal('🎓 Confirmed Admissions (Portal) — by Branch',`${rows.length} total · ${counts.join(' · ')}`,rows,cols);
+  counts.push(`Akshara: ${avisRows.length}`);
+  openModal('🎓 Confirmed Admissions (Portal + Akshara) — by Branch',`${portalCount} portal + ${avisRows.length} Akshara = ${rows.length} total · ${counts.join(' · ')}`,rows,cols);
 }
 
 function viewObsByType(obsType){
@@ -1892,12 +1906,17 @@ function viewGOIssue(branch, month, type){
 // Total Students KPI → branch-wise fixed student count (month-independent)
 function viewStudentsByBranch(){
   const SB=window._STUDENTS_BY_BRANCH||{};
-  const BR=['Bachupally','Boduppal','Keesara','Pocharam'];
+  const BR=['Bachupally','Boduppal','Keesara','Pocharam','Gowdavalli'];
   const rows=BR.filter(b=>SB[b]!==undefined).map(b=>({Branch:b,Students:(+SB[b]||0)}));
-  const total=rows.reduce((a,r)=>a+r.Students,0);
-  rows.push({Branch:'— TOTAL —',Students:total});
-  const cols=[{key:'Branch',label:'Branch'},{key:'Students',label:'Total Students'}];
-  openModal('👦 Total Students — Branch-wise','Fixed roll strength (Pocharam/Bachupally/Keesara B3, Boduppal I3)',rows,cols);
+  const pallaviTotal=rows.reduce((a,r)=>a+r.Students,0);
+  rows.push({Branch:'— Pallavi Branches Total —',Students:pallaviTotal});
+  // Akshara Vaagdevi International School (separate campus) — count from AVIS_DATA
+  const AV=(typeof AVIS_DATA!=='undefined'&&Array.isArray(AVIS_DATA))?AVIS_DATA:[];
+  const avisCount=AV.filter(r=>r&&r.Student&&r.Student!=='–').length;
+  rows.push({Branch:'Akshara Vaagdevi Intl (separate campus)',Students:avisCount});
+  rows.push({Branch:'═ GRAND TOTAL (incl. Akshara) ═',Students:pallaviTotal+avisCount});
+  const cols=[{key:'Branch',label:'Branch / Campus'},{key:'Students',label:'Total Students'}];
+  openModal('👦 Total Students — Branch-wise + Akshara',`${pallaviTotal.toLocaleString('en-IN')} across 5 Pallavi branches · ${avisCount} at Akshara Vaagdevi`,rows,cols);
 }
 
 // Calls Made KPI → branch-wise calls count, respects month dropdown (count only)
@@ -2494,8 +2513,21 @@ function renderAdmin(){
   const overdueRows=_aRows.filter(r=>overdueDays(r)!==null&&!isDone(r));
   const compRate=totalTasks>0?+(completedTasks/totalTasks*100).toFixed(1):0;
   document.getElementById('admin-tag').textContent=bl+' · '+fi(totalTasks)+' Tasks';
-  document.getElementById('admin-total').textContent=fi(totalTasks);
-  document.getElementById('admin-total-s').textContent=(fBranch==='ALL'?'5 branches':bl);
+  // Tasks closed (Done) bucketed by Completion Date into last week / current week (Sun-based)
+  const _adw=(typeof getDateWindows==='function')?getDateWindows():null;
+  function _closedInWindow(period){
+    if(!_adw) return [];
+    return _aRows.filter(r=>{
+      if(!isDone(r)) return false;
+      const d=String(r.CompletionDate||''); if(d.length<10||d==='–') return false;
+      const day=d.slice(0,10);
+      return period==='this' ? (day>=_adw.weekStart && day<=_adw.today)
+                             : (day>=_adw.lastWeekStart && day<=_adw.lastWeekEnd);
+    });
+  }
+  const lwClosed=_closedInWindow('last'), cwClosed=_closedInWindow('this');
+  setTxt('admin-lwc',fi(lwClosed.length));
+  setTxt('admin-cwc',fi(cwClosed.length));
   document.getElementById('admin-done').textContent=fi(completedTasks);
   document.getElementById('admin-pct-s').textContent=totalTasks>0?compRate+'% completion':'–';
   document.getElementById('admin-ip').textContent=fi(ipTasks);
@@ -2598,6 +2630,21 @@ function renderAdminPerformance(rows,BRANCHES,isDone,isIP,isHoldOpen,overdueDays
 }
 
 // Quick-view drilldown for Admin Tracker KPI cards (In Progress / Hold+Open), respects branch filter
+function viewAdminClosedWeek(period){
+  const ALLADMIN=(typeof ADMIN_DATA!=='undefined'&&Array.isArray(ADMIN_DATA))?ADMIN_DATA:[];
+  const W=(typeof getDateWindows==='function')?getDateWindows():null;
+  const isDone=r=>/done|completed/i.test(r.Status||'');
+  let rows=ALLADMIN.filter(r=>(fBranch==='ALL'||r.Branch===fBranch)&&isDone(r)).filter(r=>{
+    if(!W) return false;
+    const d=String(r.CompletionDate||''); if(d.length<10||d==='–') return false;
+    const day=d.slice(0,10);
+    return period==='this' ? (day>=W.weekStart && day<=W.today)
+                           : (day>=W.lastWeekStart && day<=W.lastWeekEnd);
+  }).sort((a,b)=>String(b.CompletionDate).localeCompare(String(a.CompletionDate)));
+  const bl=fBranch==='ALL'?'All Branches':fBranch;
+  const rng=period==='this'?(W?`${fmtDispDate(W.weekStart)} – today`:'this week'):(W?`${fmtDispDate(W.lastWeekStart)} – ${fmtDispDate(W.lastWeekEnd)}`:'last week');
+  openModal(`🏗️ Tasks Closed — ${period==='this'?'Current Week':'Last Week'}`,`${rows.length} task(s) · ${bl} · ${rng}`,rows,_ADMIN_COLS);
+}
 function viewAdminRecords(statusFilter){
   const ALLADMIN=(typeof ADMIN_DATA!=='undefined'&&Array.isArray(ADMIN_DATA))?ADMIN_DATA:[];
   let rows=ALLADMIN.filter(r=>fBranch==='ALL'||r.Branch===fBranch);
@@ -3628,23 +3675,19 @@ function renderHRRanking(){
     const closurePct=total>0?+(closed/total*100).toFixed(1):0;
     return {hr:h,branch:branchOf(h),closed,open,closurePct,avgDays,fastPct,slow,samples:days.length};
   });
-  // ── Scoring (per management): Volume (positions closed) 60% + Recruitment Speed 40% ──
-  // Volume is scaled against the top closer; speed rewards faster avg days, dampened for
-  // very small samples so a 1-close recruiter can't top the list on speed alone.
-  const maxClosed=Math.max(1,...base.map(s=>s.closed));
+  // ── Ranking by HR OVERALL SCORE (from the HR Performance Scorecard) ──
+  // Overall = Hiring Speed·40% + Avg Closing/Month·40% + Vacancy Closure·10% + Compliance·10%,
+  // computed per recruiter in renderHR() and exposed via window._HR_LIVE_KPI.
+  const LK=window._HR_LIVE_KPI||{};
   const stats=base.map(s=>{
-    const volScore=s.closed/maxClosed*100;                                  // relative volume
-    const ad=s.avgDays;
-    const rawSpeed=(ad===null)?55:(ad<=7?100:Math.max(0,100-(ad-7)*2.2));    // faster = higher
-    const volConfidence=Math.min(1,s.closed/10);                            // full speed credit at 10+ closes
-    const speedScore=rawSpeed*volConfidence;
-    const score=Math.round(volScore*0.6+speedScore*0.4);
-    return {...s,volScore:Math.round(volScore),speedScore:Math.round(speedScore),score};
-  }).sort((a,b)=>b.score-a.score || b.closed-a.closed);
+    const kpi=LK[s.hr]||{};
+    const overall=(typeof kpi.overall==='number'&&isFinite(kpi.overall))?kpi.overall:0;   // 0–5
+    return {...s,overall,score:overall};
+  }).sort((a,b)=>b.overall-a.overall || b.closed-a.closed);
 
   const medals=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣'];
   tbody.innerHTML=stats.map((s,i)=>{
-    const scoreColor=s.score>=75?'#059669':s.score>=50?'#D97706':'#DC2626';
+    const scoreColor=s.overall>=4.3?'#059669':s.overall>=3.5?'#16A34A':s.overall>=2.8?'#D97706':'#DC2626';
     const adColor=s.avgDays===null?'#94A3B8':s.avgDays<=15?'#059669':s.avgDays<=30?'#D97706':'#DC2626';
     const fpColor=s.fastPct>=60?'#059669':s.fastPct>=30?'#D97706':'#DC2626';
     return `<tr style="cursor:pointer" onclick="viewHRByRecruiter('${s.hr.replace(/'/g,"\\\\'")}','ALL')">
@@ -3654,7 +3697,7 @@ function renderHRRanking(){
       <td><strong style="color:${adColor}">${s.avgDays===null?'–':s.avgDays+'d'}</strong></td>
       <td><strong style="color:${fpColor}">${s.fastPct}%</strong> <small style="color:#94A3B8;">≤15d</small></td>
       <td>${s.slow>0?`<span style="color:#DC2626;font-weight:600">${s.slow}</span>`:'0'} <small style="color:#94A3B8;">&gt;30d</small></td>
-      <td><span style="display:inline-block;min-width:36px;padding:2px 8px;border-radius:8px;background:${scoreColor};color:#fff;font-weight:800;font-size:11px;text-align:center">${s.score}</span></td></tr>`;
+      <td><span style="display:inline-block;min-width:44px;padding:2px 8px;border-radius:8px;background:${scoreColor};color:#fff;font-weight:800;font-size:11px;text-align:center">${s.overall.toFixed(2)}</span><small style="color:#94A3B8;"> /5</small></td></tr>`;
   }).join('');
 }
 
@@ -4193,12 +4236,42 @@ function renderAdmissionTrends(){
     datasets.push({label:cur+' (forecast)',data:forecast,borderColor:'#DC2626',
       borderDash:[6,4],borderWidth:2,pointRadius:0,tension:0.3,fill:false});
   }
+
+  // ── NEXT academic year prediction (e.g. 2027-28) ──
+  // Total projected by least-squares trend over complete prior years, then spread
+  // across Oct–Sep using each month's historical share (seasonal profile).
+  let predLabel=null, predMonthly=null, predTotal=null;
+  {
+    const coverage=y=>MONTH_ORDER.filter(m=>(byYear[y][m]||0)>0).length;
+    const completeYears=years.filter(y=>coverage(y)>=9);
+    const baseYears=completeYears.length>=1?completeYears:years;
+    const profile=MONTH_ORDER.map(m=>baseYears.reduce((a,y)=>a+(byYear[y][m]||0),0)/baseYears.length);
+    const baseTotals=baseYears.map(y=>MONTH_ORDER.reduce((a,m)=>a+(byYear[y][m]||0),0));
+    let nextTotal;
+    if(baseTotals.length>=2){
+      const n=baseTotals.length, xs=baseTotals.map((_,i)=>i);
+      const sx=xs.reduce((a,c)=>a+c,0), sy=baseTotals.reduce((a,c)=>a+c,0);
+      const sxx=xs.reduce((a,c)=>a+c*c,0), sxy=xs.reduce((a,c,i)=>a+c*baseTotals[i],0);
+      const slope=(n*sxx-sx*sx)!==0?(n*sxy-sx*sy)/(n*sxx-sx*sx):0;
+      const intercept=(sy-slope*sx)/n;
+      nextTotal=Math.max(Math.round(baseTotals[baseTotals.length-1]*0.8),Math.round(intercept+slope*n));
+    } else { nextTotal=baseTotals[0]||0; }
+    const pSum=profile.reduce((a,c)=>a+c,0)||1;
+    predMonthly=MONTH_ORDER.map((m,i)=>Math.round(nextTotal*profile[i]/pSum));
+    predTotal=predMonthly.reduce((a,c)=>a+c,0);
+    const latest=years[years.length-1];
+    const mm=String(latest).match(/^(\d{4})-(\d{2})$/);
+    predLabel=mm?((+mm[1]+1)+'-'+String((+mm[2]+1)%100).padStart(2,'0')):'Next Year';
+    datasets.push({label:predLabel+' (predicted)',data:predMonthly,borderColor:'#7C3AED',
+      borderDash:[3,3],borderWidth:2.5,pointRadius:2,pointStyle:'rectRot',tension:0.3,fill:false});
+  }
+
   mkChart('adm-trends-chart',{type:'line',
     data:{labels:MONTH_ORDER,datasets:datasets},
     options:{responsive:true,maintainAspectRatio:true,
       onClick:(evt,els)=>{ if(!els||!els.length)return;
         const m=MONTH_ORDER[els[0].index];
-        const yr=datasets[els[0].datasetIndex].label.replace(' (forecast)','');
+        const yr=datasets[els[0].datasetIndex].label.replace(' (forecast)','').replace(' (predicted)','');
         const recs=rows.filter(r=>r.Month===m&&r.AcademicYear===yr)
           .map(r=>({Branch:r.Branch,Month:r.Month,AcademicYear:r.AcademicYear,Admissions:r.Count}));
         const cols=[{key:'Branch',label:'Branch'},{key:'Month',label:'Month'},
@@ -4221,18 +4294,19 @@ function renderAdmissionTrends(){
     s.innerHTML=txt;
   }
 
-  // ── Total admissions by academic year (full year Oct–Sep) ──
+  // ── Total admissions by academic year (full year Oct–Sep) + predicted next year ──
   const yearTotals=years.map(y=>({year:y,total:MONTH_ORDER.reduce((a,m)=>a+(byYear[y][m]||0),0)}));
+  if(predLabel&&predTotal!=null) yearTotals.push({year:predLabel,total:predTotal,predicted:true});
   window._ADM_YEARTOTAL=yearTotals;
   const ytEl=document.getElementById('adm-yeartotal-chart');
   if(ytEl){
     mkChart('adm-yeartotal-chart',{type:'bar',
       data:{labels:yearTotals.map(y=>y.year),datasets:[{label:'Total Admissions',
         data:yearTotals.map(y=>y.total),
-        backgroundColor:yearTotals.map((y,i)=>i===yearTotals.length-1?'#1E4FD8':'#93C5FD'),
+        backgroundColor:yearTotals.map((y,i)=>y.predicted?'#7C3AED':(i===yearTotals.length-1?'#1E4FD8':'#93C5FD')),
         borderRadius:5,maxBarThickness:46}]},
       options:{responsive:true,maintainAspectRatio:false,
-        onClick:(evt,e)=>{ if(!e||!e.length)return; viewAdmissionsByYear(yearTotals[e[0].index].year); },
+        onClick:(evt,e)=>{ if(!e||!e.length)return; const yt=yearTotals[e[0].index]; if(yt&&yt.predicted)return; viewAdmissionsByYear(yt.year); },
         plugins:{legend:{display:false},
           datalabels:{display:true,anchor:'end',align:'top',color:'#1E293B',font:{size:12,weight:'bold'},
             formatter:v=>v.toLocaleString('en-IN')}},
@@ -4249,13 +4323,56 @@ function renderAdmissionTrends(){
         const col=diff>=0?'#059669':'#DC2626';
         delta=`<span style="color:${col};font-weight:700;">${diff>=0?'▲':'▼'} ${Math.abs(diff).toLocaleString('en-IN')} (${diff>=0?'+':''}${pct}%)</span>`;
       }
-      const isCur=i===yearTotals.length-1;
+      const isCur=(i===yearTotals.length-1)&&!y.predicted;
+      if(y.predicted){
+        return `<tr style="background:#F5F3FF;">
+          <td><strong>${y.year}</strong> <span style="font-size:9px;color:#7C3AED;font-weight:700;">PREDICTED</span></td>
+          <td style="font-weight:800;color:#7C3AED;">≈ ${y.total.toLocaleString('en-IN')}</td>
+          <td>${delta}</td></tr>`;
+      }
       return `<tr style="cursor:pointer;${isCur?'background:#EEF4FF;':''}" onclick="viewAdmissionsByYear('${y.year}')">
         <td><strong>${y.year}</strong>${isCur?' <span style="font-size:9px;color:#1E4FD8;font-weight:700;">CURRENT</span>':''}</td>
         <td style="font-weight:800;color:#1E4FD8;">${y.total.toLocaleString('en-IN')}</td>
         <td>${delta}</td></tr>`;
     }).join('')||'<tr><td colspan="3" class="no-data">No data</td></tr>';
   }
+
+  // ── Suggestions: how to grow admissions next academic year ──
+  renderAdmissionSuggestions(byYear, years, MONTH_ORDER, predLabel, predTotal, yearTotals);
+}
+
+// Data-driven suggestions panel for growing next-year admissions
+function renderAdmissionSuggestions(byYear, years, MONTH_ORDER, predLabel, predTotal, yearTotals){
+  const el=document.getElementById('adm-suggestions');
+  if(!el) return;
+  const realYears=yearTotals.filter(y=>!y.predicted);
+  const latest=realYears[realYears.length-1];
+  const prev=realYears.length>=2?realYears[realYears.length-2]:null;
+  // Strongest & weakest admission months (by average across years)
+  const monthAvg=MONTH_ORDER.map(m=>({m,v:years.reduce((a,y)=>a+(byYear[y][m]||0),0)/Math.max(1,years.length)}));
+  const sortedM=monthAvg.slice().sort((a,b)=>b.v-a.v);
+  const MN={OCT:'October',NOV:'November',DEC:'December',JAN:'January',FEB:'February',MAR:'March',APR:'April',MAY:'May',JUN:'June',JUL:'July',AUG:'August',SEP:'September'};
+  const peak=sortedM.slice(0,3).map(x=>MN[x.m]);
+  const weak=sortedM.slice(-3).reverse().map(x=>MN[x.m]);
+  const yoY=(prev&&prev.total>0)?((latest.total-prev.total)/prev.total*100):null;
+  const growthTxt=yoY===null?'':(yoY>=0?`up ${yoY.toFixed(1)}%`:`down ${Math.abs(yoY).toFixed(1)}%`);
+
+  let s='<div style="background:linear-gradient(135deg,#F5F3FF,#EFF6FF);border:1px solid #DDD6FE;border-radius:10px;padding:14px 16px;">';
+  s+='<div style="font-weight:800;font-size:13px;color:#5B21B6;margin-bottom:6px;">🔮 '+(predLabel||'Next Year')+' Prediction & Growth Playbook</div>';
+  s+='<div style="font-size:12px;color:#334155;line-height:1.65;margin-bottom:10px;">Model projects <strong>≈ '+((predTotal||0).toLocaleString('en-IN'))+'</strong> admissions for <strong>'+(predLabel||'next year')+'</strong> (least-squares trend × seasonal shape).'
+    +(latest?' Latest full cycle <strong>'+latest.year+'</strong> = '+latest.total.toLocaleString('en-IN')+(growthTxt?' ('+growthTxt+' YoY)':'')+'.':'')
+    +' Peak intake months: <strong>'+peak.join(', ')+'</strong>; softest: <strong>'+weak.join(', ')+'</strong>.</div>';
+  const tips=[
+    '📣 <strong>Front-load campaigns before the peak.</strong> Start digital + walk-in drives 4–6 weeks ahead of '+peak[0]+' and '+peak[1]+', when historically most parents enrol.',
+    '🎯 <strong>Rescue the soft months ('+weak.slice(0,2).join(' & ')+').</strong> Run referral incentives, open-house events and sibling/early-bird fee offers to smooth the dips.',
+    '🔁 <strong>Convert the pipeline you already have.</strong> The Leads-Only vs Portal gap shows admissions completed in EXTRAEDGE but not yet enrolled — a fast follow-up SLA recovers these with zero new marketing spend.',
+    '🏫 <strong>Double down on the strongest branches and lift the laggards.</strong> Replicate the top branch\u2019s counsellor scripts and walk-in conversion tactics at lower-yield campuses.',
+    '⭐ <strong>Leverage quality as marketing.</strong> High teacher grand-averages and care-call resolution rates are proof points — feature them in parent testimonials and admission collateral.',
+    '📊 <strong>Set a stretch target.</strong> A +10% goal over '+(latest?latest.year:'this year')+' would mean ≈ '+Math.round((latest?latest.total:predTotal||0)*1.1).toLocaleString('en-IN')+' admissions — track weekly against the seasonal curve to catch shortfalls early.'
+  ];
+  s+='<ul style="margin:0;padding-left:18px;font-size:12px;color:#334155;line-height:1.7;">'+tips.map(t=>'<li>'+t+'</li>').join('')+'</ul>';
+  s+='</div>';
+  el.innerHTML=s;
 }
 
 // Drill-down: all admission records for an academic year (all months, active branches)
@@ -4756,11 +4873,97 @@ function renderRankings(){
   tbody.innerHTML=html;
 }
 
+// Care Call insight summary — per-branch quality, resolution & data-driven recommendations
+function renderCareSummary(){
+  const el=document.getElementById('care-summary-report');
+  if(!el) return;
+  const TRK=(typeof TRACKER!=='undefined'&&Array.isArray(TRACKER))?TRACKER:[];
+  const GO=(typeof GO_DATA!=='undefined'&&Array.isArray(GO_DATA))?GO_DATA:[];
+  const BR=['Boduppal','Keesara','Pocharam','Bachupally','Gowdavalli'];
+  const scope=(fBranch==='ALL')?BR:[fBranch];
+  const fnEl=document.getElementById('care-summary-fn');
+  if(fnEl) fnEl.textContent=(fBranch==='ALL'?'All Branches':fBranch)+(fMonth==='ALL'?' · all months':' · '+fMonth);
+
+  const agg={};
+  scope.forEach(b=>{
+    const tr=TRK.filter(r=>r.branch===b&&(fMonth==='ALL'||r.month===fMonth)&&r.calls>0);
+    const go=GO.filter(r=>r.branch===b&&(fMonth==='ALL'||r.month===fMonth));
+    if(!tr.length&&!go.length) return;
+    const calls=tr.reduce((s,r)=>s+(+r.calls||0),0);
+    const resolved=tr.reduce((s,r)=>s+(+r.resolved||0),0);
+    const pending=tr.reduce((s,r)=>s+(+r.pending||0),0);
+    const ip=tr.reduce((s,r)=>s+(+r.ip||0),0);
+    const goCalls=go.reduce((s,r)=>s+(+r.total_calls||0),0);
+    const wrongG=go.reduce((s,r)=>s+(+r.wrong_grievance||0),0);
+    const emptyS=go.reduce((s,r)=>s+(+r.empty_status||0),0);
+    const emptyD=go.reduce((s,r)=>s+(+r.empty_date||0),0);
+    const officer=(go[0]&&go[0].officer)||'–';
+    const resPct=calls>0?Math.round(resolved/calls*100):0;
+    const pendPct=calls>0?Math.round(pending/calls*100):0;
+    const wrongPct=goCalls>0?Math.round(wrongG/goCalls*100):0;
+    const emptyDPct=goCalls>0?Math.round(emptyD/goCalls*100):0;
+    const emptySPct=goCalls>0?Math.round(emptyS/goCalls*100):0;
+    const quality=goCalls>0?Math.round(Math.max(0,100-(wrongG+emptyS+emptyD)/goCalls*100)):null;
+    agg[b]={officer,calls,resolved,pending,ip,resPct,pendPct,wrongG,wrongPct,emptyD,emptyDPct,emptyS,emptySPct,quality,goCalls};
+  });
+  const branches=Object.keys(agg);
+  if(!branches.length){ el.innerHTML='<div class="no-data">No care-call data for this filter.</div>'; return; }
+
+  // System-level rollup
+  const totCalls=branches.reduce((s,b)=>s+agg[b].calls,0);
+  const totRes=branches.reduce((s,b)=>s+agg[b].resolved,0);
+  const sysRes=totCalls>0?Math.round(totRes/totCalls*100):0;
+  const qBranches=branches.filter(b=>agg[b].quality!==null);
+  const best=qBranches.slice().sort((a,b)=>agg[b].quality-agg[a].quality)[0];
+  const worst=qBranches.slice().sort((a,b)=>agg[a].quality-agg[b].quality)[0];
+
+  function rec(b){
+    const a=agg[b], out=[];
+    if(a.emptyDPct>=20) out.push(`📅 <strong>${a.emptyDPct}%</strong> of calls have no date logged — enforce mandatory call-date entry so trends & SLAs stay reliable.`);
+    if(a.wrongPct>=10) out.push(`⚠ <strong>${a.wrongPct}%</strong> grievances mis-categorised — a short refresher on the standard grievance list would lift data quality fast.`);
+    if(a.resPct<70) out.push(`🔁 Resolution at <strong>${a.resPct}%</strong> (below 70%) — assign a follow-up owner for the ${fi(a.pending)} pending case(s) and set a callback SLA.`);
+    if(a.emptySPct>=10) out.push(`⏳ <strong>${a.emptySPct}%</strong> of calls have no status — close the loop by marking each call Resolved / Pending / In-Progress.`);
+    if(!out.length) out.push(`✅ Healthy: <strong>${a.resPct}%</strong> resolved${a.quality!==null?` · quality ${a.quality}%`:''} — maintain the current cadence and share this branch's practice with others.`);
+    return out;
+  }
+
+  let html='<div style="background:#F0F9FF;border:1px solid #BAE6FD;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12.5px;color:#0F172A;line-height:1.6;">'
+    +'📊 <strong>Overview:</strong> '+fi(totCalls)+' care calls analysed across '+branches.length+' branch(es), <strong>'+sysRes+'%</strong> resolved overall.'
+    +(best?` Highest data quality: <strong>${best}</strong> (${agg[best].quality}%).`:'')
+    +(worst&&worst!==best?` Needs most attention: <strong>${worst}</strong> (${agg[worst].quality}%).`:'')
+    +'</div>';
+
+  html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;">';
+  branches.forEach(b=>{
+    const a=agg[b];
+    const qColor=a.quality===null?'#94A3B8':a.quality>=90?'#059669':a.quality>=75?'#D97706':'#DC2626';
+    const rColor=a.resPct>=85?'#059669':a.resPct>=70?'#D97706':'#DC2626';
+    html+=`<div style="border:1px solid #E0E8FF;border-radius:10px;padding:12px 14px;background:#fff;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
+        <div style="font-weight:800;font-size:13.5px;color:#0F172A;"><span class="bd b${b}"></span> ${b}</div>
+        <div style="font-size:11px;color:#64748B;">Officer: <strong>${a.officer}</strong></div>
+      </div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;margin-bottom:8px;">
+        <span>📞 Calls <strong>${fi(a.calls)}</strong></span>
+        <span style="color:${rColor};">✅ Resolved <strong>${a.resPct}%</strong></span>
+        <span style="color:#D97706;">⏳ Pending <strong>${fi(a.pending)}</strong></span>
+        ${a.quality!==null?`<span style="color:${qColor};">🎯 Quality <strong>${a.quality}%</strong></span>`:''}
+      </div>
+      <ul style="margin:0;padding-left:18px;font-size:11.5px;color:#334155;line-height:1.6;">
+        ${rec(b).map(x=>'<li>'+x+'</li>').join('')}
+      </ul>
+    </div>`;
+  });
+  html+='</div>';
+  el.innerHTML=html;
+}
+
 function renderCare(){
   const rows=filtT(); const s=sumT(rows); const bc=brComp(rows);
   const bl=fBranch==='ALL'?'All Branches':fBranch, ml=fMonth==='ALL'?'All Months':fMonth+' 2026';
   document.getElementById('care-tag').textContent=bl+' · '+ml;
   document.getElementById('care-fn').textContent=bl+' · '+ml;
+  renderCareSummary();
   // Completion = Calls Made / Total Students (capped); Resolved% = resolved / calls
   const compPct=s.students>0?+(Math.min(s.calls/s.students*100,100).toFixed(1)):0;
   const resPct=s.calls>0?+((s.resolved/s.calls*100).toFixed(1)):0;
@@ -5144,7 +5347,7 @@ function drillCareByGrievance(category) {
   grievAllRows = rows;
   grievPage = 1;
   grievSearch = '';
-  grievStatusF = 'ALL';  
+  grievStatusF = 'ALL';
 
   document.getElementById('griev-search').value = '';
   document.getElementById('griev-status-filter').value = 'ALL';
