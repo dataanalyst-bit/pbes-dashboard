@@ -321,9 +321,29 @@ function tryInstantCache(){
 document.addEventListener('DOMContentLoaded', async () => {
   // Hard gate: no session → go to login BEFORE any data or UI renders
   const { data: { session } } = await sb.auth.getSession();
+  // Admin Manager: show only Admin, Vigilance and Purchase tabs
+if (userRole === "admin_manager") {
+
+  document.querySelectorAll(".tb").forEach(tab => {
+
+    const txt = tab.textContent.trim();
+
+    const allowed =
+      txt.includes("Admin Tracker") ||
+      txt.includes("Vigilance") ||
+      txt.includes("Purchase");
+
+    if (!allowed) {
+      tab.style.display = "none";
+    }
+
+  });
+
+}
   if (!session) { window.location.href = 'login.html'; return; }
   // ── Lock the branch selector for principals (branch-restricted accounts) ──
   const userBranch = session.user?.app_metadata?.branch || null;
+  const userRole = session.user?.app_metadata?.role || "";
   if (userBranch) {
     const sel = document.getElementById('sel-branch');
     if (sel) {
@@ -335,6 +355,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     fBranch = userBranch;
   }
+
+  // Admin Manager - Hide unwanted tabs
+if (userRole === "admin_manager") {
+
+    document.querySelectorAll(".tb").forEach(tab => {
+
+        const text = tab.textContent;
+
+        if (
+            !text.includes("Admin Tracker") &&
+            !text.includes("Vigilance") &&
+            !text.includes("Purchase")
+        ) {
+            tab.style.display = "none";
+        }
+
+    });
+
+}
 
   // Inject the status banner at the very top of the page
   document.body.insertAdjacentHTML('afterbegin',
