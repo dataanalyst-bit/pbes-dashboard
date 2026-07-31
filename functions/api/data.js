@@ -32,7 +32,8 @@ export async function onRequestGet({ request, env }) {
   if (!check.ok) return json({ error: true, message: "Invalid or expired session" }, 401);
 
   const user = await check.json();
-  const userBranch = user?.app_metadata?.branch || null; // null = management, sees all
+  const role = user?.app_metadata?.role || "";
+const userBranch = user?.app_metadata?.branch || null;
 
   // ── 2. Get the dashboard payload: edge cache first, Apps Script second ──
   // Cache key is constant: the cached object is the FULL dataset; branch
@@ -89,12 +90,16 @@ export async function onRequestGet({ request, env }) {
   // ── 3. Management (no branch restriction): stream straight through ──
   // No .json(), no JSON.stringify — the Worker just pipes bytes. This is the
   // fix for the 503s: the multi-MB payload is never parsed in the Worker.
-  if (!userBranch) {
-    return new Response(upstream.body, {
-      status: 200,
-      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-    });
-  }
+ // Management OR Admin Manager gets full data
+if (!userBranch || role === "admin_manager") {
+  return new Response(upstream.body, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+    },
+  });
+}
 
   // ── 4. Branch principals: parse once and filter ──
   let data;
