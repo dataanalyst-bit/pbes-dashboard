@@ -1,13 +1,14 @@
 // functions/api/data.js
-// v2 — fixes intermittent 503 / "Unexpected token '<'" errors.
-// Key changes vs v1:
-//   1. Edge-caches the Apps Script JSON for 60s  → one upstream call serves everyone
-//   2. Management users (no branch restriction) get a STREAMED pass-through
-//      → the Worker never parses the multi-MB payload → no CPU/memory blowups
-//   3. Branch principals still get server-side filtering (small user group)
-//   4. Non-JSON upstream responses return a clean JSON error instead of crashing
+// v3 — adds ROLE-BASED ACCESS on top of v2's edge-cache + streaming.
+//   Roles (Supabase app_metadata.role):
+//     • management / (no role & no branch) → full data, all branches
+//     • admin_manager                      → full data (client shows Admin/Vigilance/Purchase/Transport/IT)
+//     • hr                                 → full data (client shows HR only; ranking needs ALL branches)
+//     • principal (any user with a branch) → branch-filtered DETAIL, but the cross-branch
+//       aggregates the Head-to-Head scorecard needs (TRACKER, OBS_DATA, HR_RECORDS,
+//       MONTH_CONFIG) are kept full so "all branches" comparison still renders.
 
-const CACHE_TTL_SECONDS = 60; // das hboard data freshness window
+const CACHE_TTL_SECONDS = 60; // dashboard data freshness window
 
 export async function onRequestGet({ request, env }) {
   const json = (obj, status = 200) =>
@@ -32,12 +33,10 @@ export async function onRequestGet({ request, env }) {
   if (!check.ok) return json({ error: true, message: "Invalid or expired session" }, 401);
 
   const user = await check.json();
-  const role = user?.app_metadata?.role || "";
-const userBranch = user?.app_metadata?.branch || null;
+  const role = (user?.app_metadata?.role || "").toLowerCase().trim();
+  const userBranch = user?.app_metadata?.branch || null;
 
   // ── 2. Get the dashboard payload: edge cache first, Apps Script second ──
-  // Cache key is constant: the cached object is the FULL dataset; branch
-  // filtering happens after the cache, and only authenticated users reach here.
   const cache = caches.default;
   const cacheKey = new Request("https://pbes-dashboard-cache.internal/api/data");
 
@@ -58,9 +57,6 @@ const userBranch = user?.app_metadata?.branch || null;
       return json({ error: true, message: "Upstream fetch failed: " + err.message }, 502);
     }
 
-    // Guard: Apps Script must answer with JSON. If Google returns an HTML
-    // page (wrong access setting, quota page, sign-in page), say so clearly
-    // instead of letting the browser choke on "Unexpected token '<'".
     const ct = (resp.headers.get("content-type") || "").toLowerCase();
     if (!resp.ok || ct.indexOf("json") === -1) {
       const head = (await resp.text()).slice(0, 180).replace(/</g, "‹");
@@ -76,7 +72,6 @@ const userBranch = user?.app_metadata?.branch || null;
       );
     }
 
-    // Store in the edge cache for CACHE_TTL_SECONDS
     upstream = new Response(resp.body, {
       status: 200,
       headers: {
@@ -87,21 +82,20 @@ const userBranch = user?.app_metadata?.branch || null;
     await cache.put(cacheKey, upstream.clone());
   }
 
-  // ── 3. Management (no branch restriction): stream straight through ──
-  // No .json(), no JSON.stringify — the Worker just pipes bytes. This is the
-  // fix for the 503s: the multi-MB payload is never parsed in the Worker.
- // Management OR Admin Manager gets full data
-if (!userBranch || role === "admin_manager") {
-  return new Response(upstream.body, {
-    status: 200,
-    headers: {
-      "Content-Type": "application/json",
-      "Cache-Control": "no-store",
-    },
-  });
-}
+  // ── 3. Full-access roles: stream straight through (no parse) ──
+  //   management, admin_manager, hr, and any user WITHOUT a branch get everything.
+  //   The browser then applies tab/branch visibility per role.
+  const fullAccess =
+    !userBranch || role === "admin_manager" || role === "hr" || role === "management";
+  if (fullAccess) {
+    return new Response(upstream.body, {
+      status: 200,
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    });
+  }
 
-  // ── 4. Branch principals: parse once and filter ──
+  // ── 4. Branch principals: parse once and filter DETAIL to their branch ──
+  //   Cross-branch aggregates needed by the Head-to-Head scorecard stay full.
   let data;
   try {
     data = await upstream.json();
@@ -111,25 +105,38 @@ if (!userBranch || role === "admin_manager") {
   return json(filterByBranch(data, userBranch));
 }
 
-// ── Filters every dataset in the payload down to one branch ──
+// ── Filters individual-record datasets down to one branch ──
+// KEEPS full (needed for the all-branch Head-to-Head comparison):
+//   TRACKER (care-call rate), OBS_DATA (observation completion), HR_RECORDS (HR overall),
+//   MONTH_CONFIG (working days per branch). These are aggregate/operational, not student PII.
 function filterByBranch(data, branch) {
   const out = { ...data };
+  const KEEP_FULL = { TRACKER: 1, OBS_DATA: 1, HR_RECORDS: 1 };
   const arrayKeys = [
-    "CARE_DATA", "TRACKER", "GO_DATA", "GRIEVANCE_DATA", "ADM_TRENDS", "ALL_TEACHER",
-    "OBS_DATA", "ADMIN_DATA", "PUR_DATA", "VIG_DATA", "HR_RECORDS", "OWNER_STATS",
-    "COMBINED_ADM", "ADM1_DATA", "ADM2_DATA", "LEAD_DATES",
+    "CARE_DATA", "GO_DATA", "GRIEVANCE_DATA", "ADM_TRENDS", "ALL_TEACHER",
+    "ADMIN_DATA", "PUR_DATA", "VIG_DATA", "OWNER_STATS",
+    "COMBINED_ADM", "ADM1_DATA", "ADM2_DATA", "LEAD_DATES", "AVIS_DATA",
   ];
   arrayKeys.forEach((k) => {
-    if (Array.isArray(out[k])) {
+    if (!KEEP_FULL[k] && Array.isArray(out[k])) {
       out[k] = out[k].filter((r) => (r.Branch || r.branch) === branch);
     }
   });
-  const branchKeyedObjects = ["STUDENTS_BY_BRANCH", "LEAD_SUMMARY", "MONTH_CONFIG", "COMBINED_SUMMARY"];
+  // Transport & IT are nested objects of arrays — filter each inner array to the branch.
+  ["TRANSPORT", "IT_DATA_ALL"].forEach((k) => {
+    if (out[k] && typeof out[k] === "object") {
+      const nk = {};
+      Object.entries(out[k]).forEach(([kk, arr]) => {
+        nk[kk] = Array.isArray(arr) ? arr.filter((r) => (r.Branch || r.branch) === branch) : arr;
+      });
+      out[k] = nk;
+    }
+  });
+  // Branch-keyed objects → keep only this branch (MONTH_CONFIG stays FULL for Head-to-Head).
+  const branchKeyedObjects = ["STUDENTS_BY_BRANCH", "LEAD_SUMMARY", "COMBINED_SUMMARY"];
   branchKeyedObjects.forEach((k) => {
     if (out[k] && typeof out[k] === "object") {
-      out[k] = Object.fromEntries(
-        Object.entries(out[k]).filter(([key]) => key === branch)
-      );
+      out[k] = Object.fromEntries(Object.entries(out[k]).filter(([key]) => key === branch));
     }
   });
   if (out.OWNER_QUALITY && typeof out.OWNER_QUALITY === "object") {
