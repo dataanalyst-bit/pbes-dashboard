@@ -257,7 +257,7 @@ catch (e) {
     applyLiveData(data);
     _liveDataLoaded = true;
     showLoadOk(data.generatedAt, data.computeMs);
-    try { localStorage.setItem('pbes_cache_v1', JSON.stringify({ t: Date.now(), data: data })); } catch(e){ /* quota — ignore */ }
+    try { localStorage.setItem('pbes_cache_v2', JSON.stringify({ t: Date.now(), data: data })); } catch(e){ /* quota — ignore */ }
     if (typeof renderAll === 'function') renderAll();
 
   } catch (err) {
@@ -304,7 +304,7 @@ function applyLiveData(data){
 // Instant paint from the last cached snapshot (like a social app), then refresh in background.
 function tryInstantCache(){
   try{
-    const raw=localStorage.getItem('pbes_cache_v1');
+    const raw=localStorage.getItem('pbes_cache_v2');
     if(!raw) return false;
     const c=JSON.parse(raw);
     if(!c||!c.data) return false;
