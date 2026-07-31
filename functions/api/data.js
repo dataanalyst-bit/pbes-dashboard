@@ -7,7 +7,7 @@
 //   3. Branch principals still get server-side filtering (small user group)
 //   4. Non-JSON upstream responses return a clean JSON error instead of crashing
 
-const CACHE_TTL_SECONDS = 15; // das hboard data freshness window
+const CACHE_TTL_SECONDS = 40; // das hboard data freshness window
 
 export async function onRequestGet({ request, env }) {
   const json = (obj, status = 200) =>
