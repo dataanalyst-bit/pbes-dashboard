@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PBES School Analytics 2026-27</title> 
+<title>PBES School Analytics 2026-27</title>
 
 <!-- Supabase client must load before our auth/data code   -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -57,7 +57,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);font-si
 .fbadge{display:flex;align-items:center;gap:5px;background:var(--pl);border:1.5px solid rgba(30,79,216,.25);border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700;color:var(--p)}
 .fbadge-dot{width:7px;height:7px;background:var(--g);border-radius:50%}
 
-/* TABS    */
+/* TABS */
 .tabs{background:var(--sur);border-bottom:2px solid var(--bor)}
 .tabs-in{max-width:1700px;margin:0 auto;padding:0 28px;display:flex;overflow-x:auto}
 .tb{padding:11px 17px;background:none;border:none;cursor:pointer;font-family:'Inter',sans-serif;font-size:12.5px;font-weight:500;color:var(--txm);border-bottom:3px solid transparent;margin-bottom:-2px;display:flex;align-items:center;gap:6px;white-space:nowrap;transition:all .18s}
@@ -229,6 +229,12 @@ async function loadLiveData(isRefresh) {
     // Attach the current Supabase session token; the server verifies it.
     const { data: { session } } = await sb.auth.getSession();
     if (!session) { window.location.href = 'login.html'; return; }
+    // Capture the signed-in user's role & branch (Supabase app_metadata) for access control.
+    try{
+      const md=(session.user&&session.user.app_metadata)||{};
+      window._ROLE=String(md.role||'').toLowerCase().trim();
+      window._USER_BRANCH=md.branch||null;
+    }catch(e){ window._ROLE=''; window._USER_BRANCH=null; }
 
     const res = await fetch(DATA_API + '?_t=' + Date.now(), {
       headers: { 'Authorization': 'Bearer ' + session.access_token }
@@ -258,7 +264,9 @@ catch (e) {
     _liveDataLoaded = true;
     showLoadOk(data.generatedAt, data.computeMs);
     try { localStorage.setItem('pbes_cache_v2', JSON.stringify({ t: Date.now(), data: data })); } catch(e){ /* quota — ignore */ }
+    try { localStorage.setItem('pbes_role', JSON.stringify({ role: window._ROLE||'', branch: window._USER_BRANCH||null })); } catch(e){}
     if (typeof renderAll === 'function') renderAll();
+    applyRoleAccess();
 
   } catch (err) {
     showLoadError(
@@ -312,38 +320,87 @@ function tryInstantCache(){
     if(Date.now()-c.t > 24*3600*1000) return false;
     applyLiveData(c.data);
     _liveDataLoaded=true;
+    // Re-apply the last known role so tabs/branch-lock don't flash before the fetch.
+    try{ const rr=JSON.parse(localStorage.getItem('pbes_role')||'null'); if(rr){ window._ROLE=rr.role||''; window._USER_BRANCH=rr.branch||null; } }catch(e){}
     if(typeof renderAll==='function') renderAll();
+    try{ applyRoleAccess(); }catch(e){}
     const el=document.getElementById('load-status'); if(el){ el.textContent='⚡ Showing saved view · refreshing…'; }
     return true;
   }catch(e){ return false; }
 }
 
+// ══════════════════ ROLE-BASED ACCESS CONTROL ══════════════════
+// Roles come from Supabase app_metadata.role + app_metadata.branch:
+//   • management / (no role & no branch) → full super-admin access, all branches
+//   • admin_manager  → Admin, Vigilance, Purchase, Transport, IT (all branches)
+//   • hr             → HR Analytics only (own-branch KPIs; ranking spans ALL HRs)
+//   • principal (or any user with a branch) → Overview (Head-to-Head shows ALL
+//                     branches) + Care, Observations, Admissions, AVIS, Grievance,
+//                     Transport, IT — everything else LOCKED to their own branch.
+// Edit ROLE_TABS below to change which tabs a role can open.
+const ROLE_TABS = {
+  admin_manager: ['admin','vigilance','purchase','transport','it'],
+  hr:            ['hr'],
+  principal:     ['overview','care','observations','admissions','avis','grievance','transport','it']
+};
+function _tabIdOf(btn){ const m=(btn.getAttribute('onclick')||'').match(/showTab\('([^']+)'/); return m?m[1]:''; }
+function applyRoleAccess(){
+  const role=(window._ROLE||'').toLowerCase().trim();
+  const branch=window._USER_BRANCH||null;
+  let allowed=null;          // null = all tabs
+  let lockBranch=null;       // non-null = force fBranch to this branch
+  if(role==='admin_manager'){ allowed=ROLE_TABS.admin_manager; }
+  else if(role==='hr'){ allowed=ROLE_TABS.hr; lockBranch=branch||null; }
+  else if(role==='principal' || (branch && role!=='management' && role!=='admin' && role!=='')){
+    allowed=ROLE_TABS.principal; lockBranch=branch||null;
+  }
+  // management / admin / empty-role-without-branch → full access (allowed stays null)
+
+  // Branch lock (principals + HR): pin the branch dropdown to the user's branch.
+  window._BRANCH_LOCK = lockBranch || null;
+  const sel=document.getElementById('sel-branch');
+  if(lockBranch && sel){
+    // ensure the option exists, then select + disable it
+    if(![...sel.options].some(o=>o.value===lockBranch)){ const o=document.createElement('option'); o.value=lockBranch; o.textContent=lockBranch; sel.appendChild(o); }
+    sel.value=lockBranch; sel.disabled=true; sel.style.opacity='0.65'; sel.style.cursor='not-allowed'; sel.title='Locked to your branch';
+    fBranch=lockBranch;
+  } else if(sel){ sel.disabled=false; sel.style.opacity=''; sel.style.cursor=''; sel.title=''; }
+
+  // Tab visibility
+  const btns=[...document.querySelectorAll('nav .tb, .tabs .tb, .tb')];
+  const seen={};
+  btns.forEach(btn=>{
+    const id=_tabIdOf(btn); if(!id||seen[id])return; seen[id]=1;
+    btn.style.display=(allowed && allowed.indexOf(id)===-1)?'none':'';
+  });
+
+  // If the currently-open tab is not allowed, jump to the first allowed one.
+  if(allowed && allowed.length){
+    const activePane=document.querySelector('.pane.active');
+    const activeId=activePane?activePane.id.replace('pane-',''):'';
+    if(allowed.indexOf(activeId)===-1){
+      const firstBtn=btns.find(b=>allowed.indexOf(_tabIdOf(b))!==-1);
+      if(firstBtn) firstBtn.click();
+    } else if(lockBranch){ renderAll(); }
+  } else if(lockBranch){ renderAll(); }
+
+  // Small role badge in the header (non-intrusive)
+  try{
+    let badge=document.getElementById('role-badge');
+    if(!badge){ const host=document.querySelector('.hdr-in')||document.body; badge=document.createElement('div'); badge.id='role-badge';
+      badge.style.cssText='position:absolute;top:8px;right:14px;font-size:10.5px;font-weight:700;color:#fff;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);padding:3px 9px;border-radius:10px;';
+      (document.querySelector('.hdr')||document.body).appendChild(badge); }
+    const label=role?role.replace(/_/g,' '):'management';
+    badge.textContent='🔐 '+label.toUpperCase()+(lockBranch?(' · '+lockBranch):' · ALL BRANCHES');
+  }catch(e){}
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   // Hard gate: no session → go to login BEFORE any data or UI renders
   const { data: { session } } = await sb.auth.getSession();
-  // Admin Manager: show only Admin, Vigilance and Purchase tabs
-if (userRole === "admin_manager") {
-
-  document.querySelectorAll(".tb").forEach(tab => {
-
-    const txt = tab.textContent.trim();
-
-    const allowed =
-      txt.includes("Admin Tracker") ||
-      txt.includes("Vigilance") ||
-      txt.includes("Purchase");
-
-    if (!allowed) {
-      tab.style.display = "none";
-    }
-
-  });
-
-}
   if (!session) { window.location.href = 'login.html'; return; }
   // ── Lock the branch selector for principals (branch-restricted accounts) ──
   const userBranch = session.user?.app_metadata?.branch || null;
-  const userRole = session.user?.app_metadata?.role || "";
   if (userBranch) {
     const sel = document.getElementById('sel-branch');
     if (sel) {
@@ -355,25 +412,6 @@ if (userRole === "admin_manager") {
     }
     fBranch = userBranch;
   }
-
-  // Admin Manager - Hide unwanted tabs
-if (userRole === "admin_manager") {
-
-    document.querySelectorAll(".tb").forEach(tab => {
-
-        const text = tab.textContent;
-
-        if (
-            !text.includes("Admin Tracker") &&
-            !text.includes("Vigilance") &&
-            !text.includes("Purchase")
-        ) {
-            tab.style.display = "none";
-        }
-
-    });
-
-}
 
   // Inject the status banner at the very top of the page
   document.body.insertAdjacentHTML('afterbegin',
@@ -1450,6 +1488,8 @@ function lineCfg(labels,datasets,opts={}){
 function applyFilters(){
   fBranch=document.getElementById('sel-branch').value;
   fMonth =document.getElementById('sel-month').value;
+  // Role branch-lock: principals & HR can never switch away from their own branch.
+  if(window._BRANCH_LOCK){ fBranch=window._BRANCH_LOCK; const _s=document.getElementById('sel-branch'); if(_s)_s.value=window._BRANCH_LOCK; }
   const bl=fBranch==='ALL'?'All Branches':fBranch;
   const ml=fMonth==='ALL'?'All Months':fMonth+' 2026';
   document.getElementById('fbadge-txt').textContent='Showing: '+bl+' · '+ml+' (excl. Overview)';
@@ -1654,11 +1694,14 @@ const _PUR_COLS=[
 ];
 function setHtml(id,val){ var el=document.getElementById(id); if(el) el.innerHTML=val; }
 function renderOverview(){
-  // Overview always shows full picture — never filtered by branch/month
-  const _b=fBranch,_m=fMonth; fBranch='ALL'; fMonth='ALL';
+  // Overview shows the full picture (all branches) — UNLESS the viewer is branch-locked
+  // (a principal), in which case their own branch is shown. The Head-to-Head scorecard
+  // below always spans all branches regardless (rendered by renderRankings).
+  const _lock=window._BRANCH_LOCK||null;
+  const _b=fBranch,_m=fMonth; fBranch=_lock||'ALL'; fMonth='ALL';
   const rows=filtT(); const s=sumT(rows); const bc=brComp(rows);
   fBranch=_b; fMonth=_m;
-  const bl='All Branches', ml='All Months';
+  const bl=_lock?_lock:'All Branches', ml='All Months';
   document.getElementById('ov-tag').textContent=bl+' · '+ml;
   // Completion = Calls Made / Total Students (capped at 100%)
   const pct=s.students>0?+(Math.min(s.calls/s.students*100,100).toFixed(1)):0;
@@ -6097,4 +6140,4 @@ function renderAll() {
 }
 </script>
 </body>
-</html>  
+</html>
