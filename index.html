@@ -253,12 +253,28 @@ catch (e) {
       return;
     }
 
-    // Assign every data array (only update fields that came back)
-    // Live student counts from Tracker sheets (not hardcoded)
+    // Apply + cache, then render
+    applyLiveData(data);
+    _liveDataLoaded = true;
+    showLoadOk(data.generatedAt, data.computeMs);
+    try { localStorage.setItem('pbes_cache_v1', JSON.stringify({ t: Date.now(), data: data })); } catch(e){ /* quota — ignore */ }
+    if (typeof renderAll === 'function') renderAll();
+
+  } catch (err) {
+    showLoadError(
+      'Cannot reach the live data source: ' + err.message +
+      ' — check your internet connection and that the Apps Script is deployed with access set to "Anyone".'
+    );
+  }
+}
+
+// Assign every data array from a payload (used by both the live fetch and the instant cache)
+function applyLiveData(data){
     if (data.TOTAL_STUDENTS)    { document.getElementById('hv-students').textContent = data.TOTAL_STUDENTS.toLocaleString('en-IN');
     document.getElementById('ov-stu').textContent = data.TOTAL_STUDENTS.toLocaleString('en-IN'); }
     if (data.STUDENTS_BY_BRANCH){ window._STUDENTS_BY_BRANCH = data.STUDENTS_BY_BRANCH; }
     if (data.TOTAL_STUDENTS){ window._TOTAL_STUDENTS = data.TOTAL_STUDENTS; }
+    if (data.AVIS_STRENGTH!==undefined){ window._AVIS_STRENGTH = data.AVIS_STRENGTH; }
     if (data.GO_DATA)          GO_DATA          = data.GO_DATA;
     if (data.GRIEVANCE_DATA)   GRIEVANCE_DATA   = data.GRIEVANCE_DATA;
     if (data.MONTH_CONFIG)     MONTH_CONFIG     = data.MONTH_CONFIG;
@@ -280,18 +296,26 @@ catch (e) {
     if (data.COMBINED_SUMMARY) COMBINED_SUMMARY = data.COMBINED_SUMMARY;
     if (data.OWNER_QUALITY)    OWNER_QUALITY    = data.OWNER_QUALITY;
     if (data.AVIS_DATA)        AVIS_DATA        = data.AVIS_DATA;
+    if (data.TRANSPORT)        window._TRANSPORT = data.TRANSPORT;
+    if (data.IT_DATA_ALL)      window._IT = data.IT_DATA_ALL;
     if (data.DATE_WINDOWS)     DATE_WINDOWS     = data.DATE_WINDOWS;
+}
 
-    _liveDataLoaded = true;
-    showLoadOk(data.generatedAt, data.computeMs);
-    if (typeof renderAll === 'function') renderAll();
-
-  } catch (err) {
-    showLoadError(
-      'Cannot reach the live data source: ' + err.message +
-      ' — check your internet connection and that the Apps Script is deployed with access set to "Anyone".'
-    );
-  }
+// Instant paint from the last cached snapshot (like a social app), then refresh in background.
+function tryInstantCache(){
+  try{
+    const raw=localStorage.getItem('pbes_cache_v1');
+    if(!raw) return false;
+    const c=JSON.parse(raw);
+    if(!c||!c.data) return false;
+    // Use cache up to 24h old for instant paint; a fresh fetch always follows.
+    if(Date.now()-c.t > 24*3600*1000) return false;
+    applyLiveData(c.data);
+    _liveDataLoaded=true;
+    if(typeof renderAll==='function') renderAll();
+    const el=document.getElementById('load-status'); if(el){ el.textContent='⚡ Showing saved view · refreshing…'; }
+    return true;
+  }catch(e){ return false; }
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -318,8 +342,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     'display:none;padding:8px 16px;text-align:center;font-size:12.5px;' +
     'font-weight:600;position:sticky;top:0;z-index:9999;"></div>');
 
-  // Initial load
-  loadLiveData(false);
+  // Initial load — paint instantly from the last saved snapshot, then refresh live in the background
+  const painted = tryInstantCache();
+  loadLiveData(painted);   // if we already painted from cache, treat the fetch as a silent refresh
 
   // Periodic background refresh (e.g. every 2 minutes)
   if (AUTO_REFRESH_SECONDS > 0) {
@@ -393,6 +418,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   <button class="tb" onclick="showTab('admissions',this)">🎓 Admissions 2026-27</button>
   <button class="tb" onclick="showTab('avis',this)">🏫 Akshara Vaagdevi</button>
   <button class="tb" onclick="showTab('grievance',this)">📣 Grievance</button>
+  <button class="tb" onclick="showTab('transport',this)">🚌 Transport</button>
+  <button class="tb" onclick="showTab('it',this)">💻 IT Report</button>
 </div></nav>
 
 <div class="content">
@@ -403,7 +430,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   <!-- Row 1: Core operational KPIs -->
   <div class="krow k5">
     <div class="kc blue clickable" onclick="viewStudentsByBranch()" title="Click to view branch-wise student count"><div class="kc-ico">👦</div><div class="kc-lbl">Total Students</div><div class="kc-val" id="ov-stu">—</div><div class="kc-sub">5 active campuses + Akshara · click to view</div></div>
-    <div class="kc green clickable" onclick="viewCallsByBranch()" title="Click to view branch-wise calls made"><div class="kc-ico">📞</div><div class="kc-lbl">Calls Made</div><div class="kc-val" id="ov-calls">–</div><div class="kc-sub" id="ov-calls-s">–</div></div>
+    <div class="kc green clickable" onclick="viewCallsByBranch()" title="Click to view branch-wise calls made"><div class="kc-ico">📞</div><div class="kc-lbl">Avg Calls / Month</div><div class="kc-val" id="ov-calls">–</div><div class="kc-sub" id="ov-calls-s">–</div></div>
     <div class="kc teal clickable" onclick="viewConfirmedAdmissions()" title="Click to view admissions by branch"><div class="kc-ico">🎓</div><div class="kc-lbl">Confirmed Admissions</div><div class="kc-val" id="ov-adm-portal">–</div><div class="kc-sub" id="ov-adm-portal-s">Portal confirmed</div></div>
     <div class="kc indigo"><div class="kc-ico">👁️</div><div class="kc-lbl">Teacher Observations</div><div class="kc-val" id="ov-obs">–</div><div class="kc-sub" id="ov-obs-s">Total recorded</div></div>
     <div class="kc purple clickable" onclick="switchTab('admin')"><div class="kc-ico">🏗️</div><div class="kc-lbl">Admin Tasks</div><div class="kc-val" id="ov-admin">–</div><div class="kc-sub" id="ov-admin-s">In Progress · Hold/Open</div></div>
@@ -439,7 +466,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="card" style="margin-bottom:16px;">
     <div class="ch">
       <h3>🏆 Branch Performance Scorecard — Head-to-Head Comparison</h3>
-      <span class="fnote">Care Call &amp; Observation rows use PREVIOUS month · resigned HRs excluded from Hiring Speed</span>
+      <span class="fnote">Care Call &amp; Observation rows use PREVIOUS month · HR Overall Score pulled from the HR Analytics scorecard</span>
       <span style="font-size:11px;background:#FFFBEB;border:1px solid rgba(217,119,6,.25);color:#D97706;padding:3px 10px;border-radius:6px;font-weight:600;" id="rank-tag">🥇 Rankings &amp; Awards — Current / Latest Month Per Branch</span>
     </div>
     <div class="cb" style="overflow-x:auto;">
@@ -1188,6 +1215,70 @@ document.addEventListener('DOMContentLoaded', async () => {
   </div>
 </div>
 
+<!-- ═══ SCHOOL TRANSPORT ═══ -->
+<div id="pane-transport" class="pane">
+  <div class="sh"><div class="sh-l"><span class="sh-ico">🚌</span><div><h2>School Transport Tracker</h2><p id="tr-tag" class="sh-sub">Fleet · Routes · Occupancy · Compliance</p></div></div>
+    <span class="fnote" id="tr-fn">All Branches</span>
+  </div>
+  <div class="krow k5">
+    <div class="kc blue clickable" onclick="viewTransport('vehicles')" title="Click to view all vehicles"><div class="kc-ico">🚌</div><div class="kc-lbl">Total Vehicles</div><div class="kc-val" id="tr-veh">–</div><div class="kc-sub" id="tr-veh-s">Active fleet · click to view</div></div>
+    <div class="kc teal clickable" onclick="viewTransport('students')" title="Click to view transport students"><div class="kc-ico">🎒</div><div class="kc-lbl">Transport Students</div><div class="kc-val" id="tr-stu">–</div><div class="kc-sub" id="tr-stu-s">Riders · click to view</div></div>
+    <div class="kc green"><div class="kc-ico">🪑</div><div class="kc-lbl">Fleet Occupancy</div><div class="kc-val" id="tr-occ">–</div><div class="kc-sub" id="tr-occ-s">Riders ÷ seats</div></div>
+    <div class="kc red clickable" onclick="viewTransport('expiring')" title="Click to view expiring documents"><div class="kc-ico">⚠️</div><div class="kc-lbl">Docs Expiring/Expired</div><div class="kc-val" id="tr-exp">–</div><div class="kc-sub" id="tr-exp-s">Compliance risk · click to view</div></div>
+    <div class="kc amber"><div class="kc-ico">⛽</div><div class="kc-lbl">Avg Mileage</div><div class="kc-val" id="tr-mil">–</div><div class="kc-sub" id="tr-mil-s">KM / litre</div></div>
+  </div>
+
+  <div class="row r2">
+    <div class="card"><div class="ch"><h3>🏫 Branch Occupancy — Riders vs Seats</h3><span class="fnote">Click a bar to view that branch's transport students</span></div><div class="cb"><div class="cw tall"><canvas id="tr-branch-occ"></canvas></div></div></div>
+    <div class="card"><div class="ch"><h3>🚦 Route Occupancy (Top / Overloaded)</h3><span class="fnote">Occupancy % per route · red &gt; 100% (over capacity)</span></div><div class="cb"><div class="cw tall"><canvas id="tr-route-occ"></canvas></div></div></div>
+  </div>
+  <div class="row r2">
+    <div class="card"><div class="ch"><h3>🛡️ Fleet Compliance</h3><span class="fnote">Document status across the fleet · click to view</span></div><div class="cb"><div class="cw tall"><canvas id="tr-compliance"></canvas></div></div></div>
+    <div class="card"><div class="ch"><h3>🔧 Maintenance Cost by Branch</h3><span class="fnote">Repair &amp; service spend · click a bar to view records</span></div><div class="cb"><div class="cw tall"><canvas id="tr-repair"></canvas></div></div></div>
+  </div>
+  <div class="card" style="margin-bottom:16px;">
+    <div class="ch"><h3>🚍 Fleet Register</h3><span class="fnote">Branch-wise vehicle list · click a row for full detail</span></div>
+    <div class="cb" style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:760px;">
+      <thead><tr style="background:#EEF2FF;">
+        <th style="padding:8px 10px;text-align:left;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Branch</th>
+        <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Vehicles</th>
+        <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Seats</th>
+        <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Riders</th>
+        <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Occupancy %</th>
+        <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Docs Expiring</th>
+      </tr></thead><tbody id="tr-fleet-tbody"></tbody></table></div>
+  </div>
+</div>
+
+<!-- ═══ IT REPORT ═══ -->
+<div id="pane-it" class="pane">
+  <div class="sh"><div class="sh-l"><span class="sh-ico">💻</span><div><h2>IT Infrastructure Report</h2><p id="it-tag" class="sh-sub">Assets · Health · Uptime</p></div></div>
+    <span class="fnote" id="it-fn">All Branches</span>
+  </div>
+  <div class="krow k4">
+    <div class="kc blue clickable" onclick="viewIT('all')" title="Click to view all assets"><div class="kc-ico">🖥️</div><div class="kc-lbl">Total Assets</div><div class="kc-val" id="it-total">–</div><div class="kc-sub" id="it-total-s">Across all systems · click to view</div></div>
+    <div class="kc green"><div class="kc-ico">✅</div><div class="kc-lbl">Avg Health</div><div class="kc-val" id="it-health">–</div><div class="kc-sub" id="it-health-s">Working ÷ total</div></div>
+    <div class="kc red clickable" onclick="viewIT('down')" title="Click to view not-working assets"><div class="kc-ico">🔴</div><div class="kc-lbl">Not Working</div><div class="kc-val" id="it-down">–</div><div class="kc-sub">Needs repair · click to view</div></div>
+    <div class="kc amber clickable" onclick="viewIT('pending')" title="Click to view pending assets"><div class="kc-ico">⏳</div><div class="kc-lbl">Pending</div><div class="kc-val" id="it-pend">–</div><div class="kc-sub">Awaiting action · click to view</div></div>
+  </div>
+  <div class="row r2">
+    <div class="card"><div class="ch"><h3>🏫 Assets by Branch</h3><span class="fnote">Click a bar to view that branch's assets</span></div><div class="cb"><div class="cw tall"><canvas id="it-branch"></canvas></div></div></div>
+    <div class="card"><div class="ch"><h3>🩺 System Health — Working vs Down vs Pending</h3><span class="fnote">Top systems by asset count</span></div><div class="cb"><div class="cw tall"><canvas id="it-system"></canvas></div></div></div>
+  </div>
+  <div class="card" style="margin-bottom:16px;">
+    <div class="ch"><h3>⚠️ Lowest-Health Systems</h3><span class="fnote">Systems needing attention · click a row for records</span></div>
+    <div class="cb" style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:680px;">
+      <thead><tr style="background:#EEF2FF;">
+        <th style="padding:8px 10px;text-align:left;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Branch</th>
+        <th style="padding:8px 10px;text-align:left;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">System</th>
+        <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Total</th>
+        <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Working</th>
+        <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Down</th>
+        <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Health %</th>
+      </tr></thead><tbody id="it-tbody"></tbody></table></div>
+  </div>
+</div>
+
 </div><!-- /content -->
 
 <script>
@@ -1532,8 +1623,10 @@ function renderOverview(){
   document.getElementById('ov-tag').textContent=bl+' · '+ml;
   // Completion = Calls Made / Total Students (capped at 100%)
   const pct=s.students>0?+(Math.min(s.calls/s.students*100,100).toFixed(1)):0;
-  document.getElementById('ov-calls').textContent=fi(s.calls);
-  document.getElementById('ov-calls-s').textContent=s.calls>0?pct+'% completion rate':'No data';
+  const _callMonths=new Set(rows.map(r=>r.month)).size||1;
+  const _avgPM=Math.round(s.calls/_callMonths);
+  document.getElementById('ov-calls').textContent=fi(_avgPM);
+  document.getElementById('ov-calls-s').textContent=s.calls>0?('Total '+fi(s.calls)+' calls · '+pct+'% completion'):'No data';
   document.getElementById('hv-calls').textContent=s.calls>0?(s.calls/1000).toFixed(1)+'K':'–';
 
   // ── NEW 10-KPI Executive Overview ──
@@ -1910,10 +2003,11 @@ function viewStudentsByBranch(){
   const rows=BR.filter(b=>SB[b]!==undefined).map(b=>({Branch:b,Students:(+SB[b]||0)}));
   const pallaviTotal=rows.reduce((a,r)=>a+r.Students,0);
   rows.push({Branch:'— Pallavi Branches Total —',Students:pallaviTotal});
-  // Akshara Vaagdevi International School (separate campus) — count from AVIS_DATA
-  const AV=(typeof AVIS_DATA!=='undefined'&&Array.isArray(AVIS_DATA))?AVIS_DATA:[];
-  const avisCount=AV.filter(r=>r&&r.Student&&r.Student!=='–').length;
-  rows.push({Branch:'Akshara Vaagdevi Intl (separate campus)',Students:avisCount});
+  // Akshara Vaagdevi International School (separate campus) — TOTAL STRENGTH sheet
+  const avisCount=(typeof window._AVIS_STRENGTH==='number'&&window._AVIS_STRENGTH>0)
+    ? window._AVIS_STRENGTH
+    : ((typeof AVIS_DATA!=='undefined'&&Array.isArray(AVIS_DATA))?AVIS_DATA.filter(r=>r&&r.Student&&r.Student!=='–').length:0);
+  rows.push({Branch:'Akshara Vaagdevi Intl (total strength)',Students:avisCount});
   rows.push({Branch:'═ GRAND TOTAL (incl. Akshara) ═',Students:pallaviTotal+avisCount});
   const cols=[{key:'Branch',label:'Branch / Campus'},{key:'Students',label:'Total Students'}];
   openModal('👦 Total Students — Branch-wise + Akshara',`${pallaviTotal.toLocaleString('en-IN')} across 5 Pallavi branches · ${avisCount} at Akshara Vaagdevi`,rows,cols);
@@ -4721,18 +4815,15 @@ function renderRankings(){
     obsCompletionStats[b]={pct,actual,required,month:useMonth,wd,types:Object.keys(typesInBranch).length};
   });
 
-  // ── HR Hiring Speed (avg days to close, lower is better) ──
-  // Resigned recruiters (HR_RESIGNED_LIST, e.g. Priya) are EXCLUDED from this ranking row.
-  // Days = Closed Date − Post Date when both dates are valid (sheet Days-to-Close as fallback).
-  const _hrResigned=(typeof HR_RESIGNED_LIST!=='undefined')?HR_RESIGNED_LIST:['Priya'];
-  const _isHrResigned=h=>_hrResigned.some(x=>String(x).trim().toLowerCase()===String(h||'').trim().toLowerCase());
+  // ── HR Overall Score per branch (from HR Performance Scorecard) ──
+  // Uses window._HR_LIVE_KPI (built in renderHR, which now runs first). Averages the
+  // overall score of the recruiter(s) mapped to each branch. Resigned staff excluded there.
+  const _LK=window._HR_LIVE_KPI||{};
   const hrStats={};
   ALLB.forEach(b=>{
-    const rows=(typeof HR_RECORDS!=='undefined'?HR_RECORDS:[]).filter(r=>r.Branch===b&&!_isHrResigned(r.HR));
-    const closed=rows.filter(r=>/closed|filled/i.test(r.Status||''));
-    const days=closed.map(r=>hrCloseDays(r)).filter(n=>n!==null&&n>=0);
-    const avgDays=days.length?+(days.reduce((a,c)=>a+c,0)/days.length).toFixed(1):null;
-    hrStats[b]={closed:closed.length,total:rows.length,avgDays};
+    const recs=Object.keys(_LK).filter(h=>_LK[h] && _LK[h].branch===b);
+    const ov=recs.map(h=>_LK[h].overall).filter(v=>typeof v==='number'&&isFinite(v));
+    hrStats[b]={overall: ov.length?+(ov.reduce((a,c)=>a+c,0)/ov.length).toFixed(2):null, recruiters:recs.length};
   });
 
   // ── Row 4: Admin Closing Speed — from Days Due (Completed / Overdue (n days) / Due in n days)
@@ -4799,16 +4890,16 @@ function renderRankings(){
     html+=`<td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;">${winnerBadge(win)}</td></tr>`;
   }
 
-  // Row: HR Hiring Speed (avg days to close — lower is better)
+  // Row: HR Overall Score (from HR Performance Scorecard — higher is better)
   {
-    const valMap={}; ALLB.forEach(b=>{valMap[b]=hrStats[b]&&hrStats[b].avgDays!=null?hrStats[b].avgDays:null;});
-    const win=winners(valMap,false);
-    html+=`<tr><td style="padding:10px 14px;font-size:12.5px;font-weight:600;border-bottom:1px solid #E0E8FF;color:#0F172A;">⚡ HR Hiring Speed</td>`;
+    const valMap={}; ALLB.forEach(b=>{valMap[b]=hrStats[b]&&hrStats[b].overall!=null?hrStats[b].overall:null;});
+    const win=winners(valMap,true);
+    html+=`<tr><td style="padding:10px 14px;font-size:12.5px;font-weight:600;border-bottom:1px solid #E0E8FF;color:#0F172A;">🏆 HR Overall Score</td>`;
     ALLB.forEach(b=>{
       const d=hrStats[b];
-      if(!d||d.avgDays==null){html+=cell('<span style="color:#94A3B8;">No data</span>',false);return;}
-      const color=d.avgDays<=15?'#059669':d.avgDays<=30?'#D97706':'#DC2626';
-      html+=cell(`<span style="font-weight:700;color:${color}">${d.avgDays}d</span><small style="color:#94A3B8;display:block;font-size:10px;">${d.closed} closed</small>`,win.includes(b));
+      if(!d||d.overall==null){html+=cell('<span style="color:#94A3B8;">No data</span>',false);return;}
+      const color=d.overall>=4.3?'#059669':d.overall>=3.5?'#16A34A':d.overall>=2.8?'#D97706':'#DC2626';
+      html+=cell(`<span style="font-weight:800;color:${color};font-size:15px;">${d.overall.toFixed(2)}</span><small style="color:#94A3B8;font-size:10px;"> /5</small><small style="color:#94A3B8;display:block;font-size:10px;">${d.recruiters} recruiter${d.recruiters===1?'':'s'}</small>`,win.includes(b));
     });
     html+=`<td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;">${winnerBadge(win)}</td></tr>`;
   }
@@ -4874,89 +4965,145 @@ function renderRankings(){
 }
 
 // Care Call insight summary — per-branch quality, resolution & data-driven recommendations
+// ── Sentiment lexicon (rule-based NLP for care-call remarks & follow-up text) ──
+const _SENT_POS=['happy','satisfied','satisfy','resolved','resolve','thank','thanks','thankful','good','great','excellent','appreciate','appreciated','positive','cooperative','cooperate','understanding','understood','agreed','agree','interested','join','joined','joining','fine','okay','ok','no concern','no issue','no problem','clear','cleared','well','glad','pleased','support','supportive','helpful','confident','yes','improved','improving','better','settled','calm','comfortable'];
+const _SENT_NEG=['angry','upset','unhappy','dissatisfied','dissatisfy','complaint','complain','problem','issue','issues','concern','concerned','worried','worry','not happy','not satisfied','no response','not answering','not answer','refuse','refused','delay','delayed','poor','bad','unable','difficult','difficulty','frustrated','frustration','disappoint','disappointed','disturb','disturbance','fear','afraid','scared','trouble','wrong','error','miss','missed','absent','irregular','pending','unresolved','harsh','rude','misbehave','misbehaviour','fight','bully','bullying','cry','crying','sad','stress','stressed','pressure','threat','warning'];
+function _sentiment(text){
+  const t=' '+String(text||'').toLowerCase().replace(/[^a-z\s]/g,' ').replace(/\s+/g,' ')+' ';
+  if(!t.trim()) return {label:'Neutral',score:0};
+  let pos=0,neg=0;
+  _SENT_POS.forEach(w=>{ if(t.indexOf(w)!==-1) pos++; });
+  _SENT_NEG.forEach(w=>{ if(t.indexOf(w)!==-1) neg++; });
+  const score=pos-neg;
+  return {label: score>0?'Positive':score<0?'Negative':'Neutral', score};
+}
+
 function renderCareSummary(){
   const el=document.getElementById('care-summary-report');
   if(!el) return;
-  const TRK=(typeof TRACKER!=='undefined'&&Array.isArray(TRACKER))?TRACKER:[];
+  const CARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
   const GO=(typeof GO_DATA!=='undefined'&&Array.isArray(GO_DATA))?GO_DATA:[];
   const BR=['Boduppal','Keesara','Pocharam','Bachupally','Gowdavalli'];
   const scope=(fBranch==='ALL')?BR:[fBranch];
   const fnEl=document.getElementById('care-summary-fn');
-  if(fnEl) fnEl.textContent=(fBranch==='ALL'?'All Branches':fBranch)+(fMonth==='ALL'?' · all months':' · '+fMonth);
+  if(fnEl) fnEl.textContent='Grievance-category groups + NLP sentiment on Remarks & Follow-up · '+(fBranch==='ALL'?'All Branches':fBranch)+(fMonth==='ALL'?'':' · '+fMonth);
 
-  const agg={};
-  scope.forEach(b=>{
-    const tr=TRK.filter(r=>r.branch===b&&(fMonth==='ALL'||r.month===fMonth)&&r.calls>0);
-    const go=GO.filter(r=>r.branch===b&&(fMonth==='ALL'||r.month===fMonth));
-    if(!tr.length&&!go.length) return;
-    const calls=tr.reduce((s,r)=>s+(+r.calls||0),0);
-    const resolved=tr.reduce((s,r)=>s+(+r.resolved||0),0);
-    const pending=tr.reduce((s,r)=>s+(+r.pending||0),0);
-    const ip=tr.reduce((s,r)=>s+(+r.ip||0),0);
-    const goCalls=go.reduce((s,r)=>s+(+r.total_calls||0),0);
-    const wrongG=go.reduce((s,r)=>s+(+r.wrong_grievance||0),0);
-    const emptyS=go.reduce((s,r)=>s+(+r.empty_status||0),0);
-    const emptyD=go.reduce((s,r)=>s+(+r.empty_date||0),0);
-    const officer=(go[0]&&go[0].officer)||'–';
-    const resPct=calls>0?Math.round(resolved/calls*100):0;
-    const pendPct=calls>0?Math.round(pending/calls*100):0;
-    const wrongPct=goCalls>0?Math.round(wrongG/goCalls*100):0;
-    const emptyDPct=goCalls>0?Math.round(emptyD/goCalls*100):0;
-    const emptySPct=goCalls>0?Math.round(emptyS/goCalls*100):0;
-    const quality=goCalls>0?Math.round(Math.max(0,100-(wrongG+emptyS+emptyD)/goCalls*100)):null;
-    agg[b]={officer,calls,resolved,pending,ip,resPct,pendPct,wrongG,wrongPct,emptyD,emptyDPct,emptyS,emptySPct,quality,goCalls};
-  });
-  const branches=Object.keys(agg);
-  if(!branches.length){ el.innerHTML='<div class="no-data">No care-call data for this filter.</div>'; return; }
+  const rowsAll=CARE.filter(r=>scope.includes(r.Branch)&&(fMonth==='ALL'||r.Month===fMonth));
+  if(!rowsAll.length){ el.innerHTML='<div class="no-data">No care-call data for this filter.</div>'; return; }
 
-  // System-level rollup
-  const totCalls=branches.reduce((s,b)=>s+agg[b].calls,0);
-  const totRes=branches.reduce((s,b)=>s+agg[b].resolved,0);
-  const sysRes=totCalls>0?Math.round(totRes/totCalls*100):0;
-  const qBranches=branches.filter(b=>agg[b].quality!==null);
-  const best=qBranches.slice().sort((a,b)=>agg[b].quality-agg[a].quality)[0];
-  const worst=qBranches.slice().sort((a,b)=>agg[a].quality-agg[b].quality)[0];
-
-  function rec(b){
-    const a=agg[b], out=[];
-    if(a.emptyDPct>=20) out.push(`📅 <strong>${a.emptyDPct}%</strong> of calls have no date logged — enforce mandatory call-date entry so trends & SLAs stay reliable.`);
-    if(a.wrongPct>=10) out.push(`⚠ <strong>${a.wrongPct}%</strong> grievances mis-categorised — a short refresher on the standard grievance list would lift data quality fast.`);
-    if(a.resPct<70) out.push(`🔁 Resolution at <strong>${a.resPct}%</strong> (below 70%) — assign a follow-up owner for the ${fi(a.pending)} pending case(s) and set a callback SLA.`);
-    if(a.emptySPct>=10) out.push(`⏳ <strong>${a.emptySPct}%</strong> of calls have no status — close the loop by marking each call Resolved / Pending / In-Progress.`);
-    if(!out.length) out.push(`✅ Healthy: <strong>${a.resPct}%</strong> resolved${a.quality!==null?` · quality ${a.quality}%`:''} — maintain the current cadence and share this branch's practice with others.`);
-    return out;
+  // Grievance category groups (Other counts as a real category, not an error)
+  const CATS=['No Concern','Not Answering','Academics','Behaviour / Wellbeing','Administration','Transport','Co Curricular','New Admission','No Response','Other'];
+  function analyse(rows){
+    const cat={}; CATS.forEach(c=>cat[c]=0);
+    let pos=0,neg=0,neu=0,texts=0;
+    const negBy={}; CATS.forEach(c=>negBy[c]=0);
+    rows.forEach(r=>{
+      const c=CATS.includes(r.Grievance)?r.Grievance:'Other'; cat[c]=(cat[c]||0)+1;
+      const rem=String(r.Remarks||''), fu=String(r.Followup||'');
+      const blob=(rem==='–'?'':rem)+' '+(fu==='–'?'':fu);
+      if(blob.trim()){ texts++; const s=_sentiment(blob);
+        if(s.label==='Positive')pos++; else if(s.label==='Negative'){neg++; negBy[c]=(negBy[c]||0)+1;} else neu++; }
+    });
+    return {n:rows.length,cat,pos,neg,neu,texts,negBy};
   }
 
-  let html='<div style="background:#F0F9FF;border:1px solid #BAE6FD;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12.5px;color:#0F172A;line-height:1.6;">'
-    +'📊 <strong>Overview:</strong> '+fi(totCalls)+' care calls analysed across '+branches.length+' branch(es), <strong>'+sysRes+'%</strong> resolved overall.'
-    +(best?` Highest data quality: <strong>${best}</strong> (${agg[best].quality}%).`:'')
-    +(worst&&worst!==best?` Needs most attention: <strong>${worst}</strong> (${agg[worst].quality}%).`:'')
+  const sysA=analyse(rowsAll);
+  const topCats=CATS.map(c=>[c,sysA.cat[c]]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);
+  const sentTot=sysA.pos+sysA.neg+sysA.neu||1;
+  const posPct=Math.round(sysA.pos/sentTot*100), negPct=Math.round(sysA.neg/sentTot*100), neuPct=100-posPct-negPct;
+  const topNegCat=CATS.map(c=>[c,sysA.negBy[c]]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1])[0];
+
+  function bar(label,val,total,color){
+    const p=total>0?Math.round(val/total*100):0;
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:11.5px;">
+      <div style="width:130px;color:#334155;cursor:pointer;text-decoration:underline dotted;" onclick="viewCareGrievance('${label.replace(/'/g,"\\'")}')" title="Click to view these calls">${label}</div>
+      <div style="flex:1;background:#F1F5F9;border-radius:6px;height:14px;overflow:hidden;"><div style="width:${p}%;height:100%;background:${color};"></div></div>
+      <div style="width:64px;text-align:right;color:#0F172A;font-weight:700;">${fi(val)} <small style="color:#94A3B8;">${p}%</small></div>
+    </div>`;
+  }
+  const catColors=['#94A3B8','#F59E0B','#3B82F6','#EF4444','#8B5CF6','#14B8A6','#EC4899','#22C55E','#64748B','#0EA5E9'];
+
+  let html='';
+  // Overview + sentiment headline
+  html+='<div style="background:linear-gradient(135deg,#EEF2FF,#F0FDFA);border:1px solid #C7D2FE;border-radius:10px;padding:13px 15px;margin-bottom:14px;font-size:12.5px;color:#0F172A;line-height:1.65;">'
+    +'🧠 <strong>NLP Insight:</strong> analysed <strong>'+fi(sysA.n)+'</strong> care calls; <strong>'+fi(sysA.texts)+'</strong> carried remarks / follow-up text. '
+    +'Sentiment split — <span style="color:#059669;font-weight:700;">'+posPct+'% positive</span>, '
+    +'<span style="color:#DC2626;font-weight:700;">'+negPct+'% negative</span>, '
+    +'<span style="color:#64748B;font-weight:700;">'+neuPct+'% neutral</span>. '
+    +(topCats[0]?('Most-raised group: <strong>'+topCats[0][0]+'</strong> ('+fi(topCats[0][1])+' calls).'):'')
+    +(topNegCat?(' Highest negative sentiment sits in <strong>'+topNegCat[0]+'</strong> — prioritise these follow-ups.'):'')
     +'</div>';
 
-  html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;">';
-  branches.forEach(b=>{
-    const a=agg[b];
-    const qColor=a.quality===null?'#94A3B8':a.quality>=90?'#059669':a.quality>=75?'#D97706':'#DC2626';
-    const rColor=a.resPct>=85?'#059669':a.resPct>=70?'#D97706':'#DC2626';
+  // Two columns: grievance groups bar list + sentiment donut-ish + insights
+  html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;">';
+  // Card 1: grievance category groups
+  html+='<div style="border:1px solid #E0E8FF;border-radius:10px;padding:12px 14px;background:#fff;">'
+    +'<div style="font-weight:800;font-size:13px;color:#0F172A;margin-bottom:10px;">📂 Grievance Category Groups</div>';
+  topCats.forEach((c,i)=>{ html+=bar(c[0],c[1],sysA.n,catColors[CATS.indexOf(c[0])%catColors.length]); });
+  html+='</div>';
+
+  // Card 2: sentiment breakdown + data-science insights
+  const insights=[];
+  if(negPct>=25) insights.push('🔴 Negative sentiment is high ('+negPct+'%). Route these calls to a senior counsellor and log a resolution note within 48h.');
+  if(topNegCat) insights.push('🎯 <strong>'+topNegCat[0]+'</strong> drives the most negative remarks — run a focused parent-engagement drive for this theme.');
+  const behav=sysA.cat['Behaviour / Wellbeing']||0, acad=sysA.cat['Academics']||0;
+  if(behav>0) insights.push('🧩 Behaviour/Wellbeing raised in '+fi(behav)+' calls — loop in the counsellor/wellbeing lead for pattern tracking.');
+  if(acad>0) insights.push('📚 Academics raised in '+fi(acad)+' calls — share with academic coordinators for subject-level intervention.');
+  const naCount=(sysA.cat['Not Answering']||0)+(sysA.cat['No Response']||0);
+  if(naCount>0) insights.push('📵 '+fi(naCount)+' calls went unanswered / no-response — retry at varied times and update contact numbers.');
+  if(posPct>=60) insights.push('✅ Sentiment is largely positive ('+posPct+'%) — capture these as testimonials for admissions marketing.');
+  if(!insights.length) insights.push('Sentiment is balanced; keep monitoring the top categories week-on-week.');
+
+  html+='<div style="border:1px solid #E0E8FF;border-radius:10px;padding:12px 14px;background:#fff;">'
+    +'<div style="font-weight:800;font-size:13px;color:#0F172A;margin-bottom:10px;">💬 Sentiment & Data-Driven Actions</div>'
+    +'<div style="display:flex;gap:6px;margin-bottom:10px;height:16px;border-radius:8px;overflow:hidden;">'
+      +'<div style="width:'+posPct+'%;background:#22C55E;" title="Positive '+posPct+'%"></div>'
+      +'<div style="width:'+neuPct+'%;background:#CBD5E1;" title="Neutral '+neuPct+'%"></div>'
+      +'<div style="width:'+negPct+'%;background:#EF4444;" title="Negative '+negPct+'%"></div>'
+    +'</div>'
+    +'<ul style="margin:0;padding-left:18px;font-size:11.5px;color:#334155;line-height:1.7;">'+insights.map(x=>'<li>'+x+'</li>').join('')+'</ul>'
+    +'</div>';
+  html+='</div>';
+
+  // Per-branch grievance + sentiment mini-cards
+  html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-top:14px;">';
+  scope.forEach(b=>{
+    const br=rowsAll.filter(r=>r.Branch===b); if(!br.length) return;
+    const a=analyse(br); const t=a.pos+a.neg+a.neu||1;
+    const bnegPct=Math.round(a.neg/t*100), bposPct=Math.round(a.pos/t*100);
+    const top=CATS.map(c=>[c,a.cat[c]]).filter(x=>x[1]>0).sort((x,y)=>y[1]-x[1]).slice(0,3);
+    const officer=(GO.find(g=>g.branch===b)||{}).officer||'–';
     html+=`<div style="border:1px solid #E0E8FF;border-radius:10px;padding:12px 14px;background:#fff;">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
-        <div style="font-weight:800;font-size:13.5px;color:#0F172A;"><span class="bd b${b}"></span> ${b}</div>
-        <div style="font-size:11px;color:#64748B;">Officer: <strong>${a.officer}</strong></div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+        <div style="font-weight:800;font-size:13px;color:#0F172A;"><span class="bd b${b}"></span> ${b}</div>
+        <div style="font-size:11px;color:#64748B;">Officer: <strong>${officer}</strong></div>
       </div>
-      <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;margin-bottom:8px;">
-        <span>📞 Calls <strong>${fi(a.calls)}</strong></span>
-        <span style="color:${rColor};">✅ Resolved <strong>${a.resPct}%</strong></span>
-        <span style="color:#D97706;">⏳ Pending <strong>${fi(a.pending)}</strong></span>
-        ${a.quality!==null?`<span style="color:${qColor};">🎯 Quality <strong>${a.quality}%</strong></span>`:''}
+      <div style="font-size:11.5px;color:#334155;margin-bottom:6px;">${fi(a.n)} calls · top: ${top.map(x=>x[0]+' ('+x[1]+')').join(', ')}</div>
+      <div style="display:flex;gap:4px;height:12px;border-radius:6px;overflow:hidden;margin-bottom:4px;">
+        <div style="width:${bposPct}%;background:#22C55E;"></div><div style="width:${100-bposPct-bnegPct}%;background:#CBD5E1;"></div><div style="width:${bnegPct}%;background:#EF4444;"></div>
       </div>
-      <ul style="margin:0;padding-left:18px;font-size:11.5px;color:#334155;line-height:1.6;">
-        ${rec(b).map(x=>'<li>'+x+'</li>').join('')}
-      </ul>
+      <div style="font-size:11px;color:#64748B;"><span style="color:#059669;font-weight:700;">${bposPct}%＋</span> · <span style="color:#DC2626;font-weight:700;">${bnegPct}%－</span>${bnegPct>=25?' &nbsp;⚠ elevated negativity':''}</div>
     </div>`;
   });
   html+='</div>';
   el.innerHTML=html;
 }
+
+// Drill-down: care calls in a grievance category (respects current branch+month filter)
+function viewCareGrievance(cat){
+  const CARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
+  const BR=['Boduppal','Keesara','Pocharam','Bachupally','Gowdavalli'];
+  const scope=(fBranch==='ALL')?BR:[fBranch];
+  const rows=CARE.filter(r=>scope.includes(r.Branch)&&(fMonth==='ALL'||r.Month===fMonth)&&(r.Grievance===cat||(cat==='Other'&&!['No Concern','Not Answering','Academics','Behaviour / Wellbeing','Administration','Transport','Co Curricular','New Admission','No Response'].includes(r.Grievance))))
+    .map(r=>({Branch:r.Branch,Month:r.Month,Student:r.Student,Class:r.Class,Date:r.Date,
+      Grievance:r.GrievanceRaw,Sentiment:_sentiment((r.Remarks==='–'?'':r.Remarks)+' '+(r.Followup==='–'?'':r.Followup)).label,
+      Remarks:r.Remarks,Followup:r.Followup,Status:r.StatusRaw}));
+  const cols=[{key:'Branch',label:'Branch'},{key:'Student',label:'Student',maxW:'160px'},{key:'Class',label:'Class'},
+    {key:'Date',label:'Date',date:true},{key:'Grievance',label:'Grievance'},{key:'Sentiment',label:'Sentiment',pill:true},
+    {key:'Remarks',label:'Remarks',maxW:'280px'},{key:'Followup',label:'Follow-up Action',maxW:'240px'},{key:'Status',label:'Status'}];
+  openModal('📂 '+cat+' — Care Calls',`${rows.length} call(s) · with NLP sentiment`,rows,cols);
+}
+
 
 function renderCare(){
   const rows=filtT(); const s=sumT(rows); const bc=brComp(rows);
@@ -5110,13 +5257,220 @@ function renderCare(){
   }});
 }
 
+// ══════════════════ SCHOOL TRANSPORT ══════════════════
+const TR_BRANCHES=['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam'];
+function _trData(){ return (window._TRANSPORT&&typeof window._TRANSPORT==='object')?window._TRANSPORT:{vehicles:[],routes:[],students:[],mileage:[],repair:[]}; }
+function _trFilt(arr){ return (arr||[]).filter(r=>fBranch==='ALL'||r.Branch===fBranch); }
+function _trExpiring(v){ // expiring within 30 days, already expired, or Compliance flagged
+  const d=v.DaysToExpiry; if(typeof d==='number'&&d<=30) return true;
+  return /expir/i.test(String(v.Compliance||''));
+}
+function renderTransport(){
+  const T=_trData();
+  const bl=fBranch==='ALL'?'All Branches':fBranch;
+  const tag=document.getElementById('tr-tag'); if(tag)tag.textContent='Fleet · Routes · Occupancy · Compliance';
+  const fn=document.getElementById('tr-fn'); if(fn)fn.textContent=bl;
+  if(!document.getElementById('tr-veh')) return;
+
+  const vehicles=_trFilt(T.vehicles), students=_trFilt(T.students), routes=_trFilt(T.routes), mileage=_trFilt(T.mileage), repair=_trFilt(T.repair);
+  if(!vehicles.length && !students.length && !routes.length){
+    ['tr-veh','tr-stu','tr-occ','tr-exp','tr-mil'].forEach(id=>setTxt(id,'–'));
+    const fb=document.getElementById('tr-fleet-tbody'); if(fb)fb.innerHTML='<tr><td colspan="6" class="no-data">Transport sheets not added yet — add Transport_Vehicle / _Route / _Student / _Mileage / _Repair.</td></tr>';
+    ['tr-branch-occ','tr-route-occ','tr-compliance','tr-repair'].forEach(id=>{const e=document.getElementById(id); if(e)mkChart(id,{type:'bar',data:{labels:[],datasets:[]},options:{responsive:true,maintainAspectRatio:true}});});
+    return;
+  }
+  const seats=vehicles.reduce((s,v)=>s+(+v.Seats||0),0);
+  const routeRiders=routes.reduce((s,r)=>s+(+r.ActiveRiders||0),0);
+  const riders=routeRiders>0?routeRiders:students.length;
+  const occ=seats>0?Math.round(riders/seats*100):0;
+  const expiring=vehicles.filter(_trExpiring).length;
+  const mils=mileage.map(m=>+m.Mileage).filter(v=>!isNaN(v)&&v>0);
+  const avgMil=mils.length?+(mils.reduce((a,c)=>a+c,0)/mils.length).toFixed(1):null;
+
+  setTxt('tr-veh',fi(vehicles.length));
+  setTxt('tr-veh-s',(vehicles.filter(v=>/active/i.test(v.Status)).length||vehicles.length)+' active · click to view');
+  setTxt('tr-stu',fi(students.length));
+  setTxt('tr-occ',occ+'%');
+  setTxt('tr-occ-s',fi(riders)+' riders ÷ '+fi(seats)+' seats');
+  setTxt('tr-exp',fi(expiring));
+  setTxt('tr-mil',avgMil!=null?avgMil:'–');
+
+  // Branch occupancy — riders vs seats
+  const scope=fBranch==='ALL'?TR_BRANCHES:[fBranch];
+  const bSeats={},bRiders={};
+  scope.forEach(b=>{ bSeats[b]=(T.vehicles||[]).filter(v=>v.Branch===b).reduce((s,v)=>s+(+v.Seats||0),0);
+    const rr=(T.routes||[]).filter(r=>r.Branch===b).reduce((s,r)=>s+(+r.ActiveRiders||0),0);
+    bRiders[b]=rr>0?rr:(T.students||[]).filter(s=>s.Branch===b).length; });
+  const boLabels=scope.filter(b=>bSeats[b]||bRiders[b]);
+  window._TR_BRANCH_OCC=boLabels;
+  mkChart('tr-branch-occ',{type:'bar',data:{labels:boLabels,datasets:[
+    {label:'Seats',data:boLabels.map(b=>bSeats[b]),backgroundColor:'#CBD5E1',borderRadius:4},
+    {label:'Riders',data:boLabels.map(b=>bRiders[b]),backgroundColor:'#1E4FD8',borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:true,onClick:(e,el)=>{if(el&&el.length)viewTransport('students',boLabels[el[0].index]);},
+      plugins:{legend:{display:true,position:'bottom',labels:{font:{size:10},usePointStyle:true}},datalabels:{display:false}},
+      scales:{y:{beginAtZero:true,grid:{color:'#E0E8FF'}},x:{grid:{display:false}}}}});
+
+  // Route occupancy — top by occupancy%
+  const rsorted=routes.map(r=>({...r,occv:(+r.Occupancy|| (r.Capacity>0?Math.round((+r.ActiveRiders||0)/r.Capacity*100):0))}))
+    .filter(r=>r.occv>0).sort((a,b)=>b.occv-a.occv).slice(0,12);
+  window._TR_ROUTES=rsorted;
+  mkChart('tr-route-occ',{type:'bar',data:{labels:rsorted.map(r=>(r.Branch.slice(0,3))+' '+r.Route),
+    datasets:[{label:'Occupancy %',data:rsorted.map(r=>r.occv),
+      backgroundColor:rsorted.map(r=>r.occv>100?'#DC2626':r.occv>=85?'#059669':r.occv>=60?'#D97706':'#93C5FD'),borderRadius:4,maxBarThickness:26}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:true,
+      plugins:{legend:{display:false},datalabels:{display:true,clip:false,anchor:'end',align:'right',offset:3,color:'#0F172A',font:{size:10,weight:'bold'},formatter:v=>v+'%'},
+        tooltip:{callbacks:{label:c=>{const r=rsorted[c.dataIndex];return r.occv+'% · '+(r.ActiveRiders||0)+'/'+(r.Capacity||'?')+' · '+r.Vehicle;}}}},
+      layout:{padding:{right:34}},scales:{x:{beginAtZero:true,grid:{color:'#E0E8FF'}},y:{grid:{display:false},ticks:{font:{size:10}}}}}});
+
+  // Fleet compliance
+  const okC=vehicles.filter(v=>/^ok/i.test(String(v.Compliance||''))).length;
+  const expC=vehicles.filter(v=>/expir/i.test(String(v.Compliance||''))).length;
+  const otherC=vehicles.length-okC-expC;
+  mkChart('tr-compliance',{type:'doughnut',data:{labels:['OK','Expired','Other/Unknown'],
+    datasets:[{data:[okC,expC,otherC],backgroundColor:['#059669','#DC2626','#CBD5E1'],borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:true,cutout:'58%',onClick:(e,el)=>{if(el&&el.length){viewTransport(el[0].index===1?'expired':el[0].index===0?'okdocs':'vehicles');}},
+      plugins:{legend:{position:'bottom',labels:{font:{size:10.5},usePointStyle:true,padding:10}},
+        datalabels:{display:true,color:'#fff',font:{weight:'bold',size:12},formatter:v=>v>0?v:''}}}});
+
+  // Maintenance cost by branch
+  const bCost={}; scope.forEach(b=>bCost[b]=(T.repair||[]).filter(r=>r.Branch===b).reduce((s,r)=>s+(+r.Cost||0),0));
+  const cLabels=scope.filter(b=>bCost[b]>0);
+  window._TR_COSTB=cLabels;
+  mkChart('tr-repair',{type:'bar',data:{labels:cLabels,datasets:[{label:'₹ Maintenance',data:cLabels.map(b=>bCost[b]),backgroundColor:'#7C3AED',borderRadius:5,maxBarThickness:46}]},
+    options:{responsive:true,maintainAspectRatio:true,onClick:(e,el)=>{if(el&&el.length)viewTransport('repair',cLabels[el[0].index]);},
+      plugins:{legend:{display:false},datalabels:{display:true,anchor:'end',align:'top',color:'#0F172A',font:{size:10,weight:'bold'},formatter:v=>'₹'+(v>=100000?(v/100000).toFixed(1)+'L':v>=1000?(v/1000).toFixed(0)+'k':v)}},
+      layout:{padding:{top:18}},scales:{y:{beginAtZero:true,grid:{color:'#E0E8FF'},ticks:{callback:v=>v>=1000?(v/1000)+'k':v}},x:{grid:{display:false}}}}});
+
+  // Fleet register table
+  const fb=document.getElementById('tr-fleet-tbody');
+  if(fb){
+    fb.innerHTML=boLabels.map(b=>{
+      const bv=(T.vehicles||[]).filter(v=>v.Branch===b);
+      const s=bSeats[b], r=bRiders[b]; const o=s>0?Math.round(r/s*100):0;
+      const exp=bv.filter(_trExpiring).length;
+      const oc=o>100?'#DC2626':o>=85?'#059669':o>=60?'#D97706':'#64748B';
+      return `<tr style="cursor:pointer" onclick="viewTransport('vehicles','${b}')">
+        <td style="padding:8px 10px;border-bottom:1px solid #F1F5F9;"><span class="bd b${b}"></span> <strong>${b}</strong></td>
+        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${fi(bv.length)}</td>
+        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${fi(s)}</td>
+        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${fi(r)}</td>
+        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;font-weight:700;color:${oc}">${o}%</td>
+        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${exp>0?'<span style="color:#DC2626;font-weight:700;">'+exp+'</span>':'0'}</td></tr>`;
+    }).join('')||'<tr><td colspan="6" class="no-data">No data</td></tr>';
+  }
+}
+function viewTransport(kind,branch){
+  const T=_trData(); const bf=r=>(!branch)?(fBranch==='ALL'||r.Branch===fBranch):(r.Branch===branch);
+  let rows,cols,title;
+  if(kind==='students'){
+    rows=(T.students||[]).filter(bf);
+    cols=[{key:'Branch',label:'Branch'},{key:'Student',label:'Student',maxW:'170px'},{key:'Class',label:'Class'},{key:'Route',label:'Route'},{key:'VehicleNo',label:'Vehicle'},{key:'Distance',label:'Distance'},{key:'RiderType',label:'Rider Type'},{key:'Status',label:'Status'}];
+    title='🎒 Transport Students';
+  } else if(kind==='repair'){
+    rows=(T.repair||[]).filter(bf);
+    cols=[{key:'Branch',label:'Branch'},{key:'Date',label:'Date',date:true},{key:'VehicleNo',label:'Vehicle'},{key:'Type',label:'Type'},{key:'Work',label:'Work',maxW:'220px'},{key:'Vendor',label:'Vendor'},{key:'Cost',label:'Cost ₹'},{key:'Status',label:'Status',pill:true}];
+    title='🔧 Maintenance Records';
+  } else if(kind==='expiring'||kind==='expired'){
+    rows=(T.vehicles||[]).filter(bf).filter(kind==='expired'?(v=>/expir/i.test(String(v.Compliance||''))):_trExpiring);
+    cols=_TR_VCOLS(); title='⚠️ Vehicles — Documents Expiring/Expired';
+  } else if(kind==='okdocs'){
+    rows=(T.vehicles||[]).filter(bf).filter(v=>/^ok/i.test(String(v.Compliance||'')));
+    cols=_TR_VCOLS(); title='🛡️ Vehicles — Compliant';
+  } else {
+    rows=(T.vehicles||[]).filter(bf);
+    cols=_TR_VCOLS(); title='🚌 Fleet — Vehicles';
+  }
+  const bl=branch||(fBranch==='ALL'?'All Branches':fBranch);
+  openModal(title,`${rows.length} record(s) · ${bl}`,rows,cols);
+}
+function _TR_VCOLS(){ return [{key:'Branch',label:'Branch'},{key:'VehicleNo',label:'Vehicle No'},{key:'Category',label:'Type'},{key:'Seats',label:'Seats'},{key:'Fuel',label:'Fuel'},{key:'Driver',label:'Driver',maxW:'150px'},{key:'GPS',label:'GPS'},{key:'Compliance',label:'Compliance',pill:true},{key:'DaysToExpiry',label:'Days To Expiry'},{key:'EarliestDocExp',label:'Earliest Doc Exp',date:true}]; }
+
+// ══════════════════ IT REPORT ══════════════════
+function _itData(){ return (window._IT&&typeof window._IT==='object')?window._IT:{assets:[],health:[]}; }
+function renderIT(){
+  const D=_itData();
+  const bl=fBranch==='ALL'?'All Branches':fBranch;
+  const fn=document.getElementById('it-fn'); if(fn)fn.textContent=bl;
+  if(!document.getElementById('it-total')) return;
+  const health=(D.health||[]).filter(r=>fBranch==='ALL'||r.Branch===fBranch);
+  const assets=(D.assets||[]).filter(r=>fBranch==='ALL'||r.Branch===fBranch);
+  const src=health.length?health:assets;   // prefer the health snapshot
+  if(!src.length){
+    ['it-total','it-health','it-down','it-pend'].forEach(id=>setTxt(id,'–'));
+    const tb=document.getElementById('it-tbody'); if(tb)tb.innerHTML='<tr><td colspan="6" class="no-data">IT sheets not added yet — add "IT Assets" and "IT Data".</td></tr>';
+    ['it-branch','it-system'].forEach(id=>{const e=document.getElementById(id); if(e)mkChart(id,{type:'bar',data:{labels:[],datasets:[]},options:{responsive:true,maintainAspectRatio:true}});});
+    return;
+  }
+  const total=src.reduce((s,r)=>s+(+r.Total||0),0);
+  const working=health.reduce((s,r)=>s+(+r.Working||0),0);
+  const down=health.reduce((s,r)=>s+(+r.NotWorking||0),0);
+  const pend=health.reduce((s,r)=>s+(+r.Pending||0),0);
+  const healthPct=total>0?Math.round(working/total*100):(health.length?Math.round(health.reduce((s,r)=>s+(+r.Health||0),0)/health.length):0);
+  setTxt('it-total',fi(total));
+  setTxt('it-health',healthPct+'%');
+  setTxt('it-down',fi(down));
+  setTxt('it-pend',fi(pend));
+
+  // Assets by branch
+  const scope=fBranch==='ALL'?['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam']:[fBranch];
+  const bTot={}; scope.forEach(b=>bTot[b]=(health.length?D.health:D.assets).filter(r=>r.Branch===b).reduce((s,r)=>s+(+r.Total||0),0));
+  const bLabels=scope.filter(b=>bTot[b]>0);
+  window._IT_BRANCHES=bLabels;
+  mkChart('it-branch',{type:'bar',data:{labels:bLabels,datasets:[{label:'Assets',data:bLabels.map(b=>bTot[b]),backgroundColor:'#1E4FD8',borderRadius:5,maxBarThickness:46}]},
+    options:{responsive:true,maintainAspectRatio:true,onClick:(e,el)=>{if(el&&el.length)viewIT('branch',bLabels[el[0].index]);},
+      plugins:{legend:{display:false},datalabels:{display:true,anchor:'end',align:'top',color:'#0F172A',font:{size:11,weight:'bold'},formatter:v=>fi(v)}},
+      layout:{padding:{top:18}},scales:{y:{beginAtZero:true,grid:{color:'#E0E8FF'}},x:{grid:{display:false}}}}});
+
+  // System health — top systems working/down/pending (stacked)
+  const bySys={};
+  (health.length?health:assets).forEach(r=>{ const k=r.System||'–'; if(!bySys[k])bySys[k]={t:0,w:0,d:0,p:0}; bySys[k].t+=(+r.Total||0); bySys[k].w+=(+r.Working||0); bySys[k].d+=(+r.NotWorking||0); bySys[k].p+=(+r.Pending||0); });
+  const sysTop=Object.entries(bySys).sort((a,b)=>b[1].t-a[1].t).slice(0,10);
+  mkChart('it-system',{type:'bar',data:{labels:sysTop.map(s=>s[0]),datasets:[
+    {label:'Working',data:sysTop.map(s=>s[1].w),backgroundColor:'#059669'},
+    {label:'Down',data:sysTop.map(s=>s[1].d),backgroundColor:'#DC2626'},
+    {label:'Pending',data:sysTop.map(s=>s[1].p),backgroundColor:'#F59E0B'}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:true,
+      plugins:{legend:{position:'bottom',labels:{font:{size:10},usePointStyle:true}},datalabels:{display:false}},
+      scales:{x:{stacked:true,beginAtZero:true,grid:{color:'#E0E8FF'}},y:{stacked:true,grid:{display:false},ticks:{font:{size:10}}}}}});
+
+  // Lowest-health systems table
+  const tb=document.getElementById('it-tbody');
+  if(tb){
+    const rows=(health.length?health:assets).map(r=>({...r,hp:(+r.Total>0&&r.Working!=null)?Math.round((+r.Working)/(+r.Total)*100):(+r.Health||0)}))
+      .filter(r=>+r.Total>0).sort((a,b)=>a.hp-b.hp).slice(0,12);
+    tb.innerHTML=rows.map(r=>{
+      const hc=r.hp>=90?'#059669':r.hp>=70?'#D97706':'#DC2626';
+      return `<tr><td style="padding:8px 10px;border-bottom:1px solid #F1F5F9;"><span class="bd b${r.Branch}"></span> ${r.Branch}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #F1F5F9;">${r.System}</td>
+        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${fi(+r.Total||0)}</td>
+        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;color:#059669;">${fi(+r.Working||0)}</td>
+        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;color:#DC2626;">${fi(+r.NotWorking||0)}</td>
+        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;font-weight:700;color:${hc}">${r.hp}%</td></tr>`;
+    }).join('')||'<tr><td colspan="6" class="no-data">No data</td></tr>';
+  }
+}
+function viewIT(kind,branch){
+  const D=_itData(); const health=D.health||[]; const assets=D.assets||[];
+  const base=(health.length?health:assets);
+  const bf=r=>(!branch)?(fBranch==='ALL'||r.Branch===fBranch):(r.Branch===branch);
+  let rows=base.filter(bf);
+  if(kind==='down') rows=rows.filter(r=>(+r.NotWorking||0)>0);
+  else if(kind==='pending') rows=rows.filter(r=>(+r.Pending||0)>0);
+  const cols=[{key:'Branch',label:'Branch'},{key:'System',label:'System'},{key:'Total',label:'Total'},{key:'Working',label:'Working'},{key:'NotWorking',label:'Not Working'},{key:'Pending',label:'Pending'},{key:'Health',label:'Health %'},{key:'Remarks',label:'Remarks',maxW:'240px'}];
+  const bl=branch||(fBranch==='ALL'?'All Branches':fBranch);
+  const title=kind==='down'?'🔴 Not-Working Assets':kind==='pending'?'⏳ Pending Assets':'🖥️ IT Assets';
+  openModal(title,`${rows.length} system record(s) · ${bl}`,rows,cols);
+}
+
+
 function _origRenderAll(){
   // Each render is isolated: if one throws on unexpected live data, the rest still render.
   const steps=[
-    ['Overview',renderOverview],['GrievanceOfficer',renderGrievanceOfficer],['Rankings',renderRankings],['Insights',renderInsights],
+    ['Overview',renderOverview],['GrievanceOfficer',renderGrievanceOfficer],['HR',renderHR],['Rankings',renderRankings],['Insights',renderInsights],
     ['Care',renderCare],['Observations',renderObservations],['Admin',renderAdmin],
-    ['Vigilance',renderVigilance],['Purchase',renderPurchase],['HR',renderHR],
-    ['Admissions',renderAdmissions],['AVIS',renderAVIS],['Grievance',renderGrievance]
+    ['Vigilance',renderVigilance],['Purchase',renderPurchase],
+    ['Admissions',renderAdmissions],['AVIS',renderAVIS],['Grievance',renderGrievance],
+    ['Transport',renderTransport],['IT',renderIT]
   ];
   steps.forEach(function(s){
     try{ s[1](); }
