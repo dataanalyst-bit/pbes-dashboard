@@ -1325,6 +1325,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Docs Expiring</th>
       </tr></thead><tbody id="tr-fleet-tbody"></tbody></table></div>
   </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <div class="ch"><h3>🗺️ Route-wise Complete Report</h3><span class="fnote">Select a route to view vehicle, driver &amp; attender, documents, and all riders</span></div>
+    <div class="cb" style="padding:14px 18px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+        <label style="font-size:12px;font-weight:700;color:#475569;">ROUTE</label>
+        <select id="tr-route-sel" onchange="viewTransportRoute(this.value)" style="padding:8px 12px;border:1.5px solid #E0E8FF;border-radius:8px;font-size:12.5px;font-family:Inter,sans-serif;min-width:280px;background:#fff;cursor:pointer;">
+          <option value="">— Select a route —</option>
+        </select>
+      </div>
+      <div id="tr-route-report"><div class="no-data" style="padding:16px;">Choose a route above to see its full report.</div></div>
+    </div>
+  </div>
 </div>
 
 <!-- ═══ IT REPORT ═══ -->
@@ -1337,6 +1350,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="kc green"><div class="kc-ico">✅</div><div class="kc-lbl">Avg Health</div><div class="kc-val" id="it-health">–</div><div class="kc-sub" id="it-health-s">Working ÷ total</div></div>
     <div class="kc red clickable" onclick="viewIT('down')" title="Click to view not-working assets"><div class="kc-ico">🔴</div><div class="kc-lbl">Not Working</div><div class="kc-val" id="it-down">–</div><div class="kc-sub">Needs repair · click to view</div></div>
     <div class="kc amber clickable" onclick="viewIT('pending')" title="Click to view pending assets"><div class="kc-ico">⏳</div><div class="kc-lbl">Pending</div><div class="kc-val" id="it-pend">–</div><div class="kc-sub">Awaiting action · click to view</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <div class="cb" style="padding:12px 18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+      <div id="it-logo" style="width:64px;height:64px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;"></div>
+      <div style="flex:1;min-width:220px;">
+        <div style="font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;">System Category</div>
+        <select id="it-sys-sel" onchange="renderIT()" style="padding:9px 14px;border:1.5px solid #E0E8FF;border-radius:9px;font-size:13px;font-weight:600;font-family:Inter,sans-serif;min-width:260px;background:#fff;cursor:pointer;">
+          <option value="ALL">All Systems</option>
+        </select>
+      </div>
+      <div id="it-sys-summary" style="font-size:12px;color:#334155;text-align:right;min-width:200px;"></div>
+    </div>
   </div>
   <div class="row r2">
     <div class="card"><div class="ch"><h3>🏫 Assets by Branch</h3><span class="fnote">Click a bar to view that branch's assets</span></div><div class="cb"><div class="cw tall"><canvas id="it-branch"></canvas></div></div></div>
@@ -5440,47 +5466,183 @@ function renderTransport(){
         <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${exp>0?'<span style="color:#DC2626;font-weight:700;">'+exp+'</span>':'0'}</td></tr>`;
     }).join('')||'<tr><td colspan="6" class="no-data">No data</td></tr>';
   }
+
+  // Populate the Route-wise dropdown (respects branch filter)
+  const rsel=document.getElementById('tr-route-sel');
+  if(rsel){
+    const rlist=(T.routes||[]).filter(r=>fBranch==='ALL'||r.Branch===fBranch)
+      .slice().sort((a,b)=>String(a.Branch).localeCompare(b.Branch)||String(a.Route).localeCompare(String(b.Route),undefined,{numeric:true}));
+    const cur=rsel.value;
+    rsel.innerHTML='<option value="">— Select a route —</option>'+rlist.map((r)=>{
+      const key=r.Branch+'||'+r.Route;
+      return `<option value="${_escAttr(key)}">${r.Branch} · ${r.Route}${r.Vehicle&&r.Vehicle!=='–'?(' ('+r.Vehicle+')'):''}</option>`;
+    }).join('');
+    if(cur && [...rsel.options].some(o=>o.value===cur)){ rsel.value=cur; } else { const rr=document.getElementById('tr-route-report'); if(rr)rr.innerHTML='<div class="no-data" style="padding:16px;">Choose a route above to see its full report.</div>'; }
+  }
 }
+// Complete route report: route/occupancy + vehicle + driver/attender + documents + riders
+function viewTransportRoute(key){
+  const box=document.getElementById('tr-route-report'); if(!box)return;
+  if(!key){ box.innerHTML='<div class="no-data" style="padding:16px;">Choose a route above to see its full report.</div>'; return; }
+  const T=_trData();
+  const parts=key.split('||'); const br=parts[0], rt=parts[1];
+  const route=(T.routes||[]).find(r=>r.Branch===br&&String(r.Route)===String(rt))||{};
+  let veh=(T.vehicles||[]).find(v=>v.Branch===br && route.Vehicle && v.VehicleNo===route.Vehicle);
+  if(!veh) veh=(T.vehicles||[]).find(v=>v.Branch===br && String(v.RouteNo)===String(rt));
+  const riders=(T.students||[]).filter(s=>s.Branch===br && String(s.Route)===String(rt));
+  const occ=route.Capacity>0?Math.round((route.ActiveRiders||riders.length||0)/route.Capacity*100):(veh&&veh.Seats?Math.round(riders.length/veh.Seats*100):0);
+  const oc=occ>100?'#DC2626':occ>=85?'#059669':occ>=60?'#D97706':'#64748B';
+  const card=(t,inner,accent)=>`<div style="flex:1;min-width:270px;background:#fff;border:1px solid #E0E8FF;border-left:3px solid ${accent||'#1E4FD8'};border-radius:9px;padding:12px 14px;"><div style="font-weight:800;font-size:12px;color:${accent||'#1E4FD8'};text-transform:uppercase;margin-bottom:8px;">${t}</div>${inner}</div>`;
+  const F=(l,val)=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px dashed #EEF2F7;"><span style="color:#64748B;font-size:11px;">${l}</span><span style="color:#0F172A;font-size:11.5px;font-weight:600;text-align:right;">${(val===undefined||val===null||val===''||val==='–')?'–':val}</span></div>`;
+  const D=x=>(x&&x!=='–'&&typeof fmtDispDate==='function')?fmtDispDate(x):(x||'–');
+  const v=veh||{};
+  let h='<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;padding:10px 14px;background:linear-gradient(135deg,#EEF2FF,#F0FDFA);border-radius:9px;">'
+    +`<div style="font-weight:800;font-size:15px;color:#0F172A;"><span class="bd b${br}"></span> ${br} · ${rt}</div>`
+    +`<div style="font-size:12px;color:#475569;">Vehicle <strong>${v.VehicleNo||route.Vehicle||'–'}</strong> · Riders <strong>${fi(riders.length)}</strong> · Capacity <strong>${v.Seats||route.Capacity||'–'}</strong> · Occupancy <strong style="color:${oc}">${occ}%</strong></div></div>`;
+  if(route.Areas&&route.Areas!=='–') h+='<div style="font-size:11.5px;color:#475569;margin-bottom:10px;">🛣️ <strong>Stops:</strong> '+route.Areas+'</div>';
+  h+='<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;">'
+    +card('Vehicle', F('Vehicle No',v.VehicleNo)+F('Category',v.Category)+F('Make',v.Make)+F('Fuel',v.Fuel)+F('AC',v.AC)+F('Seats',v.Seats)+F('GPS',v.GPS)+F('Engine No',v.EngineNo)+F('Chassis No',v.ChassisNo)+F('Status',v.Status),'#1E4FD8')
+    +card('Driver & Attender', F('Driver',v.Driver)+F('Driver Contact',v.DriverContact)+F('Driver Licence',v.DriverLicence)+F('Heavy Licence Exp',D(v.HeavyLicenceExp))+F('Attender',v.Attender)+F('Attender Contact',v.AttenderContact),'#059669')
+    +card('Documents & Compliance', F('Compliance',v.Compliance)+F('Days To Expiry',v.DaysToExpiry)+F('Insurance Exp',D(v.InsuranceExp))+F('Permit Exp',D(v.PermitExp))+F('Fitness Exp',D(v.FitnessExp))+F('PUC Exp',D(v.PucExp))+F('Road Tax Exp',D(v.RoadTaxExp))+F('Labour Cert Exp',D(v.LabourCertExp))+F('RC',v.RC),'#DC2626')
+    +'</div>';
+  const rcols=[{key:'Student',label:'Student',maxW:'180px'},{key:'Class',label:'Class'},{key:'Section',label:'Section'},{key:'Distance',label:'Distance'},{key:'RiderType',label:'Rider Type'},{key:'Status',label:'Status'}];
+  h+='<div style="font-weight:800;font-size:12.5px;color:#0F172A;margin:4px 0 6px;">🎒 Riders on this route ('+riders.length+')</div>'+_accTable(riders,rcols);
+  box.innerHTML=h;
+}
+const _TR_ALLB2=['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam'];
 function viewTransport(kind,branch){
   const T=_trData(); const bf=r=>(!branch)?(fBranch==='ALL'||r.Branch===fBranch):(r.Branch===branch);
-  let rows,cols,title;
+  const scope=branch?[branch]:(fBranch==='ALL'?_TR_ALLB:[fBranch]);
+
   if(kind==='students'){
-    rows=(T.students||[]).filter(bf);
-    cols=[{key:'Branch',label:'Branch'},{key:'Student',label:'Student',maxW:'170px'},{key:'Class',label:'Class'},{key:'Route',label:'Route'},{key:'VehicleNo',label:'Vehicle'},{key:'Distance',label:'Distance'},{key:'RiderType',label:'Rider Type'},{key:'Status',label:'Status'}];
-    title='🎒 Transport Students';
-  } else if(kind==='repair'){
-    rows=(T.repair||[]).filter(bf);
-    cols=[{key:'Branch',label:'Branch'},{key:'Date',label:'Date',date:true},{key:'VehicleNo',label:'Vehicle'},{key:'Type',label:'Type'},{key:'Work',label:'Work',maxW:'220px'},{key:'Vendor',label:'Vendor'},{key:'Cost',label:'Cost ₹'},{key:'Status',label:'Status',pill:true}];
-    title='🔧 Maintenance Records';
-  } else if(kind==='expiring'||kind==='expired'){
-    rows=(T.vehicles||[]).filter(bf).filter(kind==='expired'?(v=>/expir/i.test(String(v.Compliance||''))):_trExpiring);
-    cols=_TR_VCOLS(); title='⚠️ Vehicles — Documents Expiring/Expired';
-  } else if(kind==='okdocs'){
-    rows=(T.vehicles||[]).filter(bf).filter(v=>/^ok/i.test(String(v.Compliance||'')));
-    cols=_TR_VCOLS(); title='🛡️ Vehicles — Compliant';
-  } else {
-    rows=(T.vehicles||[]).filter(bf);
-    cols=_TR_VCOLS(); title='🚌 Fleet — Vehicles';
+    // Branch-wise total riders count with expand dropdown to view all riders
+    const cols=[{key:'Student',label:'Student',maxW:'180px'},{key:'Class',label:'Class'},{key:'Section',label:'Section'},{key:'Route',label:'Route'},{key:'VehicleNo',label:'Vehicle'},{key:'Distance',label:'Distance'},{key:'RiderType',label:'Rider Type'},{key:'Status',label:'Status'}];
+    const groups=scope.map(b=>{const rows=(T.students||[]).filter(r=>r.Branch===b);return {key:b,count:rows.length,rows:rows};});
+    openBranchAccordion('🎒 Transport Students — Branch-wise Riders','Riders per branch · expand to view all riders',groups,cols,'riders');
+    return;
   }
-  const bl=branch||(fBranch==='ALL'?'All Branches':fBranch);
-  openModal(title,`${rows.length} record(s) · ${bl}`,rows,cols);
+  if(kind==='vehicles'||kind==='fleet'){
+    // Branch-wise total vehicles count with expand dropdown to view all vehicles
+    const cols=[{key:'VehicleNo',label:'Vehicle No'},{key:'Category',label:'Type'},{key:'Make',label:'Make'},{key:'Seats',label:'Seats'},{key:'Fuel',label:'Fuel'},{key:'AC',label:'AC'},{key:'Driver',label:'Driver',maxW:'150px'},{key:'GPS',label:'GPS'},{key:'Status',label:'Status'},{key:'Compliance',label:'Compliance'}];
+    const groups=scope.map(b=>{const rows=(T.vehicles||[]).filter(r=>r.Branch===b);return {key:b,count:rows.length,rows:rows};});
+    openBranchAccordion('🚌 Total Vehicles — Branch-wise Fleet','Vehicles per branch · expand to view all vehicles',groups,cols,'vehicles');
+    return;
+  }
+  if(kind==='expiring'||kind==='expired'){
+    // Per-vehicle expand dropdown showing ALL Vehicle_Master details
+    const rows=(T.vehicles||[]).filter(bf).filter(kind==='expired'?(v=>/expir/i.test(String(v.Compliance||''))):_trExpiring)
+      .sort((a,b)=>(a.DaysToExpiry==null?1e9:a.DaysToExpiry)-(b.DaysToExpiry==null?1e9:b.DaysToExpiry));
+    let h='<div style="font-size:12px;color:#334155;margin-bottom:10px;"><strong>'+rows.length+'</strong> vehicle(s) with documents expiring/expired. Click a vehicle to see every Vehicle_Master detail.</div>';
+    rows.forEach((v,i)=>{
+      const id='veh_'+i+'_'+Math.random().toString(36).slice(2,7);
+      const dcol=(v.DaysToExpiry==null)?'#94A3B8':(v.DaysToExpiry<0?'#DC2626':v.DaysToExpiry<=15?'#DC2626':v.DaysToExpiry<=30?'#D97706':'#059669');
+      const dtxt=(v.DaysToExpiry==null)?'–':(v.DaysToExpiry<0?Math.abs(v.DaysToExpiry)+'d overdue':v.DaysToExpiry+'d left');
+      h+=`<div style="border:1px solid #FECACA;border-radius:9px;margin-bottom:8px;overflow:hidden;">
+        <div onclick="toggleAcc('${id}',this)" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#FEF2F2;">
+          <div style="font-weight:800;font-size:13px;color:#0F172A;"><span class="acc-caret" style="color:#DC2626;margin-right:6px;">▸</span><span class="bd b${v.Branch}"></span> ${v.VehicleNo} <small style="color:#64748B;font-weight:600;">· ${v.Branch} · ${v.Category}</small></div>
+          <div style="font-weight:800;font-size:12.5px;color:${dcol};">${dtxt} <small style="color:#94A3B8;">${v.Compliance||''}</small></div>
+        </div>
+        <div id="${id}" style="display:none;padding:12px 14px;background:#fff;">${_vehicleDetailHTML(v)}</div>
+      </div>`;
+    });
+    openHTMLModal('⚠️ Documents Expiring / Expired', (branch||(fBranch==='ALL'?'All Branches':fBranch)), h);
+    return;
+  }
+  if(kind==='okdocs'){
+    const rows=(T.vehicles||[]).filter(bf).filter(v=>/^ok/i.test(String(v.Compliance||'')));
+    openModal('🛡️ Vehicles — Compliant',`${rows.length} vehicle(s)`,rows,_TR_VCOLS());
+    return;
+  }
+  if(kind==='repair'){
+    const rows=(T.repair||[]).filter(bf);
+    const cols=[{key:'Branch',label:'Branch'},{key:'Date',label:'Date',date:true},{key:'VehicleNo',label:'Vehicle'},{key:'Type',label:'Type'},{key:'Work',label:'Work',maxW:'220px'},{key:'Vendor',label:'Vendor'},{key:'Cost',label:'Cost ₹'},{key:'Status',label:'Status',pill:true}];
+    openModal('🔧 Maintenance Records',`${rows.length} record(s) · ${branch||(fBranch==='ALL'?'All Branches':fBranch)}`,rows,cols);
+    return;
+  }
+  const rows=(T.vehicles||[]).filter(bf);
+  openModal('🚌 Fleet — Vehicles',`${rows.length} vehicle(s)`,rows,_TR_VCOLS());
+}
+// Full detail grid for one vehicle (all Vehicle_Master fields).
+function _vehicleDetailHTML(v){
+  const F=(l,val)=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px dashed #EEF2F7;"><span style="color:#64748B;font-size:11px;">${l}</span><span style="color:#0F172A;font-size:11.5px;font-weight:600;text-align:right;">${(val===undefined||val===null||val===''||val==='–')?'–':val}</span></div>`;
+  const D=x=>(x&&x!=='–'&&typeof fmtDispDate==='function')?fmtDispDate(x):(x||'–');
+  const sec=(t,items)=>`<div style="flex:1;min-width:240px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px;"><div style="font-weight:800;font-size:11.5px;color:#1E4FD8;text-transform:uppercase;margin-bottom:6px;">${t}</div>${items}</div>`;
+  return '<div style="display:flex;flex-wrap:wrap;gap:10px;">'
+    +sec('Vehicle', F('Vehicle No',v.VehicleNo)+F('Vehicle ID',v.VehicleID)+F('Category',v.Category)+F('Make / Company',v.Make)+F('Fuel',v.Fuel)+F('AC / Non-AC',v.AC)+F('Seating',v.Seats)+F('Purchase Year',v.PurchaseYear)+F('Engine No',v.EngineNo)+F('Chassis No',v.ChassisNo)+F('GPS',v.GPS)+F('Status',v.Status)+F('Reg. Date',D(v.RegDate)))
+    +sec('Driver & Attender', F('Driver',v.Driver)+F('Driver Contact',v.DriverContact)+F('Driver Licence',v.DriverLicence)+F('Heavy Licence Exp',D(v.HeavyLicenceExp))+F('Driver Emp ID',v.DriverEmpId)+F('Attender',v.Attender)+F('Attender Contact',v.AttenderContact))
+    +sec('Documents & Compliance', F('Compliance',v.Compliance)+F('Days To Expiry',v.DaysToExpiry)+F('Earliest Doc Exp',D(v.EarliestDocExp))+F('RC',v.RC)+F('Insurance No',v.InsuranceNo)+F('Insurance Co',v.InsuranceCompany)+F('Insurance Exp',D(v.InsuranceExp))+F('Permit No',v.PermitNo)+F('Permit Exp',D(v.PermitExp))+F('Fitness No',v.FitnessNo)+F('Fitness Exp',D(v.FitnessExp))+F('PUC No',v.PucNo)+F('PUC Exp',D(v.PucExp))+F('Road Tax No',v.RoadTaxNo)+F('Road Tax Exp',D(v.RoadTaxExp))+F('Labour Cert No',v.LabourCertNo)+F('Labour Cert Exp',D(v.LabourCertExp)))
+    +sec('Safety & Service', F('Fire Extinguisher',v.FireExt)+F('Medical Kit',v.MedKit)+F('Tool Kit',v.ToolKit)+F('Spare Wheel',v.SpareWheel)+F('Last Service',D(v.LastServiceDate))+F('Last Service KM',v.LastServiceKM)+F('Next Service Due',D(v.NextServiceDue))+F('Next Service KM',v.NextServiceKM)+F('Service Vendor',v.ServiceVendor)+F('Remarks',v.Remarks))
+    +'</div>';
 }
 function _TR_VCOLS(){ return [{key:'Branch',label:'Branch'},{key:'VehicleNo',label:'Vehicle No'},{key:'Category',label:'Type'},{key:'Seats',label:'Seats'},{key:'Fuel',label:'Fuel'},{key:'Driver',label:'Driver',maxW:'150px'},{key:'GPS',label:'GPS'},{key:'Compliance',label:'Compliance',pill:true},{key:'DaysToExpiry',label:'Days To Expiry'},{key:'EarliestDocExp',label:'Earliest Doc Exp',date:true}]; }
 
 // ══════════════════ IT REPORT ══════════════════
 function _itData(){ return (window._IT&&typeof window._IT==='object')?window._IT:{assets:[],health:[]}; }
+// Animated SVG logo per system category (CSS keyframes injected once).
+function _itAnimStyle(){
+  if(document.getElementById('it-anim-style'))return;
+  const s=document.createElement('style'); s.id='it-anim-style';
+  s.textContent='@keyframes itpulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.12);opacity:.75}}'
+    +'@keyframes itspin{from{transform:rotate(0)}to{transform:rotate(360deg)}}'
+    +'@keyframes itblink{0%,100%{opacity:1}50%{opacity:.25}}'
+    +'.it-ic{width:56px;height:56px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:30px;box-shadow:0 6px 16px rgba(30,79,216,.18);}'
+    +'.it-ic.a1{animation:itpulse 1.8s ease-in-out infinite}.it-ic.a2{animation:itblink 1.6s ease-in-out infinite}.it-ic.a3{animation:itspin 6s linear infinite}';
+  document.head.appendChild(s);
+}
+function _itLogo(system){
+  const s=String(system||'').toLowerCase();
+  let emoji='🖥️',bg='linear-gradient(135deg,#EEF2FF,#DBEAFE)',anim='a1';
+  if(/cctv|camera/.test(s)){emoji='📹';bg='linear-gradient(135deg,#FEE2E2,#FECACA)';anim='a2';}
+  else if(/nvr|dvr/.test(s)){emoji='🎛️';bg='linear-gradient(135deg,#E0E7FF,#C7D2FE)';anim='a1';}
+  else if(/pa system|speaker|announce/.test(s)){emoji='📢';bg='linear-gradient(135deg,#FEF3C7,#FDE68A)';anim='a2';}
+  else if(/intercom|phone/.test(s)){emoji='☎️';bg='linear-gradient(135deg,#DCFCE7,#BBF7D0)';anim='a1';}
+  else if(/wifi|internet|network|switch|router/.test(s)){emoji='📶';bg='linear-gradient(135deg,#DBEAFE,#BFDBFE)';anim='a2';}
+  else if(/firewall|security/.test(s)){emoji='🛡️';bg='linear-gradient(135deg,#FEE2E2,#FCA5A5)';anim='a1';}
+  else if(/gps/.test(s)){emoji='🛰️';bg='linear-gradient(135deg,#E0E7FF,#A5B4FC)';anim='a3';}
+  else if(/smart board|ifp|projector/.test(s)){emoji='📽️';bg='linear-gradient(135deg,#F3E8FF,#E9D5FF)';anim='a1';}
+  else if(/computer|desktop|pc/.test(s)){emoji='🖥️';bg='linear-gradient(135deg,#EEF2FF,#DBEAFE)';anim='a1';}
+  else if(/laptop/.test(s)){emoji='💻';bg='linear-gradient(135deg,#EEF2FF,#DBEAFE)';anim='a1';}
+  else if(/printer/.test(s)){emoji='🖨️';bg='linear-gradient(135deg,#F1F5F9,#E2E8F0)';anim='a2';}
+  else if(/biometric|attendance/.test(s)){emoji='🫆';bg='linear-gradient(135deg,#DCFCE7,#A7F3D0)';anim='a1';}
+  else if(/email|erp|account|user/.test(s)){emoji='📧';bg='linear-gradient(135deg,#DBEAFE,#BFDBFE)';anim='a2';}
+  else if(/server/.test(s)){emoji='🗄️';bg='linear-gradient(135deg,#E2E8F0,#CBD5E1)';anim='a3';}
+  else if(/ups|power|battery/.test(s)){emoji='🔋';bg='linear-gradient(135deg,#DCFCE7,#BBF7D0)';anim='a2';}
+  else if(/all systems/.test(s)){emoji='🧩';bg='linear-gradient(135deg,#EEF2FF,#F0FDFA)';anim='a3';}
+  return `<div class="it-ic ${anim}" style="background:${bg}">${emoji}</div>`;
+}
 function renderIT(){
+  _itAnimStyle();
   const D=_itData();
   const bl=fBranch==='ALL'?'All Branches':fBranch;
   const fn=document.getElementById('it-fn'); if(fn)fn.textContent=bl;
   if(!document.getElementById('it-total')) return;
-  const health=(D.health||[]).filter(r=>fBranch==='ALL'||r.Branch===fBranch);
-  const assets=(D.assets||[]).filter(r=>fBranch==='ALL'||r.Branch===fBranch);
-  const src=health.length?health:assets;   // prefer the health snapshot
+  const healthAllSys=(D.health||[]).filter(r=>fBranch==='ALL'||r.Branch===fBranch);
+  const assetsAllSys=(D.assets||[]).filter(r=>fBranch==='ALL'||r.Branch===fBranch);
+  const baseAll=healthAllSys.length?healthAllSys:assetsAllSys;
+
+  // Populate the system-category dropdown from all systems present
+  const sel=document.getElementById('it-sys-sel');
+  const allSystems=[...new Set(baseAll.map(r=>r.System).filter(x=>x&&x!=='–'))].sort();
+  if(sel){
+    const cur=sel.value;
+    sel.innerHTML='<option value="ALL">All Systems</option>'+allSystems.map(s=>`<option value="${_escAttr(s)}">${s}</option>`).join('');
+    sel.value=(cur&&(cur==='ALL'||allSystems.includes(cur)))?cur:'ALL';
+  }
+  const sys=sel?sel.value:'ALL';
+  window._IT_SYS=sys;
+
+  // Update the animated logo + summary
+  const logoEl=document.getElementById('it-logo'); if(logoEl)logoEl.innerHTML=_itLogo(sys==='ALL'?'all systems':sys);
+
+  // Filter to the selected system
+  const health=(sys==='ALL')?healthAllSys:healthAllSys.filter(r=>r.System===sys);
+  const assets=(sys==='ALL')?assetsAllSys:assetsAllSys.filter(r=>r.System===sys);
+  const src=health.length?health:assets;
   if(!src.length){
     ['it-total','it-health','it-down','it-pend'].forEach(id=>setTxt(id,'–'));
-    const tb=document.getElementById('it-tbody'); if(tb)tb.innerHTML='<tr><td colspan="6" class="no-data">IT sheets not added yet — add "IT Assets" and "IT Data".</td></tr>';
+    const tb=document.getElementById('it-tbody'); if(tb)tb.innerHTML='<tr><td colspan="6" class="no-data">No IT data for this selection. (Add "IT Assets" &amp; "IT Data" sheets if empty.)</td></tr>';
     ['it-branch','it-system'].forEach(id=>{const e=document.getElementById(id); if(e)mkChart(id,{type:'bar',data:{labels:[],datasets:[]},options:{responsive:true,maintainAspectRatio:true}});});
+    const su=document.getElementById('it-sys-summary'); if(su)su.textContent='';
     return;
   }
   const total=src.reduce((s,r)=>s+(+r.Total||0),0);
@@ -5488,14 +5650,15 @@ function renderIT(){
   const down=health.reduce((s,r)=>s+(+r.NotWorking||0),0);
   const pend=health.reduce((s,r)=>s+(+r.Pending||0),0);
   const healthPct=total>0?Math.round(working/total*100):(health.length?Math.round(health.reduce((s,r)=>s+(+r.Health||0),0)/health.length):0);
-  setTxt('it-total',fi(total));
-  setTxt('it-health',healthPct+'%');
-  setTxt('it-down',fi(down));
-  setTxt('it-pend',fi(pend));
+  setTxt('it-total',fi(total)); setTxt('it-health',healthPct+'%'); setTxt('it-down',fi(down)); setTxt('it-pend',fi(pend));
+  const su=document.getElementById('it-sys-summary');
+  if(su)su.innerHTML=(sys==='ALL'?'<strong>'+allSystems.length+'</strong> system categories':'<strong>'+sys+'</strong>')
+    +' · <span style="color:#059669;font-weight:700;">'+healthPct+'% healthy</span>';
 
-  // Assets by branch
+  // Assets by branch (for the selected system) — click to view
   const scope=fBranch==='ALL'?['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam']:[fBranch];
-  const bTot={}; scope.forEach(b=>bTot[b]=(health.length?D.health:D.assets).filter(r=>r.Branch===b).reduce((s,r)=>s+(+r.Total||0),0));
+  const srcB=health.length?health:assets;
+  const bTot={}; scope.forEach(b=>bTot[b]=srcB.filter(r=>r.Branch===b).reduce((s,r)=>s+(+r.Total||0),0));
   const bLabels=scope.filter(b=>bTot[b]>0);
   window._IT_BRANCHES=bLabels;
   mkChart('it-branch',{type:'bar',data:{labels:bLabels,datasets:[{label:'Assets',data:bLabels.map(b=>bTot[b]),backgroundColor:'#1E4FD8',borderRadius:5,maxBarThickness:46}]},
@@ -5503,26 +5666,28 @@ function renderIT(){
       plugins:{legend:{display:false},datalabels:{display:true,anchor:'end',align:'top',color:'#0F172A',font:{size:11,weight:'bold'},formatter:v=>fi(v)}},
       layout:{padding:{top:18}},scales:{y:{beginAtZero:true,grid:{color:'#E0E8FF'}},x:{grid:{display:false}}}}});
 
-  // System health — top systems working/down/pending (stacked)
+  // System health — working/down/pending; click a bar to view that system's records
   const bySys={};
-  (health.length?health:assets).forEach(r=>{ const k=r.System||'–'; if(!bySys[k])bySys[k]={t:0,w:0,d:0,p:0}; bySys[k].t+=(+r.Total||0); bySys[k].w+=(+r.Working||0); bySys[k].d+=(+r.NotWorking||0); bySys[k].p+=(+r.Pending||0); });
-  const sysTop=Object.entries(bySys).sort((a,b)=>b[1].t-a[1].t).slice(0,10);
+  srcB.forEach(r=>{ const k=r.System||'–'; if(!bySys[k])bySys[k]={t:0,w:0,d:0,p:0}; bySys[k].t+=(+r.Total||0); bySys[k].w+=(+r.Working||0); bySys[k].d+=(+r.NotWorking||0); bySys[k].p+=(+r.Pending||0); });
+  const sysTop=Object.entries(bySys).sort((a,b)=>b[1].t-a[1].t).slice(0,12);
+  window._IT_SYSLABELS=sysTop.map(s=>s[0]);
   mkChart('it-system',{type:'bar',data:{labels:sysTop.map(s=>s[0]),datasets:[
     {label:'Working',data:sysTop.map(s=>s[1].w),backgroundColor:'#059669'},
     {label:'Down',data:sysTop.map(s=>s[1].d),backgroundColor:'#DC2626'},
     {label:'Pending',data:sysTop.map(s=>s[1].p),backgroundColor:'#F59E0B'}]},
-    options:{indexAxis:'y',responsive:true,maintainAspectRatio:true,
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:true,onClick:(e,el)=>{if(el&&el.length)viewIT('system',null,window._IT_SYSLABELS[el[0].index]);},
       plugins:{legend:{position:'bottom',labels:{font:{size:10},usePointStyle:true}},datalabels:{display:false}},
       scales:{x:{stacked:true,beginAtZero:true,grid:{color:'#E0E8FF'}},y:{stacked:true,grid:{display:false},ticks:{font:{size:10}}}}}});
 
-  // Lowest-health systems table
+  // Lowest-health systems table (click a row to view that branch+system record)
   const tb=document.getElementById('it-tbody');
   if(tb){
-    const rows=(health.length?health:assets).map(r=>({...r,hp:(+r.Total>0&&r.Working!=null)?Math.round((+r.Working)/(+r.Total)*100):(+r.Health||0)}))
-      .filter(r=>+r.Total>0).sort((a,b)=>a.hp-b.hp).slice(0,12);
+    const rows=srcB.map(r=>({...r,hp:(+r.Total>0&&r.Working!=null)?Math.round((+r.Working)/(+r.Total)*100):(+r.Health||0)}))
+      .filter(r=>+r.Total>0).sort((a,b)=>a.hp-b.hp).slice(0,14);
     tb.innerHTML=rows.map(r=>{
       const hc=r.hp>=90?'#059669':r.hp>=70?'#D97706':'#DC2626';
-      return `<tr><td style="padding:8px 10px;border-bottom:1px solid #F1F5F9;"><span class="bd b${r.Branch}"></span> ${r.Branch}</td>
+      return `<tr style="cursor:pointer" onclick="viewIT('system','${_escAttr(r.Branch)}','${_escAttr(r.System)}')">
+        <td style="padding:8px 10px;border-bottom:1px solid #F1F5F9;"><span class="bd b${r.Branch}"></span> ${r.Branch}</td>
         <td style="padding:8px 10px;border-bottom:1px solid #F1F5F9;">${r.System}</td>
         <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${fi(+r.Total||0)}</td>
         <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;color:#059669;">${fi(+r.Working||0)}</td>
@@ -5531,17 +5696,22 @@ function renderIT(){
     }).join('')||'<tr><td colspan="6" class="no-data">No data</td></tr>';
   }
 }
-function viewIT(kind,branch){
+function viewIT(kind,branch,system){
   const D=_itData(); const health=D.health||[]; const assets=D.assets||[];
   const base=(health.length?health:assets);
+  // Honor the currently-selected system category (dropdown) unless a specific system was clicked.
+  const selSys=(window._IT_SYS && window._IT_SYS!=='ALL')?window._IT_SYS:null;
+  const sysFilter=system||selSys||null;
   const bf=r=>(!branch)?(fBranch==='ALL'||r.Branch===fBranch):(r.Branch===branch);
   let rows=base.filter(bf);
+  if(sysFilter) rows=rows.filter(r=>r.System===sysFilter);
   if(kind==='down') rows=rows.filter(r=>(+r.NotWorking||0)>0);
   else if(kind==='pending') rows=rows.filter(r=>(+r.Pending||0)>0);
   const cols=[{key:'Branch',label:'Branch'},{key:'System',label:'System'},{key:'Total',label:'Total'},{key:'Working',label:'Working'},{key:'NotWorking',label:'Not Working'},{key:'Pending',label:'Pending'},{key:'Health',label:'Health %'},{key:'Remarks',label:'Remarks',maxW:'240px'}];
   const bl=branch||(fBranch==='ALL'?'All Branches':fBranch);
-  const title=kind==='down'?'🔴 Not-Working Assets':kind==='pending'?'⏳ Pending Assets':'🖥️ IT Assets';
-  openModal(title,`${rows.length} system record(s) · ${bl}`,rows,cols);
+  const sysLabel=sysFilter?(' · '+sysFilter):'';
+  const title=kind==='down'?'🔴 Not-Working Assets':kind==='pending'?'⏳ Pending Assets':(kind==='system'&&system)?('🖥️ '+system):'🖥️ IT Assets';
+  openModal(title,`${rows.length} record(s) · ${bl}${sysLabel}`,rows,cols);
 }
 
 
@@ -5587,12 +5757,13 @@ document.body.insertAdjacentHTML('beforeend', `
       <span id="modal-count" style="font-size:12px;color:#64748B;font-weight:600;"></span>
       <div id="modal-filters" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
     </div>
-    <div style="overflow-x:auto;max-height:65vh;">
+    <div id="modal-table-wrap" style="overflow-x:auto;max-height:65vh;">
       <table id="modal-table" style="width:100%;border-collapse:collapse;">
         <thead id="modal-thead"></thead>
         <tbody id="modal-tbody"></tbody>
       </table>
     </div>
+    <div id="modal-html" style="display:none;padding:14px 22px 20px;max-height:70vh;overflow:auto;"></div>
     <div id="modal-pagination" style="padding:12px 20px;background:#F8FAFF;border-top:1px solid #E0E8FF;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;"></div>
   </div>
 </div>
@@ -5613,10 +5784,65 @@ function openModal(title, sub, rows, columns) {
   thead.innerHTML = '<tr>' + columns.map(c => `<th style="background:#EEF2FF;color:#1E4FD8;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:10px 13px;text-align:left;border-bottom:2px solid #E0E8FF;white-space:nowrap;">${c.label}</th>`).join('') + '</tr>';
   
   window._modalColumns = columns;
+  document.getElementById('modal-table-wrap').style.display='';
+  document.getElementById('modal-html').style.display='none';
+  document.getElementById('modal-search').style.display='';
+  const _mp0=document.getElementById('modal-pagination'); if(_mp0)_mp0.style.display='';
   renderModalTable();
   document.getElementById('drill-modal').style.display = 'block';
   document.body.style.overflow = 'hidden';
 }
+
+// Open the modal with arbitrary HTML (used for accordion / grouped / report views).
+function openHTMLModal(title, sub, html){
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-sub').textContent = sub || '';
+  document.getElementById('modal-table-wrap').style.display='none';
+  document.getElementById('modal-search').style.display='none';
+  const mp=document.getElementById('modal-pagination'); if(mp){mp.innerHTML=''; mp.style.display='none';}
+  const mc=document.getElementById('modal-count'); if(mc)mc.textContent='';
+  const mf=document.getElementById('modal-filters'); if(mf)mf.innerHTML='';
+  const box=document.getElementById('modal-html'); box.style.display='block'; box.innerHTML=html;
+  modalAllRows=[]; window._modalColumns=[];
+  document.getElementById('drill-modal').style.display='block';
+  document.body.style.overflow='hidden';
+}
+// Toggle an accordion section open/closed.
+function toggleAcc(id, el){
+  const body=document.getElementById(id); if(!body)return;
+  const open=body.style.display!=='none';
+  body.style.display=open?'none':'block';
+  if(el){ const c=el.querySelector('.acc-caret'); if(c)c.textContent=open?'▸':'▾'; }
+}
+// Build a small HTML table from rows+columns (for accordion bodies).
+function _accTable(rows, cols){
+  if(!rows.length) return '<div style="padding:8px 4px;color:#94A3B8;font-size:12px;">No records.</div>';
+  let h='<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11.5px;min-width:520px;"><thead><tr>'
+    +cols.map(c=>`<th style="background:#F1F5F9;color:#475569;font-size:9.5px;font-weight:700;text-transform:uppercase;padding:6px 9px;text-align:left;border-bottom:1px solid #E2E8F0;white-space:nowrap;">${c.label}</th>`).join('')
+    +'</tr></thead><tbody>';
+  rows.forEach((r,i)=>{ h+='<tr style="background:'+(i%2?'#FbFcFf':'#fff')+'">'
+    +cols.map(c=>{let v=r[c.key];if(v===undefined||v===null||v==='')v='–';if(c.date&&typeof fmtDispDate==='function'&&v!=='–')v=fmtDispDate(v);return `<td style="padding:6px 9px;border-bottom:1px solid #F1F5F9;white-space:nowrap;max-width:${c.maxW||'220px'};overflow:hidden;text-overflow:ellipsis;">${v}</td>`;}).join('')
+    +'</tr>'; });
+  return h+'</tbody></table></div>';
+}
+// Branch-wise accordion: groups = [{key, count, rows}], cols for the inner table.
+function openBranchAccordion(title, sub, groups, cols, unit){
+  let total=groups.reduce((a,g)=>a+g.count,0);
+  let h='<div style="font-size:12px;color:#334155;margin-bottom:10px;">Total <strong>'+fi(total)+'</strong> '+(unit||'records')+' across '+groups.filter(g=>g.count>0).length+' branch(es). Click a branch to expand.</div>';
+  groups.forEach((g,gi)=>{
+    if(!g.count) return;
+    const id='acc_'+gi+'_'+Math.random().toString(36).slice(2,7);
+    h+=`<div style="border:1px solid #E0E8FF;border-radius:9px;margin-bottom:8px;overflow:hidden;">
+      <div onclick="toggleAcc('${id}',this)" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#F8FAFF;">
+        <div style="font-weight:800;font-size:13px;color:#0F172A;"><span class="acc-caret" style="color:#1E4FD8;margin-right:6px;">▸</span><span class="bd b${g.key}"></span> ${g.key}</div>
+        <div style="font-weight:800;font-size:14px;color:#1E4FD8;">${fi(g.count)} <small style="color:#94A3B8;font-weight:600;">${unit||''}</small></div>
+      </div>
+      <div id="${id}" style="display:none;padding:10px 12px;background:#fff;">${_accTable(g.rows,cols)}</div>
+    </div>`;
+  });
+  openHTMLModal(title, sub, h);
+}
+
 
 // Export the currently open modal's records to CSV (respects the active search filter).
 function exportModalCSV(){
