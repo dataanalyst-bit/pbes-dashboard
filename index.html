@@ -316,15 +316,17 @@ function tryInstantCache(){
     if(!raw) return false;
     const c=JSON.parse(raw);
     if(!c||!c.data) return false;
-    // Use cache up to 24h old for instant paint; a fresh fetch always follows.
-    if(Date.now()-c.t > 24*3600*1000) return false;
+    // Paint the last saved snapshot INSTANTLY (like a social feed) — up to 30 days old —
+    // then a fresh fetch always follows in the background and silently updates the view.
+    if(Date.now()-c.t > 30*24*3600*1000) return false;
     applyLiveData(c.data);
     _liveDataLoaded=true;
     // Re-apply the last known role so tabs/branch-lock don't flash before the fetch.
     try{ const rr=JSON.parse(localStorage.getItem('pbes_role')||'null'); if(rr){ window._ROLE=rr.role||''; window._USER_BRANCH=rr.branch||null; } }catch(e){}
     if(typeof renderAll==='function') renderAll();
     try{ applyRoleAccess(); }catch(e){}
-    const el=document.getElementById('load-status'); if(el){ el.textContent='⚡ Showing saved view · refreshing…'; }
+    // Subtle, non-blocking "refreshing" banner (auto-hides) instead of the blank loader.
+    _banner('⚡ Showing your latest saved view · refreshing in the background…','#EFF6FF','#1E4FD8',6000);
     return true;
   }catch(e){ return false; }
 }
