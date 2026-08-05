@@ -8,7 +8,7 @@
 //       aggregates the Head-to-Head scorecard needs (TRACKER, OBS_DATA, HR_RECORDS,
 //       MONTH_CONFIG) are kept full so "all branches" comparison still renders.
 
-const CACHE_TTL_SECONDS = 60; // dashboard data freshness window
+const CACHE_TTL_SECONDS = 300; // edge freshness window (Apps Script keep-warm keeps upstream fast)
 
 export async function onRequestGet({ request, env }) {
   const json = (obj, status = 200) =>
@@ -76,7 +76,7 @@ export async function onRequestGet({ request, env }) {
       status: 200,
       headers: {
         "Content-Type": "application/json",
-        "Cache-Control": "s-maxage=" + CACHE_TTL_SECONDS,
+        "Cache-Control": "s-maxage=" + CACHE_TTL_SECONDS + ", stale-while-revalidate=3600",
       },
     });
     await cache.put(cacheKey, upstream.clone());
