@@ -221,6 +221,46 @@ function showLoadOk(genAt, ms) {
           '#ECFDF5', '#059669', 8000);
 }
 
+// ---- IndexedDB cache (handles multi-MB payloads localStorage can't; makes repeat opens instant) ----
+function _idbOpen(){
+  return new Promise((res,rej)=>{
+    try{
+      const r=indexedDB.open('pbes_cache',1);
+      r.onupgradeneeded=()=>{ try{ r.result.createObjectStore('kv'); }catch(e){} };
+      r.onsuccess=()=>res(r.result);
+      r.onerror=()=>rej(r.error);
+    }catch(e){ rej(e); }
+  });
+}
+async function idbGet(key){
+  try{ const db=await _idbOpen(); return await new Promise((res)=>{
+    const t=db.transaction('kv','readonly').objectStore('kv').get(key);
+    t.onsuccess=()=>res(t.result); t.onerror=()=>res(null);
+  }); }catch(e){ return null; }
+}
+async function idbSet(key,val){
+  try{ const db=await _idbOpen(); return await new Promise((res)=>{
+    const t=db.transaction('kv','readwrite').objectStore('kv').put(val,key);
+    t.onsuccess=()=>res(true); t.onerror=()=>res(false);
+  }); }catch(e){ return false; }
+}
+
+// Paint instantly from the last saved snapshot (IndexedDB), then a background fetch refreshes it.
+async function paintFromCache(){
+  try{
+    const c=await idbGet('pbes_data');
+    if(!c||!c.data) return false;
+    if(Date.now()-c.t > 7*24*3600*1000) return false;   // ignore snapshots older than 7 days
+    const rr=await idbGet('pbes_role'); if(rr){ window._ROLE=rr.role||''; window._USER_BRANCH=rr.branch||null; }
+    applyLiveData(c.data);
+    _liveDataLoaded=true;
+    if(typeof renderAll==='function') renderAll();
+    try{ applyRoleAccess(); }catch(e){}
+    _banner('⚡ Opened instantly from saved data · refreshing in background…','#EFF6FF','#1E4FD8',4000);
+    return true;
+  }catch(e){ return false; }
+}
+
 // ---- Core fetch function ----
 async function loadLiveData(isRefresh) {
   if (!isRefresh) showLoading();
@@ -263,8 +303,10 @@ catch (e) {
     applyLiveData(data);
     _liveDataLoaded = true;
     showLoadOk(data.generatedAt, data.computeMs);
-    try { localStorage.setItem('pbes_cache_v2', JSON.stringify({ t: Date.now(), data: data })); } catch(e){ /* quota — ignore */ }
-    try { localStorage.setItem('pbes_role', JSON.stringify({ role: window._ROLE||'', branch: window._USER_BRANCH||null })); } catch(e){}
+    // Persist to IndexedDB (localStorage can't hold the multi-MB payload → its writes silently
+    // failed, which is why every open was slow). IndexedDB makes the next open instant.
+    idbSet('pbes_data', { t: Date.now(), data: data });
+    idbSet('pbes_role', { role: window._ROLE||'', branch: window._USER_BRANCH||null });
     if (typeof renderAll === 'function') renderAll();
     applyRoleAccess();
 
@@ -310,26 +352,8 @@ function applyLiveData(data){
 }
 
 // Instant paint from the last cached snapshot (like a social app), then refresh in background.
-function tryInstantCache(){
-  try{
-    const raw=localStorage.getItem('pbes_cache_v2');
-    if(!raw) return false;
-    const c=JSON.parse(raw);
-    if(!c||!c.data) return false;
-    // Paint the last saved snapshot INSTANTLY (like a social feed) — up to 30 days old —
-    // then a fresh fetch always follows in the background and silently updates the view.
-    if(Date.now()-c.t > 30*24*3600*1000) return false;
-    applyLiveData(c.data);
-    _liveDataLoaded=true;
-    // Re-apply the last known role so tabs/branch-lock don't flash before the fetch.
-    try{ const rr=JSON.parse(localStorage.getItem('pbes_role')||'null'); if(rr){ window._ROLE=rr.role||''; window._USER_BRANCH=rr.branch||null; } }catch(e){}
-    if(typeof renderAll==='function') renderAll();
-    try{ applyRoleAccess(); }catch(e){}
-    // Subtle, non-blocking "refreshing" banner (auto-hides) instead of the blank loader.
-    _banner('⚡ Showing your latest saved view · refreshing in the background…','#EFF6FF','#1E4FD8',6000);
-    return true;
-  }catch(e){ return false; }
-}
+// (legacy) one-time cleanup of the old localStorage cache that couldn't hold the payload
+try{ localStorage.removeItem('pbes_cache_v1'); localStorage.removeItem('pbes_cache_v2'); }catch(e){}
 
 // ══════════════════ ROLE-BASED ACCESS CONTROL ══════════════════
 // Roles come from Supabase app_metadata.role + app_metadata.branch:
@@ -422,8 +446,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     'font-weight:600;position:sticky;top:0;z-index:9999;"></div>');
 
   // Initial load — paint instantly from the last saved snapshot, then refresh live in the background
-  const painted = tryInstantCache();
-  loadLiveData(painted);   // if we already painted from cache, treat the fetch as a silent refresh
+  const painted = await paintFromCache();
+  loadLiveData(painted);   // if we painted from cache, the fetch is a silent background refresh
 
   // Periodic background refresh (e.g. every 2 minutes)
   if (AUTO_REFRESH_SECONDS > 0) {
