@@ -803,7 +803,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     <!-- HR Ranking & Awards -->
   <div class="card" style="margin-bottom:16px;">
-    <div class="ch"><h3>🏆 Recruiter Rankings &amp; Awards</h3><span class="fnote">Ranked by HR Overall Score (Hiring Speed 40% + Avg Closing/Month 40% + Vacancy Closure 10% + Compliance 10%) · resigned staff excluded · click a row to view records</span></div>
+    <div class="ch"><h3>🏆 Recruiter Rankings &amp; Awards</h3><span class="fnote">Unified score: Workload 35% + Closure Efficiency 25% + Closure Speed (TAT) 20% + Overdue Control 20% · resigned staff excluded · click a row to view</span></div>
     <div class="cb-0" style="overflow-x:auto"><table class="dt">
       <thead><tr><th>Rank</th><th>Recruiter</th><th>Closed</th><th>Open</th><th>Avg Days</th><th>Fast Closure %</th><th>Slow Closures</th><th>Score</th></tr></thead>
       <tbody id="hr-rank-tbody"></tbody>
@@ -1095,7 +1095,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   </div>
   <div class="card">
     <div class="ch"><h3>🏆 Admin Performance — Branch Closing Speed Scorecard</h3>
-      <span class="fnote">Score = Done%×0.6 + On-Schedule%×0.4 − overdue ageing · uses Days Due + Completion Date</span>
+      <span class="fnote">Workload 35% + Closure 25% + Speed 20% + Overdue Control 20% · click a branch for records</span>
       <button onclick="openAdminAllTasks()" style="margin-left:auto;padding:7px 16px;background:#1E4FD8;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">📋 View All Tasks →</button>
     </div>
     <div class="cb" style="padding:0;">
@@ -1163,7 +1163,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   </div>
   <div class="row r2">
     <div class="card"><div class="ch"><h3>🧑‍💼 Admin Follow-up Status by Branch</h3><span class="fnote">Admin Status column · filled by Admins only · click to view</span></div><div class="cb"><div class="cw tall"><canvas id="vig-admin-br"></canvas></div></div></div>
-    <div class="card"><div class="ch"><h3>🏆 Branch Safety Performance Score</h3><span class="fnote">Closure 50% · Admin Follow-Up 30% · On-Time 20% · uses Visit / Target / Completion dates &amp; Over Due</span></div><div class="cb-0" id="vig-safety-perf"></div></div>
+    <div class="card"><div class="ch"><h3>🏆 Branch Safety Performance Score</h3><span class="fnote">Workload 35% + Closure 25% + Speed 20% + Overdue Control 20% · click a branch for records</span></div><div class="cb-0" id="vig-safety-perf"></div></div>
   </div>
   <div class="row r2">
     <div class="card"><div class="ch"><h3>🏫 Issue Status by Branch</h3></div><div class="cb"><div class="cw tall"><canvas id="vig-br"></canvas></div></div></div>
@@ -2040,9 +2040,9 @@ function renderGrievanceOfficer(){
     if(!rows.length) return '';
     const officer = rows[0].officer;
     const sorted  = rows.slice().sort(function(a,c){ return MONTH_ORDER.indexOf(a.month)-MONTH_ORDER.indexOf(c.month); });
-    const avg     = Math.round(sorted.reduce(function(s,r){ return s+r.quality_score; },0)/sorted.length*10)/10;
-    const color   = avg>=90?'#059669':avg>=80?'#D97706':'#DC2626';
-    const trend   = sorted.map(function(r){ return r.quality_score; });
+    const avg     = Math.round(sorted.reduce(function(s,r){ return s+(r.unified_score||r.quality_score); },0)/sorted.length*10)/10;
+    const color   = avg>=80?'#059669':avg>=60?'#D97706':'#DC2626';
+    const trend   = sorted.map(function(r){ return r.unified_score||r.quality_score; });
     const sW=100,sH=36;
     const minT=Math.min.apply(null,trend),maxT=Math.max.apply(null,trend);
     const pts=trend.map(function(v,i){
@@ -2081,9 +2081,9 @@ function viewGOBranchDetail(branch){
     +'</tr></thead><tbody>';
   rows.forEach((r,i)=>{
     const bg=i%2===0?'#fff':'#F8FAFF';
-    const qColor=r.quality_score>=90?'#059669':r.quality_score>=80?'#D97706':'#DC2626';
-    const qBg   =r.quality_score>=90?'#ECFDF5':r.quality_score>=80?'#FFFBEB':'#FEF2F2';
-    const bar='<div style="background:#E0E8FF;border-radius:4px;height:5px;margin-top:3px;"><div style="background:'+qColor+';width:'+Math.round(r.quality_score)+'%;height:5px;border-radius:4px;"></div></div>';
+    const qColor=(r.unified_score||r.quality_score)>=80?'#059669':(r.unified_score||r.quality_score)>=60?'#D97706':'#DC2626';
+    const qBg   =(r.unified_score||r.quality_score)>=80?'#ECFDF5':(r.unified_score||r.quality_score)>=60?'#FFFBEB':'#FEF2F2';
+    const bar='<div style="background:#E0E8FF;border-radius:4px;height:5px;margin-top:3px;"><div style="background:'+qColor+';width:'+Math.round(r.unified_score||r.quality_score)+'%;height:5px;border-radius:4px;"></div></div>';
     html+='<tr style="background:'+bg+';">'
       +'<td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;font-weight:600;">'+r.month+'</td>'
       +'<td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">'+r.total_calls.toLocaleString('en-IN')+'</td>'
@@ -2094,7 +2094,9 @@ function viewGOBranchDetail(branch){
       +'<td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;'+(r.empty_date>0?'cursor:pointer;':'')+'"'+(r.empty_date>0?' onclick="viewGOIssue(\''+r.branch+'\',\''+r.month+'\',\'empty_date\')" title="Click to view these entries"':'')+'>'
       +(r.empty_date>0?'<span style="color:#7C3AED;font-weight:700;text-decoration:underline dotted;">'+r.empty_date+'</span>':'<span style="color:#059669;">&#10003;</span>')+'</td>'
       +'<td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">'
-      +'<span style="background:'+qBg+';color:'+qColor+';font-weight:800;font-size:13px;padding:3px 10px;border-radius:20px;">'+r.quality_score+'%</span>'+bar+'</td></tr>';
+      +'<span style="background:'+qBg+';color:'+qColor+';font-weight:800;font-size:13px;padding:3px 10px;border-radius:20px;">'+(r.unified_score||r.quality_score)+'</span>'+bar
+      +(r.u_wh!==undefined?'<div style="font-size:9px;color:#94A3B8;margin-top:2px;">WH'+r.u_wh+' CE'+r.u_ce+' CS'+r.u_cs+' OC'+r.u_oc+'</div>':'')
+      +'</td></tr>';
   });
   html+='</tbody></table></div><div style="margin-top:8px;font-size:11px;color:#64748B;">Click a highlighted cell above to see the exact offending call records.</div>';
   openHTMLModal('🎯 '+branch+' — '+officer+' · Monthly Quality Detail','', html);
@@ -2917,6 +2919,8 @@ function renderAdmin(){
     }
   }
 
+  // Compute max-assigned across branches (for the Workload Handled KPI)
+  window._ADMIN_MAX_ASSIGNED=Math.max(1,...BRANCHES.map(b=>_aRows.filter(r=>r.Branch===b).length));
   renderAdminPerformance(_aRows,BRANCHES,isDone,isIP,isHoldOpen,overdueDays);
 }
 
@@ -2944,7 +2948,13 @@ function renderAdminPerformance(rows,BRANCHES,isDone,isIP,isHoldOpen,overdueDays
       <div style="font-size:22px;width:32px;text-align:center;">${rankBadge}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-weight:700;font-size:13.5px;color:#0F172A;"><span class="bd b${s.branch}"></span>${s.branch}</div>
-        <div style="font-size:11px;color:#64748B;margin-top:2px;">✅ ${s.dn}/${s.tot} done (${s.comp}%) · 📅 ${s.onSch}% on schedule · ⏰ ${s.od} overdue${s.od>0?' (avg '+s.avgOdDays+'d)':''}${s.avgEarly!==null?' · 🏁 '+Math.abs(s.avgEarly)+'d '+(s.avgEarly>=0?'early':'late')+' (Completion Date)':''}</div>
+        <div style="font-size:11px;color:#64748B;margin-top:2px;">✅ ${s.dn}/${s.tot} done (${s.comp}%) · ⏰ ${s.od} overdue${s.od>0?' (avg '+s.avgOdDays+'d)':''}${s.avgEarly!==null?' · 🏁 '+Math.abs(s.avgEarly)+'d '+(s.avgEarly>=0?'early':'late'):''}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;font-size:10px;color:#475569;margin-top:3px;">
+          <span title="Workload Handled 35%">📦WH ${s.u?s.u.wh:'-'}%</span>
+          <span title="Closure Efficiency 25%">✅CE ${s.u?s.u.ce:'-'}%</span>
+          <span title="Closure Speed 20%">⚡CS ${s.u?s.u.cs:'-'}%</span>
+          <span title="Overdue Control 20%">🛡OC ${s.u?s.u.oc:'-'}%</span>
+        </div>
         <div style="background:#E0E8FF;border-radius:5px;height:6px;margin-top:5px;overflow:hidden;"><div style="background:${sc};width:${Math.max(s.score,2)}%;height:6px;"></div></div>
       </div>
       <div style="text-align:center;"><div style="background:${scBg};color:${sc};font-weight:800;font-size:15px;padding:5px 12px;border-radius:10px;">${s.score}</div><div style="font-size:9px;color:#94A3B8;margin-top:2px;">SCORE</div></div>
@@ -3058,15 +3068,15 @@ function renderVigilance(){
     }});
   }
 
-  // ── Branch Safety Performance Score (Closure 50% + Admin Follow-Up 30% + On-Time 20%) ──
+  // ── Branch Safety Performance Score (unified: WH 35% + CE 25% + CS 20% + OC 20%) ──
   {
     const perfEl=document.getElementById('vig-safety-perf');
     if(perfEl){
       const vb=fBranch==='ALL'?BRANCHES:[fBranch];
+      window._VIG_MAX_ASSIGNED=Math.max(1,...vb.map(b=>ALLVIG.filter(r=>r.Branch===b&&(fMonth==='ALL'||r.Month===fMonth)).length));
       const stats=vb.map(b=>{
         const rws=ALLVIG.filter(r=>r.Branch===b&&(fMonth==='ALL'||r.Month===fMonth));
         const st=vigSafetyStats(rws);
-        // avg closure time (Completion Date − Visit Date) when Completion Date is filled
         const cdRows=rws.filter(r=>r.CompletionDate&&r.CompletionDate!=='–'&&r.VisitDate&&r.VisitDate!=='–');
         let avgClose=null;
         if(cdRows.length){
@@ -3084,11 +3094,16 @@ function renderVigilance(){
           <div style="font-size:22px;width:32px;text-align:center;">${rankBadge}</div>
           <div style="flex:1;min-width:0;">
             <div style="font-weight:700;font-size:13.5px;color:#0F172A;"><span class="bd b${s.branch}"></span>${s.branch}</div>
-            <div style="font-size:11px;color:#64748B;margin-top:2px;">✅ ${s.closed}/${s.total} closed (${s.closurePct}%) · 🧑‍💼 admin verified ${s.adminPct}% · ⏱️ on-time ${s.onTimePct}%</div>
-            <div style="font-size:10.5px;color:#94A3B8;margin-top:1px;">${s.open} open · ${s.awaitingAdmin} awaiting admin${s.avgClose!==null?' · avg close '+s.avgClose+'d (Completion − Visit)':''}</div>
+            <div style="font-size:11px;color:#64748B;margin-top:2px;">✅ ${s.closed}/${s.total} closed (${s.closurePct}%) · 🧑‍💼 admin ${s.adminPct}% · ⏱️ on-time ${s.onTimePct}%</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;font-size:10px;color:#475569;margin-top:3px;">
+              <span title="Workload Handled 35%">📦WH ${s.u?s.u.wh:'-'}%</span>
+              <span title="Closure Efficiency 25%">✅CE ${s.u?s.u.ce:'-'}%</span>
+              <span title="Closure Speed 20%">⚡CS ${s.u?s.u.cs:'-'}%</span>
+              <span title="Overdue Control 20%">🛡OC ${s.u?s.u.oc:'-'}%</span>
+            </div>
             <div style="background:#E0E8FF;border-radius:5px;height:6px;margin-top:5px;overflow:hidden;"><div style="background:${sc};width:${Math.max(s.score,2)}%;height:6px;"></div></div>
           </div>
-          <div style="text-align:center;"><div style="background:${scBg};color:${sc};font-weight:800;font-size:15px;padding:5px 12px;border-radius:10px;">${s.score}</div><div style="font-size:9px;color:#94A3B8;margin-top:2px;">SAFETY SCORE</div></div>
+          <div style="text-align:center;"><div style="background:${scBg};color:${sc};font-weight:800;font-size:15px;padding:5px 12px;border-radius:10px;">${s.score}</div><div style="font-size:9px;color:#94A3B8;margin-top:2px;">SCORE</div></div>
         </div>`;
       }).join('')||'<div style="padding:20px;text-align:center;color:#94A3B8;">No vigilance data</div>';
     }
@@ -4000,19 +4015,25 @@ function renderHRRanking(){
     const closurePct=total>0?+(closed/total*100).toFixed(1):0;
     return {hr:h,branch:branchOf(h),closed,open,closurePct,avgDays,fastPct,slow,samples:days.length};
   });
-  // ── Ranking by HR OVERALL SCORE (from the HR Performance Scorecard) ──
-  // Overall = Hiring Speed·40% + Avg Closing/Month·40% + Vacancy Closure·10% + Compliance·10%,
-  // computed per recruiter in renderHR() and exposed via window._HR_LIVE_KPI.
-  const LK=window._HR_LIVE_KPI||{};
+  // ── Ranking by unified formula: WH 35% + CE 25% + CS(TAT) 20% + OC 20% ──
+  // HR target TAT = 15 days (fast closure threshold).
+  const maxClosed=Math.max(1,...base.map(s=>s.closed+s.open));
   const stats=base.map(s=>{
-    const kpi=LK[s.hr]||{};
-    const overall=(typeof kpi.overall==='number'&&isFinite(kpi.overall))?kpi.overall:0;   // 0–5
-    return {...s,overall,score:overall};
-  }).sort((a,b)=>b.overall-a.overall || b.closed-a.closed);
+    const assigned=s.closed+s.open;
+    const targetTAT=15;
+    const actualTAT=s.avgDays||targetTAT;
+    // Total overdue days: sum of (days - 30) for each position > 30 days
+    const odDays=(()=>{const rows=allRec.filter(r=>r.HR===s.hr);
+      return rows.filter(r=>isClosed(r.Status)).map(r=>{const d=parseFloat(r.DaysToClose); return (!isNaN(d)&&d>30)?(d-30):0;}).reduce((a,b)=>a+b,0)
+        + rows.filter(r=>isOpen(r.Status)).map(r=>{const pd=r.PostDate; if(!pd||pd==='–')return 0; const age=Math.round((Date.now()-new Date(pd))/86400000); return age>30?(age-30):0;}).reduce((a,b)=>a+b,0);
+    })();
+    const u=unifiedScore(assigned, s.closed, targetTAT, actualTAT, odDays, maxClosed);
+    return {...s,score:u.score,u};
+  }).sort((a,b)=>b.score-a.score || b.closed-a.closed);
 
   const medals=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣'];
   tbody.innerHTML=stats.map((s,i)=>{
-    const scoreColor=s.overall>=4.3?'#059669':s.overall>=3.5?'#16A34A':s.overall>=2.8?'#D97706':'#DC2626';
+    const scoreColor=s.score>=80?'#059669':s.score>=60?'#D97706':'#DC2626';
     const adColor=s.avgDays===null?'#94A3B8':s.avgDays<=15?'#059669':s.avgDays<=30?'#D97706':'#DC2626';
     const fpColor=s.fastPct>=60?'#059669':s.fastPct>=30?'#D97706':'#DC2626';
     return `<tr style="cursor:pointer" onclick="viewHRByRecruiter('${s.hr.replace(/'/g,"\\\\'")}','ALL')">
@@ -4022,7 +4043,10 @@ function renderHRRanking(){
       <td><strong style="color:${adColor}">${s.avgDays===null?'–':s.avgDays+'d'}</strong></td>
       <td><strong style="color:${fpColor}">${s.fastPct}%</strong> <small style="color:#94A3B8;">≤15d</small></td>
       <td>${s.slow>0?`<span style="color:#DC2626;font-weight:600">${s.slow}</span>`:'0'} <small style="color:#94A3B8;">&gt;30d</small></td>
-      <td><span style="display:inline-block;min-width:44px;padding:2px 8px;border-radius:8px;background:${scoreColor};color:#fff;font-weight:800;font-size:11px;text-align:center">${s.overall.toFixed(2)}</span><small style="color:#94A3B8;"> /5</small></td></tr>`;
+      <td><span style="display:inline-block;min-width:44px;padding:2px 8px;border-radius:8px;background:${scoreColor};color:#fff;font-weight:800;font-size:11px;text-align:center">${s.score}</span>
+        <div style="font-size:9px;color:#94A3B8;margin-top:1px;display:flex;gap:3px;flex-wrap:wrap;">
+          <span title="Workload 35%">WH${s.u.wh.toFixed(0)}</span>·<span title="Closure 25%">CE${s.u.ce.toFixed(0)}</span>·<span title="Speed 20%">CS${s.u.cs.toFixed(0)}</span>·<span title="Overdue 20%">OC${s.u.oc.toFixed(0)}</span>
+        </div></td></tr>`;
   }).join('');
 }
 
@@ -4979,45 +5003,78 @@ function hrCloseDays(r){
   return isNaN(n)||n<0?null:n;
 }
 // Admin closing-speed stats from Days Due text + Completion Date vs Deadline.
+// ══════════════════════════════════════════════════════════════════════════
+// UNIFIED PERFORMANCE SCORING (Manager's formula — all departments)
+// ──────────────────────────────────────────────────────────────────────────
+// 1. Workload Handled   35%  =  (Assigned ÷ maxAssigned) × 100
+// 2. Closure Efficiency  25%  =  (Closed ÷ Assigned) × 100
+// 3. Closure Speed (TAT) 20%  =  min(100, TargetTAT ÷ ActualTAT × 100)
+// 4. Overdue Control     20%  =  max(0, 100 − (OverdueRatio × 100))
+//      where OverdueRatio = TotalOverdueDays ÷ Assigned
+//
+// Score = WH×0.35 + CE×0.25 + CS×0.20 + OC×0.20   (0–100 scale)
+//
+// Applied to: Admin, HR, Vigilance, Grievance — each adapter extracts
+// (assigned, closed, targetTAT, actualTAT, totalOverdueDays) from its data shape.
+// ══════════════════════════════════════════════════════════════════════════
+
+function unifiedScore(assigned, closed, targetTAT, actualTAT, totalOverdueDays, maxAssigned){
+  if(!assigned || assigned===0) return {score:0,wh:0,ce:0,cs:0,oc:0};
+  const wh = (assigned / (maxAssigned||assigned)) * 100;          // workload handled
+  const ce = (closed / assigned) * 100;                           // closure efficiency
+  const cs = actualTAT>0 ? Math.min(100, (targetTAT/actualTAT)*100) : 100; // closure speed
+  const overdueRatio = totalOverdueDays / assigned;
+  const oc = Math.max(0, 100 - (overdueRatio * 100));             // overdue control
+  const score = Math.round(wh*0.35 + ce*0.25 + cs*0.20 + oc*0.20);
+  return {score:Math.min(100,score), wh:+wh.toFixed(1), ce:+ce.toFixed(1), cs:+cs.toFixed(1), oc:+oc.toFixed(1)};
+}
+
+// ── ADMIN adapter ──
 function adminSpeedStats(rows){
   const total=rows.length;
   if(total===0) return {total:0,score:null};
   const parseOd=r=>{const m=String(r.DaysDue||'').match(/overdue\s*\((\d+)/i);return m?parseInt(m[1],10):(/overdue/i.test(String(r.DaysDue||''))?1:null);};
   const completed=rows.filter(r=>/^completed$/i.test(String(r.DaysDue||'').trim())||/done|completed/i.test(r.Status||'')).length;
   const odRows=rows.filter(r=>parseOd(r)!==null&&!/done|completed/i.test(r.Status||''));
+  const totalOverdueDays=odRows.reduce((a,r)=>a+(parseOd(r)||0),0);
+  const avgOd=odRows.length?+(totalOverdueDays/odRows.length).toFixed(0):0;
   const onTrack=rows.filter(r=>/due in/i.test(String(r.DaysDue||''))||/not started/i.test(String(r.DaysDue||''))).length;
-  const avgOd=odRows.length?odRows.reduce((a,r)=>a+(parseOd(r)||0),0)/odRows.length:0;
   const compPct=+(completed/total*100).toFixed(1);
   const onSchedulePct=+(((total-odRows.length)/total)*100).toFixed(1);
-  // Early/late finish from Completion Date vs Deadline (only rows where admins filled it)
+  // Early/late finish from Completion Date vs Deadline
   const cdRows=rows.filter(r=>r.CompletionDate&&r.CompletionDate!=='–'&&r.Deadline&&r.Deadline!=='–');
-  let avgEarly=null;
+  let avgEarly=null, actualTAT=null, targetTAT=7; // default target = 7 days
   if(cdRows.length){
-    const diffs=cdRows.map(r=>{const c=new Date(r.CompletionDate),d=new Date(r.Deadline);return (isNaN(c)||isNaN(d))?null:Math.round((d-c)/86400000);}).filter(v=>v!==null);
-    if(diffs.length) avgEarly=+(diffs.reduce((a,b)=>a+b,0)/diffs.length).toFixed(1); // +ve = finished early
+    const diffs=cdRows.map(r=>{const c=new Date(r.CompletionDate),d=new Date(r.Deadline),s=new Date(r.StartDate||r.CompletionDate);
+      return {early:(isNaN(c)||isNaN(d))?null:Math.round((d-c)/86400000), tat:(isNaN(c)||isNaN(s))?null:Math.max(1,Math.round((c-s)/86400000))};});
+    const earlyV=diffs.map(d=>d.early).filter(v=>v!==null);
+    const tatV=diffs.map(d=>d.tat).filter(v=>v!==null);
+    if(earlyV.length) avgEarly=+(earlyV.reduce((a,b)=>a+b,0)/earlyV.length).toFixed(1);
+    if(tatV.length) actualTAT=+(tatV.reduce((a,b)=>a+b,0)/tatV.length).toFixed(1);
   }
-  const penalty=Math.min(15,avgOd*0.5);
-  const score=Math.max(0,Math.round(compPct*0.6+onSchedulePct*0.4-penalty));
-  return {total,done:completed,overdue:odRows.length,onTrack,avgOd:+avgOd.toFixed(0),avgEarly,
-          pct:compPct,onSchedulePct,score};
+  const u=unifiedScore(total, completed, targetTAT, actualTAT||targetTAT, totalOverdueDays, window._ADMIN_MAX_ASSIGNED||total);
+  return {total,done:completed,overdue:odRows.length,onTrack,avgOd,avgEarly,
+          pct:compPct,onSchedulePct,score:u.score,u};
 }
-// Vigilance safety stats: officer Status + Admin Status follow-up + Over Due timeliness.
+// ── Vigilance adapter (unified formula) ──
 function vigSafetyStats(rows){
   const total=rows.length;
   const open_=rows.filter(r=>r.Status==='Open').length;
   const closed=rows.filter(r=>r.Status==='Closed').length;
   const isAdmDone=r=>/closed|done|completed|resolved/i.test(String(r.AdminStatus||''));
   const adminClosed=rows.filter(isAdmDone).length;
-  // "Awaiting admin": vigilance says Closed but Admin Status not yet updated/closed
   const awaitingAdmin=rows.filter(r=>r.Status==='Closed'&&!isAdmDone(r)).length;
   const onTime=rows.filter(r=>/on time/i.test(String(r.OverDue||''))).length;
   const odDays=rows.map(r=>{const m=String(r.OverDue||'').match(/(\d+)\s*day/i);return m?parseInt(m[1],10):0;});
-  const avgOd=odDays.length?+(odDays.reduce((a,b)=>a+b,0)/Math.max(1,odDays.filter(d=>d>0).length||1)).toFixed(1):0;
+  const totalOverdueDays=odDays.reduce((a,b)=>a+b,0);
+  const avgOd=odDays.filter(d=>d>0).length?+(totalOverdueDays/odDays.filter(d=>d>0).length).toFixed(1):0;
   const closurePct=total>0?+(closed/total*100).toFixed(1):0;
   const adminPct=closed>0?+(adminClosed/closed*100).toFixed(1):0;
   const onTimePct=total>0?+(onTime/total*100).toFixed(1):0;
-  const score=total>0?Math.round(closurePct*0.5+adminPct*0.3+onTimePct*0.2):null;
-  return {total,open:open_,closed,adminClosed,awaitingAdmin,onTime,onTimePct,closurePct,adminPct,score};
+  // Unified scoring: assigned=total, closed=closed, targetTAT=7 days default, actualTAT from overdue pattern
+  const actualTAT=avgOd>0?(7+avgOd):7;  // if overdue, actual TAT = target + avg overdue days
+  const u=unifiedScore(total, closed, 7, actualTAT, totalOverdueDays, window._VIG_MAX_ASSIGNED||total);
+  return {total,open:open_,closed,adminClosed,awaitingAdmin,onTime,onTimePct,closurePct,adminPct,score:u.score,u};
 }
 
 function renderRankings(){
