@@ -367,7 +367,7 @@ try{ localStorage.removeItem('pbes_cache_v1'); localStorage.removeItem('pbes_cac
 const ROLE_TABS = {
   admin_manager: ['admin','vigilance','purchase','transport','it'],
   hr:            ['hr'],
-  principal:     ['overview','care','observations','admissions','avis','grievance','transport','it']
+  principal:     ['overview','care','observations','admissions','grievance','transport','it']
 };
 function _tabIdOf(btn){ const m=(btn.getAttribute('onclick')||'').match(/showTab\('([^']+)'/); return m?m[1]:''; }
 function applyRoleAccess(){
@@ -519,7 +519,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   <button class="tb" onclick="showTab('purchase',this)">🛒 Purchase</button>
   <button class="tb" onclick="showTab('hr',this)">👥 HR Analytics</button>
   <button class="tb" onclick="showTab('admissions',this)">🎓 Admissions 2026-27</button>
-  <button class="tb" onclick="showTab('avis',this)">🏫 Akshara Vaagdevi</button>
   <button class="tb" onclick="showTab('grievance',this)">📣 Grievance</button>
   <button class="tb" onclick="showTab('transport',this)">🚌 Transport</button>
   <button class="tb" onclick="showTab('it',this)">💻 IT Report</button>
@@ -606,7 +605,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="kc purple" onclick="viewCareRecords('In Progress')" style="cursor:pointer;" title="Click to view In Progress records"><div class="kc-ico">🔄</div><div class="kc-lbl">In Progress</div><div class="kc-val" id="cc-ip">–</div><div class="kc-sub" id="cc-ip-s">–</div></div>
   </div>
   <div class="row r2">
-    <div class="card"><div class="ch"><h3>🏫 Branch Completion Rate Comparison</h3><span class="fnote">Current month by default · follows Branch &amp; Month dropdowns</span></div><div class="cb" id="care-bars"></div></div>
+    <div class="card"><div class="ch"><h3>🏫 Branch Completion Rate Comparison</h3><span class="fnote">Current month always · follows Branch dropdown (ignores Month filter so it never goes stale)</span></div><div class="cb" id="care-bars"></div></div>
     <div class="card"><div class="ch"><h3>📈 Completion Rate Trend (Month-wise)</h3></div><div class="cb"><div class="cw tall"><canvas id="care-trend"></canvas></div></div></div>
   </div>
   <!-- Quick View: Pending & In Progress records, live-filtered by branch/month -->
@@ -644,11 +643,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     </div>
   </div>
 
-  <div class="card"><div class="ch"><h3>📊 Branch × Month Detail Comparison</h3><span class="fnote" id="care-fn">All Branches · All Months</span></div>
-    <div class="cb-0" style="overflow-x:auto"><table class="cdt" id="care-cdt"><thead><tr>
-      <th>Branch</th><th>Month</th><th>Students</th><th>Calls Made</th><th>Resolved</th><th>Pending</th><th>In Progress</th><th>Completion %</th>
-    </tr></thead><tbody id="care-tbody"></tbody></table></div>
+  <!-- Grievance Officer Performance — ALWAYS VISIBLE (previously trapped inside the hidden
+       grievance-records panel, so it rarely rendered). Cards are click-to-view for the
+       full monthly quality breakdown; no permanently-shown Branch/Officer table anymore. -->
+  <div class="card" id="go-perf-card" style="margin-bottom:16px;">
+    <div class="ch">
+      <h3>🎯 Grievance Officer Performance</h3>
+      <span class="fnote">Click a branch card for the full monthly quality breakdown</span>
+    </div>
+    <div class="cb" style="padding:0 14px 14px;">
+      <div id="go-summary-row" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;"></div>
+    </div>
   </div>
+
+  <!-- Care Call Summary — Insights & Data-Driven Decisions — ALWAYS VISIBLE (same bug fixed)
+       and placed directly ABOVE Grievance Category Breakdown as requested. -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="ch"><h3>🧭 Care Call Summary — Insights &amp; Data-Driven Decisions</h3><span class="fnote" id="care-summary-fn">Parents-satisfied % + grievance-category insights</span></div>
+    <div class="cb" id="care-summary-report" style="padding:14px 18px;"></div>
+  </div>
+
   <div class="row r2">
     <div class="card"><div class="ch"><h3>📋 Grievance Category Breakdown</h3><span class="fnote" id="griev-fn">All Branches</span></div><div class="cb"><div class="cw tall"><canvas id="care-griev"></canvas></div>
       <div style="text-align:center;font-size:11px;color:#1E4FD8;font-weight:600;margin-top:8px;padding:6px 0;background:#EEF2FF;border-radius:8px;">👆 Click any bar above to see student records — or use quick filters below:</div>
@@ -666,7 +680,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="card"><div class="ch"><h3>📊 Monthly Volume — Resolved vs Pending</h3></div><div class="cb"><div class="cw tall"><canvas id="care-vol"></canvas></div></div></div>
   </div>
 
-  <!-- ── Grievance Inline Records Table ── -->
+  <!-- ── Grievance Inline Records Table (on-demand, triggered by chart/button clicks) ── -->
   <div id="griev-records-panel" style="display:none;margin-bottom:16px;">
     <div class="card">
       <div class="ch" style="background:linear-gradient(135deg,#EEF2FF,#F5F3FF);">
@@ -718,42 +732,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       <!-- Pagination -->
       <div id="griev-pagination" style="padding:12px 16px;background:#F8FAFF;border-top:1px solid #E0E8FF;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;"></div>
     </div>
-    <!-- Grievance Officer Performance (GO_DATA from Apps Script) -->
-  <div class="card" id="go-perf-card" style="margin-bottom:16px;">
-    <div class="ch">
-      <h3>🎯 Grievance Officer Performance</h3>
-      <span class="fnote">Data quality of care call entries per branch</span>
-    </div>
-    <div class="cb" style="padding:0 14px 10px;">
-      <!-- Quality score trend bars per branch -->
-      <div id="go-summary-row" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;"></div>
-      <!-- Monthly detail table -->
-      <div style="overflow-x:auto;">
-        <table style="width:100%;border-collapse:collapse;font-size:11.5px;min-width:600px;">
-          <thead>
-            <tr style="background:#EEF2FF;">
-              <th style="padding:7px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Branch / Officer</th>
-              <th style="padding:7px 10px;text-align:center;font-size:9.5px;font-weight:700;color:#64748B;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Month</th>
-              <th style="padding:7px 10px;text-align:center;font-size:9.5px;font-weight:700;color:#64748B;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Total Calls</th>
-              <th style="padding:7px 10px;text-align:center;font-size:9.5px;font-weight:700;color:#DC2626;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">⚠ Wrong Grievance</th>
-              <th style="padding:7px 10px;text-align:center;font-size:9.5px;font-weight:700;color:#D97706;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">⏳ Empty Status</th>
-              <th style="padding:7px 10px;text-align:center;font-size:9.5px;font-weight:700;color:#7C3AED;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">📅 Empty Date</th>
-              <th style="padding:7px 10px;text-align:center;font-size:9.5px;font-weight:700;color:#0F172A;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Quality Score</th>
-            </tr>
-          </thead>
-          <tbody id="go-tbody"></tbody>
-        </table>
-      </div>
-    </div>
   </div>
 
-  <!-- Care Calls — Insight Summary & Data-Driven Decisions -->
-  <div class="card" style="margin-bottom:16px;">
-    <div class="ch"><h3>🧭 Care Call Summary — Insights &amp; Data-Driven Decisions</h3><span class="fnote" id="care-summary-fn">Per-branch call quality, resolution &amp; recommended actions</span></div>
-    <div class="cb" id="care-summary-report" style="padding:14px 18px;"></div>
+  <!-- Branch × Month Detail Comparison — kept LAST in the tab as requested -->
+  <div class="card" style="margin-bottom:16px;"><div class="ch"><h3>📊 Branch × Month Detail Comparison</h3><span class="fnote" id="care-fn">All Branches · All Months</span></div>
+    <div class="cb-0" style="overflow-x:auto"><table class="cdt" id="care-cdt"><thead><tr>
+      <th>Branch</th><th>Month</th><th>Students</th><th>Calls Made</th><th>Resolved</th><th>Pending</th><th>In Progress</th><th>Completion %</th>
+    </tr></thead><tbody id="care-tbody"></tbody></table></div>
   </div>
 
-  </div>
 </div>
 <div id="pane-hr" class="pane">
   <div class="sh">
@@ -925,6 +912,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="cb" id="adm-suggestions" style="padding:6px 14px 14px;"></div>
   </div>
 
+  <!-- TC (Transfer Certificate) Report across all branches from Admission Trends -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="ch"><h3>📤 TC Report — Transfer Certificates by Academic Year &amp; Branch</h3><span class="fnote">From the Admission Trends sheet · click a bar/cell to view</span></div>
+    <div class="row r2" style="margin:0;padding:14px;">
+      <div class="cw tall"><canvas id="adm-tc-chart"></canvas></div>
+      <div style="overflow-x:auto;"><table class="dt" style="font-size:11.5px;">
+        <thead><tr><th>Branch</th><th>Academic Year</th><th>TC Count</th></tr></thead>
+        <tbody id="adm-tc-tbody"></tbody>
+      </table></div>
+    </div>
+  </div>
+
   <div class="card" style="margin-bottom:16px;">
     <div class="ch"><h3>👤 Counsellor-Wise Report — Leads Assigned &amp; Admissions</h3><span class="fnote" id="adm-counsellor-fn">All Branches</span></div>
     <div class="cb" style="overflow-x:auto;">
@@ -983,40 +982,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   </div>
 </div>
 
-<!-- ═══ AKSHARA VAAGDEVI INTERNATIONAL SCHOOL (AVIS) — Admissions ═══ -->
-<div id="pane-avis" class="pane">
-  <div class="sh">
-    <div class="sh-l"><span class="sh-ico">🏫</span><div><h2>Akshara Vaagdevi International School — Admissions</h2><p class="sh-sub" id="avis-tag">Live from the AKSHARA VAAGDEVI INTERNATIONAL SCHOOL sheet · AY 2026-27</p></div></div>
-    <span class="fnote">Separate campus — branch/month filters don't apply here</span>
-  </div>
-
-  <!-- KPI Row 1: totals + time windows (ALL click-to-view) -->
-  <div style="font-size:11px;font-weight:800;letter-spacing:.5px;color:#7C3AED;text-transform:uppercase;margin:0 0 8px 2px;display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:3px;background:#7C3AED;display:inline-block;"></span>🎓 Admissions (Portal entries by Created Date)</div>
-  <div class="krow k6" style="margin-bottom:18px;">
-    <div class="kc purple clickable" onclick="viewAvisWindow('all')" title="Click to view all records"><div class="kc-ico">🎓</div><div class="kc-lbl">Total Admissions</div><div class="kc-val" id="avis-total">–</div><div class="kc-sub">All records · click to view</div></div>
-    <div class="kc purple clickable" onclick="viewAvisWindow('today')" title="Click to view records"><div class="kc-ico">📅</div><div class="kc-lbl">Today</div><div class="kc-val" id="avis-today">–</div><div class="kc-sub">New entries · click to view</div></div>
-    <div class="kc purple clickable" onclick="viewAvisWindow('thisWeek')" title="Click to view records"><div class="kc-ico">📆</div><div class="kc-lbl">This Week</div><div class="kc-val" id="avis-thisweek">–</div><div class="kc-sub">Sun–today · click to view</div></div>
-    <div class="kc purple clickable" onclick="viewAvisWindow('lastWeek')" title="Click to view records"><div class="kc-ico">📆</div><div class="kc-lbl">Last Week</div><div class="kc-val" id="avis-lastweek">–</div><div class="kc-sub">Sun–Sat · click to view</div></div>
-    <div class="kc purple clickable" onclick="viewAvisWindow('thisM')" title="Click to view records"><div class="kc-ico">📈</div><div class="kc-lbl">This Month</div><div class="kc-val" id="avis-thismonth">–</div><div class="kc-sub">Month to date · click to view</div></div>
-    <div class="kc purple clickable" onclick="viewAvisWindow('lastM')" title="Click to view records"><div class="kc-ico">📊</div><div class="kc-lbl">Last Month</div><div class="kc-val" id="avis-lastmonth">–</div><div class="kc-sub">Previous month · click to view</div></div>
-  </div>
-
-  <!-- KPI Row 2: quality / joining -->
-  <div class="krow k3" style="margin-bottom:18px;">
-    <div class="kc teal clickable" onclick="viewAvisJoined(true)" title="Click to view records"><div class="kc-ico">✅</div><div class="kc-lbl">Joined (Date of Joining)</div><div class="kc-val" id="avis-joined">–</div><div class="kc-sub">Joining date filled · click to view</div></div>
-    <div class="kc amber clickable" onclick="viewAvisJoined(false)" title="Click to view records"><div class="kc-ico">⏳</div><div class="kc-lbl">Yet to Join</div><div class="kc-val" id="avis-notjoined">–</div><div class="kc-sub">No joining date yet · click to view</div></div>
-    <div class="kc blue clickable" onclick="viewAvisTopClass()" title="Click to view records"><div class="kc-ico">🏆</div><div class="kc-lbl">Top Class</div><div class="kc-val" id="avis-topclass">–</div><div class="kc-sub" id="avis-topclass-s">Most admissions · click to view</div></div>
-  </div>
-
-  <div class="row r2">
-    <div class="card"><div class="ch"><h3>🏫 Class-wise Admissions</h3><span class="fnote">Click a bar to view the students</span></div><div class="cb"><div class="cw tall"><canvas id="avis-class-chart"></canvas></div></div></div>
-    <div class="card"><div class="ch"><h3>📈 Monthly Admission Trend</h3><span class="fnote">By Date of Admission · click a bar to view</span></div><div class="cb"><div class="cw tall"><canvas id="avis-month-chart"></canvas></div></div></div>
-  </div>
-
-  <div style="margin:14px 0;">
-    <button onclick="viewAvisWindow('all')" style="padding:8px 18px;background:#7C3AED;color:#fff;border:none;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">🏫 View All Akshara Vaagdevi Records →</button>
-  </div>
-</div>
 
 <!-- ═══ OBSERVATIONS ═══ -->
 <div id="pane-observations" class="pane">
@@ -1027,9 +992,40 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="kc amber"><div class="kc-ico">📊</div><div class="kc-lbl">Avg Score</div><div class="kc-val" id="obs-avg">–</div><div class="kc-sub">Out of 5.0</div></div>
     <div class="kc red" onclick="viewObsRecords('NeedsImprovement')" style="cursor:pointer;" title="Click to view teachers needing improvement"><div class="kc-ico">⚠️</div><div class="kc-lbl">Needs Improvement (&lt;3)</div><div class="kc-val" id="obs-ni">–</div><div class="kc-sub" id="obs-ni-s">–</div></div>
   </div>
-  <!-- Observer Tracker — Work Completion % -->
+
+  <!-- 1. Teacher Grand Average Score Distribution (from All_Teacher sheet) -->
   <div class="card" style="margin-bottom:16px;">
-    <div class="ch"><h3>📋 Observer Tracker — Observation Completion %</h3>
+    <div class="ch"><h3>📊 Teacher Grand Average Score — Category Count</h3>
+      <span class="fnote">Count of teachers by grand-average score band · click any bar to view teachers</span>
+    </div>
+    <div class="cb"><div class="cw" style="height:320px;"><canvas id="teacher-grandavg-chart"></canvas></div></div>
+  </div>
+
+  <!-- 2. Branch-wise Grand Avg + Observer Type Split -->
+  <div class="row r2">
+    <div class="card"><div class="ch"><h3>🏫 Branch-wise Observation Values — Teacher Grand Avg</h3><span class="fnote" id="obs-bars-fn">All Branches</span></div><div class="cb"><div class="cw tall"><canvas id="obs-bars-chart"></canvas></div></div></div>
+    <div class="card"><div class="ch"><h3>👁️ Observer Type Split by Branch</h3></div><div class="cb"><div class="cw tall"><canvas id="obs-type-branch"></canvas></div></div></div>
+  </div>
+
+  <!-- 3. Branch × Month Observation Comparison -->
+  <div class="card" style="margin-bottom:16px;"><div class="ch"><h3>📊 Branch × Month Observation Comparison</h3><span class="fnote" id="obs-fn">All Branches · All Months</span></div>
+    <div class="cb-0" style="overflow-x:auto"><table class="cdt" id="obs-cdt"><thead><tr>
+      <th>Branch</th><th>Month</th><th>Total Obs</th><th>Principal</th><th>VP</th><th>HM</th><th>HODs</th><th>Coordinators</th><th>Excellent (≥4)</th><th>Satisfactory (3–4)</th><th>Needs Imp (&lt;3)</th><th>Avg Score</th>
+    </tr></thead><tbody id="obs-tbody"></tbody></table></div>
+  </div>
+  <div style="margin-bottom:14px;">
+      <button onclick="viewAllObservations()" style="padding:8px 18px;background:#1E4FD8;color:#fff;border:none;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">👁️ View All Observation Records →</button>
+    </div>
+
+  <!-- 4. Observer Completion by Type + Best Teachers -->
+  <div class="row r2">
+    <div class="card"><div class="ch"><h3>📊 Observer Completion by Type — Required vs Done</h3><span class="fnote">Working Days × quota (2/day leadership · 1/day HOD) · follows Branch &amp; Month dropdowns</span></div><div class="cb"><div class="cw tall"><canvas id="obs-observer-type"></canvas></div></div></div>
+    <div class="card"><div class="ch"><h3>🌟 Best Teachers — Top Grand Averages</h3><span class="fnote" id="obs-best-fn">Highest grand-avg teachers · click a bar for full records</span></div><div class="cb"><div class="cw tall"><canvas id="obs-best-chart"></canvas></div><div id="obs-best-insight" style="margin-top:10px;font-size:11.5px;color:#334155;line-height:1.55;"></div></div></div>
+  </div>
+
+  <!-- 5. Observer Tracker — moved to the end as requested -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="ch"><h3>📋 Observer Tracker — Observation Completion % &amp; Observer Role</h3>
       <span class="fnote">Required = working days × per-day quota · 2/day for Principal/VP/HM/Incharge/Coordinators · 1/day for each subject HOD (Math/English/Science/Social/Telugu/Hindi/IT/Sports/Dance &amp; Music/Art &amp; Craft…) · click any bar to view records</span>
     </div>
     <div class="cb"><div class="cw" style="height:340px;"><canvas id="obs-completion-chart"></canvas></div></div>
@@ -1039,29 +1035,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     </table></div>
   </div>
 
-  <!-- Teacher Grand Average Score Distribution (from All_Teacher sheet) -->
+  <!-- 6. NEW: ML / data-science style insight summary (end of tab, as requested) -->
   <div class="card" style="margin-bottom:16px;">
-    <div class="ch"><h3>📊 Teacher Grand Average Score — Category Count</h3>
-      <span class="fnote">Count of teachers by grand-average score band · click any bar to view teachers</span>
-    </div>
-    <div class="cb"><div class="cw" style="height:320px;"><canvas id="teacher-grandavg-chart"></canvas></div></div>
-  </div>
-
-  <div class="row r2">
-    <div class="card"><div class="ch"><h3>🏫 Branch-wise Observation Values — Teacher Grand Avg</h3><span class="fnote" id="obs-bars-fn">All Branches</span></div><div class="cb"><div class="cw tall"><canvas id="obs-bars-chart"></canvas></div></div></div>
-    <div class="card"><div class="ch"><h3>👁️ Observer Type Split by Branch</h3></div><div class="cb"><div class="cw tall"><canvas id="obs-type-branch"></canvas></div></div></div>
-  </div>
-  <div class="card"><div class="ch"><h3>📊 Branch × Month Observation Comparison</h3><span class="fnote" id="obs-fn">All Branches · All Months</span></div>
-    <div class="cb-0" style="overflow-x:auto"><table class="cdt" id="obs-cdt"><thead><tr>
-      <th>Branch</th><th>Month</th><th>Total Obs</th><th>Principal</th><th>VP</th><th>HM</th><th>HODs</th><th>Coordinators</th><th>Excellent (≥4)</th><th>Satisfactory (3–4)</th><th>Needs Imp (&lt;3)</th><th>Avg Score</th>
-    </tr></thead><tbody id="obs-tbody"></tbody></table></div>
-  </div>
-  <div style="margin-bottom:14px;">
-      <button onclick="viewAllObservations()" style="padding:8px 18px;background:#1E4FD8;color:#fff;border:none;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">👁️ View All Observation Records →</button>
-    </div>
-    <div class="row r2">
-    <div class="card"><div class="ch"><h3>📊 Observer Completion by Type — Required vs Done</h3><span class="fnote">Working Days × quota (2/day leadership · 1/day HOD) · follows Branch &amp; Month dropdowns</span></div><div class="cb"><div class="cw tall"><canvas id="obs-observer-type"></canvas></div></div></div>
-    <div class="card"><div class="ch"><h3>🌟 Best Teachers — Top Grand Averages</h3><span class="fnote" id="obs-best-fn">Highest grand-avg teachers · click a bar for full records</span></div><div class="cb"><div class="cw tall"><canvas id="obs-best-chart"></canvas></div><div id="obs-best-insight" style="margin-top:10px;font-size:11.5px;color:#334155;line-height:1.55;"></div></div></div>
+    <div class="ch"><h3>🧠 Observation Insights &amp; Improvement Roadmap</h3><span class="fnote" id="obs-insight-fn">Data-science summary across grand-avg distribution, completion &amp; observer mix</span></div>
+    <div class="cb" id="obs-insight-report" style="padding:14px 18px;"></div>
   </div>
 </div>
 
@@ -1112,20 +1089,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   </div>
   <div class="row r2">
     <div class="card"><div class="ch"><h3>🏗️ Task Status by Branch</h3></div><div class="cb"><div class="cw tall"><canvas id="admin-br"></canvas></div></div></div>
-    <div class="card"><div class="ch"><h3>📊 Branch Completion Rate</h3></div><div class="cb">
-      <div class="sband s5">
-        <div class="sb"><div class="sb-v" style="color:#0D9488">93.5%</div><div class="sb-l">Boduppal</div></div>
-        <div class="sb"><div class="sb-v" style="color:#059669">81.3%</div><div class="sb-l">Keesara</div></div>
-        <div class="sb"><div class="sb-v" style="color:#D97706">70.0%</div><div class="sb-l">Pocharam</div></div>
-        <div class="sb"><div class="sb-v" style="color:#DC2626">44.8%</div><div class="sb-l">Bachupally</div></div>
-        <div class="sb"><div class="sb-v" style="color:#DC2626">0%</div><div class="sb-l">Gowdavalli</div></div>
-      </div>
-      <div class="bcb"><div class="bcb-name"><span class="bd bBoduppal"></span>Boduppal</div><div class="bcb-track"><div class="bcb-fill pbg" style="width:93.5%"></div></div><div class="bcb-val" style="color:#0D9488">29/31</div><div class="bcb-sub">93.5%</div></div>
-      <div class="bcb"><div class="bcb-name"><span class="bd bKeesara"></span>Keesara</div><div class="bcb-track"><div class="bcb-fill pbg" style="width:81.3%"></div></div><div class="bcb-val" style="color:#059669">13/16</div><div class="bcb-sub">81.3%</div></div>
-      <div class="bcb"><div class="bcb-name"><span class="bd bPocharam"></span>Pocharam</div><div class="bcb-track"><div class="bcb-fill pba" style="width:70%"></div></div><div class="bcb-val" style="color:#D97706">21/30</div><div class="bcb-sub">70.0%</div></div>
-      <div class="bcb"><div class="bcb-name"><span class="bd bBachupally"></span>Bachupally</div><div class="bcb-track"><div class="bcb-fill pbr" style="width:44.8%"></div></div><div class="bcb-val" style="color:#DC2626">13/29</div><div class="bcb-sub">44.8%</div></div>
-      <div class="bcb"><div class="bcb-name"><span class="bd bGowdavalli"></span>Gowdavalli</div><div class="bcb-track"><div class="bcb-fill pbr" style="width:0%"></div></div><div class="bcb-val" style="color:#DC2626">0/10</div><div class="bcb-sub">0%</div></div>
-      <div class="ins ins-d" style="margin-top:12px"><span>🚨</span><p><strong>Bachupally</strong> at 44.8% — 15 tasks In Progress including AC, furniture, lockers, all overdue. <strong>Gowdavalli</strong> (new campus) setup in progress.</p></div>
+    <div class="card"><div class="ch"><h3>📊 Branch Completion Rate</h3><span class="fnote">Done ÷ total tasks per branch · click a branch to view</span></div><div class="cb" id="admin-comp-box">
+      <div class="no-data" style="padding:16px;">Loading…</div>
     </div></div>
   </div>
   <div class="card">
@@ -1362,6 +1327,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         </select>
       </div>
       <div id="tr-route-report"><div class="no-data" style="padding:16px;">Choose a route above to see its full report.</div></div>
+    </div>
+  </div>
+
+  <!-- Mileage insights -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="ch"><h3>⛽ Mileage &amp; Fuel Insights</h3><span class="fnote">Efficiency by vehicle &amp; route · click a bar to view logs</span></div>
+    <div class="cb" style="padding:6px 14px 12px;">
+      <div id="tr-mil-insight" style="font-size:12px;color:#334155;line-height:1.6;margin-bottom:10px;"></div>
+      <div class="row r2" style="margin:0;">
+        <div><div style="font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase;margin:4px 0 6px;">By Vehicle (KM/L)</div><div class="cw" style="height:300px;"><canvas id="tr-mil-veh"></canvas></div></div>
+        <div><div style="font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase;margin:4px 0 6px;">By Route (KM/L)</div><div class="cw" style="height:300px;"><canvas id="tr-mil-route"></canvas></div></div>
+      </div>
     </div>
   </div>
 </div>
@@ -1698,6 +1675,15 @@ function getLatestMonth(branch){
   for(let i=MONTHS.length-1;i>=0;i--){ if(monthsWithData.includes(MONTHS[i])) return MONTHS[i]; }
   return monthsWithData[0]||MONTHS[MONTHS.length-1];
 }
+// The ACTUAL current calendar month (server timezone via DATE_WINDOWS when available) —
+// unlike getLatestMonth(), this never substitutes an older month just because it has data.
+// Used by "Branch Completion Rate Comparison" so it doesn't get stuck showing a stale month.
+function getCurrentCalendarMonthName(){
+  const W=(typeof getDateWindows==='function')?getDateWindows():null;
+  if(W && W.thisMonth){ const mi=+String(W.thisMonth).slice(5,7)-1; if(mi>=0&&mi<12) return _CAL_MONTHS_FULL[mi]; }
+  return _CAL_MONTHS_FULL[new Date().getMonth()];
+}
+const _CAL_MONTHS_FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
 // Previous CALENDAR month (July → June). Falls back to the latest month with data
 // BEFORE the current calendar month if the exact previous month has no data yet.
 const _CAL_MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -1769,12 +1755,20 @@ function renderOverview(){
     const CSUM=(typeof COMBINED_SUMMARY!=='undefined')?COMBINED_SUMMARY:{};
     const ALLB=['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam'];
 
-    // Confirmed Admissions — PORTAL ONLY (in_both + portal_only), with EXTRAEDGE stage-08 as sub
+    // Confirmed Admissions — Pallavi PORTAL (in_both + portal_only) + Akshara admissions
     let portalConfirmed=0, admCompleted=0;
     ALLB.forEach(b=>{ const cs=CSUM[b]||{}, ls=LS[b]||{};
       portalConfirmed+=cs.portal_total||0; admCompleted+=ls.admission_completed||0; });
-    setTxt('ov-adm-portal', fi(portalConfirmed));
-    setTxt('ov-adm-portal-s', fi(admCompleted)+' EXTRAEDGE stage-08');
+    const _AV=(typeof AVIS_DATA!=='undefined'&&Array.isArray(AVIS_DATA))?AVIS_DATA:[];
+    const aksharaAdm=_lock?0:_AV.filter(r=>r&&r.Student&&r.Student!=='–').length;
+    setTxt('ov-adm-portal', fi(portalConfirmed+aksharaAdm));
+    setTxt('ov-adm-portal-s', aksharaAdm?('Pallavi '+fi(portalConfirmed)+' + Akshara '+fi(aksharaAdm)):(fi(admCompleted)+' EXTRAEDGE stage-08'));
+
+    // Total Students KPI — Pallavi (all branches) + Akshara total strength (separate campus)
+    const _pallaviStu=window._TOTAL_STUDENTS||0;
+    const _aksharaStu=window._AVIS_STRENGTH||0;
+    const _totalStu=_lock?_pallaviStu:(_pallaviStu+_aksharaStu);
+    setTxt('ov-stu', fi(_totalStu)); setTxt('hv-students', fi(_totalStu));
 
     // Teacher Observations — total count
     const OBS=(typeof OBS_DATA!=='undefined'&&Array.isArray(OBS_DATA))?OBS_DATA:[];
@@ -2056,33 +2050,41 @@ function renderGrievanceOfficer(){
       var y=maxT===minT?sH/2:sH-(v-minT)/(maxT-minT)*sH;
       return x.toFixed(1)+','+y.toFixed(1);
     }).join(' ');
-    return '<div style="background:#F8FAFF;border-radius:10px;padding:12px;border-left:3px solid '+BRANCH_COLORS[b]+';min-width:0;">'
+    return '<div onclick="viewGOBranchDetail(\''+b+'\')" style="cursor:pointer;background:#F8FAFF;border-radius:10px;padding:12px;border-left:3px solid '+BRANCH_COLORS[b]+';min-width:0;transition:box-shadow .15s;" title="Click for the full monthly quality breakdown" onmouseover="this.style.boxShadow=\'0 2px 10px rgba(30,79,216,.15)\'" onmouseout="this.style.boxShadow=\'none\'">'
       +'<div style="font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;">'+b+'</div>'
       +'<div style="font-size:11.5px;font-weight:600;color:#1E4FD8;margin:2px 0;">&#x1F464; '+officer+'</div>'
       +'<div style="font-size:22px;font-weight:900;color:'+color+';">'+avg+'%</div>'
-      +'<div style="font-size:10px;color:#94A3B8;">avg quality &bull; '+rows.length+' month(s)</div>'
+      +'<div style="font-size:10px;color:#94A3B8;">avg quality &bull; '+rows.length+' month(s) &bull; click for detail</div>'
       +'<svg width="'+sW+'" height="'+sH+'" style="margin-top:4px;overflow:visible;display:block;">'
       +'<polyline points="'+pts+'" fill="none" stroke="'+BRANCH_COLORS[b]+'" stroke-width="2" stroke-linecap="round"/>'
       +'</svg></div>';
   }).join('');
-  const tbody=document.getElementById('go-tbody');
-  const sortedGO=GO.slice().sort(function(a,b){
-    var bi=branches.indexOf(a.branch)-branches.indexOf(b.branch);
-    if(bi!==0)return bi;
-    return MONTH_ORDER.indexOf(a.month)-MONTH_ORDER.indexOf(b.month);
-  });
-  let html='',prevBranch='';
-  sortedGO.forEach(function(r,i){
-    const isNew=r.branch!==prevBranch; prevBranch=r.branch;
+  window._GO_DATA_CACHE=GO; window._GO_BRANCHES=branches; window._GO_MONTH_ORDER=MONTH_ORDER;
+}
+
+// Click-to-view: full monthly quality breakdown for one branch's grievance officer
+// (was previously a permanently-visible table — now on-demand from the summary card).
+function viewGOBranchDetail(branch){
+  const GO=window._GO_DATA_CACHE||[];
+  const MONTH_ORDER=window._GO_MONTH_ORDER||['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const rows=GO.filter(r=>r.branch===branch).slice().sort((a,c)=>MONTH_ORDER.indexOf(a.month)-MONTH_ORDER.indexOf(c.month));
+  if(!rows.length){ return; }
+  const officer=rows[0].officer;
+  let html='<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11.5px;min-width:600px;">'
+    +'<thead><tr style="background:#EEF2FF;">'
+    +'<th style="padding:7px 10px;text-align:center;font-size:9.5px;font-weight:700;color:#64748B;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Month</th>'
+    +'<th style="padding:7px 10px;text-align:center;font-size:9.5px;font-weight:700;color:#64748B;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Total Calls</th>'
+    +'<th style="padding:7px 10px;text-align:center;font-size:9.5px;font-weight:700;color:#DC2626;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">⚠ Wrong Grievance</th>'
+    +'<th style="padding:7px 10px;text-align:center;font-size:9.5px;font-weight:700;color:#D97706;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">⏳ Empty Status</th>'
+    +'<th style="padding:7px 10px;text-align:center;font-size:9.5px;font-weight:700;color:#7C3AED;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">📅 Empty Date</th>'
+    +'<th style="padding:7px 10px;text-align:center;font-size:9.5px;font-weight:700;color:#0F172A;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Quality Score</th>'
+    +'</tr></thead><tbody>';
+  rows.forEach((r,i)=>{
     const bg=i%2===0?'#fff':'#F8FAFF';
     const qColor=r.quality_score>=90?'#059669':r.quality_score>=80?'#D97706':'#DC2626';
     const qBg   =r.quality_score>=90?'#ECFDF5':r.quality_score>=80?'#FFFBEB':'#FEF2F2';
-    const bar='<div style="background:#E0E8FF;border-radius:4px;height:5px;margin-top:3px;">'
-              +'<div style="background:'+qColor+';width:'+Math.round(r.quality_score)+'%;height:5px;border-radius:4px;"></div></div>';
+    const bar='<div style="background:#E0E8FF;border-radius:4px;height:5px;margin-top:3px;"><div style="background:'+qColor+';width:'+Math.round(r.quality_score)+'%;height:5px;border-radius:4px;"></div></div>';
     html+='<tr style="background:'+bg+';">'
-      +'<td style="padding:8px 10px;border-bottom:1px solid #F1F5F9;">'
-      +(isNew?'<span class="bd b'+r.branch+'"></span><strong>'+r.branch+'</strong><br>':'')
-      +'<span style="font-size:11px;color:#64748B;">'+r.officer+'</span></td>'
       +'<td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;font-weight:600;">'+r.month+'</td>'
       +'<td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">'+r.total_calls.toLocaleString('en-IN')+'</td>'
       +'<td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;'+(r.wrong_grievance>0?'cursor:pointer;':'')+'"'+(r.wrong_grievance>0?' onclick="viewGOIssue(\''+r.branch+'\',\''+r.month+'\',\'wrong_grievance\')" title="Click to view these entries"':'')+'>'
@@ -2094,7 +2096,8 @@ function renderGrievanceOfficer(){
       +'<td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">'
       +'<span style="background:'+qBg+';color:'+qColor+';font-weight:800;font-size:13px;padding:3px 10px;border-radius:20px;">'+r.quality_score+'%</span>'+bar+'</td></tr>';
   });
-  tbody.innerHTML=html;
+  html+='</tbody></table></div><div style="margin-top:8px;font-size:11px;color:#64748B;">Click a highlighted cell above to see the exact offending call records.</div>';
+  openHTMLModal('🎯 '+branch+' — '+officer+' · Monthly Quality Detail','', html);
 }
 
 // Drill-down for the three data-quality columns → lists the exact offending care-call
@@ -2165,9 +2168,10 @@ function viewCallsByBranch(){
   openModal('📞 Calls Made — Branch-wise',`Count of calls made · ${ml}`,rows,cols);
 }
 
-function viewCareRecords(statusFilter){
+function viewCareRecords(statusFilter, branchOverride, monthOverride){
   const ALLCARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
-  let rows=ALLCARE.filter(r=>(fBranch==='ALL'||r.Branch===fBranch)&&(fMonth==='ALL'||r.Month===fMonth));
+  const useBranch=branchOverride||fBranch, useMonth=monthOverride||fMonth;
+  let rows=ALLCARE.filter(r=>(useBranch==='ALL'||r.Branch===useBranch)&&(useMonth==='ALL'||r.Month===useMonth));
   let title=statusFilter;
   if(statusFilter==='ALL'){ title='All Calls Made'; }
   else { rows=rows.filter(r=>r.Status===statusFilter); }
@@ -2177,7 +2181,7 @@ function viewCareRecords(statusFilter){
     {key:'Grievance',label:'Grievance',pill:true},{key:'Remarks',label:'Remarks',maxW:'260px'},
     {key:'Followup',label:'Followup',maxW:'200px'},{key:'Status',label:'Status',pill:true},
   ];
-  const bl=fBranch==='ALL'?'All Branches':fBranch, ml=fMonth==='ALL'?'All Months':fMonth+' 2026';
+  const bl=useBranch==='ALL'?'All Branches':useBranch, ml=useMonth==='ALL'?'All Months':useMonth+' 2026';
   openModal(`📞 Care Calls — ${title}`,`${rows.length.toLocaleString('en-IN')} records · ${bl} · ${ml}`,rows,cols);
 }
 
@@ -2460,6 +2464,68 @@ function renderObservations(){
   renderObsCompletion();
   renderTeacherGrandAvg();
   renderBestTeachers();
+  renderObsInsights();
+}
+
+// ── Observation Insight Summary (data-science style) ──
+function renderObsInsights(){
+  const el=document.getElementById('obs-insight-report'); if(!el) return;
+  const AT=(typeof ALL_TEACHER!=='undefined'&&Array.isArray(ALL_TEACHER))?ALL_TEACHER:[];
+  const OBS=(typeof OBS_DATA!=='undefined'&&Array.isArray(OBS_DATA))?OBS_DATA:[];
+  const scope=AT.filter(r=>(fBranch==='ALL'||r.Branch===fBranch)).filter(r=>{const v=parseFloat(r.GrandAvg);return !isNaN(v)&&v>0;});
+  const obsScope=OBS.filter(r=>(fBranch==='ALL'||r.Branch===fBranch));
+  if(!scope.length&&!obsScope.length){ el.innerHTML='<div class="no-data">No observation data.</div>'; return; }
+  const fn=document.getElementById('obs-insight-fn');
+  if(fn) fn.textContent=(fBranch==='ALL'?'All Branches':fBranch)+' · statistical summary';
+
+  // Stats
+  const avgs=scope.map(r=>parseFloat(r.GrandAvg));
+  const mean=avgs.length?+(avgs.reduce((a,c)=>a+c,0)/avgs.length).toFixed(2):0;
+  const sorted=avgs.slice().sort((a,b)=>a-b);
+  const median=sorted.length?sorted[Math.floor(sorted.length/2)]:0;
+  const stdDev=avgs.length>1?+Math.sqrt(avgs.reduce((s,v)=>s+(v-mean)**2,0)/(avgs.length-1)).toFixed(2):0;
+  const excellent=scope.filter(r=>parseFloat(r.GrandAvg)>=4.5).length;
+  const good=scope.filter(r=>{const v=parseFloat(r.GrandAvg);return v>=4&&v<4.5;}).length;
+  const satisfactory=scope.filter(r=>{const v=parseFloat(r.GrandAvg);return v>=3&&v<4;}).length;
+  const needsImp=scope.filter(r=>parseFloat(r.GrandAvg)<3).length;
+  const total=scope.length;
+  const BR=['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam'];
+  const brAvg={}; BR.forEach(b=>{const t=AT.filter(r=>r.Branch===b).map(r=>parseFloat(r.GrandAvg)).filter(v=>!isNaN(v)&&v>0); brAvg[b]=t.length?+(t.reduce((a,c)=>a+c,0)/t.length).toFixed(2):0;});
+  const bestBranch=BR.filter(b=>brAvg[b]>0).sort((a,b)=>brAvg[b]-brAvg[a])[0];
+  const weakBranch=BR.filter(b=>brAvg[b]>0).sort((a,b)=>brAvg[a]-brAvg[b])[0];
+
+  // Observer completion rate
+  const compEl=document.getElementById('obs-completion-tbody');
+  let avgComp=null;
+  if(compEl){
+    const rows=[...compEl.querySelectorAll('tr')];
+    const pcts=rows.map(r=>{const cells=[...r.querySelectorAll('td')]; const v=cells[5]?parseFloat(cells[5].textContent):NaN; return isNaN(v)?null:v;}).filter(v=>v!==null);
+    if(pcts.length) avgComp=+(pcts.reduce((a,c)=>a+c,0)/pcts.length).toFixed(1);
+  }
+
+  let h='<div style="background:linear-gradient(135deg,#EEF2FF,#F5F3FF);border:1px solid #C7D2FE;border-radius:10px;padding:14px 16px;margin-bottom:12px;">';
+  h+='<div style="font-weight:800;font-size:13px;color:#4F46E5;margin-bottom:8px;">📊 Statistical Summary</div>';
+  h+='<div style="display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:#334155;margin-bottom:10px;">';
+  h+=`<span>👩‍🏫 <strong>${fi(total)}</strong> teachers scored</span>`;
+  h+=`<span>📈 Mean <strong>${mean}</strong> · Median <strong>${median}</strong> · σ <strong>${stdDev}</strong></span>`;
+  h+=`<span>⭐ Excellent <strong>${excellent}</strong> · Good <strong>${good}</strong> · Satisfactory <strong>${satisfactory}</strong> · Needs Imp <strong>${needsImp}</strong></span>`;
+  h+='</div>';
+
+  const insights=[];
+  if(needsImp>0) insights.push(`⚠️ <strong>${needsImp}</strong> teacher(s) (${Math.round(needsImp/total*100)}%) score below 3.0 — assign them a mentor teacher and schedule a follow-up observation within 2 weeks.`);
+  if(excellent>0) insights.push(`🌟 <strong>${excellent}</strong> teacher(s) score ≥4.5 (exemplary) — invite them to lead peer-learning sessions and capture their practices as training material.`);
+  if(stdDev>0.8) insights.push(`📉 Score dispersion is high (σ=${stdDev}) — the gap between best and weakest teachers is wide. Focus professional development on the lower quartile to tighten the distribution.`);
+  else if(stdDev<0.4&&stdDev>0) insights.push(`✅ Score dispersion is low (σ=${stdDev}) — teaching quality is consistent across the cohort. Maintain the current coaching cadence.`);
+  if(bestBranch&&weakBranch&&bestBranch!==weakBranch) insights.push(`🏫 <strong>${bestBranch}</strong> leads with avg ${brAvg[bestBranch]}; <strong>${weakBranch}</strong> is lowest at ${brAvg[weakBranch]}. Replicate ${bestBranch}'s observation-feedback loop at ${weakBranch}.`);
+  if(avgComp!==null) insights.push(avgComp>=80?`📋 Observer completion is strong at <strong>${avgComp}%</strong> — observations are happening at the required pace.`:`📋 Observer completion is at <strong>${avgComp}%</strong> — below the 80% target. Ensure principals and HODs block observation time in their daily schedules.`);
+  if(obsScope.length>0){
+    const withRemarks=obsScope.filter(r=>r.Remarks&&r.Remarks!=='–'&&r.Remarks.length>10).length;
+    const remarkPct=Math.round(withRemarks/obsScope.length*100);
+    insights.push(remarkPct>=70?`💬 <strong>${remarkPct}%</strong> of observations include detailed remarks — good qualitative feedback density.`:`💬 Only <strong>${remarkPct}%</strong> of observations have detailed remarks — encourage observers to write specific, actionable notes for each observation.`);
+  }
+  h+='<ul style="margin:0;padding-left:18px;font-size:12px;color:#334155;line-height:1.7;">'+insights.map(x=>'<li style="margin-bottom:4px;">'+x+'</li>').join('')+'</ul>';
+  h+='</div>';
+  el.innerHTML=h;
 }
 
 // Observer Tracker — Observation Completion % per role per branch
@@ -2700,8 +2766,18 @@ function viewTeacherGrandAvg(bandKey){
 // ════════════════════════════════════════════
 function renderAdmin(){
   const BRANCHES=['Boduppal','Keesara','Pocharam','Bachupally','Gowdavalli'];
+  // Admin data — filter by branch AND by month so the completion rate reflects the selected
+  // period, not all-time totals (which never changed week-to-week, causing the "stale" bug).
+  // Month is matched against StartDate or CompletionDate: a task belongs to a month if it
+  // was either started or completed in that month.
+  const _MO_MAP={January:'01',February:'02',March:'03',April:'04',May:'05',June:'06',July:'07',August:'08',September:'09',October:'10',November:'11',December:'12'};
+  function _admInMonth(r,ym){
+    const sd=String(r.StartDate||'').slice(0,7), cd=String(r.CompletionDate||'').slice(0,7), dl=String(r.Deadline||'').slice(0,7);
+    return sd===ym||cd===ym||dl===ym;
+  }
+  const _admYM=fMonth!=='ALL'&&_MO_MAP[fMonth]?('2026-'+_MO_MAP[fMonth]):null;
   const _aRows=(typeof ADMIN_DATA!=='undefined'&&Array.isArray(ADMIN_DATA))
-    ? ADMIN_DATA.filter(r=>fBranch==='ALL'||r.Branch===fBranch)
+    ? ADMIN_DATA.filter(r=>(fBranch==='ALL'||r.Branch===fBranch)&&(!_admYM||_admInMonth(r,_admYM)))
     : [];
   // Overdue parser: DaysDue like "Overdue (26 days)" → 26; "Completed" → null
   function overdueDays(r){
@@ -2709,9 +2785,9 @@ function renderAdmin(){
     const m=s.match(/overdue\s*\((\d+)/i);
     return m?parseInt(m[1],10):(/overdue/i.test(s)?1:null);
   }
-  const isDone=r=>/done|completed/i.test(r.Status||'');
-  const isIP=r=>/in progress/i.test(r.Status||'');
-  const isHoldOpen=r=>/hold|open|pending/i.test(r.Status||'');
+  const isDone=r=>/\b(done|complete|completed|closed|finished|resolved)\b/i.test(r.Status||'');
+  const isIP=r=>/in[\s-]?progress|ongoing|working|wip/i.test(r.Status||'');
+  const isHoldOpen=r=>!isDone(r)&&!isIP(r)&&/hold|open|pending|new|yet|not[\s-]?started|todo|to[\s-]?do|assigned/i.test(r.Status||'');
 
   const done=  BRANCHES.map(b=>_aRows.filter(r=>r.Branch===b&&isDone(r)).length);
   const inprog=BRANCHES.map(b=>_aRows.filter(r=>r.Branch===b&&isIP(r)).length);
@@ -2822,6 +2898,25 @@ function renderAdmin(){
     scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,grid:{color:'#E0E8FF'},ticks:{maxTicksLimit:6}}}
   }});
 
+  // 📊 Branch Completion Rate — DYNAMIC (Done ÷ total tasks per branch) · was hardcoded before
+  const _cbox=document.getElementById('admin-comp-box');
+  if(_cbox){
+    const bcomp=BRANCHES.map(b=>{
+      const rs=_aRows.filter(r=>r.Branch===b);
+      const d=rs.filter(isDone).length, t=rs.length;
+      return {b,d,t,pct:t>0?Math.round(d/t*100):0};
+    }).filter(x=>x.t>0).sort((a,b)=>b.pct-a.pct);
+    if(!bcomp.length){ _cbox.innerHTML='<div class="no-data" style="padding:16px;">No admin tasks for this selection.</div>'; }
+    else{
+      const col=p=>p>=85?'#059669':p>=70?'#0D9488':p>=50?'#D97706':'#DC2626';
+      const fillcls=p=>p>=70?'pbg':p>=50?'pba':'pbr';
+      let h='<div class="sband s'+Math.min(5,bcomp.length)+'">'+bcomp.map(x=>
+        `<div class="sb" style="cursor:pointer" onclick="viewAdminRecords('ALL','${x.b}')"><div class="sb-v" style="color:${col(x.pct)}">${x.pct}%</div><div class="sb-l">${x.b}</div></div>`).join('')+'</div>';
+      h+=bcomp.map(x=>`<div class="bcb" style="cursor:pointer" onclick="viewAdminRecords('ALL','${x.b}')"><div class="bcb-name"><span class="bd b${x.b}"></span>${x.b}</div><div class="bcb-track"><div class="bcb-fill ${fillcls(x.pct)}" style="width:${x.pct}%"></div></div><div class="bcb-val" style="color:${col(x.pct)}">${x.d}/${x.t}</div><div class="bcb-sub">${x.pct}%</div></div>`).join('');
+      _cbox.innerHTML=h;
+    }
+  }
+
   renderAdminPerformance(_aRows,BRANCHES,isDone,isIP,isHoldOpen,overdueDays);
 }
 
@@ -2873,17 +2968,19 @@ function viewAdminClosedWeek(period){
   const rng=period==='this'?(W?`${fmtDispDate(W.weekStart)} – today`:'this week'):(W?`${fmtDispDate(W.lastWeekStart)} – ${fmtDispDate(W.lastWeekEnd)}`:'last week');
   openModal(`🏗️ Tasks Closed — ${period==='this'?'Current Week':'Last Week'}`,`${rows.length} task(s) · ${bl} · ${rng}`,rows,_ADMIN_COLS);
 }
-function viewAdminRecords(statusFilter){
+function viewAdminRecords(statusFilter,branch){
   const ALLADMIN=(typeof ADMIN_DATA!=='undefined'&&Array.isArray(ADMIN_DATA))?ADMIN_DATA:[];
-  let rows=ALLADMIN.filter(r=>fBranch==='ALL'||r.Branch===fBranch);
+  const bfil=branch||null;
+  let rows=ALLADMIN.filter(r=>bfil?r.Branch===bfil:(fBranch==='ALL'||r.Branch===fBranch));
   function odDays(r){const m=String(r.DaysDue||'').match(/overdue\s*\((\d+)/i);return m?parseInt(m[1],10):(/overdue/i.test(String(r.DaysDue||''))?1:null);}
   if(statusFilter==='Hold/Open') rows=rows.filter(r=>/hold|open|pending/i.test(r.Status||''));
   else if(statusFilter==='Overdue') rows=rows.filter(r=>odDays(r)!==null&&!/done|completed/i.test(r.Status||'')).sort((a,b)=>(odDays(b)||0)-(odDays(a)||0));
   else if(statusFilter==='In Progress') rows=rows.filter(r=>/in progress/i.test(r.Status||''));
   else if(statusFilter==='Done') rows=rows.filter(r=>/done|completed/i.test(r.Status||''));
-  else rows=rows.filter(r=>r.Status===statusFilter);
-  const bl=fBranch==='ALL'?'All Branches':fBranch;
-  openModal(`🏗️ Admin Tasks — ${statusFilter}`,`${rows.length.toLocaleString('en-IN')} records · ${bl}`,rows,_ADMIN_COLS);
+  else if(statusFilter&&statusFilter!=='ALL') rows=rows.filter(r=>r.Status===statusFilter);
+  const bl=bfil||(fBranch==='ALL'?'All Branches':fBranch);
+  const lbl=(statusFilter&&statusFilter!=='ALL')?statusFilter:'All Tasks';
+  openModal(`🏗️ Admin Tasks — ${lbl}`,`${rows.length.toLocaleString('en-IN')} records · ${bl}`,rows,_ADMIN_COLS);
 }
 
 // View tasks for a specific branch + status band (from chart click)
@@ -4292,7 +4389,8 @@ function renderAdmissions(){
   }});
 
   // ── Walk-In Admission % by Counsellor (= Walk-In Admissions ÷ Walk-In Leads, per counsellor) ──
-  const activeOwners=OS.filter(o=>activeBranches.includes(o.branch)).sort((a,b)=>b.walkin_pct-a.walkin_pct);
+  // Narmada (Bachupally) is a legacy/handover owner with no active pipeline — excluded from ranking.
+  const activeOwners=OS.filter(o=>activeBranches.includes(o.branch) && !/^narmada$/i.test(String(o.owner||'').trim())).sort((a,b)=>b.walkin_pct-a.walkin_pct);
   const _medals=['🥇','🥈','🥉'];
   mkChart('adm-walkin-chart',{type:'bar',data:{
     labels:activeOwners.map((o,i)=>`${_medals[i]||(i+1)+'.'} ${o.owner} (${o.branch})`),
@@ -4317,7 +4415,7 @@ function renderAdmissions(){
   const ctbody=document.getElementById('adm-counsellor-tbody');
   let ctHTML='';
   activeBranches.forEach(b=>{
-    const owners=OS.filter(o=>o.branch===b);
+    const owners=OS.filter(o=>o.branch===b && !/^narmada$/i.test(String(o.owner||'').trim()));
     if(owners.length===0)return;
     const bTotal={leads:0,adm:0,walkin:0,digital:0,digitalLeads:0,walkinLeads:0};
     owners.forEach(o=>{
@@ -4567,6 +4665,50 @@ function renderAdmissionTrends(){
 
   // ── Suggestions: how to grow admissions next academic year ──
   renderAdmissionSuggestions(byYear, years, MONTH_ORDER, predLabel, predTotal, yearTotals);
+  renderTCReport();
+}
+
+// TC (Transfer Certificate) report — from Admission Trends data where Type==='TC'
+function renderTCReport(){
+  const AT=(typeof ADM_TRENDS!=='undefined'&&Array.isArray(ADM_TRENDS))?ADM_TRENDS:[];
+  const tcRows=AT.filter(r=>r.Type==='TC'&&(fBranch==='ALL'||r.Branch===fBranch));
+  const chartEl=document.getElementById('adm-tc-chart');
+  const tbody=document.getElementById('adm-tc-tbody');
+  if(!chartEl&&!tbody) return;
+  if(!tcRows.length){
+    if(chartEl) mkChart('adm-tc-chart',{type:'bar',data:{labels:[],datasets:[]},options:{responsive:true,maintainAspectRatio:true}});
+    if(tbody) tbody.innerHTML='<tr><td colspan="3" class="no-data">No TC data in Admission Trends.</td></tr>';
+    return;
+  }
+  // Aggregate by academic year × branch
+  const years=[...new Set(tcRows.map(r=>r.AcademicYear))].sort();
+  const BR=[...new Set(tcRows.map(r=>r.Branch))].sort();
+  const byYB={};
+  tcRows.forEach(r=>{const k=r.AcademicYear+'||'+r.Branch; byYB[k]=(byYB[k]||0)+r.Count;});
+  // Chart: grouped bar by year, one dataset per branch
+  const COLORS=['#1E4FD8','#059669','#D97706','#DC2626','#7C3AED','#0D9488'];
+  if(chartEl){
+    mkChart('adm-tc-chart',{type:'bar',
+      data:{labels:years,datasets:BR.map((b,i)=>({label:b,data:years.map(y=>byYB[y+'||'+b]||0),backgroundColor:COLORS[i%COLORS.length],borderRadius:4,maxBarThickness:28}))},
+      options:{responsive:true,maintainAspectRatio:true,
+        onClick:(e,el)=>{ if(el&&el.length){ const yi=el[0].index; const di=el[0].datasetIndex; viewTCRecords(years[yi],BR[di]); } },
+        plugins:{legend:{position:'bottom',labels:{font:{size:10},usePointStyle:true}},
+          datalabels:{display:true,anchor:'end',align:'top',color:'#0F172A',font:{size:9.5,weight:'bold'},formatter:v=>v>0?v:''}},
+        layout:{padding:{top:18}},
+        scales:{y:{beginAtZero:true,grid:{color:'#E0E8FF'},ticks:{precision:0}},x:{grid:{display:false}}}}});
+  }
+  if(tbody){
+    tbody.innerHTML=BR.map(b=>years.map(y=>{
+      const cnt=byYB[y+'||'+b]||0; if(!cnt) return '';
+      return `<tr style="cursor:pointer" onclick="viewTCRecords('${y}','${b}')"><td><span class="bd b${b}"></span>${b}</td><td>${y}</td><td style="font-weight:700;">${cnt}</td></tr>`;
+    }).join('')).join('')||'<tr><td colspan="3" class="no-data">No TC data</td></tr>';
+  }
+}
+function viewTCRecords(year,branch){
+  const AT=(typeof ADM_TRENDS!=='undefined'&&Array.isArray(ADM_TRENDS))?ADM_TRENDS:[];
+  const rows=AT.filter(r=>r.Type==='TC'&&r.AcademicYear===year&&(!branch||r.Branch===branch));
+  const cols=[{key:'Branch',label:'Branch'},{key:'Month',label:'Month'},{key:'AcademicYear',label:'Academic Year'},{key:'Count',label:'TC Count'}];
+  openModal('📤 Transfer Certificates — '+year+(branch?' · '+branch:''),`${rows.length} month(s) · ${rows.reduce((s,r)=>s+r.Count,0)} TCs total`,rows,cols);
 }
 
 // Data-driven suggestions panel for growing next-year admissions
@@ -5113,114 +5255,121 @@ function _sentiment(text){
 }
 
 function renderCareSummary(){
-  const el=document.getElementById('care-summary-report');
-  if(!el) return;
+  const el=document.getElementById('care-summary-report'); if(!el)return;
   const CARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
-  const GO=(typeof GO_DATA!=='undefined'&&Array.isArray(GO_DATA))?GO_DATA:[];
   const BR=['Boduppal','Keesara','Pocharam','Bachupally','Gowdavalli'];
   const scope=(fBranch==='ALL')?BR:[fBranch];
   const fnEl=document.getElementById('care-summary-fn');
-  if(fnEl) fnEl.textContent='Grievance-category groups + NLP sentiment on Remarks & Follow-up · '+(fBranch==='ALL'?'All Branches':fBranch)+(fMonth==='ALL'?'':' · '+fMonth);
+  if(fnEl) fnEl.textContent='Parents-satisfied % + grievance-category insights · '+(fBranch==='ALL'?'All Branches':fBranch)+(fMonth==='ALL'?'':' · '+fMonth);
+  const rows=CARE.filter(r=>scope.includes(r.Branch)&&(fMonth==='ALL'||r.Month===fMonth));
+  if(!rows.length){ el.innerHTML='<div class="no-data">No care-call data for this filter.</div>'; return; }
 
-  const rowsAll=CARE.filter(r=>scope.includes(r.Branch)&&(fMonth==='ALL'||r.Month===fMonth));
-  if(!rowsAll.length){ el.innerHTML='<div class="no-data">No care-call data for this filter.</div>'; return; }
-
-  // Grievance category groups (Other counts as a real category, not an error)
   const CATS=['No Concern','Not Answering','Academics','Behaviour / Wellbeing','Administration','Transport','Co Curricular','New Admission','No Response','Other'];
-  function analyse(rows){
-    const cat={}; CATS.forEach(c=>cat[c]=0);
-    let pos=0,neg=0,neu=0,texts=0;
-    const negBy={}; CATS.forEach(c=>negBy[c]=0);
-    rows.forEach(r=>{
-      const c=CATS.includes(r.Grievance)?r.Grievance:'Other'; cat[c]=(cat[c]||0)+1;
-      const rem=String(r.Remarks||''), fu=String(r.Followup||'');
-      const blob=(rem==='–'?'':rem)+' '+(fu==='–'?'':fu);
-      if(blob.trim()){ texts++; const s=_sentiment(blob);
-        if(s.label==='Positive')pos++; else if(s.label==='Negative'){neg++; negBy[c]=(negBy[c]||0)+1;} else neu++; }
-    });
-    return {n:rows.length,cat,pos,neg,neu,texts,negBy};
-  }
+  const META={
+    'No Concern':{e:'😊',c:'#22C55E',act:'Parents satisfied — capture as testimonials for admissions marketing.'},
+    'Not Answering':{e:'📵',c:'#F59E0B',act:'Unreachable — retry at varied times & update phone numbers.'},
+    'Academics':{e:'📚',c:'#3B82F6',act:'Academic concerns — share with subject coordinators for intervention.'},
+    'Behaviour / Wellbeing':{e:'🧩',c:'#EF4444',act:'Behaviour / wellbeing — involve the counsellor & track patterns.'},
+    'Administration':{e:'🏫',c:'#8B5CF6',act:'Admin / process issues — fast-track resolution with the front office.'},
+    'Transport':{e:'🚌',c:'#14B8A6',act:'Transport concerns — coordinate with the transport desk.'},
+    'Co Curricular':{e:'🎨',c:'#EC4899',act:'Co-curricular feedback — route to activity coordinators.'},
+    'New Admission':{e:'🆕',c:'#0EA5E9',act:'New-admission queries — nurture these for conversion.'},
+    'No Response':{e:'🔕',c:'#64748B',act:'No response — schedule callbacks at a different time slot.'},
+    'Other':{e:'📌',c:'#94A3B8',act:'Uncategorised — review manually and re-tag.'}
+  };
+  const cat={}; CATS.forEach(c=>cat[c]=0);
+  rows.forEach(r=>{ const c=CATS.includes(r.Grievance)?r.Grievance:'Other'; cat[c]++; });
+  const total=rows.length;
+  const noConcern=cat['No Concern']||0;
+  const satisfiedPct=Math.round(noConcern/total*100);
+  const concern=total-noConcern, concernPct=100-satisfiedPct;
+  const present=CATS.filter(c=>cat[c]>0).sort((a,b)=>cat[b]-cat[a]);
+  window._CARE_PIE_CATS=present;
+  const concernCats=present.filter(c=>c!=='No Concern');
+  const topConcern=concernCats[0];
 
-  const sysA=analyse(rowsAll);
-  const topCats=CATS.map(c=>[c,sysA.cat[c]]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);
-  const sentTot=sysA.pos+sysA.neg+sysA.neu||1;
-  const posPct=Math.round(sysA.pos/sentTot*100), negPct=Math.round(sysA.neg/sentTot*100), neuPct=100-posPct-negPct;
-  const topNegCat=CATS.map(c=>[c,sysA.negBy[c]]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1])[0];
-
-  function bar(label,val,total,color){
-    const p=total>0?Math.round(val/total*100):0;
-    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:11.5px;">
-      <div style="width:130px;color:#334155;cursor:pointer;text-decoration:underline dotted;" onclick="viewCareGrievance('${label.replace(/'/g,"\\'")}')" title="Click to view these calls">${label}</div>
-      <div style="flex:1;background:#F1F5F9;border-radius:6px;height:14px;overflow:hidden;"><div style="width:${p}%;height:100%;background:${color};"></div></div>
-      <div style="width:64px;text-align:right;color:#0F172A;font-weight:700;">${fi(val)} <small style="color:#94A3B8;">${p}%</small></div>
-    </div>`;
-  }
-  const catColors=['#94A3B8','#F59E0B','#3B82F6','#EF4444','#8B5CF6','#14B8A6','#EC4899','#22C55E','#64748B','#0EA5E9'];
-
-  let html='';
-  // Overview + sentiment headline
-  html+='<div style="background:linear-gradient(135deg,#EEF2FF,#F0FDFA);border:1px solid #C7D2FE;border-radius:10px;padding:13px 15px;margin-bottom:14px;font-size:12.5px;color:#0F172A;line-height:1.65;">'
-    +'🧠 <strong>NLP Insight:</strong> analysed <strong>'+fi(sysA.n)+'</strong> care calls; <strong>'+fi(sysA.texts)+'</strong> carried remarks / follow-up text. '
-    +'Sentiment split — <span style="color:#059669;font-weight:700;">'+posPct+'% positive</span>, '
-    +'<span style="color:#DC2626;font-weight:700;">'+negPct+'% negative</span>, '
-    +'<span style="color:#64748B;font-weight:700;">'+neuPct+'% neutral</span>. '
-    +(topCats[0]?('Most-raised group: <strong>'+topCats[0][0]+'</strong> ('+fi(topCats[0][1])+' calls).'):'')
-    +(topNegCat?(' Highest negative sentiment sits in <strong>'+topNegCat[0]+'</strong> — prioritise these follow-ups.'):'')
-    +'</div>';
-
-  // Two columns: grievance groups bar list + sentiment donut-ish + insights
-  html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;">';
-  // Card 1: grievance category groups
-  html+='<div style="border:1px solid #E0E8FF;border-radius:10px;padding:12px 14px;background:#fff;">'
-    +'<div style="font-weight:800;font-size:13px;color:#0F172A;margin-bottom:10px;">📂 Grievance Category Groups</div>';
-  topCats.forEach((c,i)=>{ html+=bar(c[0],c[1],sysA.n,catColors[CATS.indexOf(c[0])%catColors.length]); });
-  html+='</div>';
-
-  // Card 2: sentiment breakdown + data-science insights
-  const insights=[];
-  if(negPct>=25) insights.push('🔴 Negative sentiment is high ('+negPct+'%). Route these calls to a senior counsellor and log a resolution note within 48h.');
-  if(topNegCat) insights.push('🎯 <strong>'+topNegCat[0]+'</strong> drives the most negative remarks — run a focused parent-engagement drive for this theme.');
-  const behav=sysA.cat['Behaviour / Wellbeing']||0, acad=sysA.cat['Academics']||0;
-  if(behav>0) insights.push('🧩 Behaviour/Wellbeing raised in '+fi(behav)+' calls — loop in the counsellor/wellbeing lead for pattern tracking.');
-  if(acad>0) insights.push('📚 Academics raised in '+fi(acad)+' calls — share with academic coordinators for subject-level intervention.');
-  const naCount=(sysA.cat['Not Answering']||0)+(sysA.cat['No Response']||0);
-  if(naCount>0) insights.push('📵 '+fi(naCount)+' calls went unanswered / no-response — retry at varied times and update contact numbers.');
-  if(posPct>=60) insights.push('✅ Sentiment is largely positive ('+posPct+'%) — capture these as testimonials for admissions marketing.');
-  if(!insights.length) insights.push('Sentiment is balanced; keep monitoring the top categories week-on-week.');
-
-  html+='<div style="border:1px solid #E0E8FF;border-radius:10px;padding:12px 14px;background:#fff;">'
-    +'<div style="font-weight:800;font-size:13px;color:#0F172A;margin-bottom:10px;">💬 Sentiment & Data-Driven Actions</div>'
-    +'<div style="display:flex;gap:6px;margin-bottom:10px;height:16px;border-radius:8px;overflow:hidden;">'
-      +'<div style="width:'+posPct+'%;background:#22C55E;" title="Positive '+posPct+'%"></div>'
-      +'<div style="width:'+neuPct+'%;background:#CBD5E1;" title="Neutral '+neuPct+'%"></div>'
-      +'<div style="width:'+negPct+'%;background:#EF4444;" title="Negative '+negPct+'%"></div>'
-    +'</div>'
-    +'<ul style="margin:0;padding-left:18px;font-size:11.5px;color:#334155;line-height:1.7;">'+insights.map(x=>'<li>'+x+'</li>').join('')+'</ul>'
-    +'</div>';
-  html+='</div>';
-
-  // Per-branch grievance + sentiment mini-cards
-  html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-top:14px;">';
-  scope.forEach(b=>{
-    const br=rowsAll.filter(r=>r.Branch===b); if(!br.length) return;
-    const a=analyse(br); const t=a.pos+a.neg+a.neu||1;
-    const bnegPct=Math.round(a.neg/t*100), bposPct=Math.round(a.pos/t*100);
-    const top=CATS.map(c=>[c,a.cat[c]]).filter(x=>x[1]>0).sort((x,y)=>y[1]-x[1]).slice(0,3);
-    const officer=(GO.find(g=>g.branch===b)||{}).officer||'–';
-    html+=`<div style="border:1px solid #E0E8FF;border-radius:10px;padding:12px 14px;background:#fff;">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
-        <div style="font-weight:800;font-size:13px;color:#0F172A;"><span class="bd b${b}"></span> ${b}</div>
-        <div style="font-size:11px;color:#64748B;">Officer: <strong>${officer}</strong></div>
-      </div>
-      <div style="font-size:11.5px;color:#334155;margin-bottom:6px;">${fi(a.n)} calls · top: ${top.map(x=>x[0]+' ('+x[1]+')').join(', ')}</div>
-      <div style="display:flex;gap:4px;height:12px;border-radius:6px;overflow:hidden;margin-bottom:4px;">
-        <div style="width:${bposPct}%;background:#22C55E;"></div><div style="width:${100-bposPct-bnegPct}%;background:#CBD5E1;"></div><div style="width:${bnegPct}%;background:#EF4444;"></div>
-      </div>
-      <div style="font-size:11px;color:#64748B;"><span style="color:#059669;font-weight:700;">${bposPct}%＋</span> · <span style="color:#DC2626;font-weight:700;">${bnegPct}%－</span>${bnegPct>=25?' &nbsp;⚠ elevated negativity':''}</div>
-    </div>`;
+  // ── NLP sentiment across Remarks + Follow-up text (data-science layer on top of the raw categories) ──
+  let pos=0,neg=0,neu=0,texted=0;
+  const negByCat={}; CATS.forEach(c=>negByCat[c]=0);
+  rows.forEach(r=>{
+    const blob=((r.Remarks&&r.Remarks!=='–')?r.Remarks:'')+' '+((r.Followup&&r.Followup!=='–')?r.Followup:'');
+    if(!blob.trim()) return;
+    texted++;
+    const s=_sentiment(blob);
+    if(s.label==='Positive')pos++; else if(s.label==='Negative'){neg++; const c=CATS.includes(r.Grievance)?r.Grievance:'Other'; negByCat[c]=(negByCat[c]||0)+1;} else neu++;
   });
-  html+='</div>';
-  el.innerHTML=html;
+  const sentTot=(pos+neg+neu)||1;
+  const posPct=Math.round(pos/sentTot*100), negPct=Math.round(neg/sentTot*100);
+  const topNegCat=CATS.map(c=>[c,negByCat[c]]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1])[0];
+
+  // Branch comparison (only meaningful with "All Branches")
+  let branchNote='';
+  if(fBranch==='ALL'){
+    const byBranch={}; scope.forEach(b=>byBranch[b]={tot:0,ok:0});
+    rows.forEach(r=>{ if(byBranch[r.Branch]){ byBranch[r.Branch].tot++; if(r.Grievance==='No Concern') byBranch[r.Branch].ok++; } });
+    const ranked=Object.entries(byBranch).filter(([,v])=>v.tot>0).map(([b,v])=>[b,Math.round(v.ok/v.tot*100)]).sort((a,b)=>b[1]-a[1]);
+    if(ranked.length>1) branchNote=`<strong>${ranked[0][0]}</strong> leads parent satisfaction at <strong>${ranked[0][1]}%</strong>; <strong>${ranked[ranked.length-1][0]}</strong> is lowest at <strong>${ranked[ranked.length-1][1]}%</strong> — share ${ranked[0][0]}'s call script with the lower branch.`;
+  }
+
+  // KPI strip
+  const satColor=satisfiedPct>=80?'#059669':satisfiedPct>=60?'#D97706':'#DC2626';
+  let h='<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;">'
+    +`<div style="flex:1;min-width:170px;background:linear-gradient(135deg,#ECFDF5,#F0FDFA);border:1px solid #A7F3D0;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="viewCareGrievance('No Concern')" title="Click to view satisfied parents">
+        <div style="font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:.4px;">😊 Parents Satisfied</div>
+        <div style="font-size:30px;font-weight:800;color:${satColor};line-height:1.1;margin-top:2px;">${satisfiedPct}%</div>
+        <div style="font-size:11px;color:#64748B;">${fi(noConcern)} of ${fi(total)} calls had No Concern</div></div>`
+    +`<div style="flex:1;min-width:170px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:11px;padding:12px 15px;">
+        <div style="font-size:11px;font-weight:700;color:#D97706;text-transform:uppercase;letter-spacing:.4px;">⚠ Concerns Raised</div>
+        <div style="font-size:30px;font-weight:800;color:#D97706;line-height:1.1;margin-top:2px;">${concernPct}%</div>
+        <div style="font-size:11px;color:#64748B;">${fi(concern)} calls need attention${topConcern?(' · top: '+META[topConcern].e+' '+topConcern):''}</div></div>`
+    +`<div style="flex:1;min-width:170px;background:#EEF2FF;border:1px solid #C7D2FE;border-radius:11px;padding:12px 15px;">
+        <div style="font-size:11px;font-weight:700;color:#1E4FD8;text-transform:uppercase;letter-spacing:.4px;">💬 Text Sentiment</div>
+        <div style="font-size:30px;font-weight:800;color:${posPct>=negPct?'#059669':'#DC2626'};line-height:1.1;margin-top:2px;">${posPct}% <span style="font-size:15px;">😊</span></div>
+        <div style="font-size:11px;color:#64748B;">${fi(texted)} remarks analysed · ${negPct}% negative 😟</div></div>`
+    +`<div style="flex:1;min-width:150px;background:#F5F3FF;border:1px solid #DDD6FE;border-radius:11px;padding:12px 15px;">
+        <div style="font-size:11px;font-weight:700;color:#7C3AED;text-transform:uppercase;letter-spacing:.4px;">📞 Calls Analysed</div>
+        <div style="font-size:30px;font-weight:800;color:#7C3AED;line-height:1.1;margin-top:2px;">${fi(total)}</div>
+        <div style="font-size:11px;color:#64748B;">${present.length} grievance categories</div></div>`
+    +'</div>';
+
+  // ── 3-column: category mix (left) · PIE CHART (middle) · synthesized data-driven insights (right) ──
+  const catListHtml=present.map(c=>{
+    const m=META[c], p=Math.round(cat[c]/total*100);
+    return `<div onclick="viewCareGrievance('${c.replace(/'/g,"\\'")}')" style="display:flex;gap:8px;align-items:center;padding:6px 9px;border-radius:8px;cursor:pointer;border-left:3px solid ${m.c};background:#F8FAFC;margin-bottom:5px;" title="Click to view these calls">
+      <div style="width:26px;height:26px;border-radius:8px;background:${m.c}20;display:flex;align-items:center;justify-content:center;font-size:14px;flex:0 0 auto;">${m.e}</div>
+      <div style="flex:1;min-width:0;"><div style="font-size:11.5px;font-weight:700;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c}</div></div>
+      <div style="font-size:12px;font-weight:800;color:${m.c};white-space:nowrap;">${fi(cat[c])} <small style="color:#94A3B8;font-weight:600;">${p}%</small></div></div>`;
+  }).join('');
+
+  // Synthesized insights — cross-category / sentiment / branch, not just a 1:1 category echo
+  const insights=[];
+  insights.push(`😊 <strong>${satisfiedPct}%</strong> of calls this period had <strong>No Concern</strong> — treat this as your parent-satisfaction score.`);
+  if(topConcern) insights.push(`${META[topConcern].e} Leading concern is <strong>${topConcern}</strong> (${fi(cat[topConcern])} calls, ${Math.round(cat[topConcern]/total*100)}%). ${META[topConcern].act}`);
+  if(topNegCat) insights.push(`😟 NLP flags <strong>${topNegCat[0]}</strong> as carrying the most negative-sentiment remarks — prioritise these follow-ups first.`);
+  if(negPct>=25) insights.push(`🔴 Overall negative sentiment is high (${negPct}%) — route flagged calls to a senior counsellor with a 48h resolution SLA.`);
+  else if(posPct>=60) insights.push(`✅ Sentiment is largely positive (${posPct}%) — good candidates for parent testimonials in admissions marketing.`);
+  const naCount=(cat['Not Answering']||0)+(cat['No Response']||0);
+  if(naCount>0) insights.push(`📵 <strong>${fi(naCount)}</strong> calls went unanswered / no-response (${Math.round(naCount/total*100)}%) — retry at varied times and refresh contact numbers.`);
+  if(branchNote) insights.push('🏫 '+branchNote);
+  if(!insights.length) insights.push('Sentiment and categories are balanced — keep monitoring week-on-week.');
+
+  h+='<div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:16px;align-items:start;">'
+    +'<div><div style="font-size:12px;font-weight:800;color:#0F172A;margin-bottom:8px;">📂 Category Mix</div>'+catListHtml+'</div>'
+    +'<div style="text-align:center;"><div style="height:270px;position:relative;"><canvas id="care-summary-pie"></canvas></div>'
+      +'<div style="font-size:10.5px;color:#94A3B8;margin-top:4px;">🥧 Grievance mix · click a slice to view those calls</div></div>'
+    +'<div><div style="font-size:12px;font-weight:800;color:#0F172A;margin-bottom:8px;">🧠 Data-Driven Insights</div>'
+      +'<ul style="margin:0;padding-left:16px;font-size:11.5px;color:#334155;line-height:1.65;">'+insights.map(x=>'<li style="margin-bottom:5px;">'+x+'</li>').join('')+'</ul></div>'
+    +'</div>'
+    +'<div style="@media(max-width:900px){display:none}"></div>';
+  el.innerHTML=h;
+
+  mkChart('care-summary-pie',{type:'doughnut',
+    data:{labels:present,datasets:[{data:present.map(c=>cat[c]),backgroundColor:present.map(c=>META[c].c),borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'52%',
+      onClick:(e,el2)=>{if(el2&&el2.length)viewCareGrievance(window._CARE_PIE_CATS[el2[0].index]);},
+      plugins:{legend:{position:'bottom',labels:{font:{size:9},usePointStyle:true,padding:7,boxWidth:8}},
+        datalabels:{display:true,color:'#fff',font:{weight:'bold',size:10.5},formatter:(v)=>{const p=Math.round(v/total*100);return p>=7?p+'%':'';}},
+        tooltip:{callbacks:{label:cx=>cx.label+': '+fi(cx.parsed)+' ('+Math.round(cx.parsed/total*100)+'%)'}}}}});
 }
 
 // Drill-down: care calls in a grievance category (respects current branch+month filter)
@@ -5284,23 +5433,25 @@ function renderCare(){
     document.getElementById('cc-ip-tbody').innerHTML=quickRowsHtml(ipRows,'#7C3AED');
   }
 
-  // Branch bars — CURRENT month by default; a Month selection in the dropdown overrides it
+  // Branch bars — ALWAYS the current calendar month by default (never silently substitutes
+  // an older month just because it has data); a Month selection in the dropdown overrides it.
   let html='';
   const _careSB=window._STUDENTS_BY_BRANCH||{};
   const careCmpBranches=fBranch==='ALL'?BRANCHES:[fBranch];
+  const _curCalMonth=getCurrentCalendarMonthName();
   careCmpBranches.forEach(b=>{
-    const useMonth=fMonth!=='ALL'?fMonth:getLatestMonth(b);
+    const useMonth=fMonth!=='ALL'?fMonth:_curCalMonth;
     const rec=TRACKER.find(r=>r.branch===b&&r.month===useMonth&&r.calls>0);
-    if(!rec)return;
-    const students=+_careSB[b]||rec.students||0;
-    const pct=students>0?+(Math.min(rec.calls/students*100,100).toFixed(1)):0;
+    const students=+_careSB[b]||(rec&&rec.students)||0;
+    const calls=rec?rec.calls:0;
+    const pct=students>0?+(Math.min(calls/students*100,100).toFixed(1)):0;
     const pc=pct>=95?'pbg':pct>=85?'pba':'pbr';
     const vc=pct>=95?'#059669':pct>=85?'#D97706':'#DC2626';
-    html+=`<div class="bcb">
+    html+=`<div class="bcb" style="cursor:pointer;" onclick="viewCareRecords('ALL','${b}','${useMonth}')" title="Click to view ${b}'s ${useMonth} calls">
       <div class="bcb-name"><span class="bd b${b}"></span>${b}</div>
       <div class="bcb-track"><div class="bcb-fill ${pc}" style="width:${Math.min(pct,100)}%"></div></div>
       <div class="bcb-val" style="color:${vc}">${pct}%</div>
-      <div class="bcb-sub">${useMonth.slice(0,3)}: ${fi(rec.calls)}/${fi(students)}</div></div>`;
+      <div class="bcb-sub">${rec?(useMonth.slice(0,3)+': '+fi(calls)+'/'+fi(students)):(useMonth.slice(0,3)+': no data yet')}</div></div>`;
   });
   document.getElementById('care-bars').innerHTML=html||'<div class="no-data">No data for this filter</div>';
 
@@ -5505,8 +5656,55 @@ function renderTransport(){
     }).join('');
     if(cur && [...rsel.options].some(o=>o.value===cur)){ rsel.value=cur; } else { const rr=document.getElementById('tr-route-report'); if(rr)rr.innerHTML='<div class="no-data" style="padding:16px;">Choose a route above to see its full report.</div>'; }
   }
+  renderMileageInsights(mileage);
 }
-// Complete route report: route/occupancy + vehicle + driver/attender + documents + riders
+
+// Mileage & fuel efficiency insights — by vehicle & route (click a bar → logs)
+function renderMileageInsights(mileage){
+  const ins=document.getElementById('tr-mil-insight');
+  const agg=(keyFn)=>{ const m={}; (mileage||[]).forEach(r=>{ const k=keyFn(r); if(!k||k==='–')return;
+    if(!m[k])m[k]={km:0,fuel:0,cost:0,n:0,mils:[]}; m[k].km+=(+r.KMRun||0); m[k].fuel+=(+r.Fuel||0); m[k].cost+=(+r.FuelCost||0); m[k].n++; if(r.Mileage>0)m[k].mils.push(+r.Mileage); });
+    return Object.entries(m).map(([k,v])=>({key:k, kmpl:v.fuel>0?+(v.km/v.fuel).toFixed(2):(v.mils.length?+(v.mils.reduce((a,c)=>a+c,0)/v.mils.length).toFixed(2):0), km:v.km, fuel:v.fuel, cost:v.cost, n:v.n})); };
+  const byVeh=agg(r=>r.VehicleNo).filter(x=>x.kmpl>0).sort((a,b)=>b.kmpl-a.kmpl);
+  const byRoute=agg(r=>(r.Branch!=='–'?r.Branch.slice(0,3)+' ':'')+r.Route).filter(x=>x.kmpl>0).sort((a,b)=>b.kmpl-a.kmpl);
+  window._TR_MIL_VEH=byVeh; window._TR_MIL_ROUTE=byRoute;
+
+  if(ins){
+    if(!byVeh.length){ ins.innerHTML='<span class="no-data">No mileage logs for this selection.</span>'; }
+    else{
+      const totKm=(mileage||[]).reduce((s,r)=>s+(+r.KMRun||0),0);
+      const totFuel=(mileage||[]).reduce((s,r)=>s+(+r.Fuel||0),0);
+      const totCost=(mileage||[]).reduce((s,r)=>s+(+r.FuelCost||0),0);
+      const fleetKmpl=totFuel>0?+(totKm/totFuel).toFixed(2):0;
+      const best=byVeh[0], worst=byVeh[byVeh.length-1];
+      const costPerKm=totKm>0?+(totCost/totKm).toFixed(2):0;
+      ins.innerHTML='🏁 Fleet average <strong>'+fleetKmpl+' KM/L</strong> over '+fi(totKm)+' km · fuel spend <strong>₹'+fi(Math.round(totCost))+'</strong> (₹'+costPerKm+'/km). '
+        +'Most efficient: <strong style="color:#059669">'+best.key+' ('+best.kmpl+' KM/L)</strong>; least: <strong style="color:#DC2626">'+worst.key+' ('+worst.kmpl+' KM/L)</strong>. '
+        +'Vehicles below '+ (fleetKmpl*0.85).toFixed(1) +' KM/L warrant a service/driving-habit check.';
+    }
+  }
+  const mkMil=(id,arr,store)=>{ const el=document.getElementById(id); if(!el)return;
+    const top=arr.slice(0,14);
+    mkChart(id,{type:'bar',data:{labels:top.map(x=>x.key),datasets:[{label:'KM/L',data:top.map(x=>x.kmpl),
+      backgroundColor:top.map(x=>x.kmpl>=8?'#059669':x.kmpl>=5?'#D97706':'#DC2626'),borderRadius:4,maxBarThickness:22}]},
+      options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+        onClick:(e,el)=>{ if(el&&el.length){ const it=top[el[0].index]; viewMileage(store,it.key); } },
+        plugins:{legend:{display:false},datalabels:{display:true,clip:false,anchor:'end',align:'right',offset:3,color:'#0F172A',font:{size:9.5,weight:'bold'},formatter:v=>v},
+          tooltip:{callbacks:{label:c=>{const it=top[c.dataIndex];return [it.kmpl+' KM/L',fi(it.km)+' km · '+fi(Math.round(it.fuel))+' L · ₹'+fi(Math.round(it.cost)),it.n+' log(s) · click to view'];}}}},
+        layout:{padding:{right:30}},scales:{x:{beginAtZero:true,grid:{color:'#E0E8FF'}},y:{grid:{display:false},ticks:{font:{size:9.5}}}}}});
+  };
+  mkMil('tr-mil-veh',byVeh,'veh'); mkMil('tr-mil-route',byRoute,'route');
+}
+function viewMileage(kind,key){
+  const T=_trData(); const bf=r=>(fBranch==='ALL'||r.Branch===fBranch);
+  let rows=(T.mileage||[]).filter(bf);
+  if(kind==='veh') rows=rows.filter(r=>r.VehicleNo===key);
+  else rows=rows.filter(r=>((r.Branch!=='–'?r.Branch.slice(0,3)+' ':'')+r.Route)===key);
+  rows=rows.sort((a,b)=>String(b.Date).localeCompare(String(a.Date)));
+  const cols=[{key:'Branch',label:'Branch'},{key:'Date',label:'Date',date:true},{key:'Route',label:'Route'},{key:'VehicleNo',label:'Vehicle'},
+    {key:'KMRun',label:'KM Run'},{key:'Fuel',label:'Fuel (L)'},{key:'FuelCost',label:'Fuel ₹'},{key:'Mileage',label:'KM/L'},{key:'CostPerKM',label:'₹/KM'}];
+  openModal('⛽ Mileage Logs — '+key,`${rows.length} log(s)`,rows,cols);
+}
 function viewTransportRoute(key){
   const box=document.getElementById('tr-route-report'); if(!box)return;
   if(!key){ box.innerHTML='<div class="no-data" style="padding:16px;">Choose a route above to see its full report.</div>'; return; }
@@ -5747,7 +5945,7 @@ function _origRenderAll(){
     ['Overview',renderOverview],['GrievanceOfficer',renderGrievanceOfficer],['HR',renderHR],['Rankings',renderRankings],['Insights',renderInsights],
     ['Care',renderCare],['Observations',renderObservations],['Admin',renderAdmin],
     ['Vigilance',renderVigilance],['Purchase',renderPurchase],
-    ['Admissions',renderAdmissions],['AVIS',renderAVIS],['Grievance',renderGrievance],
+    ['Admissions',renderAdmissions],['Grievance',renderGrievance],
     ['Transport',renderTransport],['IT',renderIT]
   ];
   steps.forEach(function(s){
