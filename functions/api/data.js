@@ -1,5 +1,10 @@
 // functions/api/data.js
-// v3 — adds ROLE-BASED ACCESS on top of v2's edge-cache + streaming.
+// v4 — adds LAZY SECTION PASS-THROUGH on top of v3's role-based access.
+//   ?section=exams  → forwarded to Apps Script, cached under its own edge key,
+//                     and branch-filtered for principals just like the main payload.
+//   Adding a future section needs ONE entry in ALLOWED_SECTIONS below.
+//
+// v3 — ROLE-BASED ACCESS on top of v2's edge-cache + streaming.
 //   Roles (Supabase app_metadata.role):
 //     • management / (no role & no branch) → full data, all branches
 //     • admin_manager                      → full data (client shows Admin/Vigilance/Purchase/Transport/IT)
@@ -10,12 +15,25 @@
 
 const CACHE_TTL_SECONDS = 300; // edge freshness window (Apps Script keep-warm keeps upstream fast)
 
+// Sections the browser is allowed to request. Anything else is ignored, so a bad
+// or hand-typed ?section= can never be used to probe the upstream script.
+const ALLOWED_SECTIONS = { exams: 1 };
+
+// Heavier than the main payload and it changes only when marks are entered, so it
+// can sit in the edge cache far longer.
+const SECTION_TTL_SECONDS = 1800;
+
 export async function onRequestGet({ request, env }) {
   const json = (obj, status = 200) =>
     new Response(JSON.stringify(obj), {
       status,
       headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
     });
+
+  // ── 0. Which payload is being asked for? ──
+  const reqUrl = new URL(request.url);
+  const rawSection = (reqUrl.searchParams.get("section") || "").trim().toLowerCase();
+  const section = ALLOWED_SECTIONS[rawSection] ? rawSection : "";
 
   // ── 1. Authenticate the caller against Supabase ──
   const authHeader = request.headers.get("Authorization") || "";
@@ -36,9 +54,13 @@ export async function onRequestGet({ request, env }) {
   const role = (user?.app_metadata?.role || "").toLowerCase().trim();
   const userBranch = user?.app_metadata?.branch || null;
 
-  // ── 2. Get the dashboard payload: edge cache first, Apps Script second ──
+  // ── 2. Get the payload: edge cache first, Apps Script second ──
+  //   Each section gets its OWN cache key, so the exam payload never overwrites
+  //   the main dashboard snapshot (or vice versa).
   const cache = caches.default;
-  const cacheKey = new Request("https://pbes-dashboard-cache.internal/api/data");
+  const cacheKey = new Request(
+    "https://pbes-dashboard-cache.internal/api/data" + (section ? "/" + section : "")
+  );
 
   let upstream = await cache.match(cacheKey);
 
@@ -48,7 +70,9 @@ export async function onRequestGet({ request, env }) {
     const keyParam = env.APPS_SCRIPT_KEY
       ? "&key=" + encodeURIComponent(env.APPS_SCRIPT_KEY)
       : "";
-    const upstreamUrl = base + sep + "_t=" + Date.now() + keyParam;
+    // ← the line that was missing: pass the section through to Apps Script
+    const sectionParam = section ? "&section=" + encodeURIComponent(section) : "";
+    const upstreamUrl = base + sep + "_t=" + Date.now() + keyParam + sectionParam;
 
     let resp;
     try {
@@ -72,11 +96,12 @@ export async function onRequestGet({ request, env }) {
       );
     }
 
+    const ttl = section ? SECTION_TTL_SECONDS : CACHE_TTL_SECONDS;
     upstream = new Response(resp.body, {
       status: 200,
       headers: {
         "Content-Type": "application/json",
-        "Cache-Control": "s-maxage=" + CACHE_TTL_SECONDS + ", stale-while-revalidate=3600",
+        "Cache-Control": "s-maxage=" + ttl + ", stale-while-revalidate=3600",
       },
     });
     await cache.put(cacheKey, upstream.clone());
@@ -95,14 +120,42 @@ export async function onRequestGet({ request, env }) {
   }
 
   // ── 4. Branch principals: parse once and filter DETAIL to their branch ──
-  //   Cross-branch aggregates needed by the Head-to-Head scorecard stay full.
   let data;
   try {
     data = await upstream.json();
   } catch (err) {
     return json({ error: true, message: "Cached payload unreadable: " + err.message }, 502);
   }
+
+  // Exam analytics carries student-level marks, so strip other campuses server-side
+  // rather than relying on the browser to hide them.
+  if (section === "exams") return json(filterExamsByBranch(data, userBranch));
+
+  //   Cross-branch aggregates needed by the Head-to-Head scorecard stay full.
   return json(filterByBranch(data, userBranch));
+}
+
+// ── Exam payload: keep only this branch's campus inside every exam ──
+// Shape: { EXAM_DATA: { generatedAt, curricula:[ { exams:[ { branches:[…] } ] } ] } }
+// An exam with no branches left, or a curriculum with no exams left, is dropped so
+// the tab shows a clean "no records" state instead of empty dropdowns.
+function filterExamsByBranch(data, branch) {
+  const src = data && data.EXAM_DATA;
+  if (!src || !Array.isArray(src.curricula)) return data;
+
+  const curricula = src.curricula
+    .map((c) => ({
+      ...c,
+      exams: (c.exams || [])
+        .map((e) => ({
+          ...e,
+          branches: (e.branches || []).filter((b) => (b.id || b.name) === branch),
+        }))
+        .filter((e) => e.branches.length),
+    }))
+    .filter((c) => c.exams.length);
+
+  return { ...data, EXAM_DATA: { ...src, curricula } };
 }
 
 // ── Filters individual-record datasets down to one branch ──
