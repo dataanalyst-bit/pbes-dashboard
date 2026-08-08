@@ -5303,7 +5303,15 @@ function renderCareSummary(){
     return true;
   });
   // Use filteredRows for all computations below
-  if(!filteredRows.length){ el.innerHTML='<div class="no-data">No care-call data for this filter.</div>'; return; }
+  // Apply sentiment filter (All / Positive / Negative / Neutral)
+  const _sentSel=document.getElementById('care-sent-sel');
+  const _sent=(_sentSel?_sentSel.value:window._CARE_SENT)||'ALL';
+  window._CARE_SENT=_sent;
+  const sentFilteredRows=(_sent==='ALL')?filteredRows:filteredRows.filter(r=>{
+    const blob=((r.Remarks&&r.Remarks!=='–')?r.Remarks:'')+' '+((r.Followup&&r.Followup!=='–')?r.Followup:'');
+    return _sentiment(blob).label===_sent;
+  });
+  if(!sentFilteredRows.length){ el.innerHTML='<div class="no-data">No care-call data for this filter combination.</div>'; return; }
 
   const CATS=['No Concern','Not Answering','Academics','Behaviour / Wellbeing','Administration','Transport','Co Curricular','New Admission','No Response','Other'];
   const META={
@@ -5312,17 +5320,17 @@ function renderCareSummary(){
     'Co Curricular':{e:'🎨',c:'#EC4899'},'New Admission':{e:'🆕',c:'#0EA5E9'},'No Response':{e:'🔕',c:'#64748B'},'Other':{e:'📌',c:'#94A3B8'}
   };
   const cat={}; CATS.forEach(c=>cat[c]=0);
-  filteredRows.forEach(r=>{ const c=CATS.includes(r.Grievance)?r.Grievance:'Other'; cat[c]++; });
-  const total=filteredRows.length;
+  sentFilteredRows.forEach(r=>{ const c=CATS.includes(r.Grievance)?r.Grievance:'Other'; cat[c]++; });
+  const total=sentFilteredRows.length;
   const noConcern=cat['No Concern']||0;
   const satisfiedPct=Math.round(noConcern/total*100);
   const present=CATS.filter(c=>cat[c]>0).sort((a,b)=>cat[b]-cat[a]);
   window._CARE_PIE_CATS=present;
 
   // Status counts
-  const resolved=filteredRows.filter(r=>r.Status==='Resolved').length;
-  const inProg=filteredRows.filter(r=>r.Status==='In Progress').length;
-  const pending=filteredRows.filter(r=>r.Status==='Pending').length;
+  const resolved=sentFilteredRows.filter(r=>r.Status==='Resolved').length;
+  const inProg=sentFilteredRows.filter(r=>r.Status==='In Progress').length;
+  const pending=sentFilteredRows.filter(r=>r.Status==='Pending').length;
 
   // ── Topic rules for ALL categories ──
   const TOPIC_RULES={
@@ -5435,21 +5443,30 @@ function renderCareSummary(){
     +'</div>';
 
   // ── Class / Section dropdown filter for the Summary ──
-  const allClasses=[...new Set(filteredRows.map(r=>String(r.Class||'').split(/[-\/]/)[0].trim()).filter(Boolean))].sort();
-  const allSections=[...new Set(filteredRows.map(r=>{const p=String(r.Class||'').split(/[-\/]/);return p.length>1?p[1].trim():'';}).filter(Boolean))].sort();
+  const allClasses=[...new Set(rows.map(r=>String(r.Class||'').split(/[-\/]/)[0].trim()).filter(Boolean))].sort();
+  const allSections=[...new Set(rows.map(r=>{const p=String(r.Class||'').split(/[-\/]/);return p.length>1?p[1].trim():'';}).filter(Boolean))].sort();
   h+='<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">'
     +'<span style="font-size:12px;font-weight:800;color:#0F172A;">📂 Category Mix</span>'
     +'<select id="care-cls-sel" onchange="renderCareSummary()" style="padding:5px 10px;border:1.5px solid #E0E8FF;border-radius:8px;font-size:11.5px;font-family:Inter,sans-serif;cursor:pointer;">'
-    +'<option value="ALL">All Classes</option>'+allClasses.map(c=>'<option value="'+c+'"'+(window._CARE_CLS===c?' selected':'')+'>'+c+'</option>').join('')+'</select>'
+    +'<option value="ALL">All Classes</option>'+allClasses.map(c=>'<option value="'+c+'"'+(_cls===c?' selected':'')+'>'+c+'</option>').join('')+'</select>'
     +'<select id="care-sec-sel" onchange="renderCareSummary()" style="padding:5px 10px;border:1.5px solid #E0E8FF;border-radius:8px;font-size:11.5px;font-family:Inter,sans-serif;cursor:pointer;">'
-    +'<option value="ALL">All Sections</option>'+allSections.map(s=>'<option value="'+s+'"'+(window._CARE_SEC===s?' selected':'')+'>'+s+'</option>').join('')+'</select>'
-    +'<span style="font-size:10.5px;color:#94A3B8;">click any row or sub-topic to view calls with sentiment</span>'
+    +'<option value="ALL">All Sections</option>'+allSections.map(s=>'<option value="'+s+'"'+(_sec===s?' selected':'')+'>'+s+'</option>').join('')+'</select>'
+    +'<div style="display:flex;border:1.5px solid #E0E8FF;border-radius:8px;overflow:hidden;font-size:11px;font-family:Inter,sans-serif;">'
+      +['ALL','Positive','Neutral','Negative'].map(s=>{
+        const active=_sent===s;
+        const bg=active?(s==='Positive'?'#059669':s==='Negative'?'#DC2626':s==='Neutral'?'#64748B':'#1E4FD8'):'#fff';
+        const fg=active?'#fff':(s==='Positive'?'#059669':s==='Negative'?'#DC2626':s==='Neutral'?'#64748B':'#334155');
+        const emoji=s==='Positive'?'😊 ':s==='Negative'?'😟 ':s==='Neutral'?'😐 ':'';
+        return '<button onclick="window._CARE_SENT=\''+s+'\';renderCareSummary()" style="padding:5px 12px;border:none;background:'+bg+';color:'+fg+';font-weight:'+(active?'700':'500')+';cursor:pointer;font-family:Inter,sans-serif;font-size:11px;">'+emoji+s+'</button>';
+      }).join('')
+    +'</div>'
+    +'<span style="font-size:10px;color:#94A3B8;">click any row or sub-topic</span>'
     +'</div>';
 
   // ── Build individual category cards with sub-topics ──
   const catCards=present.map(c=>{
     const m=META[c], p=Math.round(cat[c]/total*100);
-    const catRows=filteredRows.filter(r=>{const cc=CATS.includes(r.Grievance)?r.Grievance:'Other';return cc===c;});
+    const catRows=sentFilteredRows.filter(r=>{const cc=CATS.includes(r.Grievance)?r.Grievance:'Other';return cc===c;});
     const topics=TOPIC_RULES[c]?extractTopics(c,catRows):[];
     const tc=m.c;
     const subHtml=topics.length>0?('<div style="margin:2px 0 4px 12px;padding:5px 7px;background:#F8FAFC;border-radius:6px;border-left:2px solid '+tc+';">'
