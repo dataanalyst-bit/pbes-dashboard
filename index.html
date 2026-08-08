@@ -5517,60 +5517,74 @@ function viewCareWithSentiment(status){
   const CARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
   const BR=['Boduppal','Keesara','Pocharam','Bachupally','Gowdavalli'];
   const scope=(fBranch==='ALL')?BR:[fBranch];
-  const rows=CARE.filter(r=>scope.includes(r.Branch)&&(fMonth==='ALL'||r.Month===fMonth)&&r.Status===status)
-    .map(r=>({Branch:r.Branch,Month:r.Month,Student:r.Student,Class:r.Class,Date:r.Date,
-      Grievance:r.GrievanceRaw||r.Grievance,
-      Sentiment:_sentiment(((r.Remarks&&r.Remarks!=='–')?r.Remarks:'')+' '+((r.Followup&&r.Followup!=='–')?r.Followup:'')).label,
+  let filtered=CARE.filter(r=>scope.includes(r.Branch)&&(fMonth==='ALL'||r.Month===fMonth)&&r.Status===status);
+  filtered=_careFilterBySentiment(filtered);
+  const rows=filtered.map(r=>({Branch:r.Branch,Month:r.Month,Student:r.Student,Class:r.Class,Date:r.Date,
+      Grievance:r.GrievanceRaw||r.Grievance, Sentiment:_careRowSentiment(r),
       Remarks:r.Remarks,Followup:r.Followup,Status:r.StatusRaw||r.Status}));
   const cols=[{key:'Branch',label:'Branch'},{key:'Student',label:'Student',maxW:'160px'},{key:'Class',label:'Class'},
     {key:'Date',label:'Date',date:true},{key:'Grievance',label:'Grievance'},{key:'Sentiment',label:'Sentiment',pill:true},
     {key:'Remarks',label:'Remarks',maxW:'280px'},{key:'Followup',label:'Follow-up',maxW:'200px'},{key:'Status',label:'Status'}];
   const bl=fBranch==='ALL'?'All Branches':fBranch;
-  openModal('📞 '+status+' Calls — with Sentiment',`${rows.length} call(s) · ${bl} · each row includes NLP sentiment`,rows,cols);
+  openModal('📞 '+status+' Calls',`${rows.length} call(s) · ${bl} · ${_careSentLabel()}`,rows,cols);
 }
 
 // Drill-down: care calls in a grievance category (respects current branch+month filter)
 // Sub-topic drill-down: filters care calls by category + keyword match
+// Helper: compute sentiment for a care row and check if it matches the active filter
+function _careRowSentiment(r){
+  return _sentiment(((r.Remarks&&r.Remarks!=='–')?r.Remarks:'')+' '+((r.Followup&&r.Followup!=='–')?r.Followup:'')).label;
+}
+function _careFilterBySentiment(rows){
+  const sf=window._CARE_SENT||'ALL';
+  if(sf==='ALL') return rows;
+  return rows.filter(r=>_careRowSentiment(r)===sf);
+}
+function _careSentLabel(){
+  const sf=window._CARE_SENT||'ALL';
+  return sf==='ALL'?'all sentiments':sf.toLowerCase()+' sentiment only';
+}
+
 function viewSubTopic(catName, topicName, keywords){
   const CARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
   const BR=['Boduppal','Keesara','Pocharam','Bachupally','Gowdavalli'];
   const scope=(fBranch==='ALL')?BR:[fBranch];
   const CATS=['No Concern','Not Answering','Academics','Behaviour / Wellbeing','Administration','Transport','Co Curricular','New Admission','No Response'];
-  const catRows=CARE.filter(r=>scope.includes(r.Branch)&&(fMonth==='ALL'||r.Month===fMonth))
+  let catRows=CARE.filter(r=>scope.includes(r.Branch)&&(fMonth==='ALL'||r.Month===fMonth))
     .filter(r=>{ const c=CATS.includes(r.Grievance)?r.Grievance:'Other'; return c===catName; });
+  // Apply active sentiment filter
+  catRows=_careFilterBySentiment(catRows);
   let rows;
   if(keywords&&keywords.length>0){
     rows=catRows.filter(r=>{
       const t=((r.Remarks&&r.Remarks!=='–')?r.Remarks:'')+' '+((r.Followup&&r.Followup!=='–')?r.Followup:'');
-      const tl=t.toLowerCase();
-      return keywords.some(k=>tl.indexOf(k)!==-1);
+      return keywords.some(k=>t.toLowerCase().indexOf(k)!==-1);
     });
-  } else { // catch-all: rows NOT matched by any other topic's keywords
-    rows=catRows; // show all for the misc bucket
-  }
+  } else { rows=catRows; }
   rows=rows.map(r=>({Branch:r.Branch,Month:r.Month,Student:r.Student,Class:r.Class,Date:r.Date,
-    Grievance:r.GrievanceRaw||r.Grievance,
-    Sentiment:_sentiment(((r.Remarks&&r.Remarks!=='–')?r.Remarks:'')+' '+((r.Followup&&r.Followup!=='–')?r.Followup:'')).label,
+    Grievance:r.GrievanceRaw||r.Grievance, Sentiment:_careRowSentiment(r),
     Remarks:r.Remarks,Followup:r.Followup,Status:r.StatusRaw||r.Status}));
   const cols=[{key:'Branch',label:'Branch'},{key:'Student',label:'Student',maxW:'160px'},{key:'Class',label:'Class'},
     {key:'Date',label:'Date',date:true},{key:'Grievance',label:'Grievance'},{key:'Sentiment',label:'Sentiment',pill:true},
     {key:'Remarks',label:'Remarks',maxW:'280px'},
     {key:'Followup',label:'Follow-up',maxW:'240px'},{key:'Status',label:'Status'}];
-  openModal('🔍 '+catName+' → '+topicName,`${rows.length} call(s) matching this sub-topic`,rows,cols);
+  openModal('🔍 '+catName+' → '+topicName,`${rows.length} call(s) · ${_careSentLabel()}`,rows,cols);
 }
 
 function viewCareGrievance(cat){
   const CARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
   const BR=['Boduppal','Keesara','Pocharam','Bachupally','Gowdavalli'];
   const scope=(fBranch==='ALL')?BR:[fBranch];
-  const rows=CARE.filter(r=>scope.includes(r.Branch)&&(fMonth==='ALL'||r.Month===fMonth)&&(r.Grievance===cat||(cat==='Other'&&!['No Concern','Not Answering','Academics','Behaviour / Wellbeing','Administration','Transport','Co Curricular','New Admission','No Response'].includes(r.Grievance))))
-    .map(r=>({Branch:r.Branch,Month:r.Month,Student:r.Student,Class:r.Class,Date:r.Date,
-      Grievance:r.GrievanceRaw,Sentiment:_sentiment((r.Remarks==='–'?'':r.Remarks)+' '+(r.Followup==='–'?'':r.Followup)).label,
-      Remarks:r.Remarks,Followup:r.Followup,Status:r.StatusRaw}));
+  let rows=CARE.filter(r=>scope.includes(r.Branch)&&(fMonth==='ALL'||r.Month===fMonth)&&(r.Grievance===cat||(cat==='Other'&&!['No Concern','Not Answering','Academics','Behaviour / Wellbeing','Administration','Transport','Co Curricular','New Admission','No Response'].includes(r.Grievance))));
+  // Apply active sentiment filter
+  rows=_careFilterBySentiment(rows);
+  rows=rows.map(r=>({Branch:r.Branch,Month:r.Month,Student:r.Student,Class:r.Class,Date:r.Date,
+      Grievance:r.GrievanceRaw||r.Grievance, Sentiment:_careRowSentiment(r),
+      Remarks:r.Remarks,Followup:r.Followup,Status:r.StatusRaw||r.Status}));
   const cols=[{key:'Branch',label:'Branch'},{key:'Student',label:'Student',maxW:'160px'},{key:'Class',label:'Class'},
     {key:'Date',label:'Date',date:true},{key:'Grievance',label:'Grievance'},{key:'Sentiment',label:'Sentiment',pill:true},
     {key:'Remarks',label:'Remarks',maxW:'280px'},{key:'Followup',label:'Follow-up Action',maxW:'240px'},{key:'Status',label:'Status'}];
-  openModal('📂 '+cat+' — Care Calls',`${rows.length} call(s) · with NLP sentiment`,rows,cols);
+  openModal('📂 '+cat+' — Care Calls',`${rows.length} call(s) · ${_careSentLabel()}`,rows,cols);
 }
 
 
