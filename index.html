@@ -5690,51 +5690,54 @@ function renderCare(){
     ));
   }
 
-  // Volume stacked — aggregate by month from BOTH sources:
-  //   1) TRACKER (pre-aggregated from Tracker sheets — reliable for past months)
-  //   2) CARE_DATA (Master sheet — individual call records, covers current month too)
-  // Take the HIGHER value from either source for each month to avoid zeros.
+  // Volume stacked — aggregate by month from ALL available sources.
+  // Uses TRACKER (pre-aggregated) merged with CARE_DATA (individual records) for coverage.
   const mv={};
   MONTHS.forEach(m=>mv[m]={resolved:0,ip:0,pending:0});
 
-  // Source 1: TRACKER
+  // Source 1: TRACKER summary (resolved/ip/pending are pre-counted per branch per month)
   TRACKER.filter(r=>fBranch==='ALL'||r.branch===fBranch).forEach(r=>{
-    if(!r.calls||r.calls===0) return;
-    const m=r.month;
-    if(!mv[m]) return;
+    const m=r.month; if(!mv[m]||!r.calls) return;
     mv[m].resolved+=(+r.resolved||0); mv[m].ip+=(+r.ip||0); mv[m].pending+=(+r.pending||0);
   });
 
-  // Source 2: CARE_DATA (counts per month, normalizing month name)
-  const _cv2={};
-  MONTHS.forEach(m=>_cv2[m]={resolved:0,ip:0,pending:0});
+  // Source 2: CARE_DATA individual records (case-insensitive month/status matching)
+  const _cv2={}; MONTHS.forEach(m=>_cv2[m]={resolved:0,ip:0,pending:0});
   const _CARE_VOL=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
-  const _MONTH_NORM={}; MONTHS.forEach(m=>_MONTH_NORM[m.toLowerCase()]=m);
+  const _MN={}; MONTHS.forEach(m=>_MN[m.toLowerCase()]=m);
   _CARE_VOL.filter(r=>fBranch==='ALL'||r.Branch===fBranch).forEach(r=>{
     const raw=String(r.Month||'').trim();
-    const m=_MONTH_NORM[raw.toLowerCase()]||raw;
+    const m=_MN[raw.toLowerCase()]||raw;
     if(!_cv2[m]) return;
-    const st=String(r.Status||'');
-    if(st==='Resolved'||/resolved/i.test(st)) _cv2[m].resolved++;
-    else if(st==='In Progress'||/in.progress/i.test(st)) _cv2[m].ip++;
-    else if(st==='Pending'||/pending/i.test(st)) _cv2[m].pending++;
+    const st=String(r.Status||'').toLowerCase();
+    if(st.indexOf('resolved')!==-1) _cv2[m].resolved++;
+    else if(st.indexOf('progress')!==-1) _cv2[m].ip++;
+    else if(st.indexOf('pending')!==-1) _cv2[m].pending++;
   });
 
-  // Merge: take the higher of the two sources per month (covers both stale-TRACKER and missing-CARE_DATA)
+  // Merge: take the max of both sources per month
   MONTHS.forEach(m=>{
-    mv[m].resolved=Math.max(mv[m].resolved, _cv2[m].resolved);
-    mv[m].ip=Math.max(mv[m].ip, _cv2[m].ip);
-    mv[m].pending=Math.max(mv[m].pending, _cv2[m].pending);
+    mv[m].resolved=Math.max(mv[m].resolved,_cv2[m].resolved);
+    mv[m].ip=Math.max(mv[m].ip,_cv2[m].ip);
+    mv[m].pending=Math.max(mv[m].pending,_cv2[m].pending);
   });
-  mkChart('care-vol',{type:'bar',data:{labels:MONTHS,datasets:[
-    {label:'Resolved',   data:MONTHS.map(m=>mv[m].resolved),backgroundColor:'#059669',borderRadius:4,stack:'s'},
-    {label:'In Progress',data:MONTHS.map(m=>mv[m].ip),       backgroundColor:'#3B82F6',borderRadius:4,stack:'s'},
-    {label:'Pending',    data:MONTHS.map(m=>mv[m].pending),  backgroundColor:'#F59E0B',borderRadius:4,stack:'s'},
+
+  // Only show months that have at least some data (avoids a flat line of zeros)
+  const activeMonths=MONTHS.filter(m=>mv[m].resolved+mv[m].ip+mv[m].pending>0);
+  const chartLabels=activeMonths.length>0?activeMonths:MONTHS;
+  window._CARE_VOL_LABELS=chartLabels;
+  console.log('[care-vol] TRACKER rows:',TRACKER.length,'CARE_DATA rows:',_CARE_VOL.length,
+    'activeMonths:',activeMonths,'sample mv:',activeMonths.slice(0,3).map(m=>m+':R'+mv[m].resolved+'/IP'+mv[m].ip+'/P'+mv[m].pending));
+
+  mkChart('care-vol',{type:'bar',data:{labels:chartLabels,datasets:[
+    {label:'Resolved',   data:chartLabels.map(m=>mv[m].resolved),backgroundColor:'#059669',borderRadius:4,stack:'s'},
+    {label:'In Progress',data:chartLabels.map(m=>mv[m].ip),       backgroundColor:'#3B82F6',borderRadius:4,stack:'s'},
+    {label:'Pending',    data:chartLabels.map(m=>mv[m].pending),  backgroundColor:'#F59E0B',borderRadius:4,stack:'s'},
   ]},options:{responsive:true,maintainAspectRatio:true,
     onClick:(evt,elements)=>{
       if(!elements||!elements.length)return;
       const el=elements[0];
-      const month=MONTHS[el.index];
+      const month=(window._CARE_VOL_LABELS||MONTHS)[el.index];
       const statusMap=['Resolved','In Progress','Pending'];
       const status=statusMap[el.datasetIndex];
       const ALLCARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
