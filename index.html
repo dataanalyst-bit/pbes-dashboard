@@ -643,21 +643,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     </div>
   </div>
 
-  <!-- Grievance Officer Performance — ALWAYS VISIBLE (previously trapped inside the hidden
-       grievance-records panel, so it rarely rendered). Cards are click-to-view for the
-       full monthly quality breakdown; no permanently-shown Branch/Officer table anymore. -->
-  <div class="card" id="go-perf-card" style="margin-bottom:16px;">
-    <div class="ch">
-      <h3>🎯 Grievance Officer Performance</h3>
-      <span class="fnote">Click a branch card for the full monthly quality breakdown</span>
-    </div>
-    <div class="cb" style="padding:0 14px 14px;">
-      <div id="go-summary-row" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;"></div>
-    </div>
-  </div>
-
-  <!-- Care Call Summary — Insights & Data-Driven Decisions — ALWAYS VISIBLE (same bug fixed)
-       and placed directly ABOVE Grievance Category Breakdown as requested. -->
+  <!-- Care Call Summary — Insights & Data-Driven Decisions -->
   <div class="card" style="margin-bottom:16px;">
     <div class="ch"><h3>🧭 Care Call Summary — Insights &amp; Data-Driven Decisions</h3><span class="fnote" id="care-summary-fn">Parents-satisfied % + grievance-category insights</span></div>
     <div class="cb" id="care-summary-report" style="padding:14px 18px;"></div>
@@ -2014,7 +2000,7 @@ function viewVigOverviewStatus(status){
 // ── Grievance Officer Performance ──────────────────────────────────────────
 function renderGrievanceOfficer(){
   const goCard = document.getElementById('go-perf-card');
-  if(!goCard) return;
+  if(!goCard) return;  // Card removed from Care pane; skip rendering
   const GO = (typeof GO_DATA !== 'undefined' && Array.isArray(GO_DATA)) ? GO_DATA : [];
   if(GO.length === 0){ goCard.style.display='none'; return; }
   goCard.style.display = '';
@@ -5306,7 +5292,18 @@ function renderCareSummary(){
   const fnEl=document.getElementById('care-summary-fn');
   if(fnEl) fnEl.textContent='Parents-satisfied % + grievance-category insights · '+(fBranch==='ALL'?'All Branches':fBranch)+(fMonth==='ALL'?'':' · '+fMonth);
   const rows=CARE.filter(r=>scope.includes(r.Branch)&&(fMonth==='ALL'||r.Month===fMonth));
-  if(!rows.length){ el.innerHTML='<div class="no-data">No care-call data for this filter.</div>'; return; }
+  // Apply class / section dropdown filter (persists across re-renders)
+  const _clsSel=document.getElementById('care-cls-sel');
+  const _secSel=document.getElementById('care-sec-sel');
+  const _cls=(_clsSel?_clsSel.value:window._CARE_CLS)||'ALL';
+  const _sec=(_secSel?_secSel.value:window._CARE_SEC)||'ALL';
+  const filteredRows=rows.filter(r=>{
+    if(_cls!=='ALL'){ const cp=String(r.Class||'').split(/[-\/]/)[0].trim(); if(cp!==_cls) return false; }
+    if(_sec!=='ALL'){ const sp=String(r.Class||'').split(/[-\/]/); const sv=sp.length>1?sp[1].trim():''; if(sv!==_sec) return false; }
+    return true;
+  });
+  // Use filteredRows for all computations below
+  if(!filteredRows.length){ el.innerHTML='<div class="no-data">No care-call data for this filter.</div>'; return; }
 
   const CATS=['No Concern','Not Answering','Academics','Behaviour / Wellbeing','Administration','Transport','Co Curricular','New Admission','No Response','Other'];
   const META={
@@ -5315,17 +5312,17 @@ function renderCareSummary(){
     'Co Curricular':{e:'🎨',c:'#EC4899'},'New Admission':{e:'🆕',c:'#0EA5E9'},'No Response':{e:'🔕',c:'#64748B'},'Other':{e:'📌',c:'#94A3B8'}
   };
   const cat={}; CATS.forEach(c=>cat[c]=0);
-  rows.forEach(r=>{ const c=CATS.includes(r.Grievance)?r.Grievance:'Other'; cat[c]++; });
-  const total=rows.length;
+  filteredRows.forEach(r=>{ const c=CATS.includes(r.Grievance)?r.Grievance:'Other'; cat[c]++; });
+  const total=filteredRows.length;
   const noConcern=cat['No Concern']||0;
   const satisfiedPct=Math.round(noConcern/total*100);
   const present=CATS.filter(c=>cat[c]>0).sort((a,b)=>cat[b]-cat[a]);
   window._CARE_PIE_CATS=present;
 
   // Status counts
-  const resolved=rows.filter(r=>r.Status==='Resolved').length;
-  const inProg=rows.filter(r=>r.Status==='In Progress').length;
-  const pending=rows.filter(r=>r.Status==='Pending').length;
+  const resolved=filteredRows.filter(r=>r.Status==='Resolved').length;
+  const inProg=filteredRows.filter(r=>r.Status==='In Progress').length;
+  const pending=filteredRows.filter(r=>r.Status==='Pending').length;
 
   // ── Topic rules for ALL categories ──
   const TOPIC_RULES={
@@ -5437,42 +5434,63 @@ function renderCareSummary(){
         <div style="font-size:11px;color:#64748B;">${Math.round(pending/total*100)}% · click to view with sentiment</div></div>`
     +'</div>';
 
-  // ── Category Mix with sub-topics for ALL categories + Pie chart (NO data-driven-insights text column) ──
-  const catListHtml=present.map(c=>{
+  // ── Class / Section dropdown filter for the Summary ──
+  const allClasses=[...new Set(filteredRows.map(r=>String(r.Class||'').split(/[-\/]/)[0].trim()).filter(Boolean))].sort();
+  const allSections=[...new Set(filteredRows.map(r=>{const p=String(r.Class||'').split(/[-\/]/);return p.length>1?p[1].trim():'';}).filter(Boolean))].sort();
+  h+='<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">'
+    +'<span style="font-size:12px;font-weight:800;color:#0F172A;">📂 Category Mix</span>'
+    +'<select id="care-cls-sel" onchange="renderCareSummary()" style="padding:5px 10px;border:1.5px solid #E0E8FF;border-radius:8px;font-size:11.5px;font-family:Inter,sans-serif;cursor:pointer;">'
+    +'<option value="ALL">All Classes</option>'+allClasses.map(c=>'<option value="'+c+'"'+(window._CARE_CLS===c?' selected':'')+'>'+c+'</option>').join('')+'</select>'
+    +'<select id="care-sec-sel" onchange="renderCareSummary()" style="padding:5px 10px;border:1.5px solid #E0E8FF;border-radius:8px;font-size:11.5px;font-family:Inter,sans-serif;cursor:pointer;">'
+    +'<option value="ALL">All Sections</option>'+allSections.map(s=>'<option value="'+s+'"'+(window._CARE_SEC===s?' selected':'')+'>'+s+'</option>').join('')+'</select>'
+    +'<span style="font-size:10.5px;color:#94A3B8;">click any row or sub-topic to view calls with sentiment</span>'
+    +'</div>';
+
+  // ── Build individual category cards with sub-topics ──
+  const catCards=present.map(c=>{
     const m=META[c], p=Math.round(cat[c]/total*100);
-    const catRows=rows.filter(r=>{const cc=CATS.includes(r.Grievance)?r.Grievance:'Other';return cc===c;});
+    const catRows=filteredRows.filter(r=>{const cc=CATS.includes(r.Grievance)?r.Grievance:'Other';return cc===c;});
     const topics=TOPIC_RULES[c]?extractTopics(c,catRows):[];
     const tc=m.c;
-    const subHtml=topics.length>0?('<div style="margin:2px 0 6px 12px;padding:6px 8px;background:#F8FAFC;border-radius:6px;border-left:2px solid '+tc+';">'
-      +'<div style="font-size:9.5px;font-weight:700;color:#94A3B8;margin-bottom:3px;">🔍 SUB-TOPICS</div>'
-      +topics.slice(0,6).map(t=>{
+    const subHtml=topics.length>0?('<div style="margin:2px 0 4px 12px;padding:5px 7px;background:#F8FAFC;border-radius:6px;border-left:2px solid '+tc+';">'
+      +'<div style="font-size:9px;font-weight:700;color:#94A3B8;margin-bottom:2px;">🔍 SUB-TOPICS</div>'
+      +topics.slice(0,5).map(t=>{
         const tp=Math.round(t.count/catRows.length*100);
-        return '<div style="display:flex;justify-content:space-between;align-items:center;font-size:10.5px;color:#334155;padding:2px 0;cursor:pointer;" '
+        return '<div style="display:flex;justify-content:space-between;font-size:10px;color:#334155;padding:1px 0;cursor:pointer;" '
           +'onclick="viewSubTopic(\''+c.replace(/'/g,"\\'")+'\',\''+t.topic.replace(/'/g,"\\'")+'\','+JSON.stringify(t.kw).replace(/"/g,'&quot;')+')" '
-          +'title="Click to view these calls with sentiment">'
+          +'title="Click to view with sentiment">'
           +'<span>'+t.topic+'</span>'
           +'<span style="font-weight:700;color:'+tc+';">'+t.count+' <small style="color:#94A3B8;">'+tp+'%</small></span></div>';
       }).join('')+'</div>'):'';
-    return `<div>
-      <div onclick="viewCareGrievance('${c.replace(/'/g,"\\'")}')" style="display:flex;gap:8px;align-items:center;padding:6px 9px;border-radius:8px;cursor:pointer;border-left:3px solid ${m.c};background:#F8FAFC;margin-bottom:2px;" title="Click to view all ${c} calls">
-        <div style="width:26px;height:26px;border-radius:8px;background:${m.c}20;display:flex;align-items:center;justify-content:center;font-size:14px;flex:0 0 auto;">${m.e}</div>
-        <div style="flex:1;min-width:0;"><div style="font-size:11.5px;font-weight:700;color:#0F172A;">${c}</div></div>
-        <div style="font-size:12px;font-weight:800;color:${m.c};white-space:nowrap;">${fi(cat[c])} <small style="color:#94A3B8;font-weight:600;">${p}%</small></div>
+    return `<div style="margin-bottom:4px;">
+      <div onclick="viewCareGrievance('${c.replace(/'/g,"\\'")}')" style="display:flex;gap:6px;align-items:center;padding:5px 8px;border-radius:8px;cursor:pointer;border-left:3px solid ${m.c};background:#F8FAFC;" title="Click to view all ${c} calls">
+        <div style="width:24px;height:24px;border-radius:7px;background:${m.c}20;display:flex;align-items:center;justify-content:center;font-size:13px;flex:0 0 auto;">${m.e}</div>
+        <div style="flex:1;min-width:0;"><div style="font-size:11px;font-weight:700;color:#0F172A;">${c}</div></div>
+        <div style="font-size:11px;font-weight:800;color:${m.c};white-space:nowrap;">${fi(cat[c])} <small style="color:#94A3B8;font-weight:600;">${p}%</small></div>
       </div>${subHtml}</div>`;
-  }).join('');
+  });
 
-  // ── Category list (full width, 2-column grid for compactness) + Pie chart below ──
-  h+='<div style="font-size:12px;font-weight:800;color:#0F172A;margin-bottom:8px;">📂 Category Mix — click any row or sub-topic to view calls with sentiment</div>';
-  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;">'+catListHtml+'</div>';
-  h+='<div style="display:flex;justify-content:center;margin-top:16px;"><div style="width:340px;height:320px;position:relative;"><canvas id="care-summary-pie"></canvas></div></div>';
-  h+='<div style="text-align:center;font-size:10.5px;color:#94A3B8;margin-top:4px;">🥧 Grievance mix · click a slice to view those calls</div>';
+  // ── 3-column: LEFT 4 categories | CENTER pie chart | RIGHT remaining categories ──
+  const half=Math.min(4,Math.ceil(catCards.length/2));
+  const leftCats=catCards.slice(0,half).join('');
+  const rightCats=catCards.slice(half).join('');
+  h+='<div style="display:grid;grid-template-columns:1fr 280px 1fr;gap:14px;align-items:start;">'
+    +'<div>'+leftCats+'</div>'
+    +'<div style="text-align:center;"><div style="height:280px;position:relative;"><canvas id="care-summary-pie"></canvas></div>'
+    +'<div style="font-size:10px;color:#94A3B8;margin-top:2px;">click a slice to view</div></div>'
+    +'<div>'+rightCats+'</div>'
+    +'</div>';
   el.innerHTML=h;
+
+  // Store selected class/section for re-render persistence
+  window._CARE_CLS=document.getElementById('care-cls-sel')?document.getElementById('care-cls-sel').value:'ALL';
+  window._CARE_SEC=document.getElementById('care-sec-sel')?document.getElementById('care-sec-sel').value:'ALL';
 
   mkChart('care-summary-pie',{type:'doughnut',
     data:{labels:present,datasets:[{data:present.map(c=>cat[c]),backgroundColor:present.map(c=>META[c].c),borderWidth:2,borderColor:'#fff'}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'52%',
       onClick:(e,el2)=>{if(el2&&el2.length)viewCareGrievance(window._CARE_PIE_CATS[el2[0].index]);},
-      plugins:{legend:{position:'bottom',labels:{font:{size:9},usePointStyle:true,padding:7,boxWidth:8}},
+      plugins:{legend:{display:false},
         datalabels:{display:true,color:'#fff',font:{weight:'bold',size:10.5},formatter:(v)=>{const p=Math.round(v/total*100);return p>=5?p+'%':'';}},
         tooltip:{callbacks:{label:cx=>cx.label+': '+fi(cx.parsed)+' ('+Math.round(cx.parsed/total*100)+'%)'}}}}});
 }
@@ -5672,26 +5690,18 @@ function renderCare(){
     ));
   }
 
-  // Volume stacked — aggregate by month, filtered.
-  // Uses TRACKER first; fills gaps from CARE_DATA (the Master sheet) for months the Tracker
-  // hasn't been updated yet (same fix as the completion-rate bars above).
+  // Volume stacked — aggregate by month directly from CARE_DATA (the Master sheet).
+  // This guarantees the chart shows data even when the TRACKER summary sheets haven't
+  // been updated yet (which was the root cause of the empty chart).
+  const _CARE_VOL=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
   const mv={};
   MONTHS.forEach(m=>mv[m]={resolved:0,ip:0,pending:0});
-  TRACKER.filter(r=>fBranch==='ALL'||r.branch===fBranch).forEach(r=>{
-    if(r.calls===0)return;
-    mv[r.month].resolved+=r.resolved;mv[r.month].ip+=r.ip;mv[r.month].pending+=r.pending;
-  });
-  // Fill gaps from CARE_DATA for months with zero in TRACKER
-  const _CARE_ALL=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
-  MONTHS.forEach(m=>{
-    if(mv[m].resolved===0&&mv[m].ip===0&&mv[m].pending===0){
-      const mc=_CARE_ALL.filter(r=>(fBranch==='ALL'||r.Branch===fBranch)&&r.Month===m);
-      if(mc.length>0){
-        mv[m].resolved=mc.filter(r=>r.Status==='Resolved').length;
-        mv[m].ip=mc.filter(r=>r.Status==='In Progress').length;
-        mv[m].pending=mc.filter(r=>r.Status==='Pending').length;
-      }
-    }
+  _CARE_VOL.filter(r=>fBranch==='ALL'||r.Branch===fBranch).forEach(r=>{
+    const m=r.Month;
+    if(!mv[m]) return;
+    if(r.Status==='Resolved') mv[m].resolved++;
+    else if(r.Status==='In Progress') mv[m].ip++;
+    else if(r.Status==='Pending') mv[m].pending++;
   });
   mkChart('care-vol',{type:'bar',data:{labels:MONTHS,datasets:[
     {label:'Resolved',   data:MONTHS.map(m=>mv[m].resolved),backgroundColor:'#059669',borderRadius:4,stack:'s'},
