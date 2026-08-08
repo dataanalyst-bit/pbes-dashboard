@@ -34,6 +34,10 @@ export async function onRequestGet({ request, env }) {
   const reqUrl = new URL(request.url);
   const rawSection = (reqUrl.searchParams.get("section") || "").trim().toLowerCase();
   const section = ALLOWED_SECTIONS[rawSection] ? rawSection : "";
+  // The dashboard's ↻ Refresh sends nocache=1. Without honouring it here, the edge
+  // cache would keep serving the old snapshot for its whole TTL and "Refresh" would
+  // appear to do nothing after a redeploy.
+  const bypassCache = reqUrl.searchParams.get("nocache") === "1";
 
   // ── 1. Authenticate the caller against Supabase ──
   const authHeader = request.headers.get("Authorization") || "";
@@ -62,7 +66,7 @@ export async function onRequestGet({ request, env }) {
     "https://pbes-dashboard-cache.internal/api/data" + (section ? "/" + section : "")
   );
 
-  let upstream = await cache.match(cacheKey);
+  let upstream = bypassCache ? undefined : await cache.match(cacheKey);
 
   if (!upstream) {
     const base = env.APPS_SCRIPT_URL;
@@ -72,7 +76,10 @@ export async function onRequestGet({ request, env }) {
       : "";
     // ← the line that was missing: pass the section through to Apps Script
     const sectionParam = section ? "&section=" + encodeURIComponent(section) : "";
-    const upstreamUrl = base + sep + "_t=" + Date.now() + keyParam + sectionParam;
+    // Also rebuild the Apps Script side, not just the edge copy.
+    const bustParam = bypassCache ? "&nocache=1" : "";
+    const upstreamUrl =
+      base + sep + "_t=" + Date.now() + keyParam + sectionParam + bustParam;
 
     let resp;
     try {
