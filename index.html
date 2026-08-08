@@ -663,22 +663,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="cb" id="care-summary-report" style="padding:14px 18px;"></div>
   </div>
 
-  <div class="row r2">
-    <div class="card"><div class="ch"><h3>📋 Grievance Category Breakdown</h3><span class="fnote" id="griev-fn">All Branches</span></div><div class="cb"><div class="cw tall"><canvas id="care-griev"></canvas></div>
-      <div style="text-align:center;font-size:11px;color:#1E4FD8;font-weight:600;margin-top:8px;padding:6px 0;background:#EEF2FF;border-radius:8px;">👆 Click any bar above to see student records — or use quick filters below:</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;padding:2px 0;">
-        <button onclick="drillCareByGrievance('No Concern')" style="padding:4px 10px;border-radius:16px;background:#ECFDF5;color:#059669;border:1.5px solid #A7F3D0;font-size:11px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;">✅ No Concern</button>
-        <button onclick="drillCareByGrievance('Academics')" style="padding:4px 10px;border-radius:16px;background:#EEF2FF;color:#1E4FD8;border:1.5px solid #C7D2FE;font-size:11px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;">📚 Academics</button>
-        <button onclick="drillCareByGrievance('Not Answering')" style="padding:4px 10px;border-radius:16px;background:#FFFBEB;color:#D97706;border:1.5px solid #FDE68A;font-size:11px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;">📵 Not Answering</button>
-        <button onclick="drillCareByGrievance('Behaviour / Wellbeing')" style="padding:4px 10px;border-radius:16px;background:#F5F3FF;color:#7C3AED;border:1.5px solid #DDD6FE;font-size:11px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;">🧠 Behaviour</button>
-        <button onclick="drillCareByGrievance('Administration')" style="padding:4px 10px;border-radius:16px;background:#F0FDFA;color:#0D9488;border:1.5px solid #99F6E4;font-size:11px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;">🏛️ Admin</button>
-        <button onclick="drillCareByGrievance('Other')" style="padding:4px 10px;border-radius:16px;background:#F8FAFF;color:#64748B;border:1.5px solid #E2E8F0;font-size:11px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;">📋 Other</button>
-        <button onclick="drillCareByGrievance('Transport')" style="padding:4px 10px;border-radius:16px;background:#FEF2F2;color:#DC2626;border:1.5px solid #FECACA;font-size:11px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;">🚌 Transport</button>
-        <button onclick="drillCareByGrievance('Co Curricular')" style="padding:4px 10px;border-radius:16px;background:#FFF7ED;color:#EA580C;border:1.5px solid #FED7AA;font-size:11px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;">🎭 Co-Curricular</button>
-      </div>
-    </div></div>
-    <div class="card"><div class="ch"><h3>📊 Monthly Volume — Resolved vs Pending</h3></div><div class="cb"><div class="cw tall"><canvas id="care-vol"></canvas></div></div></div>
-  </div>
+  <!-- Monthly Volume chart (Grievance Category Breakdown removed — sub-topics in Summary replace it) -->
+  <div class="card" style="margin-bottom:16px;"><div class="ch"><h3>📊 Monthly Volume — Resolved vs Pending</h3></div><div class="cb"><div class="cw tall"><canvas id="care-vol"></canvas></div></div></div>
 
   <!-- ── Grievance Inline Records Table (on-demand, triggered by chart/button clicks) ── -->
   <div id="griev-records-panel" style="display:none;margin-bottom:16px;">
@@ -5324,182 +5310,163 @@ function renderCareSummary(){
 
   const CATS=['No Concern','Not Answering','Academics','Behaviour / Wellbeing','Administration','Transport','Co Curricular','New Admission','No Response','Other'];
   const META={
-    'No Concern':{e:'😊',c:'#22C55E',act:'Parents satisfied — capture as testimonials for admissions marketing.'},
-    'Not Answering':{e:'📵',c:'#F59E0B',act:'Unreachable — retry at varied times & update phone numbers.'},
-    'Academics':{e:'📚',c:'#3B82F6',act:'Academic concerns — share with subject coordinators for intervention.'},
-    'Behaviour / Wellbeing':{e:'🧩',c:'#EF4444',act:'Behaviour / wellbeing — involve the counsellor & track patterns.'},
-    'Administration':{e:'🏫',c:'#8B5CF6',act:'Admin / process issues — fast-track resolution with the front office.'},
-    'Transport':{e:'🚌',c:'#14B8A6',act:'Transport concerns — coordinate with the transport desk.'},
-    'Co Curricular':{e:'🎨',c:'#EC4899',act:'Co-curricular feedback — route to activity coordinators.'},
-    'New Admission':{e:'🆕',c:'#0EA5E9',act:'New-admission queries — nurture these for conversion.'},
-    'No Response':{e:'🔕',c:'#64748B',act:'No response — schedule callbacks at a different time slot.'},
-    'Other':{e:'📌',c:'#94A3B8',act:'Uncategorised — review manually and re-tag.'}
+    'No Concern':{e:'😊',c:'#22C55E'},'Not Answering':{e:'📵',c:'#F59E0B'},'Academics':{e:'📚',c:'#3B82F6'},
+    'Behaviour / Wellbeing':{e:'🧩',c:'#EF4444'},'Administration':{e:'🏫',c:'#8B5CF6'},'Transport':{e:'🚌',c:'#14B8A6'},
+    'Co Curricular':{e:'🎨',c:'#EC4899'},'New Admission':{e:'🆕',c:'#0EA5E9'},'No Response':{e:'🔕',c:'#64748B'},'Other':{e:'📌',c:'#94A3B8'}
   };
   const cat={}; CATS.forEach(c=>cat[c]=0);
   rows.forEach(r=>{ const c=CATS.includes(r.Grievance)?r.Grievance:'Other'; cat[c]++; });
   const total=rows.length;
   const noConcern=cat['No Concern']||0;
   const satisfiedPct=Math.round(noConcern/total*100);
-  const concern=total-noConcern, concernPct=100-satisfiedPct;
   const present=CATS.filter(c=>cat[c]>0).sort((a,b)=>cat[b]-cat[a]);
   window._CARE_PIE_CATS=present;
-  const concernCats=present.filter(c=>c!=='No Concern');
-  const topConcern=concernCats[0];
 
-  // ── NLP sentiment across Remarks + Follow-up text (data-science layer on top of the raw categories) ──
-  let pos=0,neg=0,neu=0,texted=0;
-  const negByCat={}; CATS.forEach(c=>negByCat[c]=0);
-  rows.forEach(r=>{
-    const blob=((r.Remarks&&r.Remarks!=='–')?r.Remarks:'')+' '+((r.Followup&&r.Followup!=='–')?r.Followup:'');
-    if(!blob.trim()) return;
-    texted++;
-    const s=_sentiment(blob);
-    if(s.label==='Positive')pos++; else if(s.label==='Negative'){neg++; const c=CATS.includes(r.Grievance)?r.Grievance:'Other'; negByCat[c]=(negByCat[c]||0)+1;} else neu++;
-  });
-  const sentTot=(pos+neg+neu)||1;
-  const posPct=Math.round(pos/sentTot*100), negPct=Math.round(neg/sentTot*100);
-  const topNegCat=CATS.map(c=>[c,negByCat[c]]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1])[0];
+  // Status counts
+  const resolved=rows.filter(r=>r.Status==='Resolved').length;
+  const inProg=rows.filter(r=>r.Status==='In Progress').length;
+  const pending=rows.filter(r=>r.Status==='Pending').length;
 
-  // Branch comparison (only meaningful with "All Branches")
-  let branchNote='';
-  if(fBranch==='ALL'){
-    const byBranch={}; scope.forEach(b=>byBranch[b]={tot:0,ok:0});
-    rows.forEach(r=>{ if(byBranch[r.Branch]){ byBranch[r.Branch].tot++; if(r.Grievance==='No Concern') byBranch[r.Branch].ok++; } });
-    const ranked=Object.entries(byBranch).filter(([,v])=>v.tot>0).map(([b,v])=>[b,Math.round(v.ok/v.tot*100)]).sort((a,b)=>b[1]-a[1]);
-    if(ranked.length>1) branchNote=`<strong>${ranked[0][0]}</strong> leads parent satisfaction at <strong>${ranked[0][1]}%</strong>; <strong>${ranked[ranked.length-1][0]}</strong> is lowest at <strong>${ranked[ranked.length-1][1]}%</strong> — share ${ranked[0][0]}'s call script with the lower branch.`;
-  }
-
-  // KPI strip
-  const satColor=satisfiedPct>=80?'#059669':satisfiedPct>=60?'#D97706':'#DC2626';
-  let h='<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;">'
-    +`<div style="flex:1;min-width:170px;background:linear-gradient(135deg,#ECFDF5,#F0FDFA);border:1px solid #A7F3D0;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="viewCareGrievance('No Concern')" title="Click to view satisfied parents">
-        <div style="font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:.4px;">😊 Parents Satisfied</div>
-        <div style="font-size:30px;font-weight:800;color:${satColor};line-height:1.1;margin-top:2px;">${satisfiedPct}%</div>
-        <div style="font-size:11px;color:#64748B;">${fi(noConcern)} of ${fi(total)} calls had No Concern</div></div>`
-    +`<div style="flex:1;min-width:170px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:11px;padding:12px 15px;">
-        <div style="font-size:11px;font-weight:700;color:#D97706;text-transform:uppercase;letter-spacing:.4px;">⚠ Concerns Raised</div>
-        <div style="font-size:30px;font-weight:800;color:#D97706;line-height:1.1;margin-top:2px;">${concernPct}%</div>
-        <div style="font-size:11px;color:#64748B;">${fi(concern)} calls need attention${topConcern?(' · top: '+META[topConcern].e+' '+topConcern):''}</div></div>`
-    +`<div style="flex:1;min-width:170px;background:#EEF2FF;border:1px solid #C7D2FE;border-radius:11px;padding:12px 15px;">
-        <div style="font-size:11px;font-weight:700;color:#1E4FD8;text-transform:uppercase;letter-spacing:.4px;">💬 Text Sentiment</div>
-        <div style="font-size:30px;font-weight:800;color:${posPct>=negPct?'#059669':'#DC2626'};line-height:1.1;margin-top:2px;">${posPct}% <span style="font-size:15px;">😊</span></div>
-        <div style="font-size:11px;color:#64748B;">${fi(texted)} remarks analysed · ${negPct}% negative 😟</div></div>`
-    +`<div style="flex:1;min-width:150px;background:#F5F3FF;border:1px solid #DDD6FE;border-radius:11px;padding:12px 15px;">
-        <div style="font-size:11px;font-weight:700;color:#7C3AED;text-transform:uppercase;letter-spacing:.4px;">📞 Calls Analysed</div>
-        <div style="font-size:30px;font-weight:800;color:#7C3AED;line-height:1.1;margin-top:2px;">${fi(total)}</div>
-        <div style="font-size:11px;color:#64748B;">${present.length} grievance categories</div></div>`
-    +'</div>';
-
-  // ── 3-column: category mix (left) · PIE CHART (middle) · synthesized data-driven insights (right) ──
-  const catListHtml=present.map(c=>{
-    const m=META[c], p=Math.round(cat[c]/total*100);
-    return `<div onclick="viewCareGrievance('${c.replace(/'/g,"\\'")}')" style="display:flex;gap:8px;align-items:center;padding:6px 9px;border-radius:8px;cursor:pointer;border-left:3px solid ${m.c};background:#F8FAFC;margin-bottom:5px;" title="Click to view these calls">
-      <div style="width:26px;height:26px;border-radius:8px;background:${m.c}20;display:flex;align-items:center;justify-content:center;font-size:14px;flex:0 0 auto;">${m.e}</div>
-      <div style="flex:1;min-width:0;"><div style="font-size:11.5px;font-weight:700;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c}</div></div>
-      <div style="font-size:12px;font-weight:800;color:${m.c};white-space:nowrap;">${fi(cat[c])} <small style="color:#94A3B8;font-weight:600;">${p}%</small></div></div>`;
-  }).join('');
-
-  // Synthesized insights — cross-category / sentiment / branch, not just a 1:1 category echo
-  const insights=[];
-  insights.push(`😊 <strong>${satisfiedPct}%</strong> of calls this period had <strong>No Concern</strong> — treat this as your parent-satisfaction score.`);
-  if(topConcern) insights.push(`${META[topConcern].e} Leading concern is <strong>${topConcern}</strong> (${fi(cat[topConcern])} calls, ${Math.round(cat[topConcern]/total*100)}%). ${META[topConcern].act}`);
-  if(topNegCat) insights.push(`😟 NLP flags <strong>${topNegCat[0]}</strong> as carrying the most negative-sentiment remarks — prioritise these follow-ups first.`);
-  if(negPct>=25) insights.push(`🔴 Overall negative sentiment is high (${negPct}%) — route flagged calls to a senior counsellor with a 48h resolution SLA.`);
-  else if(posPct>=60) insights.push(`✅ Sentiment is largely positive (${posPct}%) — good candidates for parent testimonials in admissions marketing.`);
-  const naCount=(cat['Not Answering']||0)+(cat['No Response']||0);
-  if(naCount>0) insights.push(`📵 <strong>${fi(naCount)}</strong> calls went unanswered / no-response (${Math.round(naCount/total*100)}%) — retry at varied times and refresh contact numbers.`);
-  if(branchNote) insights.push('🏫 '+branchNote);
-  if(!insights.length) insights.push('Sentiment and categories are balanced — keep monitoring week-on-week.');
-
-  // ── NLP sub-topic extraction for high-share categories (Academics, Other, etc.) ──
-  // Uses keyword-frequency clustering on Remarks + Followup text to auto-discover
-  // the specific issues within each broad grievance category. Like a lightweight LDA
-  // topic model, but deterministic and explainable (no black-box ML needed).
+  // ── Topic rules for ALL categories ──
   const TOPIC_RULES={
+    'No Concern':[
+      {topic:'Teacher Call — Positive',kw:['teacher','informed','discussed','what i had informed','class teacher']},
+      {topic:'Parent Satisfied',kw:['happy','satisfied','good','great','no concern','no issue','well','fine','thank','appreciate']},
+      {topic:'Event / Activity',kw:['event','bonalu','field trip','sports','annual','cultural','function','competition']},
+      {topic:'Progress Update',kw:['progress','improvement','change','better','improving','marks','result']},
+      {topic:'General Check-in',kw:[]}
+    ],
     'Academics':[
       {topic:'Homework / Assignments',kw:['homework','assignment','home work','hw','project','submission']},
       {topic:'Marks / Results',kw:['marks','result','score','grade','pt-1','pt-2','exam','test','rank','percentage','fail']},
-      {topic:'Teaching Quality',kw:['teaching','teacher','explain','understand','doubt','syllabus','portion','class room','pedagogy']},
+      {topic:'Teaching Quality',kw:['teaching','teacher','explain','understand','doubt','syllabus','portion','pedagogy']},
       {topic:'Attendance / Regularity',kw:['absent','attendance','irregular','leave','bunk','late','punctual']},
-      {topic:'Reading / Writing',kw:['reading','writing','handwriting','spelling','vocabulary','english','hindi','telugu','language']},
+      {topic:'Reading / Writing',kw:['reading','writing','handwriting','spelling','vocabulary','english','hindi','telugu']},
       {topic:'Math / Science',kw:['math','maths','science','formula','calculation','physics','chemistry','biology']},
-      {topic:'Communication to Parents',kw:['inform','communication','message','whatsapp','almanac','diary','notice','update','dc','digital campus']},
-      {topic:'General Academic Concern',kw:['concern','improvement','progress','performance','weak','slow','attention','focus','concentration']}
+      {topic:'Communication',kw:['inform','communication','message','whatsapp','almanac','diary','notice','dc','digital campus']},
+      {topic:'General Academic',kw:['concern','improvement','performance','weak','slow','attention','focus','concentration']},
+      {topic:'Other Academic',kw:[]}
     ],
     'Other':[
-      {topic:'Fees / Payment',kw:['fee','fees','payment','amount','receipt','due','balance','concession','scholarship']},
-      {topic:'Uniform / Stationery',kw:['uniform','dress','shoes','books','textbook','notebook','stationery','id card','identity']},
-      {topic:'Safety / Infrastructure',kw:['safety','broken','damage','repair','clean','hygiene','washroom','toilet','drinking','water','cctv','gate']},
-      {topic:'Food / Canteen',kw:['food','lunch','canteen','tiffin','snack','meal','menu','quality']},
-      {topic:'Positive / Appreciation',kw:['good','great','happy','satisfied','thank','appreciate','excellent','improve','well done','proud']},
-      {topic:'Miscellaneous',kw:[]}  // catch-all
+      {topic:'Fees / Payment',kw:['fee','fees','payment','amount','receipt','due','balance','concession']},
+      {topic:'Uniform / Stationery',kw:['uniform','dress','shoes','books','textbook','notebook','stationery','id card']},
+      {topic:'Safety / Infrastructure',kw:['safety','broken','damage','repair','clean','hygiene','washroom','water','cctv']},
+      {topic:'Food / Canteen',kw:['food','lunch','canteen','tiffin','snack','meal']},
+      {topic:'Positive / Appreciation',kw:['good','great','happy','satisfied','thank','appreciate','excellent']},
+      {topic:'Miscellaneous',kw:[]}
     ],
     'Behaviour / Wellbeing':[
-      {topic:'Bullying / Fights',kw:['bully','fight','hit','beat','push','tease','ragging','quarrel','abuse']},
-      {topic:'Emotional / Mental',kw:['stress','anxiety','cry','sad','fear','pressure','depress','counsel','emotional','mental']},
-      {topic:'Discipline',kw:['discipline','misbehav','rude','disturbance','punish','complain','disobey','respect']},
-      {topic:'Health / Medical',kw:['health','sick','fever','injury','allergy','medicine','doctor','medical','hospital','headache','stomach']}
+      {topic:'Bullying / Fights',kw:['bully','fight','hit','beat','push','tease','quarrel','abuse']},
+      {topic:'Emotional / Mental',kw:['stress','anxiety','cry','sad','fear','pressure','depress','counsel','emotional']},
+      {topic:'Discipline',kw:['discipline','misbehav','rude','disturbance','punish','complain','disobey']},
+      {topic:'Health / Medical',kw:['health','sick','fever','injury','allergy','medicine','doctor','medical']},
+      {topic:'Other Wellbeing',kw:[]}
+    ],
+    'Not Answering':[
+      {topic:'Phone Switched Off',kw:['switched off','switch off','not reachable','unreachable','out of service']},
+      {topic:'Busy / Engaged',kw:['busy','engaged','call back','call later','not available']},
+      {topic:'No Pick Up',kw:['not answering','not picking','no answer','no response','ring','didn\'t pick']},
+      {topic:'Wrong Number',kw:['wrong number','invalid','disconnected','not in use']},
+      {topic:'General',kw:[]}
+    ],
+    'Administration':[
+      {topic:'TC / Transfer',kw:['tc','transfer','leaving','withdraw','migration']},
+      {topic:'Admission Process',kw:['admission','enroll','registration','form','document']},
+      {topic:'Schedule / Timing',kw:['timing','schedule','holiday','vacation','time table','calendar']},
+      {topic:'Fees / Admin',kw:['fee','receipt','payment','bill','challan']},
+      {topic:'Other Admin',kw:[]}
+    ],
+    'Transport':[
+      {topic:'Route / Timing',kw:['route','timing','late','delay','early','pickup','drop','time','stop']},
+      {topic:'Driver / Attender',kw:['driver','attender','staff','behaviour','rude','speed','rash']},
+      {topic:'Safety',kw:['safety','accident','seat','overcrowd','cctv','gps']},
+      {topic:'Vehicle Condition',kw:['ac','condition','clean','maintenance','repair','breakdown']},
+      {topic:'General Transport',kw:[]}
+    ],
+    'Co Curricular':[
+      {topic:'Sports',kw:['sports','game','physical','swimming','skating','cricket','football']},
+      {topic:'Arts / Dance / Music',kw:['art','dance','music','craft','drawing','painting','singing']},
+      {topic:'Clubs / Activities',kw:['club','activity','robotics','coding','debate','quiz']},
+      {topic:'General Co-Curricular',kw:[]}
+    ],
+    'New Admission':[
+      {topic:'Enquiry',kw:['enquiry','inquiry','information','details','seat','availability']},
+      {topic:'Process',kw:['process','document','form','submit','fee','payment']},
+      {topic:'Visit / Tour',kw:['visit','tour','campus','school','see']},
+      {topic:'General',kw:[]}
+    ],
+    'No Response':[
+      {topic:'Unreachable',kw:['not reachable','switched off','out of service']},
+      {topic:'No Pick Up',kw:['not answering','not picking','no response','ring']},
+      {topic:'General',kw:[]}
     ]
   };
+
   function extractTopics(catName, catRows){
     const rules=TOPIC_RULES[catName];
     if(!rules||!catRows.length) return [];
-    const buckets=rules.map(r=>({topic:r.topic,kw:r.kw,count:0,rows:[]}));
+    const buckets=rules.map(r=>({topic:r.topic,kw:r.kw,count:0}));
     catRows.forEach(r=>{
       const text=((r.Remarks&&r.Remarks!=='–')?r.Remarks:'')+' '+((r.Followup&&r.Followup!=='–')?r.Followup:'');
       const t=text.toLowerCase();
       let matched=false;
-      buckets.forEach(b=>{
-        if(b.kw.length===0) return; // skip catch-all first pass
-        if(b.kw.some(k=>t.indexOf(k)!==-1)){ b.count++; b.rows.push(r); matched=true; }
-      });
-      if(!matched){ const misc=buckets.find(b=>b.kw.length===0); if(misc){misc.count++;misc.rows.push(r);} }
+      buckets.forEach(b=>{ if(b.kw.length===0)return; if(b.kw.some(k=>t.indexOf(k)!==-1)){b.count++;matched=true;} });
+      if(!matched){ const misc=buckets.find(b=>b.kw.length===0); if(misc)misc.count++; }
     });
     return buckets.filter(b=>b.count>0).sort((a,b)=>b.count-a.count);
   }
 
-  // Build sub-topic HTML for categories with ≥3% share
-  function subTopicHtml(catName){
-    const catRows=rows.filter(r=>{
-      const c=CATS.includes(r.Grievance)?r.Grievance:'Other';
-      return c===catName;
-    });
-    if(!TOPIC_RULES[catName]||catRows.length<3) return '';
-    const topics=extractTopics(catName,catRows);
-    if(!topics.length) return '';
-    const tc=META[catName]?META[catName].c:'#64748B';
-    return '<div style="margin:2px 0 6px 12px;padding:6px 8px;background:#F8FAFC;border-radius:6px;border-left:2px solid '+tc+';">'
-      +'<div style="font-size:10px;font-weight:700;color:#64748B;margin-bottom:3px;">🔍 SUB-TOPICS (auto-detected from remarks)</div>'
-      +topics.slice(0,5).map(t=>{
-        const pct=Math.round(t.count/catRows.length*100);
-        return '<div style="display:flex;justify-content:space-between;align-items:center;font-size:10.5px;color:#334155;padding:2px 0;cursor:pointer;" '
-          +'onclick="viewSubTopic(\''+catName.replace(/'/g,"\\'")+'\',\''+t.topic.replace(/'/g,"\\'")+'\','+JSON.stringify(t.kw).replace(/"/g,'&quot;')+')" '
-          +'title="Click to view these calls">'
-          +'<span>'+t.topic+'</span>'
-          +'<span style="font-weight:700;color:'+tc+';">'+t.count+' <small style="color:#94A3B8;">'+pct+'%</small></span></div>';
-      }).join('')+'</div>';
-  }
+  // ── KPI strip: Parents Satisfied + Resolved + In Progress + Pending ──
+  const satColor=satisfiedPct>=80?'#059669':satisfiedPct>=60?'#D97706':'#DC2626';
+  let h='<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;">'
+    +`<div style="flex:1;min-width:170px;background:linear-gradient(135deg,#ECFDF5,#F0FDFA);border:1px solid #A7F3D0;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="viewCareGrievance('No Concern')" title="Click to view satisfied parents">
+        <div style="font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;">😊 Parents Satisfied</div>
+        <div style="font-size:30px;font-weight:800;color:${satColor};line-height:1.1;margin-top:2px;">${satisfiedPct}%</div>
+        <div style="font-size:11px;color:#64748B;">${fi(noConcern)} of ${fi(total)} calls · click to view</div></div>`
+    +`<div style="flex:1;min-width:150px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="viewCareWithSentiment('Resolved')" title="Click to view">
+        <div style="font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;">✅ Resolved</div>
+        <div style="font-size:30px;font-weight:800;color:#059669;line-height:1.1;margin-top:2px;">${fi(resolved)}</div>
+        <div style="font-size:11px;color:#64748B;">${Math.round(resolved/total*100)}% · click to view with sentiment</div></div>`
+    +`<div style="flex:1;min-width:150px;background:#F5F3FF;border:1px solid #DDD6FE;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="viewCareWithSentiment('In Progress')" title="Click to view">
+        <div style="font-size:11px;font-weight:700;color:#7C3AED;text-transform:uppercase;">🔄 In Progress</div>
+        <div style="font-size:30px;font-weight:800;color:#7C3AED;line-height:1.1;margin-top:2px;">${fi(inProg)}</div>
+        <div style="font-size:11px;color:#64748B;">${Math.round(inProg/total*100)}% · click to view with sentiment</div></div>`
+    +`<div style="flex:1;min-width:150px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="viewCareWithSentiment('Pending')" title="Click to view">
+        <div style="font-size:11px;font-weight:700;color:#D97706;text-transform:uppercase;">⏳ Pending</div>
+        <div style="font-size:30px;font-weight:800;color:#D97706;line-height:1.1;margin-top:2px;">${fi(pending)}</div>
+        <div style="font-size:11px;color:#64748B;">${Math.round(pending/total*100)}% · click to view with sentiment</div></div>`
+    +'</div>';
 
-  // Rebuild catListHtml with sub-topics for qualifying categories
-  const catListHtml2=present.map(c=>{
+  // ── Category Mix with sub-topics for ALL categories + Pie chart (NO data-driven-insights text column) ──
+  const catListHtml=present.map(c=>{
     const m=META[c], p=Math.round(cat[c]/total*100);
-    const sub=(p>=3&&TOPIC_RULES[c])?subTopicHtml(c):'';
+    const catRows=rows.filter(r=>{const cc=CATS.includes(r.Grievance)?r.Grievance:'Other';return cc===c;});
+    const topics=TOPIC_RULES[c]?extractTopics(c,catRows):[];
+    const tc=m.c;
+    const subHtml=topics.length>0?('<div style="margin:2px 0 6px 12px;padding:6px 8px;background:#F8FAFC;border-radius:6px;border-left:2px solid '+tc+';">'
+      +'<div style="font-size:9.5px;font-weight:700;color:#94A3B8;margin-bottom:3px;">🔍 SUB-TOPICS</div>'
+      +topics.slice(0,6).map(t=>{
+        const tp=Math.round(t.count/catRows.length*100);
+        return '<div style="display:flex;justify-content:space-between;align-items:center;font-size:10.5px;color:#334155;padding:2px 0;cursor:pointer;" '
+          +'onclick="viewSubTopic(\''+c.replace(/'/g,"\\'")+'\',\''+t.topic.replace(/'/g,"\\'")+'\','+JSON.stringify(t.kw).replace(/"/g,'&quot;')+')" '
+          +'title="Click to view these calls with sentiment">'
+          +'<span>'+t.topic+'</span>'
+          +'<span style="font-weight:700;color:'+tc+';">'+t.count+' <small style="color:#94A3B8;">'+tp+'%</small></span></div>';
+      }).join('')+'</div>'):'';
     return `<div>
-      <div onclick="viewCareGrievance('${c.replace(/'/g,"\\'")}')" style="display:flex;gap:8px;align-items:center;padding:6px 9px;border-radius:8px;cursor:pointer;border-left:3px solid ${m.c};background:#F8FAFC;margin-bottom:2px;" title="Click to view these calls">
+      <div onclick="viewCareGrievance('${c.replace(/'/g,"\\'")}')" style="display:flex;gap:8px;align-items:center;padding:6px 9px;border-radius:8px;cursor:pointer;border-left:3px solid ${m.c};background:#F8FAFC;margin-bottom:2px;" title="Click to view all ${c} calls">
         <div style="width:26px;height:26px;border-radius:8px;background:${m.c}20;display:flex;align-items:center;justify-content:center;font-size:14px;flex:0 0 auto;">${m.e}</div>
-        <div style="flex:1;min-width:0;"><div style="font-size:11.5px;font-weight:700;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c}</div></div>
+        <div style="flex:1;min-width:0;"><div style="font-size:11.5px;font-weight:700;color:#0F172A;">${c}</div></div>
         <div style="font-size:12px;font-weight:800;color:${m.c};white-space:nowrap;">${fi(cat[c])} <small style="color:#94A3B8;font-weight:600;">${p}%</small></div>
-      </div>${sub}</div>`;
+      </div>${subHtml}</div>`;
   }).join('');
 
-  h+='<div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:16px;align-items:start;">'
-    +'<div><div style="font-size:12px;font-weight:800;color:#0F172A;margin-bottom:8px;">📂 Category Mix</div>'+catListHtml2+'</div>'
-    +'<div style="text-align:center;"><div style="height:270px;position:relative;"><canvas id="care-summary-pie"></canvas></div>'
-      +'<div style="font-size:10.5px;color:#94A3B8;margin-top:4px;">🥧 Grievance mix · click a slice to view those calls</div></div>'
-    +'<div><div style="font-size:12px;font-weight:800;color:#0F172A;margin-bottom:8px;">🧠 Data-Driven Insights</div>'
-      +'<ul style="margin:0;padding-left:16px;font-size:11.5px;color:#334155;line-height:1.65;">'+insights.map(x=>'<li style="margin-bottom:5px;">'+x+'</li>').join('')+'</ul></div>'
-    +'</div>'
-    +'<div style="@media(max-width:900px){display:none}"></div>';
+  // Two-column layout: Category list with sub-topics (left) + Pie chart (right)
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start;">'
+    +'<div><div style="font-size:12px;font-weight:800;color:#0F172A;margin-bottom:8px;">📂 Category Mix — click any row or sub-topic to view calls</div>'+catListHtml+'</div>'
+    +'<div style="text-align:center;"><div style="height:320px;position:relative;"><canvas id="care-summary-pie"></canvas></div>'
+    +'<div style="font-size:10.5px;color:#94A3B8;margin-top:4px;">🥧 Grievance mix · click a slice to view those calls</div></div>'
+    +'</div>';
   el.innerHTML=h;
 
   mkChart('care-summary-pie',{type:'doughnut',
@@ -5507,8 +5474,25 @@ function renderCareSummary(){
     options:{responsive:true,maintainAspectRatio:false,cutout:'52%',
       onClick:(e,el2)=>{if(el2&&el2.length)viewCareGrievance(window._CARE_PIE_CATS[el2[0].index]);},
       plugins:{legend:{position:'bottom',labels:{font:{size:9},usePointStyle:true,padding:7,boxWidth:8}},
-        datalabels:{display:true,color:'#fff',font:{weight:'bold',size:10.5},formatter:(v)=>{const p=Math.round(v/total*100);return p>=7?p+'%':'';}},
+        datalabels:{display:true,color:'#fff',font:{weight:'bold',size:10.5},formatter:(v)=>{const p=Math.round(v/total*100);return p>=5?p+'%':'';}},
         tooltip:{callbacks:{label:cx=>cx.label+': '+fi(cx.parsed)+' ('+Math.round(cx.parsed/total*100)+'%)'}}}}});
+}
+
+// Click-to-view by Status with Sentiment column
+function viewCareWithSentiment(status){
+  const CARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
+  const BR=['Boduppal','Keesara','Pocharam','Bachupally','Gowdavalli'];
+  const scope=(fBranch==='ALL')?BR:[fBranch];
+  const rows=CARE.filter(r=>scope.includes(r.Branch)&&(fMonth==='ALL'||r.Month===fMonth)&&r.Status===status)
+    .map(r=>({Branch:r.Branch,Month:r.Month,Student:r.Student,Class:r.Class,Date:r.Date,
+      Grievance:r.GrievanceRaw||r.Grievance,
+      Sentiment:_sentiment(((r.Remarks&&r.Remarks!=='–')?r.Remarks:'')+' '+((r.Followup&&r.Followup!=='–')?r.Followup:'')).label,
+      Remarks:r.Remarks,Followup:r.Followup,Status:r.StatusRaw||r.Status}));
+  const cols=[{key:'Branch',label:'Branch'},{key:'Student',label:'Student',maxW:'160px'},{key:'Class',label:'Class'},
+    {key:'Date',label:'Date',date:true},{key:'Grievance',label:'Grievance'},{key:'Sentiment',label:'Sentiment',pill:true},
+    {key:'Remarks',label:'Remarks',maxW:'280px'},{key:'Followup',label:'Follow-up',maxW:'200px'},{key:'Status',label:'Status'}];
+  const bl=fBranch==='ALL'?'All Branches':fBranch;
+  openModal('📞 '+status+' Calls — with Sentiment',`${rows.length} call(s) · ${bl} · each row includes NLP sentiment`,rows,cols);
 }
 
 // Drill-down: care calls in a grievance category (respects current branch+month filter)
@@ -5675,12 +5659,16 @@ function renderCare(){
     transport:   _gRows.filter(r=>r.Grievance==='Transport').length,
     coCurricular:_gRows.filter(r=>r.Grievance==='Co Curricular').length,
   };
-  mkChart('care-griev',hBarCfg(
-    ['No Concern','Academics','Other','Not Answering','Administration','Behaviour','Transport','Co-Curricular'],
-    [{label:'Count',data:[g.noConcern,g.academics,g.other,g.notAnswering,g.admin,g.behaviour,g.transport,g.coCurricular],
-      backgroundColor:['#059669','#1E4FD8','#94A3B8','#F59E0B','#0D9488','#7C3AED','#DC2626','#EA580C'],
-      borderRadius:4,barThickness:22}]
-  ));
+  // Grievance Category Breakdown chart removed (sub-topics in the Summary replace it).
+  // Guard: if the canvas still exists in a cached DOM, render it; otherwise skip.
+  if(document.getElementById('care-griev')){
+    mkChart('care-griev',hBarCfg(
+      ['No Concern','Academics','Other','Not Answering','Administration','Behaviour','Transport','Co-Curricular'],
+      [{label:'Count',data:[g.noConcern,g.academics,g.other,g.notAnswering,g.admin,g.behaviour,g.transport,g.coCurricular],
+        backgroundColor:['#059669','#1E4FD8','#94A3B8','#F59E0B','#0D9488','#7C3AED','#DC2626','#EA580C'],
+        borderRadius:4,barThickness:22}]
+    ));
+  }
 
   // Volume stacked — aggregate by month, filtered
   const mv={};
@@ -5755,12 +5743,10 @@ function renderTransport(){
   setTxt('tr-occ',occ+'%');
   setTxt('tr-occ-s',fi(riders)+' riders ÷ '+fi(seats)+' seats');
   // Spare/Extra vehicles: routes named "EXTRA"/"SPARE"/"STANDBY" or vehicles not assigned to a numbered route
-  const spareRoutes=routes.filter(r=>/extra|spare|standby|eecho/i.test(String(r.Route||'')));
-  const spareVehNos=new Set(spareRoutes.map(r=>String(r.Vehicle||'').trim().toUpperCase()).filter(Boolean));
-  const spareVehicles=vehicles.filter(v=>spareVehNos.has(String(v.VehicleNo||'').trim().toUpperCase())
-    || /extra|spare|standby/i.test(String(v.RouteNo||'')));
+  // Spare vehicles: identified by Status="Spare" in the Transport_Vehicle sheet
+  const spareVehicles=vehicles.filter(v=>/^spare$/i.test(String(v.Status||'').trim()));
   setTxt('tr-spare',fi(spareVehicles.length));
-  setTxt('tr-spare-s',spareVehicles.length>0?spareVehicles.map(v=>v.Branch).filter((v,i,a)=>a.indexOf(v)===i).join(', '):'None identified');
+  setTxt('tr-spare-s',spareVehicles.length>0?spareVehicles.map(v=>v.Branch).filter((v,i,a)=>a.indexOf(v)===i).join(', ')+' · click to view':'None identified');
   window._TR_SPARE=spareVehicles;
   setTxt('tr-exp',fi(expiring));
   setTxt('tr-mil',avgMil!=null?avgMil:'–');
