@@ -5690,18 +5690,41 @@ function renderCare(){
     ));
   }
 
-  // Volume stacked — aggregate by month directly from CARE_DATA (the Master sheet).
-  // This guarantees the chart shows data even when the TRACKER summary sheets haven't
-  // been updated yet (which was the root cause of the empty chart).
-  const _CARE_VOL=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
+  // Volume stacked — aggregate by month from BOTH sources:
+  //   1) TRACKER (pre-aggregated from Tracker sheets — reliable for past months)
+  //   2) CARE_DATA (Master sheet — individual call records, covers current month too)
+  // Take the HIGHER value from either source for each month to avoid zeros.
   const mv={};
   MONTHS.forEach(m=>mv[m]={resolved:0,ip:0,pending:0});
-  _CARE_VOL.filter(r=>fBranch==='ALL'||r.Branch===fBranch).forEach(r=>{
-    const m=r.Month;
+
+  // Source 1: TRACKER
+  TRACKER.filter(r=>fBranch==='ALL'||r.branch===fBranch).forEach(r=>{
+    if(!r.calls||r.calls===0) return;
+    const m=r.month;
     if(!mv[m]) return;
-    if(r.Status==='Resolved') mv[m].resolved++;
-    else if(r.Status==='In Progress') mv[m].ip++;
-    else if(r.Status==='Pending') mv[m].pending++;
+    mv[m].resolved+=(+r.resolved||0); mv[m].ip+=(+r.ip||0); mv[m].pending+=(+r.pending||0);
+  });
+
+  // Source 2: CARE_DATA (counts per month, normalizing month name)
+  const _cv2={};
+  MONTHS.forEach(m=>_cv2[m]={resolved:0,ip:0,pending:0});
+  const _CARE_VOL=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
+  const _MONTH_NORM={}; MONTHS.forEach(m=>_MONTH_NORM[m.toLowerCase()]=m);
+  _CARE_VOL.filter(r=>fBranch==='ALL'||r.Branch===fBranch).forEach(r=>{
+    const raw=String(r.Month||'').trim();
+    const m=_MONTH_NORM[raw.toLowerCase()]||raw;
+    if(!_cv2[m]) return;
+    const st=String(r.Status||'');
+    if(st==='Resolved'||/resolved/i.test(st)) _cv2[m].resolved++;
+    else if(st==='In Progress'||/in.progress/i.test(st)) _cv2[m].ip++;
+    else if(st==='Pending'||/pending/i.test(st)) _cv2[m].pending++;
+  });
+
+  // Merge: take the higher of the two sources per month (covers both stale-TRACKER and missing-CARE_DATA)
+  MONTHS.forEach(m=>{
+    mv[m].resolved=Math.max(mv[m].resolved, _cv2[m].resolved);
+    mv[m].ip=Math.max(mv[m].ip, _cv2[m].ip);
+    mv[m].pending=Math.max(mv[m].pending, _cv2[m].pending);
   });
   mkChart('care-vol',{type:'bar',data:{labels:MONTHS,datasets:[
     {label:'Resolved',   data:MONTHS.map(m=>mv[m].resolved),backgroundColor:'#059669',borderRadius:4,stack:'s'},
