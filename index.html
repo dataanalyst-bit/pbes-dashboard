@@ -1288,12 +1288,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="sh"><div class="sh-l"><span class="sh-ico">🚌</span><div><h2>School Transport Tracker</h2><p id="tr-tag" class="sh-sub">Fleet · Routes · Occupancy · Compliance</p></div></div>
     <span class="fnote" id="tr-fn">All Branches</span>
   </div>
-  <div class="krow k5">
+  <div class="krow k6">
     <div class="kc blue clickable" onclick="viewTransport('vehicles')" title="Click to view all vehicles"><div class="kc-ico">🚌</div><div class="kc-lbl">Total Vehicles</div><div class="kc-val" id="tr-veh">–</div><div class="kc-sub" id="tr-veh-s">Active fleet · click to view</div></div>
     <div class="kc teal clickable" onclick="viewTransport('students')" title="Click to view transport students"><div class="kc-ico">🎒</div><div class="kc-lbl">Transport Students</div><div class="kc-val" id="tr-stu">–</div><div class="kc-sub" id="tr-stu-s">Riders · click to view</div></div>
     <div class="kc green"><div class="kc-ico">🪑</div><div class="kc-lbl">Fleet Occupancy</div><div class="kc-val" id="tr-occ">–</div><div class="kc-sub" id="tr-occ-s">Riders ÷ seats</div></div>
+    <div class="kc amber clickable" onclick="viewTransport('spare')" title="Click to view spare/extra vehicles"><div class="kc-ico">🔄</div><div class="kc-lbl">Spare Vehicles</div><div class="kc-val" id="tr-spare">–</div><div class="kc-sub" id="tr-spare-s">Extra / standby · click to view</div></div>
     <div class="kc red clickable" onclick="viewTransport('expiring')" title="Click to view expiring documents"><div class="kc-ico">⚠️</div><div class="kc-lbl">Docs Expiring/Expired</div><div class="kc-val" id="tr-exp">–</div><div class="kc-sub" id="tr-exp-s">Compliance risk · click to view</div></div>
-    <div class="kc amber"><div class="kc-ico">⛽</div><div class="kc-lbl">Avg Mileage</div><div class="kc-val" id="tr-mil">–</div><div class="kc-sub" id="tr-mil-s">KM / litre</div></div>
+    <div class="kc purple"><div class="kc-ico">⛽</div><div class="kc-lbl">Avg Mileage</div><div class="kc-val" id="tr-mil">–</div><div class="kc-sub" id="tr-mil-s">KM / litre</div></div>
   </div>
 
   <div class="row r2">
@@ -2937,7 +2938,7 @@ function renderAdminPerformance(rows,BRANCHES,isDone,isIP,isHoldOpen,overdueDays
     const st=adminSpeedStats(br);
     if(st.total===0) return null;
     return {branch:b,tot:st.total,dn:st.done,od:st.overdue,avgOdDays:st.avgOd,
-            comp:st.pct,onSch:st.onSchedulePct,avgEarly:st.avgEarly,score:st.score};
+            comp:st.pct,onSch:st.onSchedulePct,avgEarly:st.avgEarly,score:st.score,u:st.u};
   }).filter(Boolean).sort((a,b)=>b.score-a.score);
   const medals=['🥇','🥈','🥉'];
   el.innerHTML=stats.map((s,i)=>{
@@ -5410,8 +5411,89 @@ function renderCareSummary(){
   if(branchNote) insights.push('🏫 '+branchNote);
   if(!insights.length) insights.push('Sentiment and categories are balanced — keep monitoring week-on-week.');
 
+  // ── NLP sub-topic extraction for high-share categories (Academics, Other, etc.) ──
+  // Uses keyword-frequency clustering on Remarks + Followup text to auto-discover
+  // the specific issues within each broad grievance category. Like a lightweight LDA
+  // topic model, but deterministic and explainable (no black-box ML needed).
+  const TOPIC_RULES={
+    'Academics':[
+      {topic:'Homework / Assignments',kw:['homework','assignment','home work','hw','project','submission']},
+      {topic:'Marks / Results',kw:['marks','result','score','grade','pt-1','pt-2','exam','test','rank','percentage','fail']},
+      {topic:'Teaching Quality',kw:['teaching','teacher','explain','understand','doubt','syllabus','portion','class room','pedagogy']},
+      {topic:'Attendance / Regularity',kw:['absent','attendance','irregular','leave','bunk','late','punctual']},
+      {topic:'Reading / Writing',kw:['reading','writing','handwriting','spelling','vocabulary','english','hindi','telugu','language']},
+      {topic:'Math / Science',kw:['math','maths','science','formula','calculation','physics','chemistry','biology']},
+      {topic:'Communication to Parents',kw:['inform','communication','message','whatsapp','almanac','diary','notice','update','dc','digital campus']},
+      {topic:'General Academic Concern',kw:['concern','improvement','progress','performance','weak','slow','attention','focus','concentration']}
+    ],
+    'Other':[
+      {topic:'Fees / Payment',kw:['fee','fees','payment','amount','receipt','due','balance','concession','scholarship']},
+      {topic:'Uniform / Stationery',kw:['uniform','dress','shoes','books','textbook','notebook','stationery','id card','identity']},
+      {topic:'Safety / Infrastructure',kw:['safety','broken','damage','repair','clean','hygiene','washroom','toilet','drinking','water','cctv','gate']},
+      {topic:'Food / Canteen',kw:['food','lunch','canteen','tiffin','snack','meal','menu','quality']},
+      {topic:'Positive / Appreciation',kw:['good','great','happy','satisfied','thank','appreciate','excellent','improve','well done','proud']},
+      {topic:'Miscellaneous',kw:[]}  // catch-all
+    ],
+    'Behaviour / Wellbeing':[
+      {topic:'Bullying / Fights',kw:['bully','fight','hit','beat','push','tease','ragging','quarrel','abuse']},
+      {topic:'Emotional / Mental',kw:['stress','anxiety','cry','sad','fear','pressure','depress','counsel','emotional','mental']},
+      {topic:'Discipline',kw:['discipline','misbehav','rude','disturbance','punish','complain','disobey','respect']},
+      {topic:'Health / Medical',kw:['health','sick','fever','injury','allergy','medicine','doctor','medical','hospital','headache','stomach']}
+    ]
+  };
+  function extractTopics(catName, catRows){
+    const rules=TOPIC_RULES[catName];
+    if(!rules||!catRows.length) return [];
+    const buckets=rules.map(r=>({topic:r.topic,kw:r.kw,count:0,rows:[]}));
+    catRows.forEach(r=>{
+      const text=((r.Remarks&&r.Remarks!=='–')?r.Remarks:'')+' '+((r.Followup&&r.Followup!=='–')?r.Followup:'');
+      const t=text.toLowerCase();
+      let matched=false;
+      buckets.forEach(b=>{
+        if(b.kw.length===0) return; // skip catch-all first pass
+        if(b.kw.some(k=>t.indexOf(k)!==-1)){ b.count++; b.rows.push(r); matched=true; }
+      });
+      if(!matched){ const misc=buckets.find(b=>b.kw.length===0); if(misc){misc.count++;misc.rows.push(r);} }
+    });
+    return buckets.filter(b=>b.count>0).sort((a,b)=>b.count-a.count);
+  }
+
+  // Build sub-topic HTML for categories with ≥3% share
+  function subTopicHtml(catName){
+    const catRows=rows.filter(r=>{
+      const c=CATS.includes(r.Grievance)?r.Grievance:'Other';
+      return c===catName;
+    });
+    if(!TOPIC_RULES[catName]||catRows.length<3) return '';
+    const topics=extractTopics(catName,catRows);
+    if(!topics.length) return '';
+    const tc=META[catName]?META[catName].c:'#64748B';
+    return '<div style="margin:2px 0 6px 12px;padding:6px 8px;background:#F8FAFC;border-radius:6px;border-left:2px solid '+tc+';">'
+      +'<div style="font-size:10px;font-weight:700;color:#64748B;margin-bottom:3px;">🔍 SUB-TOPICS (auto-detected from remarks)</div>'
+      +topics.slice(0,5).map(t=>{
+        const pct=Math.round(t.count/catRows.length*100);
+        return '<div style="display:flex;justify-content:space-between;align-items:center;font-size:10.5px;color:#334155;padding:2px 0;cursor:pointer;" '
+          +'onclick="viewSubTopic(\''+catName.replace(/'/g,"\\'")+'\',\''+t.topic.replace(/'/g,"\\'")+'\','+JSON.stringify(t.kw).replace(/"/g,'&quot;')+')" '
+          +'title="Click to view these calls">'
+          +'<span>'+t.topic+'</span>'
+          +'<span style="font-weight:700;color:'+tc+';">'+t.count+' <small style="color:#94A3B8;">'+pct+'%</small></span></div>';
+      }).join('')+'</div>';
+  }
+
+  // Rebuild catListHtml with sub-topics for qualifying categories
+  const catListHtml2=present.map(c=>{
+    const m=META[c], p=Math.round(cat[c]/total*100);
+    const sub=(p>=3&&TOPIC_RULES[c])?subTopicHtml(c):'';
+    return `<div>
+      <div onclick="viewCareGrievance('${c.replace(/'/g,"\\'")}')" style="display:flex;gap:8px;align-items:center;padding:6px 9px;border-radius:8px;cursor:pointer;border-left:3px solid ${m.c};background:#F8FAFC;margin-bottom:2px;" title="Click to view these calls">
+        <div style="width:26px;height:26px;border-radius:8px;background:${m.c}20;display:flex;align-items:center;justify-content:center;font-size:14px;flex:0 0 auto;">${m.e}</div>
+        <div style="flex:1;min-width:0;"><div style="font-size:11.5px;font-weight:700;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c}</div></div>
+        <div style="font-size:12px;font-weight:800;color:${m.c};white-space:nowrap;">${fi(cat[c])} <small style="color:#94A3B8;font-weight:600;">${p}%</small></div>
+      </div>${sub}</div>`;
+  }).join('');
+
   h+='<div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:16px;align-items:start;">'
-    +'<div><div style="font-size:12px;font-weight:800;color:#0F172A;margin-bottom:8px;">📂 Category Mix</div>'+catListHtml+'</div>'
+    +'<div><div style="font-size:12px;font-weight:800;color:#0F172A;margin-bottom:8px;">📂 Category Mix</div>'+catListHtml2+'</div>'
     +'<div style="text-align:center;"><div style="height:270px;position:relative;"><canvas id="care-summary-pie"></canvas></div>'
       +'<div style="font-size:10.5px;color:#94A3B8;margin-top:4px;">🥧 Grievance mix · click a slice to view those calls</div></div>'
     +'<div><div style="font-size:12px;font-weight:800;color:#0F172A;margin-bottom:8px;">🧠 Data-Driven Insights</div>'
@@ -5430,6 +5512,32 @@ function renderCareSummary(){
 }
 
 // Drill-down: care calls in a grievance category (respects current branch+month filter)
+// Sub-topic drill-down: filters care calls by category + keyword match
+function viewSubTopic(catName, topicName, keywords){
+  const CARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
+  const BR=['Boduppal','Keesara','Pocharam','Bachupally','Gowdavalli'];
+  const scope=(fBranch==='ALL')?BR:[fBranch];
+  const CATS=['No Concern','Not Answering','Academics','Behaviour / Wellbeing','Administration','Transport','Co Curricular','New Admission','No Response'];
+  const catRows=CARE.filter(r=>scope.includes(r.Branch)&&(fMonth==='ALL'||r.Month===fMonth))
+    .filter(r=>{ const c=CATS.includes(r.Grievance)?r.Grievance:'Other'; return c===catName; });
+  let rows;
+  if(keywords&&keywords.length>0){
+    rows=catRows.filter(r=>{
+      const t=((r.Remarks&&r.Remarks!=='–')?r.Remarks:'')+' '+((r.Followup&&r.Followup!=='–')?r.Followup:'');
+      const tl=t.toLowerCase();
+      return keywords.some(k=>tl.indexOf(k)!==-1);
+    });
+  } else { // catch-all: rows NOT matched by any other topic's keywords
+    rows=catRows; // show all for the misc bucket
+  }
+  rows=rows.map(r=>({Branch:r.Branch,Month:r.Month,Student:r.Student,Class:r.Class,Date:r.Date,
+    Grievance:r.GrievanceRaw,Remarks:r.Remarks,Followup:r.Followup,Status:r.StatusRaw}));
+  const cols=[{key:'Branch',label:'Branch'},{key:'Student',label:'Student',maxW:'160px'},{key:'Class',label:'Class'},
+    {key:'Date',label:'Date',date:true},{key:'Grievance',label:'Grievance'},{key:'Remarks',label:'Remarks',maxW:'280px'},
+    {key:'Followup',label:'Follow-up',maxW:'240px'},{key:'Status',label:'Status'}];
+  openModal('🔍 '+catName+' → '+topicName,`${rows.length} call(s) matching this sub-topic`,rows,cols);
+}
+
 function viewCareGrievance(cat){
   const CARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
   const BR=['Boduppal','Keesara','Pocharam','Bachupally','Gowdavalli'];
@@ -5498,7 +5606,19 @@ function renderCare(){
   const _curCalMonth=getCurrentCalendarMonthName();
   careCmpBranches.forEach(b=>{
     const useMonth=fMonth!=='ALL'?fMonth:_curCalMonth;
-    const rec=TRACKER.find(r=>r.branch===b&&r.month===useMonth&&r.calls>0);
+    let rec=TRACKER.find(r=>r.branch===b&&r.month===useMonth&&r.calls>0);
+    // If TRACKER doesn't have this month yet (e.g. current month before the Tracker sheet
+    // is updated), fall back to counting calls directly from CARE_DATA (the Master sheet).
+    if(!rec){
+      const CARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
+      const brCalls=CARE.filter(r=>r.Branch===b&&r.Month===useMonth);
+      if(brCalls.length>0){
+        const resolved=brCalls.filter(r=>r.Status==='Resolved').length;
+        const pending=brCalls.filter(r=>r.Status==='Pending').length;
+        const ip=brCalls.filter(r=>r.Status==='In Progress').length;
+        rec={branch:b,month:useMonth,calls:brCalls.length,resolved,pending,ip,students:0,comp:0};
+      }
+    }
     const students=+_careSB[b]||(rec&&rec.students)||0;
     const calls=rec?rec.calls:0;
     const pct=students>0?+(Math.min(calls/students*100,100).toFixed(1)):0;
@@ -5634,6 +5754,14 @@ function renderTransport(){
   setTxt('tr-stu',fi(students.length));
   setTxt('tr-occ',occ+'%');
   setTxt('tr-occ-s',fi(riders)+' riders ÷ '+fi(seats)+' seats');
+  // Spare/Extra vehicles: routes named "EXTRA"/"SPARE"/"STANDBY" or vehicles not assigned to a numbered route
+  const spareRoutes=routes.filter(r=>/extra|spare|standby|eecho/i.test(String(r.Route||'')));
+  const spareVehNos=new Set(spareRoutes.map(r=>String(r.Vehicle||'').trim().toUpperCase()).filter(Boolean));
+  const spareVehicles=vehicles.filter(v=>spareVehNos.has(String(v.VehicleNo||'').trim().toUpperCase())
+    || /extra|spare|standby/i.test(String(v.RouteNo||'')));
+  setTxt('tr-spare',fi(spareVehicles.length));
+  setTxt('tr-spare-s',spareVehicles.length>0?spareVehicles.map(v=>v.Branch).filter((v,i,a)=>a.indexOf(v)===i).join(', '):'None identified');
+  window._TR_SPARE=spareVehicles;
   setTxt('tr-exp',fi(expiring));
   setTxt('tr-mil',avgMil!=null?avgMil:'–');
 
@@ -5807,6 +5935,12 @@ function viewTransport(kind,branch){
     const cols=[{key:'VehicleNo',label:'Vehicle No'},{key:'Category',label:'Type'},{key:'Make',label:'Make'},{key:'Seats',label:'Seats'},{key:'Fuel',label:'Fuel'},{key:'AC',label:'AC'},{key:'Driver',label:'Driver',maxW:'150px'},{key:'GPS',label:'GPS'},{key:'Status',label:'Status'},{key:'Compliance',label:'Compliance'}];
     const groups=scope.map(b=>{const rows=(T.vehicles||[]).filter(r=>r.Branch===b);return {key:b,count:rows.length,rows:rows};});
     openBranchAccordion('🚌 Total Vehicles — Branch-wise Fleet','Vehicles per branch · expand to view all vehicles',groups,cols,'vehicles');
+    return;
+  }
+  if(kind==='spare'){
+    const rows=(window._TR_SPARE||[]).filter(bf);
+    const cols=_TR_VCOLS();
+    openModal('🔄 Spare / Extra Vehicles',`${rows.length} spare vehicle(s) · ${bl}`,rows,cols);
     return;
   }
   if(kind==='expiring'||kind==='expired'){
