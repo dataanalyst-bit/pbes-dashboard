@@ -6981,7 +6981,9 @@ async function loadExamAnalytics(force){
     try{ var s=await sb.auth.getSession(); session=s && s.data && s.data.session; }catch(e){}
     if(!session){ window.location.href='login.html'; return; }
 
-    var res=await fetch(DATA_API+'?section=exams&_t='+Date.now(),
+    // force=true (↻ Refresh) adds nocache=1 so the edge cache AND the Apps Script
+    // cache are both rebuilt — otherwise Refresh looks like it does nothing.
+    var res=await fetch(DATA_API+'?section=exams'+(force?'&nocache=1':'')+'&_t='+Date.now(),
                         { headers:{ 'Authorization':'Bearer '+session.access_token } });
     if(res.status===401){ await sb.auth.signOut(); window.location.href='login.html'; return; }
 
