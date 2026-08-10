@@ -7095,6 +7095,367 @@ function renderGrievRanking(rows, ALLB){
 
 <script>
 /* ══════════════════════════════════════════════════════════════════════════
+   EXECUTIVE OVERVIEW — Head-to-Head scorecard, unified scoring
+   ------------------------------------------------------------------------
+   Every department row is now scored on the SAME formula:
+
+        Workload 35% + Closure 25% + Speed 20% + Overdue Control 20%
+
+   and the Overall Ranking is the MEAN of those scores rather than a count of
+   category wins. Counting wins treated a 0.1-point edge the same as a 40-point
+   one and produced constant ties; averaging respects the margins.
+
+   What the four components mean per department:
+     HR         volume of roles handled · % filled · days-to-fill vs a 30-day
+                target · days run past target
+     Admin      tasks held · % completed · turnaround vs deadline · overdue days
+     Safety     issues held · % closed · closure vs a 7-day target · overdue days
+     Grievance  cases held · % resolved · raised→closed vs a 3-day target · overdue days
+     Exams      students assessed · assessment coverage · average attainment ·
+                pass rate  (exams have no clock, so "Speed" carries attainment
+                and "Overdue Control" carries the at-risk share)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Vigilance fix: admin-verified could exceed 100% ──
+   adminClosed counted every row an admin had signed off, including issues the
+   officer had not closed, then divided by closed only — hence "106.5%" on the
+   scorecard. Restrict the numerator to closed issues. */
+function vigSafetyStats(rows){
+  const total=rows.length;
+  const open_=rows.filter(r=>r.Status==='Open').length;
+  const closedRows=rows.filter(r=>r.Status==='Closed');
+  const closed=closedRows.length;
+  const isAdmDone=r=>/closed|done|completed|resolved/i.test(String(r.AdminStatus||''));
+  const adminClosed=closedRows.filter(isAdmDone).length;
+  const awaitingAdmin=closed-adminClosed;
+  const onTime=rows.filter(r=>/on time/i.test(String(r.OverDue||''))).length;
+  const odDays=rows.map(r=>{const m=String(r.OverDue||'').match(/(\d+)\s*day/i);return m?parseInt(m[1],10):0;});
+  const totalOverdueDays=odDays.reduce((a,b)=>a+b,0);
+  const avgOd=odDays.filter(d=>d>0).length?+(totalOverdueDays/odDays.filter(d=>d>0).length).toFixed(1):0;
+  const closurePct=total>0?+(closed/total*100).toFixed(1):0;
+  const adminPct=closed>0?+(adminClosed/closed*100).toFixed(1):0;
+  const onTimePct=total>0?+(onTime/total*100).toFixed(1):0;
+  const actualTAT=avgOd>0?(7+avgOd):7;
+  const u=unifiedScore(total, closed, 7, actualTAT, totalOverdueDays, window._VIG_MAX_ASSIGNED||total);
+  return {total,open:open_,closed,adminClosed,awaitingAdmin,onTime,onTimePct,closurePct,adminPct,score:u.score,u};
+}
+
+/* ── HR adapter ── roles posted → roles filled, against a 30-day hiring target */
+function hrUnifiedStats(rows, maxAssigned){
+  const total=rows.length;
+  if(!total) return {total:0,score:null};
+  const isClosed=r=>/closed|filled|hired|joined|completed/i.test(String(r.Status||''));
+  const closedRows=rows.filter(isClosed);
+  const TARGET=30;
+  const dtc=closedRows.map(r=>+r.DaysToClose).filter(v=>!isNaN(v)&&v>=0);
+  const actualTAT=dtc.length?dtc.reduce((a,b)=>a+b,0)/dtc.length:TARGET;
+  let overdueDays=0;
+  dtc.forEach(d=>{ overdueDays+=Math.max(0,d-TARGET); });
+  rows.filter(r=>!isClosed(r)).forEach(r=>{           // still-open roles age too
+    if(!r.PostDate||r.PostDate==='–') return;
+    const p=new Date(r.PostDate); if(isNaN(p)) return;
+    overdueDays+=Math.max(0,Math.round((Date.now()-p)/86400000)-TARGET);
+  });
+  const u=unifiedScore(total, closedRows.length, TARGET, actualTAT, overdueDays, maxAssigned||total);
+  return {total,closed:closedRows.length,avgDays:dtc.length?+actualTAT.toFixed(1):null,
+          overdueDays:Math.round(overdueDays),score:u.score,u};
+}
+
+/* ── Grievance adapter ── raised → closed, against a 3-day target */
+function grievUnifiedStats(rows, maxAssigned){
+  const total=rows.length;
+  if(!total) return {total:0,score:null};
+  const resolved=rows.filter(r=>/resolved/i.test(String(r.Status||''))).length;
+  const TARGET=3;
+  const days=[];
+  rows.forEach(r=>{
+    if(!r.Date||!r.ClosureDate||r.Date==='–'||r.ClosureDate==='–') return;
+    const a=new Date(r.Date), b=new Date(r.ClosureDate);
+    if(isNaN(a)||isNaN(b)) return;
+    const dd=Math.round((b-a)/86400000);
+    if(dd>=0&&dd<400) days.push(dd);
+  });
+  const actualTAT=days.length?days.reduce((a,b)=>a+b,0)/days.length:TARGET;
+  let overdueDays=0;
+  rows.forEach(r=>{ if(typeof r.OverDue==='number'&&r.OverDue>0&&r.OverDue<100000) overdueDays+=r.OverDue; });
+  const sameDay=days.filter(d=>d===0).length;
+  const u=unifiedScore(total, resolved, TARGET, Math.max(TARGET,actualTAT), overdueDays, maxAssigned||total);
+  return {total,resolved,sameDay,closedN:days.length,
+          avgDays:days.length?+actualTAT.toFixed(1):null,score:u.score,u};
+}
+
+/* ── Examination adapter ──
+   No clock exists in an exam, so the two time components carry the two things
+   that do matter academically: Speed → average attainment, Overdue Control →
+   pass rate (the inverse of the at-risk share). */
+function examBranchStats(){
+  const p=window._examPayload;
+  if(!p||!p.curricula||!p.curricula.length) return null;
+  const out={};
+  p.curricula.forEach(c=>(c.exams||[]).forEach(e=>(e.branches||[]).forEach(b=>{
+    const o=out[b.id]||(out[b.id]={enrolled:0,assessed:0,sum:0,pass:0,dist:0});
+    (b.grades||[]).forEach(g=>(g.sections||[]).forEach(s=>(s.students||[]).forEach(st=>{
+      o.enrolled++;
+      const present=st[9], pct=st[8];
+      if(present>0){ o.assessed++; o.sum+=pct; if(pct>=33)o.pass++; if(pct>=75)o.dist++; }
+    })));
+  })));
+  let maxAssessed=1;
+  Object.keys(out).forEach(b=>{ if(out[b].assessed>maxAssessed) maxAssessed=out[b].assessed; });
+  Object.keys(out).forEach(b=>{
+    const o=out[b];
+    o.avg      = o.assessed?o.sum/o.assessed:0;
+    o.coverage = o.enrolled?o.assessed/o.enrolled*100:0;
+    o.passPct  = o.assessed?o.pass/o.assessed*100:0;
+    o.distPct  = o.assessed?o.dist/o.assessed*100:0;
+    o.u = {wh:+(o.assessed/maxAssessed*100).toFixed(1), ce:+o.coverage.toFixed(1),
+           cs:+o.avg.toFixed(1), oc:+o.passPct.toFixed(1)};
+    o.score = Math.min(100,Math.round(o.u.wh*0.35 + o.u.ce*0.25 + o.u.cs*0.20 + o.u.oc*0.20));
+  });
+  return out;
+}
+
+/* Exam data is lazy — pull it quietly in the background so the Overview row can
+   fill in, then re-render. Silent by design: a failure just leaves "No data". */
+async function _examEnsureForScorecard(){
+  if(window._examPayload||window.__examRankLoading) return;
+  window.__examRankLoading=true;
+  try{
+    let payload=null;
+    try{ const c=await idbGet('pbes_exams'); if(c&&c.data&&c.data.curricula) payload=c.data; }catch(e){}
+    if(!payload){
+      const s=await sb.auth.getSession();
+      const session=s&&s.data&&s.data.session;
+      if(!session) return;
+      const res=await fetch(DATA_API+'?section=exams&_t='+Date.now(),
+        {headers:{Authorization:'Bearer '+session.access_token}});
+      if(!res.ok) return;
+      const d=await res.json();
+      payload=(d&&d.EXAM_DATA&&d.EXAM_DATA.curricula)?d.EXAM_DATA:null;
+      if(payload){ try{ idbSet('pbes_exams',{t:Date.now(),data:payload}); }catch(e){} }
+    }
+    if(payload){ window._examPayload=payload; if(typeof renderRankings==='function') renderRankings(); }
+  }catch(e){ /* leave the exam row empty */ }
+  finally{ window.__examRankLoading=false; }
+}
+
+function renderRankings(){
+  const tbody=document.getElementById('rank-tbody');
+  if(!tbody)return;
+  const ALLB=['Keesara','Pocharam','Bachupally','Boduppal','Gowdavalli'];
+  const MO_MAP={March:'Mar-2026',April:'Apr-2026',May:'May-2026',June:'Jun-2026',July:'Jul-2026',August:'Aug-2026',September:'Sep-2026',October:'Oct-2026',November:'Nov-2026',December:'Dec-2026',January:'Jan-2027',February:'Feb-2027'};
+
+  // ── Care Call Rate (previous month per branch) ── unchanged
+  const prevMonth={}; ALLB.forEach(b=>{prevMonth[b]=getPrevMonth(b);});
+  const careStats={};
+  ALLB.forEach(b=>{
+    const rec=prevMonth[b]?TRACKER.find(d=>d.branch===b&&d.month===prevMonth[b]&&d.calls>0):null;
+    careStats[b]=rec?{pct:rec.comp,resolved:rec.resolved,calls:rec.calls,students:rec.students,month:rec.month}:null;
+  });
+
+  // ── Observation Completion % (previous month, all observer types) ── unchanged
+  const obsCompletionStats={};
+  ALLB.forEach(b=>{
+    const MC=(typeof MONTH_CONFIG!=='undefined'&&MONTH_CONFIG)?MONTH_CONFIG:{};
+    const cfg=MC[b]||{};
+    const branchObs=(typeof OBS_DATA!=='undefined'?OBS_DATA:[]).filter(r=>r.Branch===b);
+    if(branchObs.length===0||!cfg){obsCompletionStats[b]=null;return;}
+    let useMonth=null;
+    const _pk=MO_MAP[getPrevCalendarMonth()];
+    const _ok=mk=>mcMaxWD(cfg,mk)>0&&branchObs.some(r=>r.Month===mk);
+    if(_pk&&_ok(_pk)) useMonth=_pk;
+    else{
+      let curIdx=MONTHS.indexOf(_CAL_MONTHS[new Date().getMonth()]); if(curIdx<0)curIdx=MONTHS.length;
+      for(let i=curIdx-1;i>=0;i--){ const mk=MO_MAP[MONTHS[i]]; if(_ok(mk)){useMonth=mk;break;} }
+    }
+    if(!useMonth){obsCompletionStats[b]=null;return;}
+    const quotaOf=t=>/hod|head of dep/i.test(String(t||''))?1:2;
+    const typesInBranch={};
+    branchObs.forEach(r=>{const t=String(r.ObsType||'').trim(); if(t&&t!=='–'&&!/^nan$/i.test(t)) typesInBranch[t]=quotaOf(t);});
+    let required=0; Object.keys(typesInBranch).forEach(t=>{ required+=mcRoleWD(cfg,useMonth,t)*typesInBranch[t]; });
+    const actual=branchObs.filter(r=>r.Month===useMonth).length;
+    const pct=required>0?Math.min(100,+(actual/required*100).toFixed(1)):0;
+    obsCompletionStats[b]={pct,actual,required,month:useMonth};
+  });
+
+  // ── Department stats, all on the unified formula ──
+  const HRA=(typeof HR_RECORDS!=='undefined'?HR_RECORDS:[]);
+  const GRA=(typeof GRIEVANCE_DATA!=='undefined'?GRIEVANCE_DATA:[]);
+  const hrMax =Math.max(1,...ALLB.map(b=>HRA.filter(r=>r.Branch===b).length));
+  const grMax =Math.max(1,...ALLB.map(b=>GRA.filter(r=>r.Branch===b).length));
+  const admMax=Math.max(1,...ALLB.map(b=>(typeof ADMIN_DATA!=='undefined'?ADMIN_DATA:[]).filter(r=>r.Branch===b).length));
+  const vigMax=Math.max(1,...ALLB.map(b=>(typeof VIG_DATA!=='undefined'?VIG_DATA:[]).filter(r=>r.Branch===b).length));
+  window._ADMIN_MAX_ASSIGNED=admMax; window._VIG_MAX_ASSIGNED=vigMax;
+
+  const hrStats={},adminStats={},vigStats={},grievStats={};
+  ALLB.forEach(b=>{
+    hrStats[b]   =hrUnifiedStats(HRA.filter(r=>r.Branch===b), hrMax);
+    adminStats[b]=adminSpeedStats((typeof ADMIN_DATA!=='undefined'?ADMIN_DATA:[]).filter(r=>r.Branch===b));
+    vigStats[b]  =vigSafetyStats((typeof VIG_DATA!=='undefined'?VIG_DATA:[]).filter(r=>r.Branch===b));
+    grievStats[b]=grievUnifiedStats(GRA.filter(r=>r.Branch===b), grMax);
+  });
+  const examStats=examBranchStats();
+  if(!examStats) _examEnsureForScorecard();
+
+  function winners(valMap,higherIsBetter=true){
+    const entries=Object.entries(valMap).filter(([b,v])=>v!=null&&!isNaN(v));
+    if(entries.length===0)return[];
+    const best=higherIsBetter?Math.max(...entries.map(e=>e[1])):Math.min(...entries.map(e=>e[1]));
+    return entries.filter(([b,v])=>v===best).map(e=>e[0]);
+  }
+  function winnerBadge(names){
+    if(names.length===0)return '<span style="color:#94A3B8;font-size:11px;">–</span>';
+    return `<span style="background:#ECFDF5;color:#059669;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;">🥇 ${names.join(' &amp; ')}</span>`;
+  }
+  function cell(content,highlight){
+    return `<td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;${highlight?'background:#ECFDF5;':''}">${content}</td>`;
+  }
+  const scoreColor=v=>v>=80?'#059669':v>=60?'#D97706':'#DC2626';
+  // The four components, spelled out under every score so a rank is auditable.
+  function ucomp(u,labels){
+    if(!u) return '';
+    const L=labels||['W','C','S','O'];
+    return `<small style="color:#94A3B8;display:block;font-size:9.5px;margin-top:2px;">`+
+      `${L[0]} ${Math.round(u.wh)} · ${L[1]} ${Math.round(u.ce)} · ${L[2]} ${Math.round(u.cs)} · ${L[3]} ${Math.round(u.oc)}</small>`;
+  }
+  function scoreRow(icon,title,statMap,render,alt){
+    const valMap={}; ALLB.forEach(b=>{valMap[b]=render(statMap[b]).value;});
+    const win=winners(valMap);
+    let h=`<tr${alt?' style="background:#F8FAFF;"':''}><td style="padding:10px 14px;font-size:12.5px;font-weight:600;border-bottom:1px solid #E0E8FF;color:#0F172A;">${icon} ${title}</td>`;
+    ALLB.forEach(b=>{
+      const r=render(statMap[b]);
+      h+= r.value==null ? cell('<span style="color:#94A3B8;">No data</span>',false)
+                        : cell(r.html,win.includes(b));
+    });
+    h+=`<td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;">${winnerBadge(win)}</td></tr>`;
+    return {html:h,valMap};
+  }
+
+  let html='';
+  const contrib=[];   // every category's 0–100 score per branch → Overall Ranking
+
+  // Care Call Rate
+  {
+    const valMap={}; ALLB.forEach(b=>{valMap[b]=careStats[b]?careStats[b].pct:null;});
+    const win=winners(valMap);
+    html+=`<tr><td style="padding:10px 14px;font-size:12.5px;font-weight:600;border-bottom:1px solid #E0E8FF;color:#0F172A;">📞 Care Call Rate</td>`;
+    ALLB.forEach(b=>{
+      const d=careStats[b];
+      if(!d){html+=cell('<span style="color:#94A3B8;">No data</span>',false);return;}
+      const color=d.pct>=95?'#059669':d.pct>=85?'#D97706':'#DC2626';
+      html+=cell(`<span style="font-weight:700;color:${color}">${d.pct}%</span><br><small style="color:#94A3B8;font-size:10px;">${d.month.slice(0,3)}: ${fi(d.calls)}/${fi(d.students)}</small>`,win.includes(b));
+    });
+    html+=`<td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;">${winnerBadge(win)}</td></tr>`;
+    contrib.push(valMap);
+  }
+
+  // Observation Completion %
+  {
+    const valMap={}; ALLB.forEach(b=>{valMap[b]=obsCompletionStats[b]?obsCompletionStats[b].pct:null;});
+    const win=winners(valMap);
+    html+=`<tr style="background:#F8FAFF;"><td style="padding:10px 14px;font-size:12.5px;font-weight:600;border-bottom:1px solid #E0E8FF;color:#0F172A;">📋 Observation Completion %</td>`;
+    ALLB.forEach(b=>{
+      const d=obsCompletionStats[b];
+      if(!d){html+=cell('<span style="color:#94A3B8;">No data</span>',false);return;}
+      const color=d.pct>=80?'#059669':d.pct>=50?'#D97706':'#DC2626';
+      html+=cell(`<span style="font-weight:800;color:${color};font-size:15px;">${d.pct}%</span><br><small style="color:#94A3B8;font-size:10px;">${d.actual}/${d.required} · ${(d.month||'').replace('-',' ')}</small>`,win.includes(b));
+    });
+    html+=`<td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;">${winnerBadge(win)}</td></tr>`;
+    contrib.push(valMap);
+  }
+
+  // HR
+  {
+    const r=scoreRow('🧑‍💼','HR Hiring Score',hrStats,d=>{
+      if(!d||!d.total) return {value:null};
+      return {value:d.score,html:`<span style="font-weight:800;color:${scoreColor(d.score)};font-size:15px;">${d.score}</span>`+
+        `<small style="color:#94A3B8;display:block;font-size:10px;">${d.closed}/${d.total} filled${d.avgDays!=null?' · avg '+d.avgDays+'d':''}</small>`+
+        ucomp(d.u,['Vol','Fill','Speed','Age'])};
+    },false);
+    html+=r.html; contrib.push(r.valMap);
+  }
+
+  // Admin
+  {
+    const r=scoreRow('🏗️','Admin Closing Speed',adminStats,d=>{
+      if(!d||!d.total) return {value:null};
+      return {value:d.score,html:`<span style="font-weight:800;color:${scoreColor(d.score)};font-size:15px;">${d.score}</span>`+
+        `<small style="color:#94A3B8;display:block;font-size:10px;">${d.done}/${d.total} done · ${d.overdue} overdue${d.overdue>0?' (~'+d.avgOd+'d)':''}</small>`+
+        ucomp(d.u,['Load','Done','Speed','OD'])};
+    },true);
+    html+=r.html; contrib.push(r.valMap);
+  }
+
+  // Vigilance & Safety
+  {
+    const r=scoreRow('🛡️','Vigilance &amp; Safety Score',vigStats,d=>{
+      if(!d||!d.total) return {value:null};
+      return {value:d.score,html:`<span style="font-weight:800;color:${scoreColor(d.score)};font-size:15px;">${d.score}</span>`+
+        `<small style="color:#94A3B8;display:block;font-size:10px;">${d.open} open · ${d.closed} closed · admin verified ${d.adminPct}%</small>`+
+        ucomp(d.u,['Load','Closed','Speed','OD'])};
+    },false);
+    html+=r.html; contrib.push(r.valMap);
+  }
+
+  // Grievance
+  {
+    const r=scoreRow('📣','Grievance Handling Score',grievStats,d=>{
+      if(!d||!d.total) return {value:null};
+      const sd=d.closedN?Math.round(d.sameDay/d.closedN*100):0;
+      return {value:d.score,html:`<span style="font-weight:800;color:${scoreColor(d.score)};font-size:15px;">${d.score}</span>`+
+        `<small style="color:#94A3B8;display:block;font-size:10px;">${d.resolved}/${d.total} resolved · ${sd}% same-day</small>`+
+        ucomp(d.u,['Load','Closed','Speed','OD'])};
+    },true);
+    html+=r.html; contrib.push(r.valMap);
+  }
+
+  // Examination Analytics
+  {
+    const r=scoreRow('📝','Exam Performance Score',(examStats||{}),d=>{
+      if(!d||!d.assessed) return {value:null};
+      return {value:d.score,html:`<span style="font-weight:800;color:${scoreColor(d.score)};font-size:15px;">${d.score}</span>`+
+        `<small style="color:#94A3B8;display:block;font-size:10px;">avg ${d.avg.toFixed(1)}% · ${d.passPct.toFixed(0)}% pass · ${fi(d.assessed)} assessed</small>`+
+        ucomp(d.u,['Vol','Cover','Attain','Pass'])};
+    },false);
+    html+=r.html; contrib.push(r.valMap);
+  }
+
+  // ── Overall Ranking: mean of every category score a branch actually has ──
+  const avgScore={};
+  ALLB.forEach(b=>{
+    const vals=contrib.map(m=>m[b]).filter(v=>v!=null&&!isNaN(v));
+    avgScore[b]=vals.length?+(vals.reduce((a,c)=>a+c,0)/vals.length).toFixed(1):null;
+    avgScore[b+'__n']=vals.length;
+  });
+  const ranked=ALLB.slice().sort((a,b)=>{
+    const x=avgScore[a],y=avgScore[b];
+    if(x==null&&y==null)return 0; if(x==null)return 1; if(y==null)return -1;
+    return y-x;
+  });
+  const medals=['🥇 1st','🥈 2nd','🥉 3rd','4th','5th'];
+  const medalColors=[
+    {bg:'linear-gradient(135deg,#1E4FD8,#7C3AED)',color:'#fff'},
+    {bg:'#ECFDF5',color:'#059669'},
+    {bg:'#FFFBEB',color:'#D97706'},
+    {bg:'#FEF2F2',color:'#DC2626'},
+    {bg:'#F1F5F9',color:'#64748B'},
+  ];
+  html+=`<tr><td colspan="7" style="padding:6px 14px;border-bottom:1px solid #E0E8FF;"></td></tr>`;
+  html+=`<tr style="background:linear-gradient(135deg,#EEF2FF,#F0FDFA);"><td style="padding:12px 14px;font-size:13px;font-weight:800;color:#0F172A;">🏆 Overall Ranking<small style="display:block;font-weight:600;color:#64748B;font-size:9.5px;">mean of all category scores</small></td>`;
+  const champion=ranked[0];
+  ALLB.forEach(b=>{
+    const rank=ranked.indexOf(b), mc=medalColors[rank];
+    const av=avgScore[b];
+    html+=`<td style="padding:12px 14px;text-align:center;"><span style="background:${mc.bg};color:${mc.color};padding:5px 12px;border-radius:20px;font-size:12px;font-weight:800;">${medals[rank]}</span><small style="display:block;color:#94A3B8;font-size:9.5px;margin-top:2px;">${av==null?'no data':av+' avg · '+avgScore[b+'__n']+' categories'}</small></td>`;
+  });
+  html+=`<td style="padding:12px 14px;text-align:center;"><span style="background:linear-gradient(135deg,#1E4FD8,#7C3AED);color:#fff;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:800;">🏆 ${champion}</span></td></tr>`;
+
+  tbody.innerHTML=html;
+}
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
    EMBEDDED PAGE · Examination Analytics
    ------------------------------------------------------------------------
    A complete HTML document held as a string and mounted into a frame the
