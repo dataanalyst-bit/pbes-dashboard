@@ -1089,7 +1089,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       <button onclick="openAdminAllTasks()" style="margin-left:auto;padding:7px 16px;background:#1E4FD8;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">📋 View All Tasks →</button>
     </div>
     <div class="cb" style="padding:0;">
-      <div style="padding:8px 14px 4px;font-size:11.5px;color:#64748B;">Ranked by performance score (completion % minus overdue penalty). Click a branch to drill in.</div>
+      <div style="padding:8px 14px 4px;font-size:11.5px;color:#64748B;">Bar length = the score; each segment is the points that component contributed. Click a branch for its records.</div>
       <div id="admin-perf"></div>
     </div>
   </div>
@@ -7451,6 +7451,169 @@ function renderRankings(){
   html+=`<td style="padding:12px 14px;text-align:center;"><span style="background:linear-gradient(135deg,#1E4FD8,#7C3AED);color:#fff;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:800;">🏆 ${champion}</span></td></tr>`;
 
   tbody.innerHTML=html;
+}
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   ADMIN TRACKER — closing-speed scoring straight from the sheet columns
+   ------------------------------------------------------------------------
+   Score = Workload 35% + Closure 25% + Speed 20% + Overdue Control 20%
+
+     assigned          = number of tasks
+     closed            = Status "Done"
+     targetTAT         = Deadline − Start Date      (the time allowed)
+     actualTAT         = Completion Date − Start Date (the time taken;
+                         open tasks are aged to today, so they cannot hide)
+     totalOverdueDays  = Days Due column
+
+   TWO BUGS THIS REPLACES
+   ----------------------
+   1. Days Due reads "Completed (14 days overdue)" — the number sits BEFORE
+      the word. The old regex /overdue\s*\((\d+)/ only matched "Overdue (14
+      days)", so every completed-late task parsed as 1 day.
+   2. Overdue days were then counted only for tasks NOT done, so a task
+      finished 14 days late contributed nothing at all. That is why Boduppal
+      showed "0 overdue · 5.5d late" with Overdue Control at 100% — the two
+      figures contradicted each other on the same line.
+   Finishing late is still finishing late, so completed-late days now count.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Days Due → overdue days. Handles every variant the sheet formula emits:
+     "Completed (14 days overdue)"  → 14   (finished late)
+     "Overdue (7 days)"             →  7   (running late, still open)
+     "Completed 3 days early"       →  0
+     "Completed On Time"            →  0
+     "Completed" / "Due in 4 days" / "Not Started" / blank → 0            */
+function admOverdueDays(r){
+  const s=String(r.DaysDue||'').trim();
+  if(!s||s==='–') return 0;
+  if(/early|on\s*time|not\s*started|due\s*in/i.test(s)) return 0;
+  const m=s.match(/(\d+)\s*days?\s*overdue/i)     // "(14 days overdue)"
+       || s.match(/overdue\s*\(?\s*(\d+)/i);      // "Overdue (7 days)"
+  if(m) return parseInt(m[1],10);
+  return /overdue/i.test(s) ? 1 : 0;              // "Overdue", no number
+}
+function admIsDone(r){ return /^done$/i.test(String(r.Status||'').trim())||/done|completed/i.test(String(r.Status||'')); }
+function admDays(a,b){
+  if(!a||!b||a==='–'||b==='–') return null;
+  const x=new Date(a), y=new Date(b);
+  if(isNaN(x)||isNaN(y)) return null;
+  const d=Math.round((y-x)/86400000);
+  return (d>=-400&&d<=400)?d:null;
+}
+
+function adminSpeedStats(rows){
+  const total=rows.length;
+  if(total===0) return {total:0,score:null};
+
+  const doneRows=rows.filter(admIsDone);
+  const openRows=rows.filter(r=>!admIsDone(r));
+
+  // ── Overdue days from the Days Due column, completed-late included ──
+  let totalOverdueDays=0, lateCount=0;
+  rows.forEach(r=>{ const d=admOverdueDays(r); if(d>0){ totalOverdueDays+=d; lateCount++; } });
+  const overdueOpen=openRows.filter(r=>admOverdueDays(r)>0).length;
+  const avgOd=lateCount?+(totalOverdueDays/lateCount).toFixed(1):0;
+
+  // ── Target TAT = Deadline − Start Date, per task ──
+  const tgt=[]; rows.forEach(r=>{ const d=admDays(r.StartDate,r.Deadline); if(d!==null&&d>=0) tgt.push(d); });
+  const targetTAT=tgt.length?tgt.reduce((a,b)=>a+b,0)/tgt.length:7;
+
+  // ── Actual TAT = Completion Date − Start Date; open tasks aged to today ──
+  const act=[];
+  doneRows.forEach(r=>{ const d=admDays(r.StartDate,r.CompletionDate); if(d!==null&&d>=0) act.push(Math.max(0,d)); });
+  const today=new Date().toISOString().slice(0,10);
+  openRows.forEach(r=>{ const d=admDays(r.StartDate,today); if(d!==null&&d>=0) act.push(d); });
+  const actualTAT=act.length?act.reduce((a,b)=>a+b,0)/act.length:targetTAT;
+
+  // ── Early / late vs deadline (display) ──
+  const fin=[]; doneRows.forEach(r=>{ const d=admDays(r.CompletionDate,r.Deadline); if(d!==null) fin.push(d); });
+  const avgEarly=fin.length?+(fin.reduce((a,b)=>a+b,0)/fin.length).toFixed(1):null;
+  const onTime=doneRows.filter(r=>admOverdueDays(r)===0).length;
+
+  const u=unifiedScore(total, doneRows.length, targetTAT, actualTAT, totalOverdueDays,
+                       window._ADMIN_MAX_ASSIGNED||total);
+  return {total, done:doneRows.length, open:openRows.length,
+          overdue:overdueOpen, lateCount, onTime,
+          totalOverdueDays, avgOd, avgEarly,
+          targetTAT:+targetTAT.toFixed(1), actualTAT:+actualTAT.toFixed(1),
+          pct:+(doneRows.length/total*100).toFixed(1),
+          onSchedulePct:+(onTime/Math.max(1,doneRows.length)*100).toFixed(1),
+          score:u.score, u};
+}
+
+/* ── The card ──
+   Each branch shows its four components as a stacked contribution bar, so the
+   bar length IS the score and every segment is the points that component
+   actually contributed (component × its weight). A branch can be read at a
+   glance: a short purple segment means low volume, a short amber one means
+   it ran slow. */
+function renderAdminPerformance(rows,BRANCHES){
+  const el=document.getElementById('admin-perf');
+  if(!el)return;
+  const stats=BRANCHES.map(b=>{
+    const st=adminSpeedStats(rows.filter(r=>r.Branch===b));
+    return st.total?Object.assign({branch:b},st):null;
+  }).filter(Boolean).sort((a,b)=>b.score-a.score);
+
+  if(!stats.length){ el.innerHTML='<div style="padding:20px;text-align:center;color:#94A3B8;">No admin task data</div>'; return; }
+
+  const PARTS=[
+    {k:'wh',w:0.35,c:'#7C3AED',lbl:'Workload',   tip:'Workload 35% — tasks held vs the busiest branch'},
+    {k:'ce',w:0.25,c:'#1E4FD8',lbl:'Closure',    tip:'Closure 25% — % of tasks marked Done'},
+    {k:'cs',w:0.20,c:'#0891B2',lbl:'Speed',      tip:'Speed 20% — time allowed (Deadline − Start) vs time taken (Completion − Start)'},
+    {k:'oc',w:0.20,c:'#059669',lbl:'Overdue Ctl',tip:'Overdue Control 20% — overdue days per task, from Days Due'}
+  ];
+  const medals=['🥇','🥈','🥉'];
+
+  let h='<div style="display:flex;gap:14px;flex-wrap:wrap;padding:2px 14px 10px;font-size:10.5px;color:#475569;">'+
+    PARTS.map(p=>`<span title="${p.tip}"><span style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${p.c};margin-right:4px;vertical-align:-1px;"></span>${p.lbl} ${Math.round(p.w*100)}%</span>`).join('')+
+    '</div>';
+
+  h+=stats.map((s,i)=>{
+    const sc=s.score>=85?'#059669':s.score>=70?'#D97706':'#DC2626';
+    const scBg=s.score>=85?'#ECFDF5':s.score>=70?'#FFFBEB':'#FEF2F2';
+    const rankBadge=medals[i]||('<span style="color:#CBD5E1;font-weight:800;">'+(i+1)+'</span>');
+
+    // stacked contribution bar — segment width = points contributed
+    const seg=PARTS.map(p=>{
+      const pts=(s.u[p.k]||0)*p.w;
+      return `<div title="${p.tip}&#10;${p.lbl}: ${Math.round(s.u[p.k])}% × ${Math.round(p.w*100)}% = ${pts.toFixed(1)} pts" style="width:${pts}%;background:${p.c};height:100%;"></div>`;
+    }).join('');
+
+    const chips=PARTS.map(p=>
+      `<span title="${p.tip}" style="background:${p.c}14;color:${p.c};border-radius:5px;padding:1px 6px;font-weight:700;">`+
+      `${p.lbl} ${Math.round(s.u[p.k])}<small style="opacity:.65"> → ${((s.u[p.k]||0)*p.w).toFixed(1)}pt</small></span>`).join('');
+
+    const lateTxt = s.lateCount
+      ? `<b style="color:#DC2626">${s.lateCount} late</b> · ${fi(s.totalOverdueDays)} overdue days (avg ${s.avgOd}d)`
+      : `<b style="color:#059669">none late</b>`;
+    const finTxt = s.avgEarly===null ? ''
+      : ` · 🏁 avg ${Math.abs(s.avgEarly)}d ${s.avgEarly>=0?'early':'late'} vs deadline`;
+
+    return `<div style="padding:11px 14px;border-bottom:1px solid #F1F5F9;cursor:pointer;" onclick="viewAdminByBranch('${s.branch}')">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="font-size:20px;width:28px;text-align:center;">${rankBadge}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:baseline;gap:8px;">
+            <span style="font-weight:700;font-size:13.5px;color:#0F172A;"><span class="bd b${s.branch}"></span>${s.branch}</span>
+            <span style="font-size:11px;color:#64748B;">✅ ${s.done}/${s.total} done (${s.pct}%)${s.open?' · '+s.open+' open':''}</span>
+          </div>
+          <div style="font-size:10.5px;color:#64748B;margin-top:2px;">⏰ ${lateTxt}${finTxt}</div>
+          <div style="font-size:10.5px;color:#64748B;margin-top:1px;">⚡ allowed ${s.targetTAT}d vs taken ${s.actualTAT}d</div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;font-size:9.5px;margin-top:4px;">${chips}</div>
+          <div style="background:#EEF2FF;border-radius:5px;height:9px;margin-top:5px;overflow:hidden;display:flex;">${seg}</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="background:${scBg};color:${sc};font-weight:800;font-size:16px;padding:5px 12px;border-radius:10px;">${s.score}</div>
+          <div style="font-size:9px;color:#94A3B8;margin-top:2px;">SCORE</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML=h;
 }
 </script>
 
