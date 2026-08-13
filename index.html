@@ -7229,8 +7229,12 @@ async function _examEnsureForScorecard(){
     let raw=null;
     try{ const c=await idbGet('pbes_pt1'); if(c&&c.data&&c.data.students) raw=c.data; }catch(e){}
     if(!raw){
+      const s=await sb.auth.getSession();
+      const session=s&&s.data&&s.data.session;
+      if(!session) return;
       const res=await fetch(DATA_API+'?section=pt1&_t='+Date.now(),
-        { headers:{ Authorization:'Bearer '+(window._TOKEN||'') } });
+        {headers:{Authorization:'Bearer '+session.access_token}});
+      if(!res.ok) return;
       const d=await res.json();
       raw=(d&&d.PT1_RAW&&d.PT1_RAW.students)?d.PT1_RAW:null;
       if(raw){ try{ idbSet('pbes_pt1',{t:Date.now(),data:raw}); }catch(e){} }
@@ -7710,8 +7714,15 @@ async function loadPT1Review(force){
       }catch(e){}
     }
 
+    var session=null;
+    try{ var s=await sb.auth.getSession(); session=s && s.data && s.data.session; }catch(e){}
+    if(!session){ window.location.href='login.html'; return; }
+
+    // force=true (↻ Refresh) adds nocache=1 so the edge cache AND the Apps Script
+    // cache are both rebuilt — otherwise Refresh looks like it does nothing.
     var res=await fetch(DATA_API+'?section=pt1'+(force?'&nocache=1':'')+'&_t='+Date.now(),
-      { headers:{ Authorization:'Bearer '+(window._TOKEN||'') } });
+                        { headers:{ 'Authorization':'Bearer '+session.access_token } });
+    if(res.status===401){ await sb.auth.signOut(); window.location.href='login.html'; return; }
     if(!res.ok) throw new Error('HTTP '+res.status);
     var d=await res.json();
     if(d && d.error) throw new Error(d.message||'Upstream error');
