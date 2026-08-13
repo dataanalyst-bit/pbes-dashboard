@@ -1,8 +1,12 @@
 // functions/api/data.js
-// v4 — adds LAZY SECTION PASS-THROUGH on top of v3's role-based access.
-//   ?section=exams  → forwarded to Apps Script, cached under its own edge key,
-//                     and branch-filtered for principals just like the main payload.
+// v5 — the Exam Analytics section is replaced by the PT-1 / IA-1 Academic Review.
+//   ?section=pt1    → the three raw marks/staff/period tabs, cached under their
+//                     own edge key and branch-filtered for principals.
+//                     Unlike ?section=exams this is RAW sheet data: the browser
+//                     derives the review, so the filtering here is row-level.
 //   Adding a future section needs ONE entry in ALLOWED_SECTIONS below.
+//
+// v4 — added LAZY SECTION PASS-THROUGH on top of v3's role-based access.
 //
 // v3 — ROLE-BASED ACCESS on top of v2's edge-cache + streaming.
 //   Roles (Supabase app_metadata.role):
@@ -17,11 +21,16 @@ const CACHE_TTL_SECONDS = 300; // edge freshness window (Apps Script keep-warm k
 
 // Sections the browser is allowed to request. Anything else is ignored, so a bad
 // or hand-typed ?section= can never be used to probe the upstream script.
-const ALLOWED_SECTIONS = { exams: 1 };
+const ALLOWED_SECTIONS = { pt1: 1 };
 
 // Heavier than the main payload and it changes only when marks are entered, so it
 // can sit in the edge cache far longer.
 const SECTION_TTL_SECONDS = 1800;
+
+// Column headers that carry the campus name, in the order they are looked for.
+// The three PT-1 tabs all use "Branch", but this keeps a rename from silently
+// disabling the filter and leaking other campuses to a principal.
+const BRANCH_HEADERS = ["Branch", "branch", "BRANCH"];
 
 export async function onRequestGet({ request, env }) {
   const json = (obj, status = 200) =>
@@ -134,35 +143,47 @@ export async function onRequestGet({ request, env }) {
     return json({ error: true, message: "Cached payload unreadable: " + err.message }, 502);
   }
 
-  // Exam analytics carries student-level marks, so strip other campuses server-side
-  // rather than relying on the browser to hide them.
-  if (section === "exams") return json(filterExamsByBranch(data, userBranch));
+  // The review carries student-level marks and named staff, so other campuses are
+  // stripped server-side rather than relying on the browser to hide them.
+  if (section === "pt1") return json(filterPT1ByBranch(data, userBranch));
 
   //   Cross-branch aggregates needed by the Head-to-Head scorecard stay full.
   return json(filterByBranch(data, userBranch));
 }
 
-// ── Exam payload: keep only this branch's campus inside every exam ──
-// Shape: { EXAM_DATA: { generatedAt, curricula:[ { exams:[ { branches:[…] } ] } ] } }
-// An exam with no branches left, or a curriculum with no exams left, is dropped so
-// the tab shows a clean "no records" state instead of empty dropdowns.
-function filterExamsByBranch(data, branch) {
-  const src = data && data.EXAM_DATA;
-  if (!src || !Array.isArray(src.curricula)) return data;
+// ── PT-1 payload: keep only this branch's rows in every tab ──
+// Shape: { PT1_RAW: { generatedAt, students:{hdr,rows}, teachers:{…}, periods:{…} } }
+//
+// This is raw sheet data, so the filter is a row-level one: find the Branch
+// column by header and drop every row belonging to another campus. A tab with
+// no Branch column is passed through untouched rather than blanked, so a future
+// lookup tab cannot silently disappear for principals.
+//
+// Note the review still renders correctly on a single branch: its comparisons
+// fall back to within-branch ones when there is nothing to compare against.
+function filterPT1ByBranch(data, branch) {
+  const src = data && data.PT1_RAW;
+  if (!src) return data;
 
-  const curricula = src.curricula
-    .map((c) => ({
-      ...c,
-      exams: (c.exams || [])
-        .map((e) => ({
-          ...e,
-          branches: (e.branches || []).filter((b) => (b.id || b.name) === branch),
-        }))
-        .filter((e) => e.branches.length),
-    }))
-    .filter((c) => c.exams.length);
-
-  return { ...data, EXAM_DATA: { ...src, curricula } };
+  const out = {};
+  Object.keys(src).forEach((key) => {
+    const tab = src[key];
+    if (!tab || !Array.isArray(tab.hdr) || !Array.isArray(tab.rows)) {
+      out[key] = tab;               // generatedAt and anything else scalar
+      return;
+    }
+    let col = -1;
+    for (const name of BRANCH_HEADERS) {
+      col = tab.hdr.indexOf(name);
+      if (col >= 0) break;
+    }
+    if (col < 0) { out[key] = tab; return; }
+    out[key] = {
+      ...tab,
+      rows: tab.rows.filter((r) => String(r[col] || "").trim() === branch),
+    };
+  });
+  return { ...data, PT1_RAW: out };
 }
 
 // ── Filters individual-record datasets down to one branch ──
