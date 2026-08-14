@@ -64,6 +64,82 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);font-si
 .tb:hover{color:var(--p);background:var(--pl)}
 .tb.active{color:var(--p);border-bottom-color:var(--p);font-weight:700;background:var(--pl)}
 
+
+/* ═══ VERTICAL SIDE NAVIGATION ═══ */
+:root{--nav-w:246px;--nav-w-min:64px}
+body{padding-left:var(--nav-w);transition:padding-left .22s cubic-bezier(.4,0,.2,1)}
+body.nav-min{padding-left:var(--nav-w-min)}
+
+.sidenav{position:fixed;top:0;left:0;bottom:0;width:var(--nav-w);z-index:300;
+  background:linear-gradient(180deg,#0E2A6B 0%,#132F7A 42%,#2E1065 100%);
+  display:flex;flex-direction:column;box-shadow:2px 0 22px rgba(16,55,176,.22);
+  transition:width .22s cubic-bezier(.4,0,.2,1)}
+body.nav-min .sidenav{width:var(--nav-w-min)}
+
+.sn-top{display:flex;align-items:center;gap:10px;padding:14px 14px 12px;
+  border-bottom:1px solid rgba(255,255,255,.12);min-height:60px}
+.sn-logo{width:34px;height:34px;border-radius:9px;background:#fff;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;color:#1E4FD8}
+.sn-ttl{color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:13.5px;
+  line-height:1.2;white-space:nowrap;overflow:hidden}
+.sn-ttl small{display:block;font-weight:500;font-size:10px;color:rgba(255,255,255,.6);margin-top:2px}
+body.nav-min .sn-ttl{display:none}
+
+.sn-toggle{position:absolute;top:16px;right:-13px;width:26px;height:26px;border-radius:50%;
+  border:1px solid var(--bor);background:#fff;color:var(--p);cursor:pointer;z-index:2;
+  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;
+  box-shadow:0 2px 8px rgba(16,55,176,.28);transition:transform .22s}
+.sn-toggle:hover{background:var(--pl)}
+body.nav-min .sn-toggle{transform:rotate(180deg)}
+
+.sn-scroll{flex:1;overflow-y:auto;overflow-x:hidden;padding:10px 0 18px}
+.sn-scroll::-webkit-scrollbar{width:6px}
+.sn-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:99px}
+.sn-grp{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:800;
+  color:rgba(255,255,255,.42);padding:14px 18px 6px;white-space:nowrap}
+body.nav-min .sn-grp{padding:12px 0 5px;text-align:center;font-size:8px;letter-spacing:.04em;overflow:hidden}
+
+/* the buttons keep class .tb so role-gating and switchTab keep finding them */
+.sidenav .tb{width:100%;padding:9px 18px;background:none;border:none;border-bottom:none;
+  margin-bottom:0;cursor:pointer;font-family:'Inter',sans-serif;font-size:12.5px;font-weight:500;
+  color:rgba(255,255,255,.78);display:flex;align-items:center;gap:11px;white-space:nowrap;
+  text-align:left;position:relative;transition:background .15s,color .15s}
+.sidenav .tb:hover{background:rgba(255,255,255,.09);color:#fff}
+.sidenav .tb.active{background:rgba(255,255,255,.16);color:#fff;font-weight:700}
+.sidenav .tb.active::before{content:'';position:absolute;left:0;top:5px;bottom:5px;width:3px;
+  background:#FBBF24;border-radius:0 3px 3px 0}
+.sidenav .tb .ic{font-size:15.5px;width:22px;text-align:center;flex-shrink:0;line-height:1}
+.sidenav .tb .lb{overflow:hidden;text-overflow:ellipsis}
+body.nav-min .sidenav .tb{padding:10px 0;justify-content:center;gap:0}
+body.nav-min .sidenav .tb .lb{display:none}
+/* collapsed: show the name on hover so the icons stay usable */
+body.nav-min .sidenav .tb:hover .lb{display:block;position:absolute;left:calc(100% + 8px);
+  background:#0F172A;color:#fff;padding:6px 11px;border-radius:7px;font-size:12px;font-weight:600;
+  box-shadow:0 4px 14px rgba(0,0,0,.3);z-index:5;pointer-events:none}
+
+.sn-foot{padding:11px 16px;border-top:1px solid rgba(255,255,255,.12);
+  font-size:10px;color:rgba(255,255,255,.45);white-space:nowrap;overflow:hidden}
+body.nav-min .sn-foot{display:none}
+
+.sn-burger{display:none;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25);
+  color:#fff;width:36px;height:36px;border-radius:9px;cursor:pointer;font-size:16px;
+  align-items:center;justify-content:center;flex-shrink:0}
+.sn-scrim{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:290;display:none}
+.sn-scrim.on{display:block}
+
+@media(max-width:1000px){
+  body,body.nav-min{padding-left:0}
+  .sidenav{transform:translateX(-100%);width:var(--nav-w);transition:transform .22s}
+  body.nav-open .sidenav{transform:none}
+  body.nav-min .sidenav{width:var(--nav-w)}
+  body.nav-min .sn-ttl,body.nav-min .sn-foot{display:block}
+  body.nav-min .sidenav .tb{padding:9px 18px;justify-content:flex-start;gap:11px}
+  body.nav-min .sidenav .tb .lb{display:block;position:static;background:none;padding:0;box-shadow:none}
+  .sn-toggle{display:none}
+  .sn-burger{display:flex}
+}
+@media print{.sidenav,.sn-scrim,.sn-burger{display:none!important}body{padding-left:0!important}}
+
 /* CONTENT */
 .content{max-width:1700px;margin:0 auto;padding:20px 28px}
 .pane{display:none}.pane.active{display:block}
@@ -620,6 +696,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <p>Multi-Branch Performance Intelligence · 2026-27</p>
       </div>
     </div>
+    <button class="sn-burger" id="sn-burger" aria-label="Open menu">☰</button>
     <div class="hdr-right">
       <div class="live-pill"><span class="ldot"></span> Active</div>
       <div class="hdr-stat"><div class="v" id="hv-students">—</div><div class="l">Students</div></div>
@@ -664,22 +741,35 @@ document.addEventListener('DOMContentLoaded', async () => {
   </div>
 </div>
 
-<nav class="tabs"><div class="tabs-in">
-  <button class="tb active" onclick="showTab('overview',this)">📊 Executive Overview</button>
-  <button class="tb" onclick="showTab('care',this)">📞 Care Calls</button>
-  <button class="tb" onclick="showTab('observations',this)">👁️ Teacher Observations</button>
-  <button class="tb" onclick="showTab('admin',this)">🏗️ Admin Tracker</button>
-  <button class="tb" onclick="showTab('vigilance',this)">🛡️ Vigilance</button>
-  <button class="tb" onclick="showTab('purchase',this)">🛒 Purchase</button>
-  <button class="tb" onclick="showTab('hr',this)">👥 HR Analytics</button>
-  <button class="tb" onclick="showTab('admissions',this)">🎓 Admissions 2026-27</button>
-  <button class="tb" onclick="showTab('grievance',this)">📣 Grievance</button>
-  <button class="tb" onclick="showTab('transport',this)">🚌 Transport</button>
-  <button class="tb" onclick="showTab('it',this)">💻 IT Report</button>
-  <button class="tb" onclick="showTab('pt1',this)">📝 PT-1 Academic Review</button>
-  <button class="tb" onclick="showTab('audit',this)">🏫 School Audit</button>
-  <button class="tb" onclick="showTab('ptm',this)">💬 PTM Feedback</button>
-</div></nav>
+<aside class="sidenav" id="sidenav">
+  <button class="sn-toggle" id="sn-toggle" title="Collapse or expand the menu" aria-label="Collapse menu">‹</button>
+  <div class="sn-top">
+    <div class="sn-logo">P</div>
+    <div class="sn-ttl">PBES Analytics<small>2026-27</small></div>
+  </div>
+  <div class="sn-scroll">
+    <div class="sn-grp">Overview</div>
+    <button class="tb active" onclick="showTab('overview',this)" title="Executive Overview"><span class="ic">📊</span><span class="lb">Executive Overview</span></button>
+    <div class="sn-grp">Academics</div>
+    <button class="tb" onclick="showTab('pt1',this)" title="PT-1 Academic Review"><span class="ic">📝</span><span class="lb">PT-1 Academic Review</span></button>
+    <button class="tb" onclick="showTab('observations',this)" title="Teacher Observations"><span class="ic">👁️</span><span class="lb">Teacher Observations</span></button>
+    <button class="tb" onclick="showTab('audit',this)" title="School Audit"><span class="ic">🏫</span><span class="lb">School Audit</span></button>
+    <div class="sn-grp">Parents & Students</div>
+    <button class="tb" onclick="showTab('ptm',this)" title="PTM Feedback"><span class="ic">💬</span><span class="lb">PTM Feedback</span></button>
+    <button class="tb" onclick="showTab('care',this)" title="Care Calls"><span class="ic">📞</span><span class="lb">Care Calls</span></button>
+    <button class="tb" onclick="showTab('grievance',this)" title="Grievance"><span class="ic">📣</span><span class="lb">Grievance</span></button>
+    <button class="tb" onclick="showTab('admissions',this)" title="Admissions 2026-27"><span class="ic">🎓</span><span class="lb">Admissions 2026-27</span></button>
+    <div class="sn-grp">Operations</div>
+    <button class="tb" onclick="showTab('admin',this)" title="Admin Tracker"><span class="ic">🏗️</span><span class="lb">Admin Tracker</span></button>
+    <button class="tb" onclick="showTab('vigilance',this)" title="Vigilance"><span class="ic">🛡️</span><span class="lb">Vigilance</span></button>
+    <button class="tb" onclick="showTab('purchase',this)" title="Purchase"><span class="ic">🛒</span><span class="lb">Purchase</span></button>
+    <button class="tb" onclick="showTab('transport',this)" title="Transport"><span class="ic">🚌</span><span class="lb">Transport</span></button>
+    <button class="tb" onclick="showTab('it',this)" title="IT Report"><span class="ic">💻</span><span class="lb">IT Report</span></button>
+    <button class="tb" onclick="showTab('hr',this)" title="HR Analytics"><span class="ic">👥</span><span class="lb">HR Analytics</span></button>
+  </div>
+  <div class="sn-foot" id="sn-foot">Pallavi Group of Schools</div>
+</aside>
+<div class="sn-scrim" id="sn-scrim"></div>
 
 <div class="content">
 
@@ -10378,6 +10468,69 @@ async function loadPTM(force){
   var _s=window.showTab, _w=window.switchTab;
   window.showTab=function(id,btn){ _s(id,btn); if(id==='ptm') loadPTM(false); };
   window.switchTab=function(id){ _w(id); if(id==='ptm') loadPTM(false); };
+})();
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   SIDE NAVIGATION
+   The buttons are the same .tb elements the old ribbon used, with the same
+   onclick handlers, so showTab, switchTab and applyRoleAccess all keep working
+   untouched. This only handles collapsing, the mobile drawer, and hiding a
+   group heading when every tab under it is hidden for the user's role.
+   ══════════════════════════════════════════════════════════════════════════ */
+(function(){
+  var body=document.body, tog=document.getElementById('sn-toggle'),
+      burger=document.getElementById('sn-burger'), scrim=document.getElementById('sn-scrim');
+
+  /* remember the collapsed state between visits */
+  try{ if(localStorage.getItem('pbes_nav')==='min') body.classList.add('nav-min'); }catch(e){}
+
+  if(tog) tog.addEventListener('click',function(){
+    body.classList.toggle('nav-min');
+    try{ localStorage.setItem('pbes_nav', body.classList.contains('nav-min')?'min':'full'); }catch(e){}
+  });
+
+  function openDrawer(o){ body.classList.toggle('nav-open',o); scrim.classList.toggle('on',o); }
+  if(burger) burger.addEventListener('click',function(){ openDrawer(!body.classList.contains('nav-open')); });
+  if(scrim)  scrim.addEventListener('click',function(){ openDrawer(false); });
+
+  /* on a phone the drawer covers the page, so close it once a tab is chosen */
+  document.querySelectorAll('.sidenav .tb').forEach(function(b){
+    b.addEventListener('click',function(){ if(window.innerWidth<=1000) openDrawer(false); });
+  });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape') openDrawer(false); });
+
+  /* A principal sees only some tabs. applyRoleAccess hides the buttons but knows
+     nothing about the group headings above them, so an empty heading would be
+     left behind. Re-check after it runs, and whenever it runs again. */
+  function syncGroups(){
+    var kids=document.querySelectorAll('#sidenav .sn-scroll > *');
+    var head=null, shown=0;
+    kids.forEach(function(el){
+      if(el.classList.contains('sn-grp')){
+        if(head) head.style.display=shown?'':'none';
+        head=el; shown=0;
+      } else if(el.classList.contains('tb')){
+        if(el.style.display!=='none') shown++;
+      }
+    });
+    if(head) head.style.display=shown?'':'none';
+  }
+  window.__syncNavGroups=syncGroups;
+  if(typeof window.applyRoleAccess==='function'){
+    var _ara=window.applyRoleAccess;
+    window.applyRoleAccess=function(){ var r=_ara.apply(this,arguments); syncGroups(); return r; };
+  }
+  setTimeout(syncGroups,0); setTimeout(syncGroups,900);
+
+  /* keep the chosen tab in view in a long list */
+  var _st=window.showTab;
+  if(typeof _st==='function') window.showTab=function(id,btn){
+    _st(id,btn);
+    var a=document.querySelector('.sidenav .tb.active');
+    if(a&&a.scrollIntoView) try{ a.scrollIntoView({block:'nearest'}); }catch(e){}
+  };
 })();
 </script>
 </body>
