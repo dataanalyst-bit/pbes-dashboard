@@ -2,6 +2,7 @@
 // v5 — the Exam Analytics section is replaced by the PT-1 / IA-1 Academic Review.
 //   ?section=pt1    → the three raw marks/staff/period tabs, cached under their
 //                     own edge key and branch-filtered for principals.
+//   ?section=audit  → the raw School Audit tab, same treatment.
 //                     Unlike ?section=exams this is RAW sheet data: the browser
 //                     derives the review, so the filtering here is row-level.
 //   Adding a future section needs ONE entry in ALLOWED_SECTIONS below.
@@ -21,7 +22,7 @@ const CACHE_TTL_SECONDS = 300; // edge freshness window (Apps Script keep-warm k
 
 // Sections the browser is allowed to request. Anything else is ignored, so a bad
 // or hand-typed ?section= can never be used to probe the upstream script.
-const ALLOWED_SECTIONS = { pt1: 1 };
+const ALLOWED_SECTIONS = { pt1: 1, audit: 1 };
 
 // Heavier than the main payload and it changes only when marks are entered, so it
 // can sit in the edge cache far longer.
@@ -145,14 +146,15 @@ export async function onRequestGet({ request, env }) {
 
   // The review carries student-level marks and named staff, so other campuses are
   // stripped server-side rather than relying on the browser to hide them.
-  if (section === "pt1") return json(filterPT1ByBranch(data, userBranch));
+  if (section === "pt1")   return json(filterTablesByBranch(data, userBranch, "PT1_RAW"));
+  if (section === "audit") return json(filterTablesByBranch(data, userBranch, "AUDIT_RAW"));
 
   //   Cross-branch aggregates needed by the Head-to-Head scorecard stay full.
   return json(filterByBranch(data, userBranch));
 }
 
-// ── PT-1 payload: keep only this branch's rows in every tab ──
-// Shape: { PT1_RAW: { generatedAt, students:{hdr,rows}, teachers:{…}, periods:{…} } }
+// ── Raw section payloads: keep only this branch's rows in every tab ──
+// Shape: { <WRAPPER>: { generatedAt, <tabName>:{hdr,rows}, … } }
 //
 // This is raw sheet data, so the filter is a row-level one: find the Branch
 // column by header and drop every row belonging to another campus. A tab with
@@ -161,8 +163,8 @@ export async function onRequestGet({ request, env }) {
 //
 // Note the review still renders correctly on a single branch: its comparisons
 // fall back to within-branch ones when there is nothing to compare against.
-function filterPT1ByBranch(data, branch) {
-  const src = data && data.PT1_RAW;
+function filterTablesByBranch(data, branch, wrapper) {
+  const src = data && data[wrapper];
   if (!src) return data;
 
   const out = {};
@@ -183,7 +185,7 @@ function filterPT1ByBranch(data, branch) {
       rows: tab.rows.filter((r) => String(r[col] || "").trim() === branch),
     };
   });
-  return { ...data, PT1_RAW: out };
+  return { ...data, [wrapper]: out };
 }
 
 // ── Filters individual-record datasets down to one branch ──
