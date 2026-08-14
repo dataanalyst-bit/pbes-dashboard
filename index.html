@@ -594,23 +594,43 @@ try{ localStorage.removeItem('pbes_cache_v1'); localStorage.removeItem('pbes_cac
 //                     branches) + Care, Observations, Admissions, AVIS, Grievance,
 //                     Transport, IT — everything else LOCKED to their own branch.
 // Edit ROLE_TABS below to change which tabs a role can open.
+// Tab ids in use: overview · pt1 · observations · audit · ptm · care · grievance ·
+// admissions · admin · vigilance · purchase · transport · it · hr
+// A role mapped to null sees every tab. A role absent from this table, but whose
+// account carries a branch, falls back to `principal`.
 const ROLE_TABS = {
-  admin_manager: ['admin','vigilance','purchase','transport','it'],
-  hr:            ['hr'],
-  principal:     ['overview','care','observations','admissions','grievance','transport','it','pt1','audit','ptm']
+  // ── group-wide roles ──
+  management:        null,   // every tab
+  auditor:           null,   // Academic Auditor — every tab, every branch
+  admin_manager:     ['admin','vigilance','purchase','transport','it'],
+  vigilance_officer: ['admin','vigilance'],
+  // ── branch roles ──
+  hr:                ['hr','observations'],
+  admin:             ['admin','vigilance'],
+  grievance_officer: ['care','grievance','ptm'],
+  hr_grievance:      ['hr','observations','care','grievance','ptm'],
+  principal:         ['overview','care','observations','admissions','grievance','transport','it','pt1','audit','ptm']
 };
+// Roles that span every campus. Everyone else with a branch on their account is
+// pinned to it, and the payload is filtered to that branch server-side.
+const ROLE_ALL_BRANCH = { management:1, auditor:1, admin_manager:1, vigilance_officer:1 };
 function _tabIdOf(btn){ const m=(btn.getAttribute('onclick')||'').match(/showTab\('([^']+)'/); return m?m[1]:''; }
 function applyRoleAccess(){
   const role=(window._ROLE||'').toLowerCase().trim();
   const branch=window._USER_BRANCH||null;
   let allowed=null;          // null = all tabs
   let lockBranch=null;       // non-null = force fBranch to this branch
-  if(role==='admin_manager'){ allowed=ROLE_TABS.admin_manager; }
-  else if(role==='hr'){ allowed=ROLE_TABS.hr; lockBranch=branch||null; }
-  else if(role==='principal' || (branch && role!=='management' && role!=='admin' && role!=='')){
-    allowed=ROLE_TABS.principal; lockBranch=branch||null;
+
+  // Table-driven so adding a department is one line in ROLE_TABS above.
+  if(Object.prototype.hasOwnProperty.call(ROLE_TABS, role)){
+    allowed = ROLE_TABS[role];
+  } else if(branch && role!==''){
+    // an unrecognised role that carries a branch is treated as a principal rather
+    // than waved through — an unknown role must never mean unrestricted access
+    allowed = ROLE_TABS.principal;
   }
-  // management / admin / empty-role-without-branch → full access (allowed stays null)
+  // no role and no branch → management-level full access (allowed stays null)
+  if(branch && !ROLE_ALL_BRANCH[role]) lockBranch = branch;
 
   // Branch lock (principals + HR): pin the branch dropdown to the user's branch.
   window._BRANCH_LOCK = lockBranch || null;
