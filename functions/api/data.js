@@ -3,6 +3,9 @@
 //   ?section=pt1    → the three raw marks/staff/period tabs, cached under their
 //                     own edge key and branch-filtered for principals.
 //   ?section=audit  → the raw School Audit tab, same treatment.
+//   ?section=ptm    → the raw PTM parent-feedback tab, same treatment. Carries
+//                     parent names, contacts and verbatim comments, so the
+//                     branch filter matters more here than anywhere else.
 //                     Unlike ?section=exams this is RAW sheet data: the browser
 //                     derives the review, so the filtering here is row-level.
 //   Adding a future section needs ONE entry in ALLOWED_SECTIONS below.
@@ -22,7 +25,7 @@ const CACHE_TTL_SECONDS = 300; // edge freshness window (Apps Script keep-warm k
 
 // Sections the browser is allowed to request. Anything else is ignored, so a bad
 // or hand-typed ?section= can never be used to probe the upstream script.
-const ALLOWED_SECTIONS = { pt1: 1, audit: 1 };
+const ALLOWED_SECTIONS = { pt1: 1, audit: 1, ptm: 1 };
 
 // Heavier than the main payload and it changes only when marks are entered, so it
 // can sit in the edge cache far longer.
@@ -148,6 +151,7 @@ export async function onRequestGet({ request, env }) {
   // stripped server-side rather than relying on the browser to hide them.
   if (section === "pt1")   return json(filterTablesByBranch(data, userBranch, "PT1_RAW"));
   if (section === "audit") return json(filterTablesByBranch(data, userBranch, "AUDIT_RAW"));
+  if (section === "ptm")   return json(filterTablesByBranch(data, userBranch, "PTM_RAW"));
 
   //   Cross-branch aggregates needed by the Head-to-Head scorecard stay full.
   return json(filterByBranch(data, userBranch));
