@@ -183,6 +183,17 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);font-si
 @media(max-width:1200px){.k5,.k6{grid-template-columns:repeat(3,1fr)}.r3{grid-template-columns:1fr 1fr}.r12,.r21,.r32{grid-template-columns:1fr}}
 @media(max-width:768px){.content,.fb-in,.hdr-in{padding-left:14px;padding-right:14px}.k4,.k5,.k6{grid-template-columns:1fr 1fr}.r2,.r3{grid-template-columns:1fr}}
 
+
+/* ═══ PTM FEEDBACK TAB ═══ */
+.pt-warn{border:1px solid #FCD34D;background:linear-gradient(180deg,#FFFBEB,#FFFDF5);
+  border-radius:14px;padding:16px 20px}
+.pt-warn h4{margin:0 0 8px;font-size:14.5px;font-weight:800;color:#92400E}
+.pt-warn p{margin:0 0 9px;font-size:12.5px;color:#3F2E10;line-height:1.6;max-width:110ch}
+.pt-warn .au-tbl th{background:transparent}
+.pt-grp{border:1px solid var(--bor);border-radius:12px;padding:13px 15px;margin-bottom:12px;background:var(--bg)}
+.pt-grp-h{font-size:12px;font-weight:800;color:var(--tx);margin-bottom:9px;letter-spacing:.01em}
+.pt-cell{min-width:44px}
+
 /* ═══ SCHOOL AUDIT TAB ═══ */
 #pane-audit .au-wrap{display:flex;flex-direction:column;gap:16px}
 .au-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
@@ -462,7 +473,7 @@ try{ localStorage.removeItem('pbes_cache_v1'); localStorage.removeItem('pbes_cac
 const ROLE_TABS = {
   admin_manager: ['admin','vigilance','purchase','transport','it'],
   hr:            ['hr'],
-  principal:     ['overview','care','observations','admissions','grievance','transport','it','pt1','audit']
+  principal:     ['overview','care','observations','admissions','grievance','transport','it','pt1','audit','ptm']
 };
 function _tabIdOf(btn){ const m=(btn.getAttribute('onclick')||'').match(/showTab\('([^']+)'/); return m?m[1]:''; }
 function applyRoleAccess(){
@@ -619,6 +630,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   <button class="tb" onclick="showTab('it',this)">💻 IT Report</button>
   <button class="tb" onclick="showTab('pt1',this)">📝 PT-1 Academic Review</button>
   <button class="tb" onclick="showTab('audit',this)">🏫 School Audit</button>
+  <button class="tb" onclick="showTab('ptm',this)">💬 PTM Feedback</button>
 </div></nav>
 
 <div class="content">
@@ -1467,6 +1479,116 @@ document.addEventListener('DOMContentLoaded', async () => {
   </div>
 </div>
 
+
+
+<!-- ═══ PTM PARENT FEEDBACK ═══ -->
+<div id="pane-ptm" class="pane">
+  <div class="au-wrap">
+
+    <div class="au-head">
+      <div>
+        <h2 style="margin:0;font-size:20px;font-weight:800">PTM Parent Feedback</h2>
+        <div style="font-size:12.5px;color:var(--txm);margin-top:3px" id="pt-meta">Loading…</div>
+      </div>
+      <div class="au-ctl">
+        <div class="f"><label for="pt-branch">Branch</label><select id="pt-branch"></select></div>
+        <div class="f"><label for="pt-month">Month</label><select id="pt-month"></select></div>
+        <div class="f"><label for="pt-theme">Theme</label><select id="pt-theme"></select></div>
+        <button class="exm-refresh" onclick="loadPTM(true)" title="Re-read the PTM sheet">↻ Refresh</button>
+        <span class="exm-status" id="pt-status"></span>
+      </div>
+    </div>
+
+    <div id="pt-loader" class="exm-loader"><div class="sp"></div>
+      <div>Reading parent feedback…<br><span>PTM · every branch, every response</span></div></div>
+
+    <div id="pt-body" style="display:none;flex-direction:column;gap:16px">
+
+      <div id="pt-warn"></div>
+      <div class="au-kpis" id="pt-kpis"></div>
+
+      <div class="au-sec">
+        <h3>Satisfaction, inside each questionnaire</h3>
+        <div class="sub">Branches are grouped by the form their parents actually filled in. Compare down a block; do
+          not compare across blocks.</div>
+        <div id="pt-branches"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>What parents wrote — the layer that <em>is</em> comparable</h3>
+        <div class="sub">The same language model read every branch's comments, so these rates mean the same thing
+          everywhere. This is the table to manage by.</div>
+        <div id="pt-text"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>Which concerns cluster where</h3>
+        <div class="sub">Shaded by how far each count sits from what that branch's overall share of concerns would
+          predict — so a busy branch does not simply look worse everywhere.</div>
+        <div id="pt-lift"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>What moves a parent's overall score</h3>
+        <div class="sub">Correlation between each part of the school experience and the parent's own overall rating,
+          run inside a single questionnaire at a time.</div>
+        <div id="pt-drivers"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>Where the rating and the words disagree</h3>
+        <div class="sub">Responses whose score and wording point in opposite directions.</div>
+        <div id="pt-diverge"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>Month on month, each branch against itself</h3>
+        <div class="sub">The questionnaire is held constant, so the movement here is real.</div>
+        <div id="pt-trend"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>The action queue — <span id="pt-queue-n">0</span> escalated items</h3>
+        <div class="sub">Everything at P1 or P2, highest priority first, with the owner the pipeline suggests.</div>
+        <div class="au-ctl" style="margin-bottom:12px">
+          <div class="f"><label for="pt-q">Search comments, themes and owners</label>
+            <input id="pt-q" type="search" placeholder="e.g. transport, homework, uniform"></div>
+        </div>
+        <div style="max-height:600px;overflow:auto"><div id="pt-queue"></div></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>Where the work would land</h3>
+        <div class="sub">Escalated items grouped by the owner the pipeline suggests.</div>
+        <div id="pt-owners"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>How far to trust this data</h3>
+        <div class="sub">What was collected, what was flagged, and the one change that would make the whole page
+          stronger.</div>
+        <div id="pt-quality"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>In parents' own words — <span id="pt-verb-n">0</span> comments</h3>
+        <div class="sub">Every substantive comment, most negative first. The search box above filters this too.</div>
+        <div style="max-height:620px;overflow:auto"><div id="pt-verbatim"></div></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="au-modal" id="pt-modal">
+  <div class="au-mod">
+    <div class="au-mod-hd">
+      <div><h3 id="pt-mod-title">—</h3><div class="sub" id="pt-mod-sub"></div></div>
+      <button class="au-mod-x" id="pt-mod-x" aria-label="Close">&times;</button>
+    </div>
+    <div class="au-mod-bd" id="pt-mod-body"></div>
+  </div>
+</div>
 
 <!-- ═══ SCHOOL AUDIT ═══ -->
 <div id="pane-audit" class="pane">
@@ -8899,5 +9021,1022 @@ async function loadAudit(force){
 })();
 </script>
 
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   PTM PARENT FEEDBACK — analytics engine
+   --------------------------------------------------------------------------
+   THE ONE THING THAT GOVERNS EVERYTHING BELOW.
+
+   Each branch used a different questionnaire, and no branch used more than
+   one. Branch and instrument are perfectly confounded:
+
+       Bachupally  → Numeric Likert 1–5          (431)
+       Boduppal    → Mixed binary + Likert       (428)
+       Keesara     → Mixed binary + Likert       (111)
+       Pocharam    → Cambridge ordinal 4-point   ( 87)
+       Gowdavalli  → handwritten, NO rating scale ( 96)
+
+   That means a difference in average rating between two branches on different
+   forms cannot be separated from the difference between the forms themselves.
+   Boduppal's 89.0 against Bachupally's 74.4 is mostly a measurement artefact:
+   Pocharam's 4-point scale returns a perfect score 58% of the time, the Likert
+   only 18% of the time. Gowdavalli has no rating at all.
+
+   So this engine does NOT publish a single cross-branch satisfaction league
+   table. It does two separate things instead:
+
+     1. RATINGS are compared only inside an instrument group. Boduppal and
+        Keesara share a form, so they are genuinely comparable to each other.
+        Bachupally and Pocharam have no peer, and are shown against their own
+        history rather than against anyone else.
+
+     2. TEXT measures — substantive rate, concern rate, negative share, theme
+        mix, escalation — run through the identical NLP for every branch, so
+        they are the comparable layer. These carry the cross-branch reading.
+
+   Everything is computed over free text the parents actually wrote, and every
+   rate is expressed over the responses that had something to say, because a
+   branch where half the parents left the box blank is not more satisfied — it
+   is less measured.
+   ══════════════════════════════════════════════════════════════════════════ */
+window.PTM = (function () {
+  'use strict';
+
+  var DIMS = [
+    { k: 'D1 Academic Progress',        s: 'Academic progress' },
+    { k: 'D2 Teaching Quality',         s: 'Teaching quality' },
+    { k: 'D3 Teacher Approachability',  s: 'Approachability' },
+    { k: 'D4 School Communication',     s: 'Communication' },
+    { k: 'D5 Assessment & Feedback',    s: 'Assessment & feedback' },
+    { k: 'D6 Engagement & Wellbeing',   s: 'Engagement & wellbeing' },
+    { k: 'D7 Environment & Facilities', s: 'Environment & facilities' },
+    { k: 'D8 Admin & PTM',              s: 'Admin & PTM' }
+  ];
+
+  function str(v) { return v === null || v === undefined ? '' : String(v).trim(); }
+  function num(v) {
+    if (v === null || v === undefined || v === '') return null;
+    var n = typeof v === 'number' ? v : parseFloat(String(v).replace(/[, %]/g, ''));
+    return isFinite(n) ? n : null;
+  }
+  function esc(s) {
+    return String(s === null || s === undefined ? '—' : s)
+      .replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+  }
+  function mean(a) { var s = 0, i; if (!a.length) return null; for (i = 0; i < a.length; i++) s += a[i]; return s / a.length; }
+  function median(a) {
+    if (!a.length) return null;
+    var b = a.slice().sort(function (x, y) { return x - y; }), m = b.length >> 1;
+    return b.length % 2 ? b[m] : (b[m - 1] + b[m]) / 2;
+  }
+  function pstdev(a) {
+    if (a.length < 2) return 0;
+    var m = mean(a), s = 0, i;
+    for (i = 0; i < a.length; i++) s += (a[i] - m) * (a[i] - m);
+    return Math.sqrt(s / a.length);
+  }
+  /* Pearson r, used for the driver analysis */
+  function pearson(xs, ys) {
+    var n = xs.length;
+    if (n < 8) return null;                       // too few pairs to mean anything
+    var mx = mean(xs), my = mean(ys), sx = pstdev(xs), sy = pstdev(ys);
+    if (!sx || !sy) return null;
+    var c = 0, i;
+    for (i = 0; i < n; i++) c += (xs[i] - mx) * (ys[i] - my);
+    return (c / n) / (sx * sy);
+  }
+  function pct(n, d) { return d ? n / d * 100 : null; }
+
+  var COL = {
+    pos: '#059669', neg: '#DC2626', warn: '#D97706', mid: '#64748B',
+    blue: '#1E4FD8', violet: '#7C3AED', teal: '#0D9488'
+  };
+
+  /* ══════════════════════════════════════════════════════════════════════ */
+  function build(raw) {
+    var tab = raw && raw.ptm;
+    if (!tab || !tab.hdr || !tab.rows || !tab.rows.length) {
+      throw new Error('The PTM sheet returned no rows.');
+    }
+    var H = tab.hdr.map(str), ix = function (n) { return H.indexOf(n); };
+    var c = {
+      branch: ix('Branch'), form: ix('Source Form Type'), scale: ix('Rating Scale Basis'),
+      month: ix('Response Month'), grade: ix('Grade (normalised)'), band: ix('Stage Band'),
+      student: ix('Student Name'), section: ix('Section'),
+      csat: ix('CSAT Score (0-100)'), avgDim: ix('Avg Dimension Score (1-5)'),
+      seg: ix('Satisfaction Segment'),
+      subst: ix('Has Substantive Feedback'), text: ix('Parent Feedback (verbatim)'),
+      strengths: ix('Strengths Noted by Parent'),
+      sent: ix('Sentiment Score (-1 to +1)'), sentL: ix('Sentiment Label'),
+      concern: ix('Concern Flag'), ask: ix('Improvement Ask'),
+      theme: ix('Primary Theme'), themes: ix('All Themes Detected'),
+      prio: ix('Priority Score (0-100)'), prioL: ix('Action Priority'),
+      owner: ix('Recommended Owner'), esc_: ix('Escalation Reason'),
+      dq: ix('Data Quality Flags'), valid: ix('Valid For Analysis'),
+      anom: ix('Anomaly Flag'), dup: ix('Duplicate Flag'),
+      cluster: ix('ML Cluster (top terms)')
+    };
+    if (c.branch < 0) throw new Error('The PTM sheet needs a Branch column.');
+
+    var dimIx = DIMS.map(function (d) { return ix(d.k); });
+
+    var rows = tab.rows.filter(function (r) { return str(r[c.branch]); }).map(function (r, n) {
+      var o = {
+        id: n,
+        branch: str(r[c.branch]),
+        form: str(r[c.form]) || 'Unknown form',
+        scale: str(r[c.scale]) || 'Unknown scale',
+        month: str(r[c.month]) || '',
+        grade: str(r[c.grade]) || '',
+        band: str(r[c.band]) || 'Unspecified',
+        student: str(r[c.student]),
+        section: str(r[c.section]),
+        csat: num(r[c.csat]),
+        seg: str(r[c.seg]) || 'Not Rated',
+        subst: str(r[c.subst]) === 'Yes',
+        text: str(r[c.text]),
+        strengths: c.strengths >= 0 ? str(r[c.strengths]) : '',
+        sent: num(r[c.sent]),
+        sentL: str(r[c.sentL]) || 'No Substantive Feedback',
+        concern: str(r[c.concern]) === 'Concern',
+        ask: str(r[c.ask]) === 'Yes',
+        theme: str(r[c.theme]) || 'No Concern Raised',
+        prio: num(r[c.prio]),
+        prioL: str(r[c.prioL]) || '',
+        owner: str(r[c.owner]),
+        escal: str(r[c.esc_]),
+        dq: str(r[c.dq]) || 'Clean',
+        valid: str(r[c.valid]) !== 'No',
+        anom: str(r[c.anom]) === 'Yes',
+        dup: /duplicate/i.test(str(r[c.dup])),
+        cluster: str(r[c.cluster]),
+        dims: {}
+      };
+      DIMS.forEach(function (d, k) {
+        if (dimIx[k] >= 0) { var v = num(r[dimIx[k]]); if (v !== null) o.dims[d.k] = v; }
+      });
+      o.negative = o.sentL === 'Negative' || o.sentL === 'Mixed';
+      o.p12 = /^P[12]/.test(o.prioL);
+      return o;
+    }).filter(function (o) { return o.valid; });
+
+    var branches = uniq(rows.map(function (r) { return r.branch; })).sort();
+    var months = uniq(rows.map(function (r) { return r.month; }).filter(Boolean)).sort();
+    var bands = uniq(rows.map(function (r) { return r.band; }));
+    var themes = uniq(rows.map(function (r) { return r.theme; }));
+
+    /* ── instrument groups: who can honestly be compared with whom ── */
+    var byScale = {};
+    rows.forEach(function (r) { (byScale[r.scale] || (byScale[r.scale] = [])).push(r); });
+    var groups = Object.keys(byScale).map(function (s) {
+      var rs = byScale[s];
+      var brs = uniq(rs.map(function (x) { return x.branch; })).sort();
+      var rated = rs.filter(function (x) { return x.csat !== null; });
+      return {
+        scale: s, branches: brs, n: rs.length, rated: rated.length,
+        /* two branches on the same form can be read against each other — but
+           only if that form actually produced ratings */
+        comparable: brs.length > 1 && rated.length > 0,
+        hasRatings: rated.length > 0,
+        /* how hard the instrument pushes to the ceiling — the single number
+           that shows why two forms cannot be read against each other */
+        ceiling: rated.length ? rated.filter(function (x) { return x.csat >= 99.9; }).length / rated.length * 100 : null,
+        mean: rated.length ? mean(rated.map(function (x) { return x.csat; })) : null
+      };
+    }).sort(function (a, b) { return b.n - a.n; });
+
+    var scaleOfBranch = {};
+    branches.forEach(function (b) {
+      var rs = rows.filter(function (r) { return r.branch === b; });
+      var cnt = {};
+      rs.forEach(function (r) { cnt[r.scale] = (cnt[r.scale] || 0) + 1; });
+      scaleOfBranch[b] = Object.keys(cnt).sort(function (x, y) { return cnt[y] - cnt[x]; })[0];
+    });
+    /* a branch has a rating peer only if another branch used the same form */
+    var peerOf = {};
+    branches.forEach(function (b) {
+      peerOf[b] = branches.filter(function (o) { return o !== b && scaleOfBranch[o] === scaleOfBranch[b]; });
+    });
+
+    /* ══ per-branch summary ══ */
+    function summarise(rs) {
+      var rated = rs.filter(function (r) { return r.csat !== null; });
+      var sub = rs.filter(function (r) { return r.subst; });
+      var cs = rated.map(function (r) { return r.csat; });
+      return {
+        n: rs.length,
+        rated: rated.length,
+        csat: cs.length ? mean(cs) : null,
+        csatMed: cs.length ? median(cs) : null,
+        ceiling: cs.length ? pct(cs.filter(function (v) { return v >= 99.9; }).length, cs.length) : null,
+        promoter: pct(rs.filter(function (r) { return r.seg === 'Promoter'; }).length, rated.length),
+        detractor: pct(rs.filter(function (r) { return r.seg === 'Detractor'; }).length, rated.length),
+        subst: sub.length,
+        substRate: pct(sub.length, rs.length),
+        /* every text rate is over SUBSTANTIVE responses, never over all of
+           them — otherwise a branch with many blank boxes looks calm */
+        sent: sub.length ? mean(sub.map(function (r) { return r.sent === null ? 0 : r.sent; })) : null,
+        concern: pct(sub.filter(function (r) { return r.concern; }).length, sub.length),
+        negative: pct(sub.filter(function (r) { return r.negative; }).length, sub.length),
+        ask: pct(sub.filter(function (r) { return r.ask; }).length, sub.length),
+        p12: rs.filter(function (r) { return r.p12; }).length,
+        p12Rate: pct(rs.filter(function (r) { return r.p12; }).length, rs.length),
+        p1: rs.filter(function (r) { return /^P1/.test(r.prioL); }).length,
+        textLen: sub.length ? median(sub.map(function (r) { return r.text.length; })) : null
+      };
+    }
+
+    var byBranch = {};
+    branches.forEach(function (b) {
+      byBranch[b] = summarise(rows.filter(function (r) { return r.branch === b; }));
+      byBranch[b].scale = scaleOfBranch[b];
+      byBranch[b].peers = peerOf[b];
+    });
+    var overall = summarise(rows);
+
+    /* ══ THEME LIFT ══
+       A raw theme count just mirrors how many responses a branch collected.
+       What matters is whether a theme is over-represented THERE relative to
+       the network. This is the standardised residual of a contingency table:
+           resid = (observed − expected) / sqrt(expected)
+       Beyond about ±2 the gap is larger than sampling noise would produce, so
+       those are the cells worth a conversation. */
+    var concernRows = rows.filter(function (r) { return r.subst && r.theme && r.theme !== 'No Concern Raised'; });
+    var themeList = uniq(concernRows.map(function (r) { return r.theme; }));
+    var grand = concernRows.length;
+    var rowTot = {}, colTot = {}, obs = {};
+    concernRows.forEach(function (r) {
+      rowTot[r.theme] = (rowTot[r.theme] || 0) + 1;
+      colTot[r.branch] = (colTot[r.branch] || 0) + 1;
+      var k = r.theme + '\u241f' + r.branch;
+      obs[k] = (obs[k] || 0) + 1;
+    });
+    var lift = themeList.map(function (t) {
+      var cells = branches.map(function (b) {
+        var o = obs[t + '\u241f' + b] || 0;
+        var e = grand ? rowTot[t] * (colTot[b] || 0) / grand : 0;
+        return {
+          branch: b, obs: o, exp: e,
+          resid: e > 0 ? (o - e) / Math.sqrt(e) : null,
+          share: colTot[b] ? o / colTot[b] * 100 : null,
+          lift: e > 0 ? o / e : null
+        };
+      });
+      return { theme: t, total: rowTot[t], share: grand ? rowTot[t] / grand * 100 : 0, cells: cells };
+    }).sort(function (a, b) { return b.total - a.total; });
+
+    /* ══ DRIVER ANALYSIS ══
+       Which part of the school experience actually moves a parent's overall
+       score? Correlation is run INSIDE each instrument, because the forms ask
+       different questions on different scales, then reported per instrument.
+       This is association, not proof of cause. */
+    var drivers = groups.filter(function (g) { return g.hasRatings; }).map(function (g) {
+      var rs = byScale[g.scale].filter(function (r) { return r.csat !== null; });
+      var out = DIMS.map(function (d) {
+        var xs = [], ys = [];
+        rs.forEach(function (r) {
+          var v = r.dims[d.k];
+          if (v !== undefined) { xs.push(v); ys.push(r.csat); }
+        });
+        return { dim: d.s, key: d.k, n: xs.length, r: pearson(xs, ys), avg: xs.length ? mean(xs) : null };
+      }).filter(function (x) { return x.n >= 20; });
+      out.sort(function (a, b) { return (b.r === null ? -9 : b.r) - (a.r === null ? -9 : a.r); });
+      return { scale: g.scale, branches: g.branches, n: rs.length, dims: out };
+    }).filter(function (g) { return g.dims.length; });
+
+    /* ══ dimension averages per branch, only meaningful inside a form ══ */
+    var dimByBranch = branches.map(function (b) {
+      var rs = rows.filter(function (r) { return r.branch === b; });
+      return {
+        branch: b, scale: scaleOfBranch[b],
+        dims: DIMS.map(function (d) {
+          var vs = rs.map(function (r) { return r.dims[d.k]; }).filter(function (v) { return v !== undefined; });
+          return { dim: d.s, n: vs.length, avg: vs.length ? mean(vs) : null };
+        })
+      };
+    });
+
+    /* ══ when each branch actually collected ══
+       Month turns out to be confounded too: every branch ran a single
+       collection round, so a "month on month" line would compare a full round
+       against a couple of stragglers. A month only counts as a round if it
+       carries at least this many responses. ══ */
+    var MIN_ROUND = 30;
+    var trend = branches.map(function (b) {
+      return {
+        branch: b,
+        points: months.map(function (m) {
+          var rs = rows.filter(function (r) { return r.branch === b && r.month === m; });
+          if (rs.length < MIN_ROUND) return null;
+          var s = summarise(rs);
+          return { month: m, n: rs.length, csat: s.csat, concern: s.concern, negative: s.negative };
+        })
+      };
+    });
+
+    /* when each branch collected, including rounds with no date at all */
+    var rounds = branches.map(function (b) {
+      var rs = rows.filter(function (r) { return r.branch === b; });
+      var cnt = {};
+      rs.forEach(function (r) { var k = r.month || 'undated'; cnt[k] = (cnt[k] || 0) + 1; });
+      var list = Object.keys(cnt).map(function (k) { return { month: k, n: cnt[k] }; })
+        .sort(function (x, y) { return y.n - x.n; });
+      return { branch: b, rounds: list, main: list[0], full: list.filter(function (x) { return x.n >= MIN_ROUND; }).length };
+    });
+
+    /* ══ the action queue ══ */
+    var queue = rows.filter(function (r) { return r.p12; })
+      .sort(function (a, b) { return (b.prio || 0) - (a.prio || 0); });
+
+    /* ══ where the rating and the words disagree ══
+       A parent who ticks every box at 5 and then writes a complaint is the
+       most under-counted signal in the whole file: the rating hides them. */
+    var divergent = rows.filter(function (r) {
+      return r.csat !== null && r.subst &&
+        ((r.csat >= 85 && r.negative) || (r.csat <= 60 && r.sentL === 'Positive'));
+    }).map(function (r) {
+      return { r: r, kind: r.csat >= 85 ? 'high-rating-negative-words' : 'low-rating-positive-words' };
+    }).sort(function (a, b) { return (b.r.prio || 0) - (a.r.prio || 0); });
+
+    /* ══ owners: who the pipeline says should pick each item up ══ */
+    var owners = {};
+    rows.filter(function (r) { return r.p12 && r.owner && r.owner !== '-'; })
+      .forEach(function (r) {
+        var o = owners[r.owner] || (owners[r.owner] = { owner: r.owner, n: 0, p1: 0, branches: {} });
+        o.n++; if (/^P1/.test(r.prioL)) o.p1++;
+        o.branches[r.branch] = (o.branches[r.branch] || 0) + 1;
+      });
+    var ownerList = Object.keys(owners).map(function (k) { return owners[k]; })
+      .sort(function (a, b) { return b.p1 - a.p1 || b.n - a.n; });
+
+    /* ══ data quality ══ */
+    var dq = {
+      total: rows.length,
+      anomaly: rows.filter(function (r) { return r.anom; }).length,
+      dup: rows.filter(function (r) { return r.dup; }).length,
+      noRating: rows.filter(function (r) { return r.csat === null; }).length,
+      blankText: rows.filter(function (r) { return !r.text; }).length,
+      flags: (function () {
+        var m = {};
+        rows.forEach(function (r) { m[r.dq] = (m[r.dq] || 0) + 1; });
+        return Object.keys(m).map(function (k) { return { flag: k, n: m[k] }; })
+          .sort(function (a, b) { return b.n - a.n; });
+      })()
+    };
+
+    return {
+      rows: rows, branches: branches, months: months, bands: bands, themes: themes,
+      groups: groups, scaleOfBranch: scaleOfBranch, peerOf: peerOf,
+      byBranch: byBranch, overall: overall,
+      lift: lift, drivers: drivers, dimByBranch: dimByBranch,
+      trend: trend, rounds: rounds, minRound: MIN_ROUND, queue: queue, divergent: divergent, owners: ownerList, dq: dq,
+      generatedAt: raw.generatedAt || null,
+      DIMS: DIMS
+    };
+  }
+
+  function uniq(a) {
+    var seen = {}, out = [];
+    a.forEach(function (x) { if (!seen[x]) { seen[x] = 1; out.push(x); } });
+    return out;
+  }
+
+  return {
+    build: build, DIMS: DIMS, COL: COL,
+    str: str, num: num, esc: esc, mean: mean, median: median,
+    pstdev: pstdev, pearson: pearson, pct: pct, uniq: uniq
+  };
+})();
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PTM PARENT FEEDBACK TAB — renderer
+   ══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  var P = window.PTM;
+  var D = null;
+  var V = { branch: '', month: '', theme: '', q: '' };
+
+  function $(id) { return document.getElementById(id); }
+  var esc = P.esc;
+  function pc(v, dp) { return v === null || v === undefined ? '—' : v.toFixed(dp === undefined ? 1 : dp) + '%'; }
+  function nn(v, dp) { return v === null || v === undefined ? '—' : v.toFixed(dp === undefined ? 1 : dp); }
+
+  /* colour for a "bad thing" rate: high = red */
+  function heatBad(v, lo, hi) {
+    if (v === null) return '#F1F5F9';
+    var t = Math.max(0, Math.min(1, (v - lo) / (hi - lo)));
+    return t > 0.66 ? '#DC2626' : t > 0.33 ? '#D97706' : '#059669';
+  }
+  function residColor(z) {
+    if (z === null) return '#F1F5F9';
+    if (z >= 3) return '#B91C1C';
+    if (z >= 2) return '#DC2626';
+    if (z >= 1) return '#FCA5A5';
+    if (z <= -2) return '#059669';
+    if (z <= -1) return '#A7F3D0';
+    return '#F1F5F9';
+  }
+  function sel(rows) {
+    return rows.filter(function (r) {
+      if (V.branch && r.branch !== V.branch) return false;
+      if (V.month && r.month !== V.month) return false;
+      if (V.theme && r.theme !== V.theme) return false;
+      return true;
+    });
+  }
+
+  /* ═══════════ CONTROLS ═══════════ */
+  function renderControls() {
+    function opts(list, cur, all) {
+      return ['<option value="">' + all + '</option>'].concat(list.map(function (x) {
+        return '<option value="' + esc(x) + '"' + (cur === x ? ' selected' : '') + '>' + esc(x) + '</option>';
+      })).join('');
+    }
+    $('pt-branch').innerHTML = opts(D.branches, V.branch, 'All branches');
+    $('pt-month').innerHTML = opts(D.months, V.month, 'All months');
+    var th = D.lift.map(function (t) { return t.theme; });
+    $('pt-theme').innerHTML = opts(th, V.theme, 'All themes');
+  }
+
+  /* ═══════════ 1. THE GOVERNING CAVEAT ═══════════ */
+  function renderWarning() {
+    var g = D.groups.filter(function (x) { return x.hasRatings; });
+    var noRate = D.groups.filter(function (x) { return !x.hasRatings; });
+    $('pt-warn').innerHTML =
+      '<div class="pt-warn">' +
+      '<h4>Read the ratings and the words separately — and never rank branches on the rating alone</h4>' +
+      '<p>Every branch used a <b>different questionnaire</b>, and no branch used more than one. That makes branch and ' +
+      'form impossible to tell apart: a gap between two branches on different forms is partly a gap between the forms. ' +
+      'The clearest evidence is the ceiling — how often each form returns a perfect score:</p>' +
+      '<table class="au-tbl" style="margin:10px 0"><thead><tr><th>Questionnaire</th><th>Branches</th>' +
+      '<th class="n">Responses</th><th class="n">Perfect scores</th><th class="n">Mean</th><th>Can be compared with</th></tr></thead><tbody>' +
+      g.map(function (x) {
+        return '<tr><td>' + esc(x.scale) + '</td><td>' + esc(x.branches.join(', ')) + '</td>' +
+          '<td class="n">' + x.rated + '</td>' +
+          '<td class="n" style="font-weight:700;color:' + (x.ceiling > 40 ? '#DC2626' : x.ceiling > 25 ? '#D97706' : '#64748B') + '">' +
+          pc(x.ceiling, 0) + '</td>' +
+          '<td class="n" style="font-weight:600">' + nn(x.mean) + '</td>' +
+          '<td>' + (x.comparable ? '<span class="pill" style="background:#ECFDF5;color:#059669">each other</span>'
+                                 : '<span class="pill" style="background:#FEF2F2;color:#DC2626">nothing — no peer</span>') + '</td></tr>';
+      }).join('') + '</tbody></table>' +
+      '<p>Pocharam\u2019s four-point form returns full marks ' + pc(g.filter(function (x) { return /Ordinal/.test(x.scale); })[0]
+        ? g.filter(function (x) { return /Ordinal/.test(x.scale); })[0].ceiling : null, 0) +
+      ' of the time; the Likert form used at Bachupally does so ' + pc(g.filter(function (x) { return /Numeric/.test(x.scale); })[0]
+        ? g.filter(function (x) { return /Numeric/.test(x.scale); })[0].ceiling : null, 0) +
+      ' of the time. Bachupally\u2019s lower average is largely that difference, not fifteen points of unhappier parents. ' +
+      (noRate.length ? '<b>Gowdavalli collected no ratings at all</b> — its form is handwritten and qualitative, so it ' +
+        'has no satisfaction score on this page and cannot be given one. ' : '') +
+      'Only <b>Boduppal and Keesara</b> share a form and can be read against each other directly.</p>' +
+      '<p style="margin-bottom:0"><b>What is comparable everywhere</b> is the free text: the same language model read ' +
+      'every branch\u2019s comments, so concern rate, negative share, theme mix and escalation carry the cross-branch ' +
+      'reading. Those are the figures to manage by until one questionnaire is used group-wide.</p>' +
+      '</div>';
+  }
+
+  /* ═══════════ 2. KPIs ═══════════ */
+  function renderKPIs() {
+    var rs = sel(D.rows);
+    var sub = rs.filter(function (r) { return r.subst; });
+    var conc = sub.filter(function (r) { return r.concern; }).length;
+    var neg = sub.filter(function (r) { return r.negative; }).length;
+    var p1 = rs.filter(function (r) { return /^P1/.test(r.prioL); }).length;
+    var p12 = rs.filter(function (r) { return r.p12; }).length;
+    var div = D.divergent.filter(function (x) {
+      return (!V.branch || x.r.branch === V.branch) && (!V.month || x.r.month === V.month);
+    }).length;
+
+    var K = [
+      { v: rs.length.toLocaleString('en-IN'), k: 'Responses in view', c: '#0F172A',
+        d: P.pct(sub.length, rs.length).toFixed(0) + '% wrote something substantive. The rest left the comment box empty.' },
+      { v: pc(P.pct(conc, sub.length), 0), k: 'Raised a concern', c: heatBad(P.pct(conc, sub.length), 40, 80),
+        d: 'Of parents who wrote something. This is the measure that is the same at every branch.' },
+      { v: pc(P.pct(neg, sub.length), 0), k: 'Negative or mixed tone', c: heatBad(P.pct(neg, sub.length), 10, 30),
+        d: 'Read from the wording itself, not from the rating.' },
+      { v: p1, k: 'Critical items', c: p1 ? '#DC2626' : '#059669',
+        d: p12 + ' at P1 or P2 in total — the queue below, with an owner named against each.' },
+      { v: div, k: 'Rating and words disagree', c: div ? '#7C3AED' : '#64748B',
+        d: 'Mostly parents who ticked top marks and then wrote a complaint. The score hides them entirely.' },
+      { v: D.branches.length + ' / ' + D.groups.filter(function (g) { return g.hasRatings; }).length,
+        k: 'Branches vs questionnaires', c: '#D97706',
+        d: 'Four different forms across five branches is why the satisfaction column cannot be ranked.' }
+    ];
+    $('pt-kpis').innerHTML = K.map(function (k) {
+      return '<div class="au-kpi"><div class="v" style="color:' + k.c + '">' + k.v + '</div>' +
+        '<div class="k">' + esc(k.k) + '</div><div class="d">' + esc(k.d) + '</div></div>';
+    }).join('');
+  }
+
+  /* ═══════════ 3. BRANCH TABLE, GROUPED BY FORM ═══════════ */
+  function renderBranches() {
+    var h = '';
+    D.groups.filter(function (g) { return g.hasRatings; }).forEach(function (g) {
+      h += '<div class="pt-grp"><div class="pt-grp-h">' + esc(g.scale) +
+        ' <span class="pill" style="' + (g.comparable ? 'background:#ECFDF5;color:#059669' : 'background:#FEF2F2;color:#DC2626') + '">' +
+        (g.comparable ? 'branches here are comparable' : 'single branch — no peer') + '</span></div>' +
+        '<table class="au-tbl"><thead><tr><th>Branch</th><th class="n">Responses</th><th class="n">Satisfaction</th>' +
+        '<th></th><th class="n">Median</th><th class="n">Perfect</th><th class="n">Promoters</th><th class="n">Detractors</th></tr></thead><tbody>' +
+        g.branches.map(function (b) {
+          var s = D.byBranch[b];
+          return '<tr class="clk" data-b="' + esc(b) + '"><td><b>' + esc(b) + '</b></td>' +
+            '<td class="n">' + s.n + '</td>' +
+            '<td class="n" style="font-weight:700">' + nn(s.csat) + '</td>' +
+            '<td style="width:130px"><div class="au-bar"><i style="width:' + (s.csat || 0) + '%;background:#1E4FD8"></i></div></td>' +
+            '<td class="n">' + nn(s.csatMed) + '</td>' +
+            '<td class="n" style="color:#64748B">' + pc(s.ceiling, 0) + '</td>' +
+            '<td class="n" style="color:#059669">' + pc(s.promoter, 0) + '</td>' +
+            '<td class="n" style="color:#DC2626">' + pc(s.detractor, 0) + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+    });
+    var noRate = D.branches.filter(function (b) { return D.byBranch[b].rated === 0; });
+    if (noRate.length) {
+      h += '<div class="pt-grp"><div class="pt-grp-h">No rating scale in the form ' +
+        '<span class="pill" style="background:#F1F5F9;color:#64748B">qualitative only</span></div>' +
+        '<p class="au-note" style="margin:0">' + esc(noRate.join(', ')) +
+        ' collected written feedback only. There is no satisfaction score to report, and inventing one from the ' +
+        'wording would put a number next to a branch that never answered the question. Read ' + esc(noRate.join(', ')) +
+        ' through the text measures below instead.</p></div>';
+    }
+    $('pt-branches').innerHTML = h +
+      '<p class="au-note"><b>Perfect</b> is the share of responses scoring full marks — a property of the form as much ' +
+      'as of the school. Compare down a block, never across blocks. Click a branch for its full file.</p>';
+  }
+
+  /* ═══════════ 4. THE COMPARABLE LAYER ═══════════ */
+  function renderText() {
+    var rows = D.branches.map(function (b) {
+      var rs = D.rows.filter(function (r) {
+        return r.branch === b && (!V.month || r.month === V.month);
+      });
+      var sub = rs.filter(function (r) { return r.subst; });
+      return {
+        b: b, n: rs.length, sub: sub.length,
+        substRate: P.pct(sub.length, rs.length),
+        concern: P.pct(sub.filter(function (r) { return r.concern; }).length, sub.length),
+        negative: P.pct(sub.filter(function (r) { return r.negative; }).length, sub.length),
+        ask: P.pct(sub.filter(function (r) { return r.ask; }).length, sub.length),
+        p12: P.pct(rs.filter(function (r) { return r.p12; }).length, rs.length),
+        sent: sub.length ? P.mean(sub.map(function (r) { return r.sent === null ? 0 : r.sent; })) : null
+      };
+    }).sort(function (a, b) { return (b.concern || 0) - (a.concern || 0); });
+
+    function bar(v, lo, hi) {
+      return '<div class="au-bar"><i style="width:' + Math.max(1, Math.min(100, v || 0)) +
+        '%;background:' + heatBad(v, lo, hi) + '"></i></div>';
+    }
+    $('pt-text').innerHTML =
+      '<table class="au-tbl"><thead><tr><th>Branch</th><th class="n">Wrote something</th>' +
+      '<th class="n">Raised a concern</th><th></th><th class="n">Negative tone</th>' +
+      '<th class="n">Asked for a change</th><th class="n">Escalated (P1/P2)</th><th class="n">Mean sentiment</th></tr></thead><tbody>' +
+      rows.map(function (r) {
+        return '<tr class="clk" data-b="' + esc(r.b) + '"><td><b>' + esc(r.b) + '</b>' +
+          '<br><span style="font-size:10.5px;color:#94A3B8">' + r.sub + ' of ' + r.n + ' responses</span></td>' +
+          '<td class="n" style="color:' + (r.substRate < 60 ? '#D97706' : '#64748B') + '">' + pc(r.substRate, 0) + '</td>' +
+          '<td class="n" style="font-weight:700;color:' + heatBad(r.concern, 40, 80) + '">' + pc(r.concern, 0) + '</td>' +
+          '<td style="width:120px">' + bar(r.concern, 40, 80) + '</td>' +
+          '<td class="n" style="color:' + heatBad(r.negative, 10, 25) + '">' + pc(r.negative, 0) + '</td>' +
+          '<td class="n" style="color:#64748B">' + pc(r.ask, 0) + '</td>' +
+          '<td class="n" style="font-weight:600;color:' + heatBad(r.p12, 15, 45) + '">' + pc(r.p12, 0) + '</td>' +
+          '<td class="n" style="color:' + (r.sent >= 0.25 ? '#059669' : r.sent >= 0.15 ? '#64748B' : '#D97706') + '">' +
+          (r.sent === null ? '—' : (r.sent >= 0 ? '+' : '') + r.sent.toFixed(2)) + '</td></tr>';
+      }).join('') + '</tbody></table>' +
+      '<p class="au-note">Every rate here is taken over the parents who <b>wrote something</b>, not over everyone who ' +
+      'responded — a branch where half the comment boxes are blank is not calmer, it is less measured, and dividing by ' +
+      'the larger number would quietly reward that. <b>Wrote something</b> is therefore the first column to read: where ' +
+      'it is low, everything to its right rests on a thinner base.</p>';
+  }
+
+  /* ═══════════ 5. THEME LIFT ═══════════ */
+  function renderLift() {
+    var bs = D.branches;
+    var list = D.lift.filter(function (t) { return t.total >= 8; }).slice(0, 16);
+    $('pt-lift').innerHTML =
+      '<div class="au-heat-scroll"><table class="au-heat"><thead><tr><th class="cat">Theme raised</th>' +
+      '<th class="net">All</th>' + bs.map(function (b) { return '<th>' + esc(b) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      list.map(function (t) {
+        return '<tr><td class="cat">' + esc(t.theme) + '</td>' +
+          '<td class="net">' + t.total + '</td>' +
+          t.cells.map(function (cl) {
+            var z = cl.resid, lab = cl.obs;
+            var title = esc(cl.branch) + ' · ' + esc(t.theme) + ' — ' + cl.obs + ' raised, ' +
+              cl.exp.toFixed(1) + ' expected' + (z === null ? '' : ', z = ' + z.toFixed(1)) +
+              (cl.lift ? ' (' + (cl.lift >= 1 ? cl.lift.toFixed(1) + '× the network rate' : Math.round((1 - cl.lift) * 100) + '% below') + ')' : '');
+            return '<td><button class="au-cell pt-cell" style="background:' + residColor(z) +
+              ';color:' + (z !== null && Math.abs(z) >= 2 ? '#fff' : '#334155') + '" ' +
+              'data-b="' + esc(cl.branch) + '" data-t="' + esc(t.theme) + '" title="' + title + '">' + lab + '</button></td>';
+          }).join('') + '</tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<div class="au-legend">' +
+      '<span><i style="background:#B91C1C"></i>far more than expected</span>' +
+      '<span><i style="background:#FCA5A5"></i>a little more</span>' +
+      '<span><i style="background:#F1F5F9;border:1px solid #E0E8FF"></i>as expected</span>' +
+      '<span><i style="background:#A7F3D0"></i>a little less</span>' +
+      '<span><i style="background:#059669"></i>far less</span>' +
+      '</div>' +
+      '<p class="au-note">Counting raw mentions would only tell you which branch collected the most forms. This shades ' +
+      'each cell by how far the count sits from what that branch\u2019s share of all concerns would predict — the ' +
+      'standardised residual, <b>(observed − expected) ÷ √expected</b>. Past about ±2 the gap is bigger than ordinary ' +
+      'sampling wobble, so a dark red cell is a theme genuinely concentrated at that branch rather than a busy one. ' +
+      'Hover for the counts behind any cell; click to read the comments themselves.</p>';
+  }
+
+  /* ═══════════ 6. DRIVERS ═══════════ */
+  function renderDrivers() {
+    $('pt-drivers').innerHTML = D.drivers.map(function (g) {
+      var mx = Math.max.apply(null, g.dims.map(function (d) { return Math.abs(d.r || 0); }).concat([0.1]));
+      return '<div class="pt-grp"><div class="pt-grp-h">' + esc(g.scale) +
+        ' <span style="font-weight:400;color:#94A3B8;font-size:11.5px">' + esc(g.branches.join(', ')) +
+        ' · ' + g.n + ' rated responses</span></div>' +
+        '<div class="au-sbars">' + g.dims.map(function (d) {
+          var w = Math.abs(d.r || 0) / mx * 100;
+          return '<div class="au-sbar" style="grid-template-columns:150px 1fr 74px"><div>' + esc(d.dim) +
+            '<br><span style="font-size:10px;color:#94A3B8">n=' + d.n + '</span></div>' +
+            '<div class="au-bar"><i style="width:' + w + '%;background:' +
+            (d.r >= 0.7 ? '#1E4FD8' : d.r >= 0.5 ? '#60A5FA' : '#CBD5E1') + '"></i></div>' +
+            '<div class="n" style="font-weight:600">' + (d.r === null ? '—' : d.r.toFixed(2)) + '</div></div>';
+        }).join('') + '</div></div>';
+    }).join('') +
+      '<p class="au-note">Each bar is the correlation between one part of the school experience and the parent\u2019s ' +
+      'overall score, calculated <b>inside a single questionnaire</b> so that different scales are never mixed. The ' +
+      'question it answers is: when this moves, does the overall score move with it? A high figure marks the areas ' +
+      'that carry a parent\u2019s judgement of the school — the places where improvement is most likely to be felt. ' +
+      'It is association, not proof: these are the areas worth investigating first, not a demonstration that one ' +
+      'causes the other.</p>';
+  }
+
+  /* ═══════════ 7. ACTION QUEUE ═══════════ */
+  function renderQueue() {
+    var q = D.queue.filter(function (r) {
+      if (V.branch && r.branch !== V.branch) return false;
+      if (V.month && r.month !== V.month) return false;
+      if (V.theme && r.theme !== V.theme) return false;
+      if (V.q) {
+        var s = (r.text + ' ' + r.theme + ' ' + r.owner + ' ' + r.student).toLowerCase();
+        if (s.indexOf(V.q.toLowerCase()) < 0) return false;
+      }
+      return true;
+    });
+    $('pt-queue-n').textContent = q.length;
+    $('pt-queue').innerHTML = q.length
+      ? '<table class="au-tbl"><thead><tr><th class="n">Priority</th><th>Branch</th><th>Grade</th>' +
+        '<th>Theme</th><th>What the parent wrote</th><th>Suggested owner</th></tr></thead><tbody>' +
+        q.slice(0, 250).map(function (r) {
+          var p1 = /^P1/.test(r.prioL);
+          return '<tr><td class="n"><span class="pill" style="' +
+            (p1 ? 'background:#FEF2F2;color:#DC2626' : 'background:#FFFBEB;color:#D97706') + '">' +
+            esc(r.prioL.split(' - ')[0]) + '</span><br><span style="font-size:10px;color:#94A3B8">' +
+            nn(r.prio, 0) + '</span></td>' +
+            '<td>' + esc(r.branch) + '</td>' +
+            '<td style="font-size:11.5px;color:#64748B">' + esc(r.grade || '—') + '</td>' +
+            '<td>' + esc(r.theme) + '</td>' +
+            '<td style="max-width:430px;font-size:12px">' + esc(r.text || '—') + '</td>' +
+            '<td style="font-size:11.5px;color:#64748B">' + esc(r.owner === '-' ? '—' : r.owner) + '</td></tr>';
+        }).join('') + '</tbody></table>' +
+        (q.length > 250 ? '<p class="au-note">Showing the 250 highest-priority of ' + q.length + '. Narrow with the filters above.</p>' : '')
+      : '<p class="au-empty">Nothing at P1 or P2 under the current filters.</p>';
+  }
+
+  /* ═══════════ 8. DIVERGENCE ═══════════ */
+  function renderDivergent() {
+    var list = D.divergent.filter(function (x) {
+      return (!V.branch || x.r.branch === V.branch) && (!V.month || x.r.month === V.month);
+    });
+    var high = list.filter(function (x) { return x.kind === 'high-rating-negative-words'; });
+    $('pt-diverge').innerHTML = list.length
+      ? '<table class="au-tbl"><thead><tr><th>Branch</th><th class="n">Score given</th><th>Tone of the words</th>' +
+        '<th>Theme</th><th>What they wrote</th></tr></thead><tbody>' +
+        list.slice(0, 60).map(function (x) {
+          var r = x.r;
+          return '<tr><td>' + esc(r.branch) + '</td>' +
+            '<td class="n" style="font-weight:700;color:' + (r.csat >= 85 ? '#059669' : '#DC2626') + '">' + nn(r.csat, 0) + '</td>' +
+            '<td><span class="pill" style="' + (r.negative ? 'background:#FEF2F2;color:#DC2626' : 'background:#ECFDF5;color:#059669') + '">' +
+            esc(r.sentL) + '</span></td>' +
+            '<td style="font-size:11.5px">' + esc(r.theme) + '</td>' +
+            '<td style="max-width:430px;font-size:12px">' + esc(r.text) + '</td></tr>';
+        }).join('') + '</tbody></table>' +
+        '<p class="au-note"><b>' + high.length + ' of these ' + list.length + '</b> gave the school high marks and then ' +
+        'wrote a complaint. They are the most under-counted group in the whole file: nothing in the satisfaction ' +
+        'average reflects them, and a branch reading only its score would never know they existed. Across the group ' +
+        'the rating and the wording barely move together at all, which is the strongest argument on this page for ' +
+        'reading the comments rather than the number.</p>'
+      : '<p class="au-empty">No divergent responses under the current filters.</p>';
+  }
+
+  /* ═══════════ 9. TREND ═══════════ */
+  function renderTrend() {
+    var rows = D.trend.map(function (t) {
+      var pts = t.points.filter(Boolean);
+      if (pts.length < 2) return null;
+      var a = pts[0], b = pts[pts.length - 1];
+      return { branch: t.branch, a: a, b: b,
+               dConc: (b.concern || 0) - (a.concern || 0),
+               dNeg: (b.negative || 0) - (a.negative || 0),
+               dCsat: (a.csat !== null && b.csat !== null) ? b.csat - a.csat : null };
+    }).filter(Boolean);
+
+    /* when nobody has two real rounds, say so plainly rather than drawing a
+       line between a full collection and a handful of stragglers */
+    var head = '<table class="au-tbl"><thead><tr><th>Branch</th><th>When it collected</th>' +
+      '<th class="n">Responses</th><th class="n">Complete rounds</th></tr></thead><tbody>' +
+      D.rounds.map(function (r) {
+        return '<tr><td><b>' + esc(r.branch) + '</b></td>' +
+          '<td>' + r.rounds.map(function (x) {
+            return esc(x.month === 'undated' ? 'no date recorded' : x.month) +
+              ' <span style="color:#94A3B8">(' + x.n + ')</span>';
+          }).join(' · ') + '</td>' +
+          '<td class="n">' + r.rounds.reduce(function (s, x) { return s + x.n; }, 0) + '</td>' +
+          '<td class="n" style="font-weight:600;color:' + (r.full > 1 ? '#059669' : '#D97706') + '">' + r.full + '</td></tr>';
+      }).join('') + '</tbody></table>';
+
+    if (!rows.length) {
+      $('pt-trend').innerHTML = head +
+        '<div class="au-flag"><b>There is no movement to report yet.</b> Every branch ran a single collection round, ' +
+        'so nothing here can be compared with a previous one — and because the rounds fall in different months, the ' +
+        'month a response carries is really just another name for its branch. A round needs at least ' + D.minRound +
+        ' responses to count; anything smaller is a few stragglers arriving late, not a second round. ' +
+        'Once any branch collects twice, this section fills in on its own.</div>' +
+        '<p class="au-note">Gowdavalli\u2019s responses carry no date at all, so they cannot be placed on a timeline ' +
+        'even once a second round exists. Recording the PTM date on the handwritten form would fix that.</p>';
+      return;
+    }
+    $('pt-trend').innerHTML = head +
+      '<table class="au-tbl" style="margin-top:12px"><thead><tr><th>Branch</th><th class="n">Responses</th>' +
+      '<th class="n">Concern rate</th><th class="n">Change</th>' +
+      '<th class="n">Negative tone</th><th class="n">Change</th>' +
+      '<th class="n">Satisfaction</th><th class="n">Change</th></tr></thead><tbody>' +
+      rows.map(function (r) {
+        function d(v, good) {
+          if (v === null) return '<td class="n">\u2014</td>';
+          var better = good === 'down' ? v < 0 : v > 0;
+          return '<td class="n" style="font-weight:600;color:' + (Math.abs(v) < 2 ? '#94A3B8' : better ? '#059669' : '#DC2626') + '">' +
+            (v > 0 ? '+' : '') + v.toFixed(1) + '</td>';
+        }
+        return '<tr><td><b>' + esc(r.branch) + '</b><br><span style="font-size:10.5px;color:#94A3B8">' +
+          esc(r.a.month) + ' \u2192 ' + esc(r.b.month) + '</span></td>' +
+          '<td class="n">' + r.a.n + ' \u2192 ' + r.b.n + '</td>' +
+          '<td class="n">' + pc(r.b.concern, 0) + '</td>' + d(r.dConc, 'down') +
+          '<td class="n">' + pc(r.b.negative, 0) + '</td>' + d(r.dNeg, 'down') +
+          '<td class="n">' + nn(r.b.csat) + '</td>' + d(r.dCsat, 'up') + '</tr>';
+      }).join('') + '</tbody></table>' +
+      '<p class="au-note">Each branch is compared only with itself, so the questionnaire is held constant and the ' +
+      'movement is real. A round needs at least ' + D.minRound + ' responses to count. For concern rate and negative ' +
+      'tone a fall is an improvement; for satisfaction a rise is. Changes under two points are shown grey.</p>';
+  }
+
+  /* ═══════════ 10. OWNERS ═══════════ */
+  function renderOwners() {
+    var list = D.owners.filter(function (o) { return !V.branch || o.branches[V.branch]; }).slice(0, 14);
+    $('pt-owners').innerHTML = list.length
+      ? '<table class="au-tbl"><thead><tr><th>Suggested owner</th><th class="n">Items</th><th class="n">Critical</th>' +
+        '<th></th><th>Spread across branches</th></tr></thead><tbody>' +
+        list.map(function (o) {
+          var mx = list[0].n || 1;
+          return '<tr><td>' + esc(o.owner) + '</td><td class="n" style="font-weight:600">' + o.n + '</td>' +
+            '<td class="n" style="color:' + (o.p1 ? '#DC2626' : '#94A3B8') + '">' + o.p1 + '</td>' +
+            '<td style="width:120px"><div class="au-bar"><i style="width:' + (o.n / mx * 100) +
+            '%;background:#1E4FD8"></i></div></td>' +
+            '<td style="font-size:11.5px;color:#64748B">' + Object.keys(o.branches).sort(function (a, b) {
+              return o.branches[b] - o.branches[a];
+            }).map(function (b) { return esc(b) + ' ' + o.branches[b]; }).join(' · ') + '</td></tr>';
+        }).join('') + '</tbody></table>' +
+        '<p class="au-note">Where the escalated items would land if the pipeline\u2019s suggested owners were adopted as ' +
+        'they stand. A role carrying items across several branches is a group-level fix rather than a branch one.</p>'
+      : '<p class="au-empty">No owned items under the current filters.</p>';
+  }
+
+  /* ═══════════ 11. DATA QUALITY ═══════════ */
+  function renderQuality() {
+    var q = D.dq;
+    $('pt-quality').innerHTML =
+      '<div class="au-stats">' +
+      '<div class="au-st"><div class="v">' + q.total.toLocaleString('en-IN') + '</div><div class="l">Responses</div></div>' +
+      '<div class="au-st"><div class="v" style="color:#D97706">' + q.noRating + '</div><div class="l">No rating in form</div></div>' +
+      '<div class="au-st"><div class="v" style="color:#D97706">' + q.blankText + '</div><div class="l">No comment written</div></div>' +
+      '<div class="au-st"><div class="v" style="color:#7C3AED">' + q.anomaly + '</div><div class="l">Statistical outliers</div></div>' +
+      '<div class="au-st"><div class="v" style="color:#DC2626">' + q.dup + '</div><div class="l">Possible duplicates</div></div>' +
+      '</div>' +
+      '<table class="au-tbl"><thead><tr><th>Flag raised on the record</th><th class="n">Responses</th><th></th></tr></thead><tbody>' +
+      q.flags.map(function (f) {
+        return '<tr><td>' + esc(f.flag) + '</td><td class="n">' + f.n + '</td>' +
+          '<td style="width:180px"><div class="au-bar"><i style="width:' + (f.n / q.total * 100) +
+          '%;background:' + (f.flag === 'Clean' ? '#059669' : '#D97706') + '"></i></div></td></tr>';
+      }).join('') + '</tbody></table>' +
+      '<div class="au-flag"><b>The single change that would make this page far stronger:</b> one questionnaire, used by ' +
+      'every branch. Four different forms is why the satisfaction column carries a warning instead of a ranking, why ' +
+      'Gowdavalli has no score at all, and why three of five branches have nobody to be compared with. The text ' +
+      'analysis works across all of them because language is the same everywhere — the rating scales are not.</div>';
+  }
+
+  /* ═══════════ 12. VERBATIM EXPLORER ═══════════ */
+  function renderVerbatim() {
+    var rs = sel(D.rows).filter(function (r) { return r.subst && r.text; });
+    if (V.q) {
+      var q = V.q.toLowerCase();
+      rs = rs.filter(function (r) { return (r.text + ' ' + r.theme + ' ' + r.student).toLowerCase().indexOf(q) >= 0; });
+    }
+    rs.sort(function (a, b) { return (a.sent === null ? 0 : a.sent) - (b.sent === null ? 0 : b.sent); });
+    $('pt-verb-n').textContent = rs.length;
+    $('pt-verbatim').innerHTML = rs.length
+      ? '<table class="au-tbl"><thead><tr><th>Branch</th><th>Grade</th><th>Tone</th><th>Theme</th>' +
+        '<th>What the parent wrote</th></tr></thead><tbody>' +
+        rs.slice(0, 300).map(function (r) {
+          var col = r.sentL === 'Negative' ? 'background:#FEF2F2;color:#DC2626'
+            : r.sentL === 'Mixed' ? 'background:#FFFBEB;color:#D97706'
+            : r.sentL === 'Positive' ? 'background:#ECFDF5;color:#059669' : 'background:#F1F5F9;color:#64748B';
+          return '<tr><td>' + esc(r.branch) + '</td>' +
+            '<td style="font-size:11.5px;color:#64748B">' + esc(r.grade || '—') + '</td>' +
+            '<td><span class="pill" style="' + col + '">' + esc(r.sentL) + '</span></td>' +
+            '<td style="font-size:11.5px">' + esc(r.theme) + '</td>' +
+            '<td style="max-width:520px;font-size:12px">' + esc(r.text) + '</td></tr>';
+        }).join('') + '</tbody></table>' +
+        (rs.length > 300 ? '<p class="au-note">Showing 300 of ' + rs.length + ', most negative first.</p>' : '')
+      : '<p class="au-empty">No comments match the current filters.</p>';
+  }
+
+  /* ═══════════ DRILL-DOWN ═══════════ */
+  function modal(title, sub, html) {
+    $('pt-mod-title').textContent = title;
+    $('pt-mod-sub').innerHTML = sub;
+    $('pt-mod-body').innerHTML = html;
+    $('pt-modal').classList.add('on');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeModal() { $('pt-modal').classList.remove('on'); document.body.style.overflow = ''; }
+
+  function branchModal(b) {
+    var s = D.byBranch[b];
+    var rs = D.rows.filter(function (r) { return r.branch === b; });
+    var sub = rs.filter(function (r) { return r.subst; });
+    var themes = {};
+    sub.filter(function (r) { return r.theme && r.theme !== 'No Concern Raised'; })
+      .forEach(function (r) { themes[r.theme] = (themes[r.theme] || 0) + 1; });
+    var tl = Object.keys(themes).map(function (k) { return { t: k, n: themes[k] }; })
+      .sort(function (x, y) { return y.n - x.n; }).slice(0, 10);
+    var mxT = tl.length ? tl[0].n : 1;
+    var dims = D.dimByBranch.filter(function (x) { return x.branch === b; })[0];
+    var top = D.queue.filter(function (r) { return r.branch === b; }).slice(0, 8);
+
+    modal(b,
+      esc(s.scale) + ' · ' + s.n + ' responses' +
+      (s.peers.length ? ' · comparable with <b>' + esc(s.peers.join(', ')) + '</b>'
+                      : ' · <b style="color:#FCA5A5">no other branch used this form</b>'),
+      '<div class="au-stats">' +
+      '<div class="au-st"><div class="v">' + nn(s.csat) + '</div><div class="l">Satisfaction</div></div>' +
+      '<div class="au-st"><div class="v">' + pc(s.substRate, 0) + '</div><div class="l">Wrote something</div></div>' +
+      '<div class="au-st"><div class="v" style="color:' + heatBad(s.concern, 40, 80) + '">' + pc(s.concern, 0) + '</div><div class="l">Raised a concern</div></div>' +
+      '<div class="au-st"><div class="v" style="color:' + heatBad(s.negative, 10, 25) + '">' + pc(s.negative, 0) + '</div><div class="l">Negative tone</div></div>' +
+      '<div class="au-st"><div class="v" style="color:#DC2626">' + s.p1 + '</div><div class="l">Critical items</div></div>' +
+      '<div class="au-st"><div class="v">' + s.p12 + '</div><div class="l">P1 + P2</div></div>' +
+      '</div>' +
+      (dims && dims.dims.some(function (d) { return d.avg !== null; })
+        ? '<h4 class="au-h4">How this branch scored each area <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#94A3B8">' +
+          '(on its own 1–5 scale — not comparable with a branch on another form)</span></h4><div class="au-sbars">' +
+          dims.dims.filter(function (d) { return d.avg !== null; }).sort(function (x, y) { return x.avg - y.avg; })
+            .map(function (d) {
+              return '<div class="au-sbar" style="grid-template-columns:150px 1fr 64px"><div>' + esc(d.dim) + '</div>' +
+                '<div class="au-bar"><i style="width:' + (d.avg / 5 * 100) + '%;background:' +
+                (d.avg >= 4.5 ? '#059669' : d.avg >= 4 ? '#84CC16' : d.avg >= 3.5 ? '#D97706' : '#DC2626') + '"></i></div>' +
+                '<div class="n">' + d.avg.toFixed(2) + '</div></div>';
+            }).join('') + '</div>' : '') +
+      (tl.length ? '<h4 class="au-h4">What parents here raise most</h4><div class="au-sbars">' +
+        tl.map(function (t) {
+          return '<div class="au-sbar" style="grid-template-columns:200px 1fr 44px"><div>' + esc(t.t) + '</div>' +
+            '<div class="au-bar"><i style="width:' + (t.n / mxT * 100) + '%;background:#7C3AED"></i></div>' +
+            '<div class="n">' + t.n + '</div></div>';
+        }).join('') + '</div>' : '') +
+      (top.length ? '<h4 class="au-h4">Highest-priority items here</h4><table class="au-tbl"><tbody>' +
+        top.map(function (r) {
+          return '<tr><td style="width:44px"><span class="pill" style="' +
+            (/^P1/.test(r.prioL) ? 'background:#FEF2F2;color:#DC2626' : 'background:#FFFBEB;color:#D97706') + '">' +
+            esc(r.prioL.split(' - ')[0]) + '</span></td><td style="font-size:11.5px;color:#64748B">' + esc(r.theme) + '</td>' +
+            '<td style="font-size:12px">' + esc(r.text) + '</td></tr>';
+        }).join('') + '</tbody></table>' : ''));
+  }
+
+  function cellModal(b, theme) {
+    var rs = D.rows.filter(function (r) { return r.branch === b && r.theme === theme && r.subst; })
+      .sort(function (x, y) { return (y.prio || 0) - (x.prio || 0); });
+    modal(b + ' · ' + theme, rs.length + ' parents raised this',
+      '<table class="au-tbl"><thead><tr><th>Grade</th><th>Tone</th><th class="n">Priority</th>' +
+      '<th>What they wrote</th></tr></thead><tbody>' +
+      rs.map(function (r) {
+        return '<tr><td style="font-size:11.5px;color:#64748B">' + esc(r.grade || '—') + '</td>' +
+          '<td style="font-size:11.5px">' + esc(r.sentL) + '</td>' +
+          '<td class="n">' + nn(r.prio, 0) + '</td>' +
+          '<td style="font-size:12px">' + esc(r.text) + '</td></tr>';
+      }).join('') + '</tbody></table>');
+  }
+
+  /* ═══════════ MASTER ═══════════ */
+  function renderAll() {
+    renderControls(); renderWarning(); renderKPIs(); renderBranches(); renderText();
+    renderLift(); renderDrivers(); renderQueue(); renderDivergent(); renderTrend();
+    renderOwners(); renderQuality(); renderVerbatim();
+    document.querySelectorAll('#pt-branches tr.clk,#pt-text tr.clk').forEach(function (tr) {
+      tr.addEventListener('click', function () { branchModal(tr.dataset.b); });
+    });
+    document.querySelectorAll('#pt-lift .pt-cell').forEach(function (el) {
+      el.addEventListener('click', function () { cellModal(el.dataset.b, el.dataset.t); });
+    });
+  }
+
+  window.renderPTMTab = function (raw) {
+    D = P.build(raw);
+    window.__PTM_D = D;
+    var el = $('pt-meta');
+    if (el) el.textContent = D.rows.length.toLocaleString('en-IN') + ' parent responses · ' +
+      D.branches.length + ' branches · ' + D.groups.filter(function (g) { return g.hasRatings; }).length +
+      ' different questionnaires · ' + D.months.length + ' month' + (D.months.length === 1 ? '' : 's');
+    renderAll();
+
+    $('pt-branch').onchange = function (e) { V.branch = e.target.value; renderAll(); };
+    $('pt-month').onchange = function (e) { V.month = e.target.value; renderAll(); };
+    $('pt-theme').onchange = function (e) { V.theme = e.target.value; renderAll(); };
+    var t; $('pt-q').oninput = function (e) {
+      clearTimeout(t); t = setTimeout(function () { V.q = e.target.value; renderQueue(); renderVerbatim(); }, 200);
+    };
+    $('pt-mod-x').onclick = closeModal;
+    $('pt-modal').onclick = function (e) { if (e.target === $('pt-modal')) closeModal(); };
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
+  };
+})();
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PTM FEEDBACK TAB — lazy loader
+   ══════════════════════════════════════════════════════════════════════════ */
+var _ptmLoaded=false, _ptmLoading=false, _ptmRaw=null;
+
+function _ptmStatus(msg,isErr){
+  var el=document.getElementById('pt-status'); if(!el) return;
+  el.textContent=msg||''; el.className='exm-status'+(isErr?' err':'');
+}
+function _ptmShow(ok){
+  var l=document.getElementById('pt-loader'), b=document.getElementById('pt-body');
+  if(l) l.classList.toggle('hide',!!ok);
+  if(b) b.style.display=ok?'flex':'none';
+}
+function _ptmPaint(){
+  try{ window.renderPTMTab(_ptmRaw); _ptmShow(true); }
+  catch(err){
+    _ptmShow(false);
+    var l=document.getElementById('pt-loader');
+    if(l) l.innerHTML='<div style="color:var(--r);font-weight:700">Could not build the feedback view</div>'+
+      '<div style="font-size:11px;color:var(--txm);max-width:460px">'+String(err&&err.message||err)+'</div>';
+  }
+}
+
+async function loadPTM(force){
+  if(_ptmLoading) return;
+  if(_ptmLoaded && !force){ _ptmPaint(); return; }
+  _ptmLoading=true; _ptmStatus(force?'Refreshing…':'Loading…');
+  try{
+    if(!force){
+      try{
+        var c=await idbGet('pbes_ptm');
+        if(c && c.data && c.data.ptm && (Date.now()-c.t) < 24*3600*1000){
+          _ptmRaw=c.data; _ptmLoaded=true; _ptmPaint(); _ptmStatus('Cached · refreshing in background');
+        }
+      }catch(e){}
+    }
+    var session=null;
+    try{ var s=await sb.auth.getSession(); session=s && s.data && s.data.session; }catch(e){}
+    if(!session){ window.location.href='login.html'; return; }
+
+    var res=await fetch(DATA_API+'?section=ptm'+(force?'&nocache=1':'')+'&_t='+Date.now(),
+                        { headers:{ 'Authorization':'Bearer '+session.access_token } });
+    if(res.status===401){ await sb.auth.signOut(); window.location.href='login.html'; return; }
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    var d=await res.json();
+    if(d && d.error) throw new Error(d.message||'Upstream error');
+
+    var raw=(d && d.PTM_RAW) ? d.PTM_RAW : (d && d.ptm ? d : null);
+    if(!raw || !raw.ptm || !raw.ptm.rows || !raw.ptm.rows.length)
+      throw new Error('No PTM rows returned. Check that the "PTM" tab exists and that '+
+                      '/api/data forwards ?section=ptm');
+
+    _ptmRaw=raw; _ptmLoaded=true;
+    try{ idbSet('pbes_ptm',{ t:Date.now(), data:raw }); }catch(e){}
+    _ptmPaint();
+    _ptmStatus(raw.generatedAt ? ('Updated '+String(raw.generatedAt).replace('T',' ').slice(0,16)) : '');
+  }catch(err){
+    if(!_ptmLoaded){
+      _ptmShow(false);
+      var l=document.getElementById('pt-loader');
+      if(l) l.innerHTML='<div style="color:var(--r);font-weight:700">Could not load parent feedback</div>'+
+        '<div style="font-size:11px;color:var(--txm);max-width:460px">'+String(err&&err.message||err)+'</div>';
+    }
+    _ptmStatus(String(err && err.message || err), true);
+  }finally{ _ptmLoading=false; }
+}
+
+(function(){
+  var _s=window.showTab, _w=window.switchTab;
+  window.showTab=function(id,btn){ _s(id,btn); if(id==='ptm') loadPTM(false); };
+  window.switchTab=function(id){ _w(id); if(id==='ptm') loadPTM(false); };
+})();
+</script>
 </body>
 </html>
