@@ -193,6 +193,54 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);font-si
 .pt-grp{border:1px solid var(--bor);border-radius:12px;padding:13px 15px;margin-bottom:12px;background:var(--bg)}
 .pt-grp-h{font-size:12px;font-weight:800;color:var(--tx);margin-bottom:9px;letter-spacing:.01em}
 .pt-cell{min-width:44px}
+/* ── segment visuals ── */
+.pt-scope{font-size:12.5px;padding:11px 14px;border-radius:10px;background:#FFFBEB;border:1px solid #FCD34D;
+  color:#3F2E10;margin-bottom:14px;line-height:1.6}
+.pt-scope.ok{background:#ECFDF5;border-color:#A7F3D0;color:#065F46}
+.pt-jump{font:inherit;font-size:11.5px;font-weight:700;padding:4px 10px;margin:0 4px 0 0;border-radius:99px;
+  border:1px solid #D97706;background:#fff;color:#B45309;cursor:pointer}
+.pt-jump:hover{background:#D97706;color:#fff}
+.pt-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:12px}
+.pt-card{border:1px solid var(--bor);border-radius:14px;overflow:hidden;background:var(--sur);display:flex;flex-direction:column}
+.pt-card-h{background:var(--tx);color:#fff;font-size:12.5px;font-weight:800;padding:8px 12px;text-align:center;letter-spacing:.02em}
+.pt-card-n{font-size:11px;color:var(--txm);text-align:center;padding:7px 8px 0}
+.pt-svg{width:100%;height:auto;display:block;max-width:210px;margin:0 auto}
+.pt-svg-lg{width:100%;height:auto;display:block;max-width:270px;margin:0 auto}
+.pt-mini{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:4px}
+.pt-mini th{font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:var(--txm);font-weight:700;
+  padding:4px 9px;background:var(--bg);text-align:left}
+.pt-mini th.n,.pt-mini td.n{text-align:right}
+.pt-mini td{padding:3px 9px;border-bottom:1px solid #F1F5FF;font-variant-numeric:tabular-nums}
+.pt-mini tr.tot td{font-weight:800;background:var(--bg);border-bottom:none}
+.pt-final{margin:8px 10px;padding:8px;border-radius:9px;background:var(--pl);color:var(--p);
+  font-size:11.5px;text-align:center;font-weight:600}
+.pt-final .st{font-size:13px;letter-spacing:1px}
+.pt-card-f{display:flex;justify-content:space-between;gap:8px;font-size:10.5px;color:var(--txm);
+  padding:8px 12px;border-top:1px solid var(--bor);background:var(--bg);margin-top:auto}
+.pt-none{font-size:12px;color:var(--txl);padding:16px 12px;text-align:center}
+.pt-callout{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:14px}
+.pt-callout>div{border-radius:12px;padding:12px 16px;font-size:13px}
+.pt-callout .best{background:#ECFDF5;border:1px solid #A7F3D0;color:#065F46}
+.pt-callout .focus{background:#FEF2F2;border:1px solid #FECACA;color:#991B1B}
+.pt-callout span{display:block;font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:800;opacity:.75}
+.pt-callout b{font-size:14.5px}
+.pt-callout small{opacity:.7}
+.pt-row2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:14px}
+@media(max-width:980px){.pt-row2{grid-template-columns:minmax(0,1fr)}}
+.pt-panel,.pt-mix{border:1px solid var(--bor);border-radius:12px;padding:14px 16px;background:var(--bg)}
+.pt-mix h5{margin:0 0 8px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--tx)}
+.pt-leg{display:flex;flex-direction:column;gap:4px;margin-top:10px;font-size:11.5px;color:var(--txm)}
+.pt-leg.sm{font-size:11px}
+.pt-leg div{display:flex;align-items:center;gap:6px}
+.pt-leg i{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.pt-leg b{margin-left:auto;color:var(--tx);font-variant-numeric:tabular-nums}
+.pt-leg span{width:44px;text-align:right;font-variant-numeric:tabular-nums}
+.pt-cats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.pt-cat{background:var(--sur);border:1px solid var(--bor);border-radius:10px;padding:10px 11px}
+.pt-cat .nm{font-size:11px;color:var(--txm);font-weight:600;min-height:28px;line-height:1.3}
+.pt-cat .vl{font-size:19px;font-weight:800;margin:2px 0 6px}
+.pt-cat .vl span{font-size:11px;font-weight:600;color:var(--txl)}
+.pt-cat .pcv{font-size:10px;color:var(--txl);margin-top:5px;font-variant-numeric:tabular-nums}
 
 /* ═══ SCHOOL AUDIT TAB ═══ */
 #pane-audit .au-wrap{display:flex;flex-direction:column;gap:16px}
@@ -1506,6 +1554,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       <div id="pt-warn"></div>
       <div class="au-kpis" id="pt-kpis"></div>
+
+      <div class="au-sec">
+        <h3>By grade group — ratings, spread and categories</h3>
+        <div class="sub">The same cut the printed PTM reports use: each grade group with its own star distribution,
+          average out of 5 and satisfaction percentage, then the overall spread, the category scores and what parents
+          praised against what they raised.</div>
+        <div id="pt-segments"></div>
+      </div>
 
       <div class="au-sec">
         <h3>Satisfaction, inside each questionnaire</h3>
@@ -9412,6 +9468,290 @@ window.PTM = (function () {
 })();
 
 /* ══════════════════════════════════════════════════════════════════════════
+   PTM — SEGMENT VISUALS
+   The grade-group cards, star distributions, quality-band donuts and
+   category-satisfaction bars that match the printed PTM reports.
+
+   These are branch-level reports by nature. A star distribution pooled across
+   branches would be mixing four different questionnaires, so when no branch is
+   selected the section says so and offers a one-click branch switch rather
+   than quietly averaging incomparable scales.
+   ══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  var P = window.PTM;
+  var esc = P.esc;
+
+  /* the grade groupings used in the printed reports */
+  var GROUPS = [
+    { key: 'ey',   label: 'Nursery to PP2', test: function (g) { return g !== null && g <= 0; } },
+    { key: 'g12',  label: 'Grade 1–2',      test: function (g) { return g >= 1 && g <= 2; } },
+    { key: 'g35',  label: 'Grade 3–5',      test: function (g) { return g >= 3 && g <= 5; } },
+    { key: 'g68',  label: 'Grade 6–8',      test: function (g) { return g >= 6 && g <= 8; } },
+    { key: 'g910', label: 'Grade 9–10',     test: function (g) { return g >= 9; } }
+  ];
+  var STAR_COL = { 1: '#DC2626', 2: '#EA580C', 3: '#F59E0B', 4: '#1E4FD8', 5: '#059669' };
+  var BANDS = [
+    { k: 'Excellent',     lo: 4.5, hi: 5.01, c: '#059669', s: 'Excellent (4.5 – 5)' },
+    { k: 'Good',          lo: 3.5, hi: 4.5,  c: '#F59E0B', s: 'Good (3.5 – 4.49)' },
+    { k: 'Average',       lo: 2.5, hi: 3.5,  c: '#EA580C', s: 'Average (2.5 – 3.49)' },
+    { k: 'Below Average', lo: 0,   hi: 2.5,  c: '#DC2626', s: 'Below Average (1 – 2.49)' }
+  ];
+
+  function gradeNum(r) {
+    var g = r.grade;
+    if (!g) return null;
+    var s = String(g).toUpperCase();
+    if (s.indexOf('NURSERY') >= 0) return -3;
+    if (/PP\s*2|UKG/.test(s)) return -1;
+    if (/PP\s*1|LKG/.test(s)) return -2;
+    var m = s.match(/(\d+)/);
+    return m ? parseInt(m[1], 10) : null;
+  }
+  /* the star a response would have given: its own 1–5 index, rounded */
+  function star(r) {
+    if (r.csat === null) return null;
+    var v = r.csat / 20;
+    return Math.max(1, Math.min(5, Math.round(v)));
+  }
+  function idx(r) { return r.csat === null ? null : r.csat / 20; }
+  function bandOf(v) {
+    if (v === null) return null;
+    for (var i = 0; i < BANDS.length; i++) if (v >= BANDS[i].lo && v < BANDS[i].hi) return BANDS[i];
+    return BANDS[BANDS.length - 1];
+  }
+
+  /* ── an SVG donut; slices is [{v,c,label}] ── */
+  function donut(slices, cx, cy, rOuter, rInner, centreHTML) {
+    var tot = slices.reduce(function (s, x) { return s + x.v; }, 0);
+    if (!tot) return '';
+    var a = -Math.PI / 2, out = '';
+    slices.forEach(function (s) {
+      if (!s.v) return;
+      var frac = s.v / tot, b = a + frac * Math.PI * 2;
+      /* a full circle cannot be drawn as one arc — draw a ring instead */
+      if (frac > 0.9999) {
+        out += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((rOuter + rInner) / 2) +
+          '" fill="none" stroke="' + s.c + '" stroke-width="' + (rOuter - rInner) + '"><title>' +
+          esc(s.label) + '</title></circle>';
+        a = b; return;
+      }
+      var large = frac > 0.5 ? 1 : 0;
+      var x1 = cx + rOuter * Math.cos(a), y1 = cy + rOuter * Math.sin(a);
+      var x2 = cx + rOuter * Math.cos(b), y2 = cy + rOuter * Math.sin(b);
+      var x3 = cx + rInner * Math.cos(b), y3 = cy + rInner * Math.sin(b);
+      var x4 = cx + rInner * Math.cos(a), y4 = cy + rInner * Math.sin(a);
+      out += '<path d="M' + x1.toFixed(2) + ' ' + y1.toFixed(2) +
+        ' A' + rOuter + ' ' + rOuter + ' 0 ' + large + ' 1 ' + x2.toFixed(2) + ' ' + y2.toFixed(2) +
+        ' L' + x3.toFixed(2) + ' ' + y3.toFixed(2) +
+        ' A' + rInner + ' ' + rInner + ' 0 ' + large + ' 0 ' + x4.toFixed(2) + ' ' + y4.toFixed(2) + ' Z" ' +
+        'fill="' + s.c + '" stroke="#fff" stroke-width="1.5"><title>' + esc(s.label) + '</title></path>';
+      /* label the slice when it is big enough to hold text */
+      if (frac >= 0.07) {
+        var mid = (a + b) / 2, rl = (rOuter + rInner) / 2;
+        out += '<text x="' + (cx + rl * Math.cos(mid)).toFixed(1) + '" y="' + (cy + rl * Math.sin(mid) + 4).toFixed(1) +
+          '" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">' +
+          (frac * 100).toFixed(frac >= 0.1 ? 0 : 1) + '%</text>';
+      }
+      a = b;
+    });
+    if (centreHTML) out += centreHTML;
+    return out;
+  }
+
+  function stars(v) {
+    var full = Math.round(v), s = '';
+    for (var i = 1; i <= 5; i++) s += '<span style="color:' + (i <= full ? '#F59E0B' : '#E2E8F0') + '">★</span>';
+    return s;
+  }
+
+  /* ══════════ one grade-group card ══════════ */
+  function groupCard(g, rows) {
+    var rated = rows.filter(function (r) { return r.csat !== null; });
+    var counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    rated.forEach(function (r) { counts[star(r)]++; });
+    var n = rated.length;
+    var avg = n ? P.mean(rated.map(idx)) : null;
+
+    var slices = [5, 4, 3, 2, 1].filter(function (k) { return counts[k]; }).map(function (k) {
+      return { v: counts[k], c: STAR_COL[k], label: k + '★ — ' + counts[k] + ' (' + (counts[k] / n * 100).toFixed(1) + '%)' };
+    });
+
+    var sub = rows.filter(function (r) { return r.subst; });
+    var conc = sub.filter(function (r) { return r.concern; }).length;
+
+    return '<div class="pt-card">' +
+      '<div class="pt-card-h">' + esc(g.label) + '</div>' +
+      '<div class="pt-card-n">' + rows.length + ' response' + (rows.length === 1 ? '' : 's') +
+        (n < rows.length ? ' · ' + n + ' rated' : '') + '</div>' +
+      (n
+        ? '<svg viewBox="0 0 200 168" class="pt-svg">' +
+            donut(slices, 100, 80, 72, 40, '') +
+            '<text x="100" y="76" text-anchor="middle" font-size="21" font-weight="800" fill="#0F172A">' +
+              avg.toFixed(2) + '</text>' +
+            '<text x="100" y="92" text-anchor="middle" font-size="9.5" fill="#64748B">out of 5</text>' +
+            '<text x="100" y="108" text-anchor="middle" font-size="10" font-weight="700" fill="#1E4FD8">' +
+              (avg / 5 * 100).toFixed(1) + '%</text>' +
+          '</svg>' +
+          '<table class="pt-mini"><thead><tr><th>Rating</th><th class="n">Count</th><th class="n">Share</th></tr></thead><tbody>' +
+          [5, 4, 3, 2, 1].map(function (k) {
+            return '<tr><td><span style="color:' + STAR_COL[k] + '">★</span> ' + k + '</td>' +
+              '<td class="n">' + counts[k] + '</td>' +
+              '<td class="n">' + (counts[k] / n * 100).toFixed(1) + '%</td></tr>';
+          }).join('') +
+          '<tr class="tot"><td>Total</td><td class="n">' + n + '</td><td class="n">100%</td></tr>' +
+          '</tbody></table>' +
+          '<div class="pt-final">' + esc(g.label) + ' &nbsp;<b>' + avg.toFixed(2) + ' / 5</b> (' +
+            (avg / 5 * 100).toFixed(1) + '%)<br><span class="st">' + stars(avg) + '</span></div>'
+        : '<div class="pt-none">No rating scale in this branch\u2019s form — nothing to distribute.</div>') +
+      '<div class="pt-card-f">' +
+        '<span>Wrote something <b>' + (rows.length ? (sub.length / rows.length * 100).toFixed(0) : 0) + '%</b></span>' +
+        '<span>Raised a concern <b style="color:' + (sub.length && conc / sub.length > 0.6 ? '#DC2626' : '#64748B') + '">' +
+          (sub.length ? (conc / sub.length * 100).toFixed(0) : 0) + '%</b></span>' +
+      '</div></div>';
+  }
+
+  /* ══════════ the whole section ══════════ */
+  window.renderPTMSegments = function (D, V) {
+    var el = document.getElementById('pt-segments');
+    if (!el) return;
+
+    var scope = V.branch ? D.rows.filter(function (r) { return r.branch === V.branch; }) : D.rows;
+    if (V.month) scope = scope.filter(function (r) { return r.month === V.month; });
+
+    /* the scale warning: pooling stars across forms is exactly the mistake
+       this dashboard exists to avoid, so it is stated before the charts */
+    var head = V.branch
+      ? '<div class="pt-scope ok"><b>' + esc(V.branch) + '</b> · ' + esc(D.byBranch[V.branch].scale) +
+        '. One questionnaire throughout, so every chart below is internally consistent.</div>'
+      : '<div class="pt-scope"><b>All branches selected — these charts are mixing four questionnaires.</b> ' +
+        'A five-star distribution only means one thing if everyone answered the same form, and they did not. ' +
+        'Pick a branch to read these properly: ' +
+        D.branches.map(function (b) {
+          return '<button class="pt-jump" data-b="' + esc(b) + '">' + esc(b) + '</button>';
+        }).join('') + '</div>';
+
+    /* ── grade-group cards ── */
+    var cards = GROUPS.map(function (g) {
+      var rows = scope.filter(function (r) {
+        var n = gradeNum(r);
+        return n !== null && g.test(n);
+      });
+      return rows.length ? groupCard(g, rows) : '';
+    }).filter(Boolean).join('');
+    var unplaced = scope.filter(function (r) { return gradeNum(r) === null; }).length;
+
+    /* ── overall quality-band donut ── */
+    var rated = scope.filter(function (r) { return r.csat !== null; });
+    var bandCounts = BANDS.map(function (b) {
+      return { b: b, n: rated.filter(function (r) { return bandOf(idx(r)) === b; }).length };
+    });
+    var avgAll = rated.length ? P.mean(rated.map(idx)) : null;
+    var bandSvg = rated.length
+      ? '<svg viewBox="0 0 260 230" class="pt-svg-lg">' +
+          donut(bandCounts.filter(function (x) { return x.n; }).map(function (x) {
+            return { v: x.n, c: x.b.c, label: x.b.s + ' — ' + x.n };
+          }), 130, 112, 96, 58, '') +
+          '<text x="130" y="100" text-anchor="middle" font-size="10" fill="#64748B">OVERALL</text>' +
+          '<text x="130" y="124" text-anchor="middle" font-size="28" font-weight="800" fill="#0F172A">' +
+            avgAll.toFixed(2) + '</text>' +
+          '<text x="130" y="140" text-anchor="middle" font-size="10" fill="#64748B">out of 5</text>' +
+          '<text x="130" y="222" text-anchor="middle" font-size="11" fill="#64748B">' +
+            rated.length + ' rated responses</text>' +
+        '</svg>' +
+        '<div class="pt-leg">' + bandCounts.map(function (x) {
+          return '<div><i style="background:' + x.b.c + '"></i>' + esc(x.b.s) +
+            '<b>' + x.n + '</b><span>' + (rated.length ? (x.n / rated.length * 100).toFixed(1) : 0) + '%</span></div>';
+        }).join('') + '</div>'
+      : '<div class="pt-none">No rated responses in this selection.</div>';
+
+    /* ── category satisfaction, out of 5 ── */
+    var cats = P.DIMS.map(function (d) {
+      var vs = scope.map(function (r) { return r.dims[d.k]; }).filter(function (v) { return v !== undefined; });
+      return { s: d.s, n: vs.length, avg: vs.length ? P.mean(vs) : null };
+    }).filter(function (x) { return x.n >= 10; }).sort(function (a, b) { return a.avg - b.avg; });
+
+    var catHTML = cats.length
+      ? '<div class="pt-cats">' + cats.map(function (c) {
+          var col = c.avg >= 4.5 ? '#059669' : c.avg >= 4 ? '#84CC16' : c.avg >= 3.5 ? '#F59E0B' : '#DC2626';
+          return '<div class="pt-cat"><div class="nm">' + esc(c.s) + '</div>' +
+            '<div class="vl" style="color:' + col + '">' + c.avg.toFixed(2) + ' <span>/ 5</span></div>' +
+            '<div class="au-bar"><i style="width:' + (c.avg / 5 * 100) + '%;background:' + col + '"></i></div>' +
+            '<div class="pcv">' + (c.avg / 5 * 100).toFixed(1) + '% · n=' + c.n + '</div></div>';
+        }).join('') + '</div>'
+      : '<div class="pt-none">This branch\u2019s form did not carry rated categories.</div>';
+
+    /* ── best and focus group ── */
+    var scored = GROUPS.map(function (g) {
+      var rows = scope.filter(function (r) { var n = gradeNum(r); return n !== null && g.test(n) && r.csat !== null; });
+      return rows.length >= 5 ? { g: g, avg: P.mean(rows.map(idx)), n: rows.length } : null;
+    }).filter(Boolean).sort(function (a, b) { return b.avg - a.avg; });
+    var callout = scored.length >= 2
+      ? '<div class="pt-callout">' +
+        '<div class="best"><span>★ Strongest group</span><b>' + esc(scored[0].g.label) + '</b> ' +
+          scored[0].avg.toFixed(2) + ' / 5 <small>(' + scored[0].n + ' rated)</small></div>' +
+        '<div class="focus"><span>⚠ Focus area</span><b>' + esc(scored[scored.length - 1].g.label) + '</b> ' +
+          scored[scored.length - 1].avg.toFixed(2) + ' / 5 <small>(' + scored[scored.length - 1].n + ' rated)</small></div>' +
+        '</div>'
+      : '';
+
+    /* ── what parents praise vs what they raise ── */
+    var sub = scope.filter(function (r) { return r.subst; });
+    function themeMix(list) {
+      var m = {};
+      list.forEach(function (r) { if (r.theme) m[r.theme] = (m[r.theme] || 0) + 1; });
+      return Object.keys(m).map(function (k) { return { t: k, n: m[k] }; })
+        .sort(function (a, b) { return b.n - a.n; }).slice(0, 6);
+    }
+    var praise = themeMix(sub.filter(function (r) { return !r.concern; }));
+    var raise = themeMix(sub.filter(function (r) { return r.concern; }));
+    var PAL = ['#1E4FD8', '#059669', '#F59E0B', '#7C3AED', '#0D9488', '#DC2626'];
+    function mixPanel(title, list, colr) {
+      var tot = list.reduce(function (s, x) { return s + x.n; }, 0);
+      if (!tot) return '<div class="pt-mix"><h5>' + title + '</h5><div class="pt-none">Nothing recorded.</div></div>';
+      return '<div class="pt-mix"><h5>' + title + '</h5>' +
+        '<svg viewBox="0 0 170 170" class="pt-svg">' +
+        donut(list.map(function (x, k) {
+          return { v: x.n, c: PAL[k % PAL.length], label: x.t + ' — ' + x.n };
+        }), 85, 85, 76, 44, '') +
+        '<text x="85" y="82" text-anchor="middle" font-size="19" font-weight="800" fill="' + colr + '">' + tot + '</text>' +
+        '<text x="85" y="97" text-anchor="middle" font-size="9" fill="#64748B">comments</text></svg>' +
+        '<div class="pt-leg sm">' + list.map(function (x, k) {
+          return '<div><i style="background:' + PAL[k % PAL.length] + '"></i>' + esc(x.t) +
+            '<b>' + x.n + '</b><span>' + (x.n / tot * 100).toFixed(0) + '%</span></div>';
+        }).join('') + '</div></div>';
+    }
+
+    el.innerHTML = head +
+      (cards ? '<div class="pt-cards">' + cards + '</div>' : '<div class="pt-none">No grade information on these responses.</div>') +
+      (unplaced ? '<p class="au-note">' + unplaced + ' response' + (unplaced === 1 ? '' : 's') +
+        ' could not be placed in a grade group because the grade was blank or unreadable, so they sit outside the cards above.</p>' : '') +
+      callout +
+      '<div class="pt-row2">' +
+        '<div class="pt-panel"><h4 class="au-h4">Overall satisfaction spread</h4>' + bandSvg + '</div>' +
+        '<div class="pt-panel"><h4 class="au-h4">Category-wise satisfaction</h4>' + catHTML + '</div>' +
+      '</div>' +
+      '<div class="pt-row2">' +
+        mixPanel('What parents praised', praise, '#059669') +
+        mixPanel('What parents raised', raise, '#DC2626') +
+      '</div>' +
+      '<p class="au-note">The five-star figures are each parent\u2019s own overall index rounded to the nearest star, and ' +
+      'the percentage beside every average is simply that average as a share of 5 — the same convention the printed PTM ' +
+      'reports use. <b>Attendance is not on this page</b> because the PTM sheet records who responded, not who attended; ' +
+      'a response rate needs the branch roll and the attendance register, which live elsewhere.</p>';
+
+    /* branch jump buttons */
+    Array.prototype.forEach.call(el.querySelectorAll('.pt-jump'), function (b) {
+      b.addEventListener('click', function () {
+        var s = document.getElementById('pt-branch');
+        s.value = b.dataset.b;
+        s.dispatchEvent(new Event('change'));
+      });
+    });
+  };
+})();
+
+/* ══════════════════════════════════════════════════════════════════════════
    PTM PARENT FEEDBACK TAB — renderer
    ══════════════════════════════════════════════════════════════════════════ */
 (function () {
@@ -9932,7 +10272,9 @@ window.PTM = (function () {
 
   /* ═══════════ MASTER ═══════════ */
   function renderAll() {
-    renderControls(); renderWarning(); renderKPIs(); renderBranches(); renderText();
+    renderControls(); renderWarning(); renderKPIs();
+    if (window.renderPTMSegments) window.renderPTMSegments(D, V);
+    renderBranches(); renderText();
     renderLift(); renderDrivers(); renderQueue(); renderDivergent(); renderTrend();
     renderOwners(); renderQuality(); renderVerbatim();
     document.querySelectorAll('#pt-branches tr.clk,#pt-text tr.clk').forEach(function (tr) {
