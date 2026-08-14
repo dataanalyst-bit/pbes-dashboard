@@ -260,6 +260,12 @@ body.nav-min .sn-foot{display:none}
 @media(max-width:768px){.content,.fb-in,.hdr-in{padding-left:14px;padding-right:14px}.k4,.k5,.k6{grid-template-columns:1fr 1fr}.r2,.r3{grid-template-columns:1fr}}
 
 
+/* the scope a tab has inherited from the global filter bar */
+.scope-chip{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;font-weight:600;
+  color:var(--p);background:var(--pl);border:1px solid var(--bor);border-radius:99px;padding:5px 13px}
+.scope-chip i{width:6px;height:6px;border-radius:50%;background:var(--g);flex-shrink:0}
+.scope-chip small{font-weight:500;color:var(--txm)}
+
 /* ═══ PTM FEEDBACK TAB ═══ */
 .pt-warn{border:1px solid #FCD34D;background:linear-gradient(180deg,#FFFBEB,#FFFDF5);
   border-radius:14px;padding:16px 20px}
@@ -1649,8 +1655,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div style="font-size:12.5px;color:var(--txm);margin-top:3px" id="pt-meta">Loading…</div>
       </div>
       <div class="au-ctl">
-        <div class="f"><label for="pt-branch">Branch</label><select id="pt-branch"></select></div>
-        <div class="f"><label for="pt-month">Month</label><select id="pt-month"></select></div>
+        <span class="scope-chip" id="pt-scope"><i></i>All branches · All months</span>
         <div class="f"><label for="pt-theme">Theme</label><select id="pt-theme"></select></div>
         <button class="exm-refresh" onclick="loadPTM(true)" title="Re-read the PTM sheet">↻ Refresh</button>
         <span class="exm-status" id="pt-status"></span>
@@ -1766,8 +1771,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div style="font-size:12.5px;color:var(--txm);margin-top:3px" id="au-meta">Loading…</div>
       </div>
       <div class="au-ctl">
-        <div class="f"><label for="au-month">Month</label><select id="au-month"></select></div>
-        <div class="f"><label for="au-branch">Branch</label><select id="au-branch"></select></div>
+        <span class="scope-chip" id="au-scope"><i></i>All branches · All months</span>
         <button class="exm-refresh" onclick="loadAudit(true)" title="Re-read the audit sheet">↻ Refresh</button>
         <span class="exm-status" id="au-status"></span>
       </div>
@@ -8571,7 +8575,7 @@ window.AUDIT = (function () {
   'use strict';
   var A = window.AUDIT;
   var D = null;                 // built model
-  var VIEW = { month: '', branch: '', cat: '', q: '' };
+  var VIEW = { month: '', branch: '', cat: '', q: '', miss: '' };
 
   function $(id) { return document.getElementById(id); }
   var esc = A.esc, r1 = A.r1;
@@ -8604,18 +8608,17 @@ window.AUDIT = (function () {
   function netGradeT(g) { return combine(function (m) { return D.byMG[m + '\u241f' + g]; }); }
   function brGradeT(b, g) { return combine(function (m) { return D.byBMG[b + '\u241f' + m + '\u241f' + g]; }); }
 
-  /* ══════════════════ CONTROLS ══════════════════ */
+  /* ══════════════════ SCOPE ══════════════════
+     Branch and month now come from the dashboard's own filter bar, so this only
+     reflects what was chosen there. ══════════════════ */
   function renderControls() {
-    var mo = ['<option value="">All audited months</option>'].concat(
-      D.months.map(function (m) {
-        return '<option value="' + esc(m) + '"' + (VIEW.month === m ? ' selected' : '') + '>' + esc(m) + '</option>';
-      })).join('');
-    var br = ['<option value="">All branches</option>'].concat(
-      D.branches.map(function (b) {
-        return '<option value="' + esc(b) + '"' + (VIEW.branch === b ? ' selected' : '') + '>' + esc(b) + '</option>';
-      })).join('');
-    $('au-month').innerHTML = mo;
-    $('au-branch').innerHTML = br;
+    var el = $('au-scope');
+    if (!el) return;
+    el.innerHTML = '<i></i>' + esc(VIEW.branch || 'All branches') + ' \u00b7 ' +
+      esc(VIEW.month || 'All audited months') +
+      (VIEW.miss
+        ? ' <small>(no audit in ' + esc(VIEW.miss) + ' \u2014 showing every month)</small>'
+        : (VIEW.month || VIEW.branch ? ' <small>(from the filter bar above)</small>' : ''));
   }
 
   /* ══════════════════ 1. HEADLINE ══════════════════ */
@@ -8664,7 +8667,7 @@ window.AUDIT = (function () {
 
   /* ══════════════════ 2. BRANCH SCORECARD ══════════════════ */
   function renderScorecard() {
-    var rows = D.branches.map(function (b) {
+    var rows = branches().map(function (b) {
       var t = brT(b), sc = t ? A.score(t) : null;
       var hist = D.months.map(function (m) { return A.scoreOf(D.byBM, b + '\u241f' + m); });
       var seen = hist.filter(function (x) { return x !== null; });
@@ -8905,7 +8908,7 @@ window.AUDIT = (function () {
 
   /* ══════════════════ 8. DATA QUALITY ══════════════════ */
   function renderQuality() {
-    var rows = D.branches.map(function (b) {
+    var rows = branches().map(function (b) {
       var t = brT(b) || A.blank();
       var tot = A.scored(t) + t.na + t.nr + t.none;
       return { b: b, t: t, tot: tot, cov: tot ? A.scored(t) / tot * 100 : null };
@@ -9097,8 +9100,23 @@ window.AUDIT = (function () {
     var el = $('au-meta'); if (el) el.textContent = meta;
     renderAll();
 
-    $('au-month').onchange = function (e) { VIEW.month = e.target.value; renderAll(); };
-    $('au-branch').onchange = function (e) { VIEW.branch = e.target.value; renderAll(); };
+    /* the global filter bar calls this whenever branch or month changes */
+    window.__auditSetScope = function (branch, monthName) {
+      var m = '';
+      if (monthName) {
+        /* the audit sheet writes "June 2026"; the filter bar carries "June" */
+        for (var i = 0; i < D.months.length; i++) {
+          if (String(D.months[i]).toLowerCase().indexOf(String(monthName).toLowerCase()) === 0) { m = D.months[i]; break; }
+        }
+      }
+      var b = branch && D.branches.indexOf(branch) >= 0 ? branch : '';
+      /* a month the filter bar offers but this sheet never collected */
+      var miss = (monthName && !m) ? monthName : '';
+      if (b === VIEW.branch && m === VIEW.month && miss === VIEW.miss) return;
+      VIEW.branch = b; VIEW.month = m; VIEW.miss = miss;
+      renderAll();
+    };
+    if (window.__pushTabScope) window.__pushTabScope();
     var qt; $('au-q').oninput = function (e) {
       clearTimeout(qt); qt = setTimeout(function () { VIEW.q = e.target.value; renderRemarks(); }, 200);
     };
@@ -9868,7 +9886,7 @@ window.PTM = (function () {
   'use strict';
   var P = window.PTM;
   var D = null;
-  var V = { branch: '', month: '', theme: '', q: '' };
+  var V = { branch: '', month: '', theme: '', q: '', miss: '' };
 
   function $(id) { return document.getElementById(id); }
   var esc = P.esc;
@@ -9899,17 +9917,26 @@ window.PTM = (function () {
     });
   }
 
-  /* ═══════════ CONTROLS ═══════════ */
+  /* ═══════════ SCOPE ═══════════
+     Branch and month come from the dashboard's filter bar. Theme stays here
+     because it has no equivalent up there. ═══════════ */
   function renderControls() {
-    function opts(list, cur, all) {
-      return ['<option value="">' + all + '</option>'].concat(list.map(function (x) {
-        return '<option value="' + esc(x) + '"' + (cur === x ? ' selected' : '') + '>' + esc(x) + '</option>';
-      })).join('');
+    var el = $('pt-scope');
+    if (el) {
+      el.innerHTML = '<i></i>' + esc(V.branch || 'All branches') + ' \u00b7 ' +
+        esc(V.month || 'All months') +
+        (V.miss
+          ? ' <small>(no responses in ' + esc(V.miss) + ' \u2014 showing every month)</small>'
+          : (V.month || V.branch ? ' <small>(from the filter bar above)</small>' : ''));
     }
-    $('pt-branch').innerHTML = opts(D.branches, V.branch, 'All branches');
-    $('pt-month').innerHTML = opts(D.months, V.month, 'All months');
-    var th = D.lift.map(function (t) { return t.theme; });
-    $('pt-theme').innerHTML = opts(th, V.theme, 'All themes');
+    var th = $('pt-theme');
+    if (th) {
+      th.innerHTML = ['<option value="">All themes</option>'].concat(
+        D.lift.map(function (t) {
+          return '<option value="' + esc(t.theme) + '"' + (V.theme === t.theme ? ' selected' : '') +
+            '>' + esc(t.theme) + '</option>';
+        })).join('');
+    }
   }
 
   /* ═══════════ 1. THE GOVERNING CAVEAT ═══════════ */
@@ -10404,9 +10431,26 @@ window.PTM = (function () {
       ' different questionnaires · ' + D.months.length + ' month' + (D.months.length === 1 ? '' : 's');
     renderAll();
 
-    $('pt-branch').onchange = function (e) { V.branch = e.target.value; renderAll(); };
-    $('pt-month').onchange = function (e) { V.month = e.target.value; renderAll(); };
     $('pt-theme').onchange = function (e) { V.theme = e.target.value; renderAll(); };
+    /* the global filter bar calls this whenever branch or month changes */
+    window.__ptmSetScope = function (branch, monthName) {
+      var MON = { january:'01', february:'02', march:'03', april:'04', may:'05', june:'06',
+                  july:'07', august:'08', september:'09', october:'10', november:'11', december:'12' };
+      var m = '';
+      if (monthName) {
+        /* the PTM sheet writes "2026-07"; the filter bar carries "July" */
+        var mm = MON[String(monthName).toLowerCase()];
+        if (mm) for (var i = 0; i < D.months.length; i++) {
+          if (String(D.months[i]).slice(-2) === mm) { m = D.months[i]; break; }
+        }
+      }
+      var b = branch && D.branches.indexOf(branch) >= 0 ? branch : '';
+      var miss = (monthName && !m) ? monthName : '';
+      if (b === V.branch && m === V.month && miss === V.miss) return;
+      V.branch = b; V.month = m; V.miss = miss;
+      renderAll();
+    };
+    if (window.__pushTabScope) window.__pushTabScope();
     var t; $('pt-q').oninput = function (e) {
       clearTimeout(t); t = setTimeout(function () { V.q = e.target.value; renderQueue(); renderVerbatim(); }, 200);
     };
@@ -10551,6 +10595,79 @@ async function loadPTM(force){
     var a=document.querySelector('.sidenav .tb.active');
     if(a&&a.scrollIntoView) try{ a.scrollIntoView({block:'nearest'}); }catch(e){}
   };
+})();
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   ONE FILTER BAR FOR EVERY TAB
+   PT-1, School Audit and PTM each arrived with their own Branch and Month
+   dropdowns, which duplicated the pair at the top of the page and could
+   silently disagree with them. Those are gone; this pushes the global choice
+   into all three instead.
+
+   The PT-1 review lives in a same-origin frame, so its own Branch control is
+   hidden and set directly rather than by message — that keeps its internal
+   filtering, drawers and student search working exactly as before.
+   ══════════════════════════════════════════════════════════════════════════ */
+(function(){
+  function globalScope(){
+    var bs=document.getElementById('sel-branch'), ms=document.getElementById('sel-month');
+    var b=(bs&&bs.value&&bs.value!=='ALL')?bs.value:'';
+    var m=(ms&&ms.value&&ms.value!=='ALL')?ms.value:'';
+    if(window._BRANCH_LOCK) b=window._BRANCH_LOCK;   // principals cannot widen it
+    return {branch:b, month:m};
+  }
+
+  /* PT-1 runs in a frame; reach in and drive its Branch select */
+  function pushPT1(b){
+    var f=document.getElementById('exm-frame');
+    if(!f||!f.contentWindow) return;
+    var d;
+    try{ d=f.contentDocument; }catch(e){ return; }
+    if(!d) return;
+    var s=d.getElementById('fBr');
+    if(!s) return;                                   // frame still building
+    var wrap=s.parentNode;
+    if(wrap&&wrap.className==='f') wrap.style.display='none';
+    var want=b||'';
+    if(s.value!==want){
+      s.value=want;
+      try{ s.dispatchEvent(new f.contentWindow.Event('change')); }
+      catch(e){ var ev=d.createEvent('HTMLEvents'); ev.initEvent('change',true,false); s.dispatchEvent(ev); }
+    }
+  }
+
+  function push(){
+    var g=globalScope();
+    try{ if(window.__auditSetScope) window.__auditSetScope(g.branch,g.month); }catch(e){}
+    try{ if(window.__ptmSetScope)   window.__ptmSetScope(g.branch,g.month);   }catch(e){}
+    pushPT1(g.branch);
+  }
+  window.__pushTabScope=push;
+
+  /* the global bar already calls applyFilters on change */
+  var _af=window.applyFilters;
+  if(typeof _af==='function') window.applyFilters=function(){
+    var r=_af.apply(this,arguments); push(); return r;
+  };
+
+  /* a tab may be opened, or its data may arrive, long after a filter was set */
+  var _st=window.showTab;
+  if(typeof _st==='function') window.showTab=function(id,btn){
+    var r=_st(id,btn);
+    if(id==='pt1'||id==='audit'||id==='ptm'){ push(); setTimeout(push,400); setTimeout(push,1500); }
+    return r;
+  };
+
+  /* the PT-1 frame reports its height as it renders — a cheap signal that it
+     is ready to accept the branch */
+  window.addEventListener('message',function(ev){
+    var m=ev.data||{};
+    if(m.type==='PBES_PT1_HEIGHT'||m.type==='PBES_PT1_READY') pushPT1(globalScope().branch);
+  });
+
+  setTimeout(push,1200);
 })();
 </script>
 </body>
