@@ -128,8 +128,20 @@ export async function onRequestGet({ request, env }) {
   }
 
   // ── 3. Full-access roles: stream straight through (no parse) ──
-  //   management, admin_manager, hr, and any user WITHOUT a branch get everything.
-  //   The browser then applies tab/branch visibility per role.
+//   Anyone WITHOUT a branch on their account gets the whole payload: that is how
+//   the group-wide roles are expressed (management, auditor, admin_manager,
+//   vigilance_officer). Everyone else is filtered to their own campus BELOW —
+//   and that filtering is the real security boundary. Hiding a tab in the
+//   browser only tidies the menu; it does not keep data out of the page.
+//
+//   Branch-scoped roles, all filtered: branch_admin, grievance_officer,
+//   hr_grievance, principal, and any unrecognised role carrying a branch.
+//
+//   `hr` is the one deliberate exception. The HR Analytics tab ranks recruitment
+//   performance ACROSS branches, so a branch HR user is sent the full payload and
+//   the browser pins their branch filter. If you would rather branch HR saw only
+//   their own campus, delete `role === "hr" ||` from the line below — their tab
+//   still works, but the cross-branch ranking collapses to a single row.
   const fullAccess =
     !userBranch || role === "admin_manager" || role === "hr" || role === "management";
   if (fullAccess) {
