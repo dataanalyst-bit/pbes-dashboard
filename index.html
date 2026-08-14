@@ -182,6 +182,84 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);font-si
 
 @media(max-width:1200px){.k5,.k6{grid-template-columns:repeat(3,1fr)}.r3{grid-template-columns:1fr 1fr}.r12,.r21,.r32{grid-template-columns:1fr}}
 @media(max-width:768px){.content,.fb-in,.hdr-in{padding-left:14px;padding-right:14px}.k4,.k5,.k6{grid-template-columns:1fr 1fr}.r2,.r3{grid-template-columns:1fr}}
+
+/* ═══ SCHOOL AUDIT TAB ═══ */
+#pane-audit .au-wrap{display:flex;flex-direction:column;gap:16px}
+.au-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.au-ctl{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.au-ctl .f{display:flex;flex-direction:column;gap:4px}
+.au-ctl label{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--txm);font-weight:700}
+.au-ctl select,.au-ctl input{font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--bor);
+  border-radius:8px;background:var(--sur);color:var(--tx);min-width:150px}
+.au-ctl input{min-width:210px}
+.au-sec{background:var(--sur);border:1px solid var(--bor);border-radius:14px;box-shadow:var(--sh);padding:18px 20px}
+.au-sec>h3{margin:0 0 3px;font-size:15.5px;font-weight:800;color:var(--tx)}
+.au-sec>.sub{font-size:12.5px;color:var(--txm);margin-bottom:14px;max-width:92ch;line-height:1.5}
+.au-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+@media(max-width:1250px){.au-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){.au-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.au-kpi{background:var(--sur);border:1px solid var(--bor);border-radius:14px;box-shadow:var(--sh);
+  padding:14px 15px;text-align:left;font:inherit;color:inherit;cursor:default}
+.au-kpi .v{font-size:27px;font-weight:800;line-height:1.05;letter-spacing:-.02em}
+.au-kpi .k{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--txm);font-weight:700;margin-top:6px}
+.au-kpi .d{font-size:11.5px;color:var(--txm);margin-top:6px;line-height:1.45}
+.au-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.au-tbl th{text-align:left;font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--txm);
+  font-weight:700;padding:8px 9px;border-bottom:1px solid var(--bor);white-space:nowrap;background:var(--sur);position:sticky;top:0;z-index:1}
+.au-tbl td{padding:8px 9px;border-bottom:1px solid #F1F5FF;vertical-align:middle}
+.au-tbl .n{text-align:right;font-variant-numeric:tabular-nums}
+.au-tbl th.n{text-align:right}
+.au-tbl tr.clk{cursor:pointer}
+.au-tbl tr.clk:hover td{background:var(--pl)}
+.au-bar{height:9px;background:#EEF2FF;border-radius:99px;position:relative;overflow:visible}
+.au-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:99px}
+.au-bar .tgt{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--tx);opacity:.55}
+.au-note{font-size:11.5px;color:var(--txm);margin:12px 0 0;line-height:1.55;max-width:100ch}
+.au-empty{font-size:12.5px;color:var(--txl);margin:6px 0}
+.au-heat-scroll{overflow-x:auto}
+.au-heat{border-collapse:separate;border-spacing:3px;width:100%}
+.au-heat th{font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--txm);font-weight:700;padding:0 4px 6px;text-align:center;white-space:nowrap}
+.au-heat th.cat{text-align:left;min-width:170px}
+.au-heat td.cat{font-size:12px;color:var(--tx);white-space:nowrap;padding-right:8px;font-weight:600}
+.au-heat td.net,.au-heat th.net{text-align:right;font-variant-numeric:tabular-nums;font-weight:800;font-size:12.5px;padding-left:8px}
+.au-cell{width:100%;min-width:52px;height:30px;border:none;border-radius:6px;cursor:pointer;
+  font:inherit;font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums;transition:transform .1s}
+.au-cell:hover{transform:scale(1.07);box-shadow:0 3px 10px rgba(0,0,0,.2)}
+.au-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--txm);margin-top:12px;align-items:center}
+.au-legend i{width:11px;height:11px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:-1px}
+.au-stage{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+@media(max-width:900px){.au-stage{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.au-tb{background:var(--sur);border:1px solid var(--bor);border-radius:12px;padding:14px 15px;border-top:3px solid var(--tx)}
+.au-tb .t{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--txm);font-weight:700}
+.au-tb .g{font-size:23px;font-weight:800;margin-top:3px;letter-spacing:-.02em}
+.au-tb .row{display:flex;justify-content:space-between;font-size:11.5px;color:var(--txm);padding:2px 0}
+.au-tb .row b{font-variant-numeric:tabular-nums;color:var(--tx)}
+.au-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+@media(max-width:980px){.au-two{grid-template-columns:minmax(0,1fr)}}
+.au-h4{font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-weight:800;margin:0 0 8px}
+.au-flag{border-left:3px solid var(--a);background:var(--al);padding:11px 14px;border-radius:0 8px 8px 0;
+  font-size:12.5px;color:var(--tx);margin-top:12px;line-height:1.55}
+.au-flag.bad{border-left-color:var(--r);background:var(--rl)}
+.au-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(108px,1fr));gap:9px;margin-bottom:14px}
+.au-st{background:var(--bg);border:1px solid var(--bor);border-radius:10px;padding:10px 12px}
+.au-st .v{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums}
+.au-st .l{font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--txm);font-weight:700;margin-top:2px}
+.au-sbars{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+.au-sbar{display:grid;grid-template-columns:96px 1fr 58px;gap:10px;align-items:center;font-size:12px}
+.au-sbar .n{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.au-list{margin:0;padding-left:18px;font-size:12.5px;color:var(--txm)}
+.au-list li{margin-bottom:5px}
+.au-modal{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:400;display:none;
+  align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto}
+.au-modal.on{display:flex}
+.au-mod{background:var(--sur);border-radius:16px;max-width:1080px;width:100%;box-shadow:var(--shl);overflow:hidden}
+.au-mod-hd{background:var(--tx);color:#fff;padding:16px 22px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.au-mod-hd h3{margin:0;font-size:19px;font-weight:800}
+.au-mod-hd .sub{font-size:12px;color:#CBD5E1;margin-top:4px}
+.au-mod-x{background:none;border:1px solid #475569;color:#fff;width:30px;height:30px;border-radius:7px;
+  cursor:pointer;font-size:16px;line-height:1;flex-shrink:0}
+.au-mod-bd{padding:20px 22px 26px;max-height:72vh;overflow-y:auto}
+
 /* ═══ EXAM ANALYTICS TAB ═══ */
 .exm-shell{position:relative;background:var(--sur);border:1.5px solid var(--bor);border-radius:14px;
   box-shadow:var(--sh);overflow:hidden;min-height:620px}
@@ -384,7 +462,7 @@ try{ localStorage.removeItem('pbes_cache_v1'); localStorage.removeItem('pbes_cac
 const ROLE_TABS = {
   admin_manager: ['admin','vigilance','purchase','transport','it'],
   hr:            ['hr'],
-  principal:     ['overview','care','observations','admissions','grievance','transport','it','pt1']
+  principal:     ['overview','care','observations','admissions','grievance','transport','it','pt1','audit']
 };
 function _tabIdOf(btn){ const m=(btn.getAttribute('onclick')||'').match(/showTab\('([^']+)'/); return m?m[1]:''; }
 function applyRoleAccess(){
@@ -540,6 +618,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   <button class="tb" onclick="showTab('transport',this)">🚌 Transport</button>
   <button class="tb" onclick="showTab('it',this)">💻 IT Report</button>
   <button class="tb" onclick="showTab('pt1',this)">📝 PT-1 Academic Review</button>
+  <button class="tb" onclick="showTab('audit',this)">🏫 School Audit</button>
 </div></nav>
 
 <div class="content">
@@ -1385,6 +1464,113 @@ document.addEventListener('DOMContentLoaded', async () => {
         <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Down</th>
         <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Health %</th>
       </tr></thead><tbody id="it-tbody"></tbody></table></div>
+  </div>
+</div>
+
+
+<!-- ═══ SCHOOL AUDIT ═══ -->
+<div id="pane-audit" class="pane">
+  <div class="au-wrap">
+
+    <div class="au-head">
+      <div>
+        <h2 style="margin:0;font-size:20px;font-weight:800">School Audit Tracker</h2>
+        <div style="font-size:12.5px;color:var(--txm);margin-top:3px" id="au-meta">Loading…</div>
+      </div>
+      <div class="au-ctl">
+        <div class="f"><label for="au-month">Month</label><select id="au-month"></select></div>
+        <div class="f"><label for="au-branch">Branch</label><select id="au-branch"></select></div>
+        <button class="exm-refresh" onclick="loadAudit(true)" title="Re-read the audit sheet">↻ Refresh</button>
+        <span class="exm-status" id="au-status"></span>
+      </div>
+    </div>
+
+    <div id="au-loader" class="exm-loader"><div class="sp"></div>
+      <div>Reading the audit sheet…<br><span>School Audit · every branch, every month</span></div></div>
+
+    <div id="au-body" style="display:none;flex-direction:column;gap:16px">
+
+      <div class="au-kpis" id="au-kpis"></div>
+
+      <div class="au-sec">
+        <h3>Branch scorecard</h3>
+        <div class="sub">Compliance is <b>Yes ÷ (Yes + No + IP)</b> across the five stage columns — the same formula
+          the branch sheets use in their own OVERALL COMPLIANCE SCORE row. NA and NR are excluded from the
+          denominator rather than counted against a branch. <b>In progress counts as a miss</b>: unfinished work at
+          audit time is not compliance, and half-crediting it would let a branch sit at 50% permanently by never
+          closing anything.</div>
+        <div id="au-score"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>Month on month</h3>
+        <div class="sub">Every branch against the 85% on-track line and the 65% review line.</div>
+        <div id="au-trend"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>Where the gaps actually are</h3>
+        <div class="sub">Each of the thirteen audit sections, for every branch. This is the one view that separates a
+          branch problem from a policy problem.</div>
+        <div id="au-heat"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>By stage</h3>
+        <div class="sub">The same checklist scored across Prep to 9–10, network-wide. A stage that trails the others
+          everywhere usually means the SOP was written for the rest of the school and never adapted to it.</div>
+        <div class="au-stage" id="au-stage"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>Failing twice running</h3>
+        <div class="sub">Items below half in both of the last two audits. This is the action list: everything here has
+          already been flagged once and has not moved.</div>
+        <div id="au-chronic"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>What moved</h3>
+        <div class="sub">Changes of 20 points or more since the previous audit, in both directions.</div>
+        <div id="au-movers"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>The weakest checklist items network-wide</h3>
+        <div class="sub">Ranked across every branch and month together, so a low score here is a group-level finding
+          rather than one campus having a bad month.</div>
+        <div id="au-worst"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>How far to trust these numbers</h3>
+        <div class="sub">A compliance percentage only speaks for the part of the checklist that was actually scored.
+          This section shows how much that is, branch by branch.</div>
+        <div id="au-quality"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>What the auditors wrote — <span id="au-remark-n">0</span> observations</h3>
+        <div class="sub">The qualitative record, lowest-scoring items first. These are usually more actionable than any
+          percentage on this page.</div>
+        <div class="au-ctl" style="margin-bottom:12px">
+          <div class="f"><label for="au-q">Search observations</label>
+            <input id="au-q" type="search" placeholder="e.g. register, pending, not updated"></div>
+        </div>
+        <div style="max-height:560px;overflow:auto"><div id="au-remarks"></div></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="au-modal" id="au-modal">
+  <div class="au-mod">
+    <div class="au-mod-hd">
+      <div><h3 id="au-mod-title">—</h3><div class="sub" id="au-mod-sub"></div></div>
+      <button class="au-mod-x" id="au-mod-x" aria-label="Close">&times;</button>
+    </div>
+    <div class="au-mod-bd" id="au-mod-body"></div>
   </div>
 </div>
 
@@ -7764,6 +7950,952 @@ window.addEventListener('message', function(ev){
   var _showTab=window.showTab, _switchTab=window.switchTab;
   window.showTab=function(id,btn){ _showTab(id,btn); if(id==='pt1') loadPT1Review(false); };
   window.switchTab=function(id){ _switchTab(id); if(id==='pt1') loadPT1Review(false); };
+})();
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   SCHOOL AUDIT TRACKER
+   --------------------------------------------------------------------------
+   Compliance analytics over the School Audit sheet.
+
+   THE MEASURE. Every figure on this tab is  Yes / (Yes + No + IP)  across the
+   five stage columns. NA, NR and blanks are excluded from the denominator.
+   This is the same formula the branch sheets use in their OVERALL COMPLIANCE
+   SCORE row, so a branch principal opening their own sheet sees the number
+   they see here. Verified against the Annual Tracker: 12 of the 13 section
+   figures for Boduppal June reproduce exactly.
+
+   IP counts as a miss, not a half-mark. "In progress" at audit time is not
+   compliance, and treating it as half would let a branch sit permanently at
+   50% by never finishing anything.
+
+   COVERAGE IS REPORTED BESIDE EVERY SCORE. A branch that marks most of the
+   checklist NA or NR is scored on whatever is left, which can flatter it. The
+   score and the coverage have to be read together, so they are never shown
+   apart.
+   ══════════════════════════════════════════════════════════════════════════ */
+window.AUDIT = (function () {
+  'use strict';
+
+  var GRADES = ['Prep', '1 & 2', '3–5', '6–8', '9–10'];
+  var ON_TRACK = 85, REVIEW = 65;          // the bands the sheet itself uses
+
+  /* A real audit scores 170–340 cells. A branch-month carrying only a handful
+     is a stray row left behind in the sheet, not a visit that happened — and
+     scoring it would publish a headline like "0.0%" off three cells and drag
+     the network trend with it. Below this line the month is reported as not
+     audited and held out of every aggregate, then listed under data quality
+     so it still gets fixed. */
+  var MIN_AUDIT = 30;
+
+  function str(v) { return v === null || v === undefined ? '' : String(v).trim(); }
+  function r1(x) { return x === null || x === undefined ? null : Math.round(x * 10) / 10; }
+  function esc(s) {
+    return String(s === null || s === undefined ? '—' : s)
+      .replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+  }
+  function pctTxt(v) { return v === null ? '—' : v.toFixed(1) + '%'; }
+
+  /* month label -> sortable key. "June 2026" -> 2026-06 */
+  var MON = { january:1, february:2, march:3, april:4, may:5, june:6, july:7,
+              august:8, september:9, october:10, november:11, december:12 };
+  function monthKey(m) {
+    var s = str(m), p = s.split(/\s+/);
+    var mm = MON[String(p[0] || '').toLowerCase()] || 0;
+    var yy = parseInt(p[1], 10) || 0;
+    return yy * 100 + mm;
+  }
+  function monthShort(m) { return str(m).split(/\s+/)[0].slice(0, 3); }
+
+  /* ── one tally object per slice ── */
+  function blank() { return { yes: 0, no: 0, ip: 0, na: 0, nr: 0, none: 0, rows: 0 }; }
+  function addRow(t, row, cols) {
+    t.rows++;
+    for (var i = 0; i < cols.length; i++) {
+      if (cols[i] < 0) continue;
+      var v = str(row[cols[i]]);
+      if (v === 'Yes') t.yes++;
+      else if (v === 'No') t.no++;
+      else if (v === 'IP') t.ip++;
+      else if (v === 'NA') t.na++;
+      else if (v === 'NR') t.nr++;
+      else t.none++;
+    }
+  }
+  function scored(t) { return t.yes + t.no + t.ip; }
+  function score(t) { var s = scored(t); return s ? t.yes / s * 100 : null; }
+  function coverage(t) {
+    var tot = scored(t) + t.na + t.nr + t.none;
+    return tot ? scored(t) / tot * 100 : null;
+  }
+  function band(v) { return v === null ? 'none' : v >= ON_TRACK ? 'ok' : v >= REVIEW ? 'review' : 'critical'; }
+  var BAND = {
+    ok:       { c: '#059669', bg: '#ECFDF5', label: 'On track',  pill: 'background:#ECFDF5;color:#059669' },
+    review:   { c: '#D97706', bg: '#FFFBEB', label: 'Review',    pill: 'background:#FFFBEB;color:#D97706' },
+    critical: { c: '#DC2626', bg: '#FEF2F2', label: 'Critical',  pill: 'background:#FEF2F2;color:#DC2626' },
+    none:     { c: '#94A3B8', bg: '#F1F5F9', label: 'Not audited', pill: 'background:#F1F5F9;color:#64748B' }
+  };
+  function colorFor(v) { return BAND[band(v)].c; }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     BUILD — everything the tab renders, derived once from the raw rows
+     ══════════════════════════════════════════════════════════════════════ */
+  function build(raw) {
+    var tab = raw && raw.audit;
+    if (!tab || !tab.hdr || !tab.rows || !tab.rows.length) {
+      throw new Error('The School Audit sheet returned no rows.');
+    }
+    var H = tab.hdr.map(str);
+    var ix = function (n) { return H.indexOf(n); };
+    var iB = ix('Branch'), iM = ix('Month'), iP = ix('Parameter'),
+        iC = ix('Category'), iR = ix('Remarks / Observations'),
+        iOwner = ix('Action Owner'), iTarget = ix('Target Date'), iClosed = ix('Closed');
+    var cols = GRADES.map(ix);
+    if (iB < 0 || iM < 0) throw new Error('The audit sheet needs Branch and Month columns.');
+
+    var allRows = tab.rows.filter(function (r) { return str(r[iB]) && str(r[iM]); });
+
+    /* ── pass 1: how much evidence does each branch-month actually carry? ── */
+    var probe = {};
+    allRows.forEach(function (r) {
+      var k = str(r[iB]) + '\u241f' + str(r[iM]);
+      addRow(probe[k] || (probe[k] = blank()), r, cols);
+    });
+    var audited = {}, stray = [];
+    Object.keys(probe).forEach(function (k) {
+      var t = probe[k], p = k.split('\u241f');
+      if (scored(t) >= MIN_AUDIT) audited[k] = 1;
+      else stray.push({ branch: p[0], month: p[1], rows: t.rows, cells: scored(t) });
+    });
+    stray.sort(function (a, b) { return a.branch.localeCompare(b.branch) || monthKey(a.month) - monthKey(b.month); });
+
+    /* everything below is built only from months that were genuinely audited */
+    var rows = allRows.filter(function (r) {
+      return audited[str(r[iB]) + '\u241f' + str(r[iM])];
+    });
+    if (!rows.length) throw new Error('No branch-month in the audit sheet carries enough entries to score.');
+
+    var branches = [], months = [], cats = [];
+    var seenB = {}, seenM = {}, seenC = {};
+    rows.forEach(function (r) {
+      var b = str(r[iB]), m = str(r[iM]), c = str(r[iC]) || 'Uncategorised';
+      if (!seenB[b]) { seenB[b] = 1; branches.push(b); }
+      if (!seenM[m]) { seenM[m] = 1; months.push(m); }
+      if (!seenC[c]) { seenC[c] = 1; cats.push(c); }
+    });
+    branches.sort();
+    months.sort(function (a, b) { return monthKey(a) - monthKey(b); });
+
+    /* keep categories in the order the checklist runs, which is the order the
+       auditor walks the school — not alphabetical */
+    var catOrder = {};
+    rows.forEach(function (r, i) {
+      var c = str(r[iC]) || 'Uncategorised';
+      if (catOrder[c] === undefined) catOrder[c] = i;
+    });
+    cats.sort(function (a, b) { return catOrder[a] - catOrder[b]; });
+
+    /* ── tallies ── */
+    var byBM = {}, byBMC = {}, byBMG = {}, byM = {}, byMC = {}, byMG = {}, byBMP = {};
+    function T(store, key) { return store[key] || (store[key] = blank()); }
+
+    rows.forEach(function (r) {
+      var b = str(r[iB]), m = str(r[iM]), c = str(r[iC]) || 'Uncategorised', p = str(r[iP]);
+      addRow(T(byBM, b + '\u241f' + m), r, cols);
+      addRow(T(byBMC, b + '\u241f' + m + '\u241f' + c), r, cols);
+      addRow(T(byM, m), r, cols);
+      addRow(T(byMC, m + '\u241f' + c), r, cols);
+      if (p) addRow(T(byBMP, b + '\u241f' + m + '\u241f' + p), r, cols);
+      GRADES.forEach(function (g, gi) {
+        if (cols[gi] < 0) return;
+        addRow(T(byBMG, b + '\u241f' + m + '\u241f' + g), r, [cols[gi]]);
+        addRow(T(byMG, m + '\u241f' + g), r, [cols[gi]]);
+      });
+    });
+
+    /* ── remarks, kept with enough context to act on ── */
+    var remarks = [];
+    rows.forEach(function (r) {
+      var t = iR >= 0 ? str(r[iR]) : '';
+      if (!t) return;
+      var sc = blank(); addRow(sc, r, cols);
+      remarks.push({
+        branch: str(r[iB]), month: str(r[iM]),
+        cat: str(r[iC]) || 'Uncategorised',
+        param: cleanParam(str(r[iP])),
+        text: t, score: r1(score(sc))
+      });
+    });
+
+    /* ── governance: is the action side of the sheet being used at all? ── */
+    var gov = { owner: 0, target: 0, closed: 0, total: rows.length };
+    rows.forEach(function (r) {
+      if (iOwner >= 0 && str(r[iOwner])) gov.owner++;
+      if (iTarget >= 0 && str(r[iTarget])) gov.target++;
+      if (iClosed >= 0 && str(r[iClosed])) gov.closed++;
+    });
+
+    /* ── per-parameter history, for the chronic and movers lists ── */
+    var params = {};
+    Object.keys(byBMP).forEach(function (k) {
+      var p = k.split('\u241f'), t = byBMP[k];
+      var rec = params[p[0] + '\u241f' + p[2]] ||
+                (params[p[0] + '\u241f' + p[2]] = { branch: p[0], param: p[2], m: {} });
+      rec.m[p[1]] = { score: score(t), t: t };
+    });
+
+    var latest = months[months.length - 1] || null;
+    var prev = months.length > 1 ? months[months.length - 2] : null;
+
+    /* Chronic = below half in the two most recent months it was audited.
+       One bad month is noise; the same item failing twice is a decision. */
+    var chronic = [];
+    Object.keys(params).forEach(function (k) {
+      var rec = params[k];
+      var ms = months.filter(function (m) { return rec.m[m] && rec.m[m].score !== null; });
+      if (ms.length < 2) return;
+      var a = rec.m[ms[ms.length - 2]].score, b = rec.m[ms[ms.length - 1]].score;
+      if (a < 50 && b < 50) {
+        chronic.push({
+          branch: rec.branch, param: cleanParam(rec.param), cat: catOf(rec.param),
+          from: r1(a), to: r1(b), delta: r1(b - a),
+          mFrom: ms[ms.length - 2], mTo: ms[ms.length - 1]
+        });
+      }
+    });
+    chronic.sort(function (x, y) { return (x.to - y.to) || (x.delta - y.delta); });
+
+    /* Movers between the two most recent months */
+    var movers = [];
+    if (prev) {
+      Object.keys(params).forEach(function (k) {
+        var rec = params[k];
+        var a = rec.m[prev], b = rec.m[latest];
+        if (!a || !b || a.score === null || b.score === null) return;
+        var d = b.score - a.score;
+        if (Math.abs(d) < 20) return;
+        movers.push({
+          branch: rec.branch, param: cleanParam(rec.param), cat: catOf(rec.param),
+          from: r1(a.score), to: r1(b.score), delta: r1(d)
+        });
+      });
+      movers.sort(function (x, y) { return x.delta - y.delta; });
+    }
+
+    /* Network-wide worst checklist items, by how often they are marked No */
+    var byParam = {};
+    rows.forEach(function (r) {
+      var p = str(r[iP]); if (!p) return;
+      var rec = byParam[p] || (byParam[p] = { param: cleanParam(p), cat: str(r[iC]) || 'Uncategorised', t: blank(), br: {} });
+      addRow(rec.t, r, cols);
+      var b = str(r[iB]);
+      addRow(rec.br[b] || (rec.br[b] = blank()), r, cols);
+    });
+    var worstParams = Object.keys(byParam).map(function (k) {
+      var rec = byParam[k];
+      return { param: rec.param, cat: rec.cat, score: r1(score(rec.t)),
+               no: rec.t.no, ip: rec.t.ip, yes: rec.t.yes, scored: scored(rec.t),
+               br: rec.br };
+    }).filter(function (x) { return x.scored >= 5; })
+      .sort(function (a, b) { return (a.score === null ? 999 : a.score) - (b.score === null ? 999 : b.score); });
+
+    function catOf(p) {
+      var m = String(p).match(/^\s*\[([^\]]+)\]/);
+      return m ? m[1].trim() : 'Uncategorised';
+    }
+
+    return {
+      generatedAt: raw.generatedAt || null,
+      branches: branches, months: months, cats: cats, grades: GRADES,
+      byBM: byBM, byBMC: byBMC, byBMG: byBMG, byM: byM, byMC: byMC, byMG: byMG,
+      byBMP: byBMP, params: params,
+      remarks: remarks, gov: gov, chronic: chronic, movers: movers,
+      audited: audited, stray: stray, minAudit: MIN_AUDIT,
+      worstParams: worstParams,
+      latest: latest, prev: prev,
+      rowCount: rows.length,
+      raw: { H: H, rows: rows, cols: cols, iB: iB, iM: iM, iP: iP, iC: iC, iR: iR }
+    };
+  }
+
+  /* the sheet prefixes every parameter with its section, e.g.
+     "[Parent Connect]  News letter" — that is already the Category column */
+  function cleanParam(p) {
+    return String(p || '').replace(/^\s*\[[^\]]*\]\s*/, '').trim() || String(p || '');
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     HELPERS the renderer uses
+     ══════════════════════════════════════════════════════════════════════ */
+  function get(store, key) { return store[key] || null; }
+  function scoreOf(store, key) { var t = store[key]; return t ? score(t) : null; }
+  function covOf(store, key) { var t = store[key]; return t ? coverage(t) : null; }
+
+  /* a branch's score for one month, or across all months when month is '' */
+  function branchScore(D, b, month) {
+    if (month) return scoreOf(D.byBM, b + '\u241f' + month);
+    var t = blank();
+    D.months.forEach(function (m) {
+      var x = D.byBM[b + '\u241f' + m]; if (!x) return;
+      t.yes += x.yes; t.no += x.no; t.ip += x.ip; t.na += x.na; t.nr += x.nr; t.none += x.none;
+    });
+    return score(t);
+  }
+  function branchTally(D, b, month) {
+    if (month) return D.byBM[b + '\u241f' + month] || blank();
+    var t = blank();
+    D.months.forEach(function (m) {
+      var x = D.byBM[b + '\u241f' + m]; if (!x) return;
+      t.yes += x.yes; t.no += x.no; t.ip += x.ip; t.na += x.na; t.nr += x.nr; t.none += x.none; t.rows += x.rows;
+    });
+    return t;
+  }
+  function cellTally(D, b, month, cat) {
+    if (month) return D.byBMC[b + '\u241f' + month + '\u241f' + cat] || null;
+    var t = blank(), any = false;
+    D.months.forEach(function (m) {
+      var x = D.byBMC[b + '\u241f' + m + '\u241f' + cat]; if (!x) return;
+      any = true;
+      t.yes += x.yes; t.no += x.no; t.ip += x.ip; t.na += x.na; t.nr += x.nr; t.none += x.none; t.rows += x.rows;
+    });
+    return any ? t : null;
+  }
+
+  return {
+    GRADES: GRADES, ON_TRACK: ON_TRACK, REVIEW: REVIEW, BAND: BAND, MIN_AUDIT: MIN_AUDIT,
+    build: build, str: str, esc: esc, r1: r1, pctTxt: pctTxt,
+    monthKey: monthKey, monthShort: monthShort,
+    blank: blank, scored: scored, score: score, coverage: coverage,
+    band: band, colorFor: colorFor, cleanParam: cleanParam,
+    get: get, scoreOf: scoreOf, covOf: covOf,
+    branchScore: branchScore, branchTally: branchTally, cellTally: cellTally
+  };
+})();
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SCHOOL AUDIT TAB — renderer
+   Reads window.AUDIT (the analytics engine) and paints the pane.
+   ══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  var A = window.AUDIT;
+  var D = null;                 // built model
+  var VIEW = { month: '', branch: '', cat: '', q: '' };
+
+  function $(id) { return document.getElementById(id); }
+  var esc = A.esc, r1 = A.r1;
+  function pc(v, dp) { return v === null || v === undefined ? '—' : v.toFixed(dp === undefined ? 1 : dp) + '%'; }
+  function sgn(v) { return v === null || v === undefined ? '—' : (v > 0 ? '+' : '') + v.toFixed(1); }
+  function pill(v) {
+    var b = A.BAND[A.band(v)];
+    return '<span class="pill" style="' + b.pill + '">' + b.label + '</span>';
+  }
+
+  /* ── the month the tab is reading; '' means every audited month combined ── */
+  function months() { return VIEW.month ? [VIEW.month] : D.months; }
+  function branches() { return VIEW.branch ? [VIEW.branch] : D.branches; }
+
+  /* combine tallies across the months in view */
+  function combine(keyFn) {
+    var t = A.blank(), any = false;
+    months().forEach(function (m) {
+      var x = keyFn(m); if (!x) return;
+      any = true;
+      t.yes += x.yes; t.no += x.no; t.ip += x.ip;
+      t.na += x.na; t.nr += x.nr; t.none += x.none; t.rows += x.rows;
+    });
+    return any ? t : null;
+  }
+  function brT(b) { return combine(function (m) { return D.byBM[b + '\u241f' + m]; }); }
+  function brCatT(b, c) { return combine(function (m) { return D.byBMC[b + '\u241f' + m + '\u241f' + c]; }); }
+  function netT() { return combine(function (m) { return D.byM[m]; }); }
+  function netCatT(c) { return combine(function (m) { return D.byMC[m + '\u241f' + c]; }); }
+  function netGradeT(g) { return combine(function (m) { return D.byMG[m + '\u241f' + g]; }); }
+  function brGradeT(b, g) { return combine(function (m) { return D.byBMG[b + '\u241f' + m + '\u241f' + g]; }); }
+
+  /* ══════════════════ CONTROLS ══════════════════ */
+  function renderControls() {
+    var mo = ['<option value="">All audited months</option>'].concat(
+      D.months.map(function (m) {
+        return '<option value="' + esc(m) + '"' + (VIEW.month === m ? ' selected' : '') + '>' + esc(m) + '</option>';
+      })).join('');
+    var br = ['<option value="">All branches</option>'].concat(
+      D.branches.map(function (b) {
+        return '<option value="' + esc(b) + '"' + (VIEW.branch === b ? ' selected' : '') + '>' + esc(b) + '</option>';
+      })).join('');
+    $('au-month').innerHTML = mo;
+    $('au-branch').innerHTML = br;
+  }
+
+  /* ══════════════════ 1. HEADLINE ══════════════════ */
+  function renderKPIs() {
+    var t = netT(), sc = t ? A.score(t) : null, cov = t ? A.coverage(t) : null;
+
+    /* movement is only meaningful against the previous month */
+    var delta = null;
+    if (!VIEW.month && D.prev && D.latest) {
+      var a = A.score(D.byM[D.prev]), b = A.score(D.byM[D.latest]);
+      if (a !== null && b !== null) delta = b - a;
+    }
+
+    var bands = { ok: 0, review: 0, critical: 0, none: 0 };
+    D.branches.forEach(function (b) {
+      var x = brT(b);
+      bands[A.band(x ? A.score(x) : null)]++;
+    });
+
+    var chronic = D.chronic.filter(function (x) { return !VIEW.branch || x.branch === VIEW.branch; }).length;
+    var rem = D.remarks.filter(function (x) {
+      return (!VIEW.branch || x.branch === VIEW.branch) && (!VIEW.month || x.month === VIEW.month);
+    }).length;
+
+    var K = [
+      { v: pc(sc), k: 'Network compliance', c: A.colorFor(sc),
+        d: 'Yes as a share of Yes + No + IP. ' + (delta === null ? 'Across all audited months.'
+          : (delta >= 0 ? 'Up ' : 'Down ') + Math.abs(delta).toFixed(1) + ' points on ' + A.monthShort(D.prev) + '.') },
+      { v: bands.ok + ' / ' + D.branches.length, k: 'Branches on track', c: '#059669',
+        d: 'At or above ' + A.ON_TRACK + '%. ' + bands.review + ' in review, ' + bands.critical + ' critical.' },
+      { v: bands.critical, k: 'Branches critical', c: bands.critical ? '#DC2626' : '#94A3B8',
+        d: 'Below ' + A.REVIEW + '%. These need a named recovery plan, not another audit.' },
+      { v: chronic, k: 'Items failing twice running', c: chronic ? '#DC2626' : '#059669',
+        d: 'Below half in both of the last two audits. Repeat failure is the real signal.' },
+      { v: pc(cov, 0), k: 'Checklist actually scored', c: cov !== null && cov < 60 ? '#D97706' : '#0F172A',
+        d: 'The rest is NA, NR or left blank. A score only speaks for the part that was audited.' },
+      { v: rem, k: 'Written observations', c: '#1E4FD8',
+        d: 'Auditor notes attached to specific items — the qualitative half of the record.' }
+    ];
+    $('au-kpis').innerHTML = K.map(function (k, i) {
+      return '<button class="au-kpi" data-i="' + i + '">' +
+        '<div class="v" style="color:' + k.c + '">' + k.v + '</div>' +
+        '<div class="k">' + esc(k.k) + '</div><div class="d">' + esc(k.d) + '</div></button>';
+    }).join('');
+  }
+
+  /* ══════════════════ 2. BRANCH SCORECARD ══════════════════ */
+  function renderScorecard() {
+    var rows = D.branches.map(function (b) {
+      var t = brT(b), sc = t ? A.score(t) : null;
+      var hist = D.months.map(function (m) { return A.scoreOf(D.byBM, b + '\u241f' + m); });
+      var seen = hist.filter(function (x) { return x !== null; });
+      var d = null;
+      if (!VIEW.month && seen.length > 1) d = seen[seen.length - 1] - seen[seen.length - 2];
+      var best = null, worst = null;
+      D.months.forEach(function (m, i) {
+        if (hist[i] === null) return;
+        if (best === null || hist[i] > hist[best]) best = i;
+        if (worst === null || hist[i] < hist[worst]) worst = i;
+      });
+      return { b: b, t: t, sc: sc, d: d, hist: hist,
+               cov: t ? A.coverage(t) : null,
+               best: best === null ? null : D.months[best],
+               worst: worst === null ? null : D.months[worst] };
+    }).sort(function (x, y) {
+      return (y.sc === null ? -1 : y.sc) - (x.sc === null ? -1 : x.sc);
+    });
+
+    var maxCells = Math.max.apply(null, rows.map(function (r) { return r.t ? A.scored(r.t) : 0; }).concat([1]));
+
+    $('au-score').innerHTML =
+      '<table class="au-tbl"><thead><tr>' +
+      '<th>Branch</th><th class="n">Compliance</th><th></th><th class="n">Change</th>' +
+      D.months.map(function (m) { return '<th class="n">' + esc(A.monthShort(m)) + '</th>'; }).join('') +
+      '<th class="n">Cells scored</th><th class="n">Coverage</th><th class="n">Best</th><th class="n">Weakest</th>' +
+      '</tr></thead><tbody>' +
+      rows.map(function (r) {
+        return '<tr class="clk" data-b="' + esc(r.b) + '">' +
+          '<td><b>' + esc(r.b) + '</b></td>' +
+          '<td class="n" style="font-weight:700;color:' + A.colorFor(r.sc) + '">' + pc(r.sc) + '</td>' +
+          '<td style="width:150px"><div class="au-bar"><i style="width:' +
+            (r.sc === null ? 0 : Math.max(1, r.sc)) + '%;background:' + A.colorFor(r.sc) + '"></i>' +
+            '<span class="tgt" style="left:' + A.ON_TRACK + '%"></span></div></td>' +
+          '<td class="n" style="color:' + (r.d === null ? '#94A3B8' : r.d >= 0 ? '#059669' : '#DC2626') + '">' +
+            (r.d === null ? '—' : sgn(r.d)) + '</td>' +
+          r.hist.map(function (h) {
+            return '<td class="n" style="color:' + A.colorFor(h) + '">' + (h === null ? '—' : h.toFixed(1)) + '</td>';
+          }).join('') +
+          '<td class="n" style="color:#64748B">' + (r.t ? A.scored(r.t) : 0) + '</td>' +
+          '<td class="n" style="color:' + (r.cov !== null && r.cov < 55 ? '#D97706' : '#64748B') + '">' + pc(r.cov, 0) + '</td>' +
+          '<td class="n" style="color:#059669">' + esc(r.best ? A.monthShort(r.best) : '—') + '</td>' +
+          '<td class="n" style="color:#DC2626">' + esc(r.worst ? A.monthShort(r.worst) : '—') + '</td>' +
+          '</tr>';
+      }).join('') + '</tbody></table>' +
+      '<p class="au-note">The marker on each bar is the ' + A.ON_TRACK + '% on-track line. <b>Cells scored</b> is how much evidence the ' +
+      'percentage rests on — ' + esc(rows[0].b) + ' is scored on ' + (rows[0].t ? A.scored(rows[0].t) : 0) + ' cells, and a branch ' +
+      'scored on far fewer is not directly comparable however high it looks. Click any branch for its full file.</p>';
+  }
+
+  /* ══════════════════ 3. TREND ══════════════════ */
+  function renderTrend() {
+    if (D.months.length < 2) {
+      $('au-trend').innerHTML = '<p class="au-empty">Only one month has been audited so far. ' +
+        'The trend appears once a second month is entered.</p>';
+      return;
+    }
+    var W = 720, H = 260, PL = 42, PR = 96, PT = 16, PB = 34;
+    var iw = W - PL - PR, ih = H - PT - PB;
+    var x = function (i) { return PL + (D.months.length === 1 ? iw / 2 : i * iw / (D.months.length - 1)); };
+    var y = function (v) { return PT + ih - (v / 100) * ih; };
+    var PALETTE = ['#1E4FD8', '#059669', '#D97706', '#7C3AED', '#0D9488', '#DC2626'];
+
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto" role="img" aria-label="Compliance by month and branch">';
+    [0, 25, 50, 65, 85, 100].forEach(function (v) {
+      var isBand = v === 85 || v === 65;
+      s += '<line x1="' + PL + '" x2="' + (W - PR) + '" y1="' + y(v) + '" y2="' + y(v) +
+        '" stroke="' + (isBand ? '#CBD5E1' : '#EEF2F7') + '"' + (isBand ? ' stroke-dasharray="4 3"' : '') + '/>' +
+        '<text x="' + (PL - 6) + '" y="' + (y(v) + 3.5) + '" text-anchor="end" font-size="9.5" fill="#94A3B8">' + v + '</text>';
+    });
+    s += '<text x="' + (W - PR + 6) + '" y="' + (y(85) + 3.5) + '" font-size="9" fill="#059669">on track</text>';
+    s += '<text x="' + (W - PR + 6) + '" y="' + (y(65) + 3.5) + '" font-size="9" fill="#D97706">review</text>';
+
+    D.branches.forEach(function (b, bi) {
+      var pts = D.months.map(function (m, i) {
+        var v = A.scoreOf(D.byBM, b + '\u241f' + m);
+        return v === null ? null : { i: i, v: v };
+      }).filter(Boolean);
+      if (!pts.length) return;
+      var col = PALETTE[bi % PALETTE.length];
+      if (pts.length > 1) {
+        s += '<path d="' + pts.map(function (p, k) {
+          return (k ? 'L' : 'M') + x(p.i).toFixed(1) + ' ' + y(p.v).toFixed(1);
+        }).join(' ') + '" fill="none" stroke="' + col + '" stroke-width="2.2" stroke-linejoin="round"/>';
+      }
+      pts.forEach(function (p) {
+        s += '<circle cx="' + x(p.i) + '" cy="' + y(p.v) + '" r="4.5" fill="' + col + '" stroke="#fff" stroke-width="1.6">' +
+          '<title>' + esc(b) + ' · ' + esc(D.months[p.i]) + ' — ' + p.v.toFixed(1) + '%</title></circle>';
+      });
+      var last = pts[pts.length - 1];
+      s += '<text x="' + (x(last.i) + 8) + '" y="' + (y(last.v) + 3.5) + '" font-size="10.5" font-weight="600" fill="' + col + '">' +
+        esc(b) + '</text>';
+    });
+    D.months.forEach(function (m, i) {
+      s += '<text x="' + x(i) + '" y="' + (H - 10) + '" text-anchor="middle" font-size="10" fill="#64748B">' + esc(m) + '</text>';
+    });
+    s += '</svg>';
+
+    var net = D.months.map(function (m) { return A.score(D.byM[m]); });
+    var d = (net[net.length - 1] !== null && net[net.length - 2] !== null)
+      ? net[net.length - 1] - net[net.length - 2] : null;
+    s += '<p class="au-note">Network compliance moved from <b>' + pc(net[net.length - 2]) + '</b> to <b>' +
+      pc(net[net.length - 1]) + '</b>' + (d === null ? '' : ', ' + (d >= 0 ? 'a gain of ' : 'a fall of ') +
+      Math.abs(d).toFixed(1) + ' points') + '. A rising line with flat coverage is real improvement; a rising line ' +
+      'alongside falling coverage usually means more of the checklist was marked NA or NR, not that more was done.</p>';
+    $('au-trend').innerHTML = s;
+  }
+
+  /* ══════════════════ 4. HEATMAP ══════════════════ */
+  function renderHeat() {
+    var bs = branches(), cs = D.cats;
+    var h = '<div class="au-heat-scroll"><table class="au-heat"><thead><tr><th class="cat">Section</th>' +
+      bs.map(function (b) { return '<th>' + esc(b) + '</th>'; }).join('') +
+      '<th class="net">Network</th></tr></thead><tbody>';
+
+    /* weakest section at the top: that is the reading order for a decision */
+    var ordered = cs.map(function (c) {
+      var t = netCatT(c);
+      return { c: c, v: t ? A.score(t) : null, t: t };
+    }).sort(function (a, b) {
+      return (a.v === null ? 999 : a.v) - (b.v === null ? 999 : b.v);
+    });
+
+    ordered.forEach(function (row) {
+      h += '<tr><td class="cat">' + esc(row.c) + '</td>';
+      bs.forEach(function (b) {
+        var t = brCatT(b, row.c), v = t ? A.score(t) : null;
+        var lbl = v === null ? '·' : Math.round(v);
+        h += '<td><button class="au-cell" style="background:' + (v === null ? '#F1F5F9' : A.colorFor(v)) +
+          ';color:' + (v === null ? '#94A3B8' : '#fff') + '" data-b="' + esc(b) + '" data-c="' + esc(row.c) + '" ' +
+          'title="' + esc(b) + ' · ' + esc(row.c) + ' — ' + (v === null ? 'not audited' : v.toFixed(1) + '%' +
+            ' (' + t.yes + ' yes, ' + t.no + ' no, ' + t.ip + ' in progress)') + '">' + lbl + '</button></td>';
+      });
+      h += '<td class="net"><span style="color:' + A.colorFor(row.v) + '">' +
+        (row.v === null ? '—' : row.v.toFixed(0)) + '</span></td></tr>';
+    });
+    h += '</tbody></table></div>' +
+      '<div class="au-legend">' +
+      '<span><i style="background:#059669"></i>' + A.ON_TRACK + '%+ on track</span>' +
+      '<span><i style="background:#D97706"></i>' + A.REVIEW + '–' + (A.ON_TRACK - 1) + '% review</span>' +
+      '<span><i style="background:#DC2626"></i>under ' + A.REVIEW + '% critical</span>' +
+      '<span><i style="background:#F1F5F9;border:1px solid #E0E8FF"></i>not audited</span>' +
+      '</div><p class="au-note">Sections are ordered weakest first across the network, so the top rows are the ' +
+      'group-wide problems and the bottom rows are settled. A red cell beside green ones in the same row is a ' +
+      'single-branch problem with a fix already working next door. A row that is red all the way across is a ' +
+      'policy or resourcing question, and no amount of branch-level chasing will close it. Click any cell for the checklist behind it.</p>';
+    $('au-heat').innerHTML = h;
+  }
+
+  /* ══════════════════ 5. STAGE STRIP ══════════════════ */
+  function renderStages() {
+    var rows = A.GRADES.map(function (g) {
+      var t = netGradeT(g);
+      return { g: g, v: t ? A.score(t) : null, t: t };
+    });
+    $('au-stage').innerHTML = rows.map(function (r) {
+      return '<div class="au-tb" style="border-top-color:' + A.colorFor(r.v) + '">' +
+        '<div class="t">' + esc(r.g) + '</div>' +
+        '<div class="g" style="color:' + A.colorFor(r.v) + '">' + pc(r.v) + '</div>' +
+        '<div class="au-bar" style="margin:8px 0 6px"><i style="width:' + (r.v === null ? 0 : Math.max(1, r.v)) +
+          '%;background:' + A.colorFor(r.v) + '"></i><span class="tgt" style="left:' + A.ON_TRACK + '%"></span></div>' +
+        '<div class="row"><span>Compliant</span><b>' + (r.t ? r.t.yes : 0) + '</b></div>' +
+        '<div class="row"><span>In progress</span><b style="color:#D97706">' + (r.t ? r.t.ip : 0) + '</b></div>' +
+        '<div class="row"><span>Not done</span><b style="color:#DC2626">' + (r.t ? r.t.no : 0) + '</b></div>' +
+        '</div>';
+    }).join('');
+  }
+
+  /* ══════════════════ 6. CHRONIC + MOVERS ══════════════════ */
+  function renderChronic() {
+    var list = D.chronic.filter(function (x) { return !VIEW.branch || x.branch === VIEW.branch; });
+    $('au-chronic').innerHTML = list.length
+      ? '<table class="au-tbl"><thead><tr><th>Branch</th><th>Section</th><th>Checklist item</th>' +
+        '<th class="n">' + esc(A.monthShort(D.prev || '')) + '</th><th class="n">' + esc(A.monthShort(D.latest || '')) + '</th>' +
+        '<th class="n">Change</th></tr></thead><tbody>' +
+        list.map(function (x) {
+          return '<tr><td>' + esc(x.branch) + '</td><td style="color:#64748B">' + esc(x.cat) + '</td>' +
+            '<td>' + esc(x.param) + '</td>' +
+            '<td class="n" style="color:' + A.colorFor(x.from) + '">' + pc(x.from, 0) + '</td>' +
+            '<td class="n" style="color:' + A.colorFor(x.to) + '">' + pc(x.to, 0) + '</td>' +
+            '<td class="n" style="color:' + (x.delta > 0 ? '#059669' : x.delta < 0 ? '#DC2626' : '#94A3B8') + '">' +
+            (x.delta === 0 ? 'no change' : sgn(x.delta)) + '</td></tr>';
+        }).join('') + '</tbody></table>' +
+        '<p class="au-note">These items were below half in both of the last two audits. Anything appearing here has ' +
+        'survived one round of being flagged, so the question is no longer whether the branch knows — it is what is ' +
+        'blocking it. Items showing <b>no change</b> have not moved at all between audits.</p>'
+      : '<p class="au-empty">Nothing has failed twice running under the current filters.</p>';
+  }
+
+  function renderMovers() {
+    if (!D.prev) { $('au-movers').innerHTML = '<p class="au-empty">Movement needs two audited months.</p>'; return; }
+    var list = D.movers.filter(function (x) { return !VIEW.branch || x.branch === VIEW.branch; });
+    var down = list.filter(function (x) { return x.delta < 0; }).slice(0, 12);
+    var up = list.slice().reverse().filter(function (x) { return x.delta > 0; }).slice(0, 12);
+    function tbl(rows, dir) {
+      if (!rows.length) return '<p class="au-empty">None.</p>';
+      return '<table class="au-tbl"><tbody>' + rows.map(function (x) {
+        return '<tr><td>' + esc(x.branch) + '</td><td>' + esc(x.param) +
+          '<br><span style="font-size:10.5px;color:#94A3B8">' + esc(x.cat) + '</span></td>' +
+          '<td class="n" style="color:#94A3B8">' + pc(x.from, 0) + ' →</td>' +
+          '<td class="n" style="color:' + A.colorFor(x.to) + ';font-weight:600">' + pc(x.to, 0) + '</td>' +
+          '<td class="n" style="color:' + (dir > 0 ? '#059669' : '#DC2626') + ';font-weight:600">' + sgn(x.delta) + '</td></tr>';
+      }).join('') + '</tbody></table>';
+    }
+    $('au-movers').innerHTML =
+      '<div class="au-two">' +
+      '<div><h4 class="au-h4" style="color:#DC2626">Slipped since ' + esc(A.monthShort(D.prev)) + '</h4>' + tbl(down, -1) + '</div>' +
+      '<div><h4 class="au-h4" style="color:#059669">Recovered since ' + esc(A.monthShort(D.prev)) + '</h4>' + tbl(up, 1) + '</div>' +
+      '</div><p class="au-note">Only movements of 20 points or more are listed, so this is genuine change rather than ' +
+      'one cell flipping. The recovered column matters as much as the slipped one — it shows which branches act on ' +
+      'an audit finding, which is the thing worth spreading.</p>';
+  }
+
+  /* ══════════════════ 7. WORST ITEMS ══════════════════ */
+  function renderWorst() {
+    var bs = branches();
+    var list = D.worstParams.slice(0, 20);
+    $('au-worst').innerHTML =
+      '<div class="au-heat-scroll"><table class="au-tbl"><thead><tr><th>Checklist item</th><th>Section</th>' +
+      '<th class="n">Network</th>' + bs.map(function (b) { return '<th class="n">' + esc(b) + '</th>'; }).join('') +
+      '<th class="n">Not done</th></tr></thead><tbody>' +
+      list.map(function (x) {
+        return '<tr><td><b>' + esc(x.param) + '</b></td>' +
+          '<td style="color:#64748B">' + esc(x.cat) + '</td>' +
+          '<td class="n" style="font-weight:700;color:' + A.colorFor(x.score) + '">' + pc(x.score, 0) + '</td>' +
+          bs.map(function (b) {
+            var t = x.br[b], v = t ? A.score(t) : null;
+            return '<td class="n" style="color:' + (v === null ? '#CBD5E1' : A.colorFor(v)) + '">' +
+              (v === null ? '—' : v.toFixed(0)) + '</td>';
+          }).join('') +
+          '<td class="n" style="color:#DC2626">' + x.no + '</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<p class="au-note">The twenty weakest checklist items across the network, counting every branch and month ' +
+      'together. Items scoring near zero everywhere are usually not a compliance failure at all — they are things ' +
+      'the schools were never resourced or scheduled to do, and they should either be funded or taken off the ' +
+      'checklist. Leaving them on depresses every branch equally and hides the real gaps.</p>';
+  }
+
+  /* ══════════════════ 8. DATA QUALITY ══════════════════ */
+  function renderQuality() {
+    var rows = D.branches.map(function (b) {
+      var t = brT(b) || A.blank();
+      var tot = A.scored(t) + t.na + t.nr + t.none;
+      return { b: b, t: t, tot: tot, cov: tot ? A.scored(t) / tot * 100 : null };
+    }).sort(function (x, y) { return (x.cov === null ? 999 : x.cov) - (y.cov === null ? 999 : y.cov); });
+
+    var g = D.gov, pctOwner = g.total ? g.owner / g.total * 100 : 0;
+
+    $('au-quality').innerHTML =
+      '<table class="au-tbl"><thead><tr><th>Branch</th><th class="n">Scored</th><th class="n">NA</th>' +
+      '<th class="n">NR</th><th class="n">Blank</th><th class="n">Coverage</th><th></th></tr></thead><tbody>' +
+      rows.map(function (r) {
+        return '<tr><td><b>' + esc(r.b) + '</b></td>' +
+          '<td class="n">' + A.scored(r.t) + '</td>' +
+          '<td class="n" style="color:#64748B">' + r.t.na + '</td>' +
+          '<td class="n" style="color:#64748B">' + r.t.nr + '</td>' +
+          '<td class="n" style="color:' + (r.t.none > A.scored(r.t) * 0.4 ? '#D97706' : '#94A3B8') + '">' + r.t.none + '</td>' +
+          '<td class="n" style="font-weight:600;color:' + (r.cov < 55 ? '#DC2626' : r.cov < 70 ? '#D97706' : '#059669') + '">' +
+          pc(r.cov, 0) + '</td>' +
+          '<td style="width:130px"><div class="au-bar"><i style="width:' + (r.cov || 0) + '%;background:' +
+          (r.cov < 55 ? '#DC2626' : r.cov < 70 ? '#D97706' : '#059669') + '"></i></div></td></tr>';
+      }).join('') + '</tbody></table>' +
+      (D.stray.length ? '<div class="au-flag">' +
+        D.stray.map(function (s) {
+          return '<b>' + esc(s.branch) + ' · ' + esc(s.month) + '</b> carries only ' + s.rows +
+            ' row' + (s.rows === 1 ? '' : 's') + ' (' + s.cells + ' scored cells), far below a real audit. ' +
+            'It is held out of every figure on this tab rather than published as a percentage, and is worth ' +
+            'deleting at source.';
+        }).join('<br>') + '</div>' : '') +
+      '<div class="au-flag' + (pctOwner < 5 ? ' bad' : '') + '">' +
+        '<b>The action side of the sheet is not being used.</b> Of ' + g.total.toLocaleString('en-IN') +
+        ' audit lines, ' + g.owner + ' name an action owner, ' + g.target + ' carry a target date and ' +
+        g.closed + ' are marked closed. Findings are being recorded but not assigned, so nothing on this tab ' +
+        'can show whether an issue was actually resolved or simply re-observed the following month. Filling ' +
+        'those three columns is the single change that would make this dashboard a tracker rather than a report.' +
+      '</div>' +
+      '<p class="au-note">Coverage is the share of the checklist that received a Yes, No or IP. The remainder was ' +
+      'marked NA (does not apply), NR (not reviewed) or left blank. Two branches can post the same percentage on ' +
+      'very different amounts of evidence, and the lower the coverage the more a high score reflects what was ' +
+      'skipped rather than what was achieved.</p>';
+  }
+
+  /* ══════════════════ 9. OBSERVATIONS ══════════════════ */
+  function renderRemarks() {
+    var q = VIEW.q.trim().toLowerCase();
+    var list = D.remarks.filter(function (x) {
+      if (VIEW.branch && x.branch !== VIEW.branch) return false;
+      if (VIEW.month && x.month !== VIEW.month) return false;
+      if (VIEW.cat && x.cat !== VIEW.cat) return false;
+      if (q && (x.text + ' ' + x.param + ' ' + x.branch + ' ' + x.cat).toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    }).sort(function (a, b) {
+      return (a.score === null ? 999 : a.score) - (b.score === null ? 999 : b.score);
+    });
+    $('au-remark-n').textContent = list.length;
+    $('au-remarks').innerHTML = list.length
+      ? '<table class="au-tbl"><thead><tr><th>Branch</th><th>Month</th><th>Section</th>' +
+        '<th>Checklist item</th><th class="n">Score</th><th>What the auditor wrote</th></tr></thead><tbody>' +
+        list.map(function (x) {
+          return '<tr><td>' + esc(x.branch) + '</td><td style="color:#64748B">' + esc(A.monthShort(x.month)) + '</td>' +
+            '<td style="color:#64748B">' + esc(x.cat) + '</td><td>' + esc(x.param) + '</td>' +
+            '<td class="n" style="color:' + A.colorFor(x.score) + ';font-weight:600">' + pc(x.score, 0) + '</td>' +
+            '<td style="max-width:420px">' + esc(x.text) + '</td></tr>';
+        }).join('') + '</tbody></table>'
+      : '<p class="au-empty">No observations match the current filters.</p>';
+  }
+
+  /* ══════════════════ DRILL-DOWN ══════════════════ */
+  function modal(title, sub, html) {
+    $('au-mod-title').textContent = title;
+    $('au-mod-sub').innerHTML = sub;
+    $('au-mod-body').innerHTML = html;
+    $('au-modal').classList.add('on');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeModal() { $('au-modal').classList.remove('on'); document.body.style.overflow = ''; }
+
+  function branchModal(b) {
+    var t = brT(b), sc = t ? A.score(t) : null;
+    var cats = D.cats.map(function (c) {
+      var x = brCatT(b, c);
+      return { c: c, v: x ? A.score(x) : null, t: x };
+    }).sort(function (a, z) { return (a.v === null ? 999 : a.v) - (z.v === null ? 999 : z.v); });
+
+    var stages = A.GRADES.map(function (g) {
+      var x = brGradeT(b, g);
+      return { g: g, v: x ? A.score(x) : null };
+    });
+    var chronic = D.chronic.filter(function (x) { return x.branch === b; });
+
+    var html =
+      '<div class="au-stats">' +
+      '<div class="au-st"><div class="v" style="color:' + A.colorFor(sc) + '">' + pc(sc) + '</div><div class="l">Compliance</div></div>' +
+      '<div class="au-st"><div class="v">' + (t ? A.scored(t) : 0) + '</div><div class="l">Cells scored</div></div>' +
+      '<div class="au-st"><div class="v" style="color:#059669">' + (t ? t.yes : 0) + '</div><div class="l">Compliant</div></div>' +
+      '<div class="au-st"><div class="v" style="color:#D97706">' + (t ? t.ip : 0) + '</div><div class="l">In progress</div></div>' +
+      '<div class="au-st"><div class="v" style="color:#DC2626">' + (t ? t.no : 0) + '</div><div class="l">Not done</div></div>' +
+      '<div class="au-st"><div class="v">' + pc(t ? A.coverage(t) : null, 0) + '</div><div class="l">Coverage</div></div>' +
+      '</div>' +
+      '<h4 class="au-h4">By stage</h4><div class="au-sbars">' +
+      stages.map(function (s) {
+        return '<div class="au-sbar"><div>' + esc(s.g) + '</div>' +
+          '<div class="au-bar"><i style="width:' + (s.v === null ? 0 : Math.max(1, s.v)) + '%;background:' +
+          A.colorFor(s.v) + '"></i></div><div class="n">' + pc(s.v, 0) + '</div></div>';
+      }).join('') + '</div>' +
+      '<h4 class="au-h4">Every section, weakest first</h4>' +
+      '<table class="au-tbl"><thead><tr><th>Section</th><th class="n">Score</th><th></th>' +
+      '<th class="n">Yes</th><th class="n">No</th><th class="n">IP</th><th class="n">Not scored</th></tr></thead><tbody>' +
+      cats.map(function (c) {
+        var x = c.t || A.blank();
+        return '<tr><td>' + esc(c.c) + '</td>' +
+          '<td class="n" style="font-weight:600;color:' + A.colorFor(c.v) + '">' + pc(c.v, 0) + '</td>' +
+          '<td style="width:110px"><div class="au-bar"><i style="width:' + (c.v === null ? 0 : Math.max(1, c.v)) +
+          '%;background:' + A.colorFor(c.v) + '"></i></div></td>' +
+          '<td class="n" style="color:#059669">' + x.yes + '</td>' +
+          '<td class="n" style="color:#DC2626">' + x.no + '</td>' +
+          '<td class="n" style="color:#D97706">' + x.ip + '</td>' +
+          '<td class="n" style="color:#94A3B8">' + (x.na + x.nr + x.none) + '</td></tr>';
+      }).join('') + '</tbody></table>' +
+      (chronic.length ? '<h4 class="au-h4">Failing twice running here</h4><ul class="au-list">' +
+        chronic.map(function (x) {
+          return '<li><b>' + esc(x.param) + '</b> <span style="color:#94A3B8">· ' + esc(x.cat) + '</span> — ' +
+            pc(x.from, 0) + ' then ' + pc(x.to, 0) + '</li>';
+        }).join('') + '</ul>' : '');
+
+    modal(b, (VIEW.month || 'All audited months') + ' · ' + (t ? A.scored(t) : 0) + ' cells scored · ' + pill(sc), html);
+  }
+
+  function cellModal(b, c) {
+    var R = D.raw, ms = months();
+    var items = R.rows.filter(function (r) {
+      return A.str(r[R.iB]) === b && (A.str(r[R.iC]) || 'Uncategorised') === c &&
+             ms.indexOf(A.str(r[R.iM])) >= 0;
+    }).map(function (r) {
+      var cells = R.cols.map(function (ci) { return ci < 0 ? '' : A.str(r[ci]); });
+      var y = 0, n = 0, p = 0;
+      cells.forEach(function (v) { if (v === 'Yes') y++; else if (v === 'No') n++; else if (v === 'IP') p++; });
+      return {
+        param: A.cleanParam(A.str(r[R.iP])), month: A.str(r[R.iM]), cells: cells,
+        v: (y + n + p) ? y / (y + n + p) * 100 : null,
+        rem: R.iR >= 0 ? A.str(r[R.iR]) : ''
+      };
+    }).sort(function (x, z) { return (x.v === null ? 999 : x.v) - (z.v === null ? 999 : z.v); });
+
+    var tt = brCatT(b, c), sc = tt ? A.score(tt) : null;
+    var html = '<table class="au-tbl"><thead><tr><th>Checklist item</th>' +
+      (ms.length > 1 ? '<th>Month</th>' : '') +
+      A.GRADES.map(function (g) { return '<th class="n">' + esc(g) + '</th>'; }).join('') +
+      '<th class="n">Score</th><th>Observation</th></tr></thead><tbody>' +
+      items.map(function (x) {
+        return '<tr><td>' + esc(x.param) + '</td>' +
+          (ms.length > 1 ? '<td style="color:#64748B">' + esc(A.monthShort(x.month)) + '</td>' : '') +
+          x.cells.map(function (v) {
+            var col = v === 'Yes' ? '#059669' : v === 'No' ? '#DC2626' : v === 'IP' ? '#D97706' : '#CBD5E1';
+            return '<td class="n" style="color:' + col + ';font-weight:' + (v === 'Yes' || v === 'No' || v === 'IP' ? 600 : 400) + '">' +
+              (v || '·') + '</td>';
+          }).join('') +
+          '<td class="n" style="font-weight:600;color:' + A.colorFor(x.v) + '">' + pc(x.v, 0) + '</td>' +
+          '<td style="max-width:320px;font-size:12px;color:#64748B">' + esc(x.rem || '') + '</td></tr>';
+      }).join('') + '</tbody></table>' +
+      '<p class="au-note">Each row is one checklist item, scored across the five stages. <b>NA</b> means it does not ' +
+      'apply to that stage and <b>NR</b> that it was not reviewed — both are excluded from the percentage rather ' +
+      'than counted against the branch.</p>';
+
+    modal(b + ' · ' + c, (VIEW.month || 'All audited months') + ' · ' + items.length + ' checklist items · ' + pill(sc), html);
+  }
+
+  /* ══════════════════ MASTER ══════════════════ */
+  function renderAll() {
+    renderControls();
+    renderKPIs(); renderScorecard(); renderTrend(); renderHeat();
+    renderStages(); renderChronic(); renderMovers(); renderWorst();
+    renderQuality(); renderRemarks();
+    wire();
+  }
+  function wire() {
+    $('au-score').querySelectorAll('tr.clk').forEach(function (tr) {
+      tr.addEventListener('click', function () { branchModal(tr.dataset.b); });
+    });
+    $('au-heat').querySelectorAll('.au-cell').forEach(function (el) {
+      el.addEventListener('click', function () { cellModal(el.dataset.b, el.dataset.c); });
+    });
+  }
+
+  window.renderAuditTab = function (raw) {
+    D = A.build(raw);
+    window.__AUDIT_D = D;
+    var meta = D.rowCount.toLocaleString('en-IN') + ' audit lines · ' +
+      D.branches.length + ' branches · ' + D.months.length + ' audited month' + (D.months.length === 1 ? '' : 's');
+    var el = $('au-meta'); if (el) el.textContent = meta;
+    renderAll();
+
+    $('au-month').onchange = function (e) { VIEW.month = e.target.value; renderAll(); };
+    $('au-branch').onchange = function (e) { VIEW.branch = e.target.value; renderAll(); };
+    var qt; $('au-q').oninput = function (e) {
+      clearTimeout(qt); qt = setTimeout(function () { VIEW.q = e.target.value; renderRemarks(); }, 200);
+    };
+    $('au-mod-x').onclick = closeModal;
+    $('au-modal').onclick = function (e) { if (e.target === $('au-modal')) closeModal(); };
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
+  };
+})();
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SCHOOL AUDIT TAB — lazy loader
+   Same pattern as the PT-1 review: the raw sheet is fetched once, cached in
+   IndexedDB for 24 hours, and every figure is derived in the browser.
+   ══════════════════════════════════════════════════════════════════════════ */
+var _auLoaded=false, _auLoading=false, _auRaw=null;
+
+function _auStatus(msg,isErr){
+  var el=document.getElementById('au-status'); if(!el) return;
+  el.textContent=msg||''; el.className='exm-status'+(isErr?' err':'');
+}
+function _auShow(ok){
+  var l=document.getElementById('au-loader'), b=document.getElementById('au-body');
+  if(l) l.classList.toggle('hide',!!ok);
+  if(b) b.style.display=ok?'flex':'none';
+}
+function _auPaint(){
+  try{
+    window.renderAuditTab(_auRaw);
+    _auShow(true);
+  }catch(err){
+    _auShow(false);
+    var l=document.getElementById('au-loader');
+    if(l) l.innerHTML='<div style="color:var(--r);font-weight:700">Could not build the audit view</div>'+
+      '<div style="font-size:11px;color:var(--txm);max-width:460px">'+String(err&&err.message||err)+'</div>';
+  }
+}
+
+async function loadAudit(force){
+  if(_auLoading) return;
+  if(_auLoaded && !force){ _auPaint(); return; }
+  _auLoading=true; _auStatus(force?'Refreshing…':'Loading…');
+  try{
+    if(!force){
+      try{
+        var c=await idbGet('pbes_audit');
+        if(c && c.data && c.data.audit && (Date.now()-c.t) < 24*3600*1000){
+          _auRaw=c.data; _auLoaded=true; _auPaint(); _auStatus('Cached · refreshing in background');
+        }
+      }catch(e){}
+    }
+    var session=null;
+    try{ var s=await sb.auth.getSession(); session=s && s.data && s.data.session; }catch(e){}
+    if(!session){ window.location.href='login.html'; return; }
+
+    var res=await fetch(DATA_API+'?section=audit'+(force?'&nocache=1':'')+'&_t='+Date.now(),
+                        { headers:{ 'Authorization':'Bearer '+session.access_token } });
+    if(res.status===401){ await sb.auth.signOut(); window.location.href='login.html'; return; }
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    var d=await res.json();
+    if(d && d.error) throw new Error(d.message||'Upstream error');
+
+    var raw=(d && d.AUDIT_RAW) ? d.AUDIT_RAW : (d && d.audit ? d : null);
+    if(!raw || !raw.audit || !raw.audit.rows || !raw.audit.rows.length)
+      throw new Error('No audit rows returned. Check that the "School Audit" tab exists and that '+
+                      '/api/data forwards ?section=audit');
+
+    _auRaw=raw; _auLoaded=true;
+    try{ idbSet('pbes_audit',{ t:Date.now(), data:raw }); }catch(e){}
+    _auPaint();
+    _auStatus(raw.generatedAt ? ('Updated '+String(raw.generatedAt).replace('T',' ').slice(0,16)) : '');
+  }catch(err){
+    if(!_auLoaded){
+      _auShow(false);
+      var l=document.getElementById('au-loader');
+      if(l) l.innerHTML='<div style="color:var(--r);font-weight:700">Could not load the audit</div>'+
+        '<div style="font-size:11px;color:var(--txm);max-width:460px">'+String(err&&err.message||err)+'</div>';
+    }
+    _auStatus(String(err && err.message || err), true);
+  }finally{ _auLoading=false; }
+}
+
+(function(){
+  var _s=window.showTab, _w=window.switchTab;
+  window.showTab=function(id,btn){ _s(id,btn); if(id==='audit') loadAudit(false); };
+  window.switchTab=function(id){ _w(id); if(id==='audit') loadAudit(false); };
 })();
 </script>
 
