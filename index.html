@@ -1044,7 +1044,11 @@ document.addEventListener('DOMContentLoaded', async () => {
        already says, while this shows WHERE in the school the concerns sit. -->
   <div class="card" style="margin-bottom:16px;">
     <div class="ch"><h3>🎓 By stage group — where the concerns actually sit</h3>
-      <span class="fnote" id="care-stage-fn">Every call grouped by the child's class</span></div>
+      <span class="fnote" id="care-stage-fn">Every call grouped by the child's class</span>
+      <div class="vt-toggle" id="care-stage-toggle">
+        <button data-v="chart" class="on">📊 Rings</button><button data-v="table">📋 Table</button>
+      </div>
+    </div>
     <div class="cb"><div id="care-stage"></div></div>
   </div>
 
@@ -6760,7 +6764,12 @@ function viewCareWithSentiment(status){
   const CARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
   const BR=['Boduppal','Keesara','Pocharam','Bachupally','Gowdavalli'];
   const scope=(fBranch==='ALL')?BR:[fBranch];
-  let filtered=CARE.filter(r=>scope.includes(r.Branch)&&(fMonth==='ALL'||r.Month===fMonth)&&r.Status===status);
+  /* An unanswered call has no progress to report, so it is held out here for
+     the same reason it is held out of the Resolved / In Progress / Pending
+     counts above. Without this the list was larger than the number clicked and
+     filled with "Not Answering" rows that have their own KPI and chart. */
+  let filtered=CARE.filter(r=>scope.includes(r.Branch)&&(fMonth==='ALL'||r.Month===fMonth)
+    &&r.Status===status&&!_careUnanswered(r));
   filtered=_careActiveFilter(filtered);
   const rows=filtered.map(r=>({Branch:r.Branch,Month:r.Month,Student:r.Student,Class:r.Class,Date:r.Date,
       Grievance:r.GrievanceRaw||r.Grievance, Sentiment:_careRowSentiment(r),
@@ -13042,6 +13051,159 @@ async function loadCivil(force){
     var r=_o.apply(this,arguments); try{ apply(); }catch(e){} return r;
   };
   window.__careSummaryView=apply;
+  setTimeout(apply,1500); setTimeout(apply,4000);
+})();
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   STAGE GROUPS — TABLE VIEW
+   The rings show one branch's shape at a time. The table answers the two
+   questions the rings cannot: how the BRANCHES compare within a stage group,
+   and how the STAGE GROUPS compare within a branch. Both read the same filtered
+   selection as the rings, and every count opens its records.
+   ══════════════════════════════════════════════════════════════════════════ */
+(function(){
+  var ALL=['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam'];
+
+  function rows(){
+    var C=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
+    var scope=(fBranch==='ALL')?ALL:[fBranch];
+    var base=C.filter(function(r){ return scope.indexOf(r.Branch)>=0 && (fMonth==='ALL'||r.Month===fMonth); });
+    return (typeof _careActiveFilter==='function')?_careActiveFilter(base):base;
+  }
+  function groupsOf(){ return (window.CARE_NLP&&CARE_NLP.GROUPS)||[]; }
+  function gOf(r){ return (window.CARE_NLP&&CARE_NLP.groupOf)?CARE_NLP.groupOf(r.Class):null; }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+  var COLS=[{key:'Branch',label:'Branch'},{key:'Month',label:'Month'},{key:'Class',label:'Class'},
+    {key:'Student',label:'Student',maxW:'170px'},{key:'Date',label:'Date',date:true},
+    {key:'Grievance',label:'Concern',pill:true},{key:'Remarks',label:'Remarks',maxW:'280px'},
+    {key:'Status',label:'Status',pill:true}];
+
+  function open(list,title){
+    if(typeof openModal!=='function') return;
+    openModal('🎓 '+title, list.length.toLocaleString('en-IN')+' call(s) · '
+      +((typeof _careSentLabel==='function')?_careSentLabel():''), list, COLS);
+  }
+
+  function build(){
+    var el=document.getElementById('care-stage'); if(!el) return;
+    var rs=rows(), G=groupsOf();
+    if(!rs.length||!G.length){ el.innerHTML='<div class="no-data">No calls match this selection.</div>'; return; }
+
+    var branches=(fBranch==='ALL')?ALL.filter(function(b){
+      return rs.some(function(r){ return r.Branch===b; }); }):[fBranch];
+
+    /* one cell = one branch × one stage group; the same grouping the rings use */
+    function cell(b,g){
+      return rs.filter(function(r){
+        return (b===null||r.Branch===b) && (g===null||gOf(r)===g);
+      });
+    }
+    function td(list,label,extra){
+      return '<td class="sgt-c" data-l="'+esc(label)+'"'+(extra||'')+' title="Click to view these calls">'
+        +list.length.toLocaleString('en-IN')+'</td>';
+    }
+
+    var store={};                       // label -> rows, so the click never recomputes differently
+    function reg(label,list){ store[label]=list; return list; }
+
+    var head='<tr><th class="nm">Branch</th>'
+      +G.map(function(g){ return '<th>'+esc(g.short)+'</th>'; }).join('')
+      +'<th>Unplaced</th><th>Total</th></tr>';
+
+    var body=branches.map(function(b){
+      var tot=reg(b+' · all stages', cell(b,null));
+      var cells=G.map(function(g){
+        var l=b+' · '+g.short, list=reg(l, cell(b,g.key));
+        var pctv=tot.length?Math.round(list.length/tot.length*100):0;
+        return td(list,l,' style="color:'+(list.length?g.c:'#CBD5E1')+';font-weight:'
+          +(list.length?700:400)+'" data-p="'+pctv+'"');
+      }).join('');
+      var un=reg(b+' · unplaced', rs.filter(function(r){ return r.Branch===b && !gOf(r); }));
+      return '<tr><td class="nm">'+esc(b)+'</td>'+cells
+        +td(un,b+' · unplaced',' style="color:#94A3B8"')
+        +td(tot,b+' · all stages',' style="font-weight:800"')+'</tr>';
+    }).join('');
+
+    var totCells=G.map(function(g){
+      var l='All branches · '+g.short;
+      return td(reg(l,cell(null,g.key)),l,' style="font-weight:800;color:'+g.c+'"');
+    }).join('');
+    var unAll=reg('All branches · unplaced', rs.filter(function(r){ return !gOf(r); }));
+    var foot='<tr class="sgt-tot"><td class="nm">ALL BRANCHES</td>'+totCells
+      +td(unAll,'All branches · unplaced')
+      +td(reg('All branches · all stages',rs),'All branches · all stages')+'</tr>';
+
+    /* a second table: within each stage group, what is being raised */
+    var CATS=['No Concern','Not Answering','Academics','Behaviour / Wellbeing','Administration',
+              'Transport','Co Curricular','New Admission','No Response'];
+    var catOf=function(r){ return CATS.indexOf(r.Grievance)>=0?r.Grievance:'Other'; };
+    var cats={}; rs.forEach(function(r){ cats[catOf(r)]=(cats[catOf(r)]||0)+1; });
+    var topCats=Object.keys(cats).sort(function(a,b){ return cats[b]-cats[a]; }).slice(0,6);
+
+    var head2='<tr><th class="nm">Stage group</th>'
+      +topCats.map(function(c){ return '<th>'+esc(c)+'</th>'; }).join('')+'<th>Total</th></tr>';
+    var body2=G.map(function(g){
+      var gr=cell(null,g.key);
+      if(!gr.length) return '';
+      var cells=topCats.map(function(c){
+        var l=g.short+' · '+c;
+        var list=reg(l, gr.filter(function(r){ return catOf(r)===c; }));
+        var pctv=gr.length?Math.round(list.length/gr.length*100):0;
+        return '<td class="sgt-c" data-l="'+esc(l)+'" title="Click to view these calls">'
+          +list.length.toLocaleString('en-IN')
+          +'<span class="sgt-p">'+pctv+'%</span></td>';
+      }).join('');
+      return '<tr><td class="nm" style="color:'+g.c+'">'+esc(g.label)+'</td>'+cells
+        +td(reg(g.short+' · all concerns',gr),g.short+' · all concerns',' style="font-weight:800"')+'</tr>';
+    }).join('');
+
+    el.innerHTML=
+      '<div class="sgt-h">Branch × stage group</div>'
+      +'<div style="overflow:auto"><table class="hrs sgt">'
+      +'<thead>'+head+'</thead><tbody>'+body+'</tbody><tfoot>'+foot+'</tfoot></table></div>'
+      +'<p class="au-note">Read <b>down a column</b> to compare branches within one stage group, and '
+      +'<b>across a row</b> to see where one branch\'s concerns sit. <b>Unplaced</b> are calls whose '
+      +'class field could not be read — they are counted, never hidden.</p>'
+      +'<div class="sgt-h" style="margin-top:14px">Stage group × what is raised</div>'
+      +'<div style="overflow:auto"><table class="hrs sgt">'
+      +'<thead>'+head2+'</thead><tbody>'+body2+'</tbody></table></div>'
+      +'<p class="au-note">Percentages are of that stage group, not of the whole school, so each row '
+      +'reads on its own terms. Every count opens the calls behind it.</p>';
+
+    el.querySelectorAll('.sgt-c').forEach(function(c){
+      c.addEventListener('click',function(){
+        var l=c.dataset.l; open(store[l]||[], l);
+      });
+    });
+  }
+
+  function apply(){
+    var tog=document.getElementById('care-stage-toggle');
+    var view=window._CARE_STAGE_VIEW||'chart';
+    if(tog) tog.querySelectorAll('button').forEach(function(b){ b.classList.toggle('on',b.dataset.v===view); });
+    if(view!=='table') return;                 // the rings are already drawn
+    try{ build(); }catch(err){
+      var el=document.getElementById('care-stage');
+      if(el) el.innerHTML='<div class="no-data" style="color:var(--r)">Could not build the stage table: '
+        +String(err&&err.message||err)+'</div>';
+    }
+  }
+
+  document.addEventListener('click',function(ev){
+    var b=ev.target.closest('#care-stage-toggle button'); if(!b) return;
+    window._CARE_STAGE_VIEW=b.dataset.v;
+    if(typeof renderCareSummary==='function') renderCareSummary(); else apply();
+  });
+
+  var _o=window.renderCareSummary;
+  if(typeof _o==='function') window.renderCareSummary=function(){
+    var r=_o.apply(this,arguments); try{ apply(); }catch(e){} return r;
+  };
+  window.__careStageView=apply;
   setTimeout(apply,1500); setTimeout(apply,4000);
 })();
 </script>
