@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PBES School Analytics 2026-27</title>  
+<title>PBES School Analytics 2026-27</title>
 
 <!-- Supabase client must load before our auth/data code   -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -6450,16 +6450,31 @@ function renderCareSummary(){
   const BR=['Boduppal','Keesara','Pocharam','Bachupally','Gowdavalli'];
   const scope=(fBranch==='ALL')?BR:[fBranch];
   const fnEl=document.getElementById('care-summary-fn');
-  if(fnEl) fnEl.textContent='Parents-satisfied % + grievance-category insights · '+(fBranch==='ALL'?'All Branches':fBranch)+(fMonth==='ALL'?'':' · '+fMonth);
+  if(fnEl){
+    const _sc=window._CARE_SCOPE||'ALL', _pd=!!window._CARE_PENDING;
+    fnEl.textContent=(_sc==='ALL'?'All concerns':_sc)+(_pd?' · pending only':'')
+      +' · '+(fBranch==='ALL'?'All Branches':fBranch)+(fMonth==='ALL'?'':' · '+fMonth);
+  }
   const rows=CARE.filter(r=>scope.includes(r.Branch)&&(fMonth==='ALL'||r.Month===fMonth));
-  // Apply class / section dropdown filter (persists across re-renders)
-  const _clsSel=document.getElementById('care-cls-sel');
-  const _secSel=document.getElementById('care-sec-sel');
-  const _cls=(_clsSel?_clsSel.value:window._CARE_CLS)||'ALL';
-  const _sec=(_secSel?_secSel.value:window._CARE_SEC)||'ALL';
+  // ── Scope + Pending filters (they persist across re-renders) ──
+  // Class and Section have gone: the stage-group panel already answers "which
+  // part of the school", and it does so by grade band rather than by every
+  // individual section, which is the level these decisions are actually taken at.
+  const _CARE_ACADEMIC=/^(academics?|academic|studies|study|teaching|learning|exam|homework)/i;
+  const _CARE_NOTCONCERN=/^(no concern|not answering|no response)/i;
+  const _scope=window._CARE_SCOPE||'ALL';
+  const _pendOnly=!!window._CARE_PENDING;
   const filteredRows=rows.filter(r=>{
-    if(_cls!=='ALL'){ const cp=String(r.Class||'').split(/[-\/]/)[0].trim(); if(cp!==_cls) return false; }
-    if(_sec!=='ALL'){ const sp=String(r.Class||'').split(/[-\/]/); const sv=sp.length>1?sp[1].trim():''; if(sv!==_sec) return false; }
+    const g=String(r.Grievance||'');
+    if(_scope==='Academic'){ if(_CARE_NOTCONCERN.test(g)||!_CARE_ACADEMIC.test(g)) return false; }
+    else if(_scope==='Non-Academic'){ if(_CARE_NOTCONCERN.test(g)||_CARE_ACADEMIC.test(g)) return false; }
+    // "Pending to be addressed" is a real concern that has not been resolved —
+    // the same test the compliance report uses for its Pending column, so the
+    // two can never disagree.
+    if(_pendOnly){
+      if(_CARE_NOTCONCERN.test(g)) return false;
+      if(/resolved/i.test(String(r.Status||''))) return false;
+    }
     return true;
   });
   // Use filteredRows for all computations below
@@ -6486,12 +6501,17 @@ function renderCareSummary(){
   // ── Satisfaction, read from the words and not from the label alone ──
   // A row tagged "No Concern" whose remark says the child is crying is not a
   // satisfied parent, and a call nobody answered is not an opinion at all.
-  const _nlp=sentFilteredRows.map(r=>CARE_NLP.classify(r));
+  // Satisfaction and reach describe the whole call set for the branch and month,
+  // never a slice of it. Filtering to Negative, or to Academic concerns, removes
+  // every "No Concern" call by definition — so computing satisfaction inside the
+  // slice would always read 0% and look like a collapse rather than a filter.
+  const _nlp=rows.map(r=>CARE_NLP.classify(r));
   const reachable=_nlp.filter(c=>c.reachable).length;
   const noAnswer=_nlp.length-reachable;
   const satisfiedN=_nlp.filter(c=>c.satisfied).length;
   const flaggedN=_nlp.filter(c=>c.flagged).length;
   const satisfiedPct=reachable?Math.round(satisfiedN/reachable*100):0;
+  const _sliced=(_scope!=='ALL')||_pendOnly||(_sent!=='ALL');
   const noConcern=cat['No Concern']||0;
   const present=CATS.filter(c=>cat[c]>0).sort((a,b)=>cat[b]-cat[a]);
   window._CARE_PIE_CATS=present;
@@ -6597,12 +6617,12 @@ function renderCareSummary(){
         <div style="font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;">😊 Parents Satisfied</div>
         <div style="font-size:30px;font-weight:800;color:${satColor};line-height:1.1;margin-top:2px;">${satisfiedPct}%</div>
         <div style="font-size:11px;color:#64748B;">${fi(satisfiedN)} of ${fi(reachable)} answered calls</div>
-        <div style="font-size:10px;color:#94A3B8;margin-top:1px;">reading the remark, not just the tag</div></div>`
+        <div style="font-size:10px;color:#94A3B8;margin-top:1px;">${_sliced?'across all calls — not the filtered slice':'reading the remark, not just the tag'}</div></div>`
     +`<div style="flex:1;min-width:160px;background:linear-gradient(135deg,#FFF7ED,#FFFBEB);border:1px solid #FED7AA;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="window._CARE_SENT='No Answer';renderCareSummary()" title="Click to view unanswered calls">
         <div style="font-size:11px;font-weight:700;color:#C2410C;text-transform:uppercase;">📵 Not Answered</div>
         <div style="font-size:30px;font-weight:800;color:#C2410C;line-height:1.1;margin-top:2px;">${fi(noAnswer)}</div>
-        <div style="font-size:11px;color:#64748B;">${total?Math.round(noAnswer/total*100):0}% of ${fi(total)} calls</div>
-        <div style="font-size:10px;color:#94A3B8;margin-top:1px;">held out of satisfaction &amp; sentiment</div></div>`
+        <div style="font-size:11px;color:#64748B;">${rows.length?Math.round(noAnswer/rows.length*100):0}% of ${fi(rows.length)} calls</div>
+        <div style="font-size:10px;color:#94A3B8;margin-top:1px;">${_sliced?'across all calls — not the filtered slice':'held out of satisfaction &amp; sentiment'}</div></div>`
     +`<div style="flex:1;min-width:150px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="viewCareWithSentiment('Resolved')" title="Click to view">
         <div style="font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;">✅ Resolved</div>
         <div style="font-size:30px;font-weight:800;color:#059669;line-height:1.1;margin-top:2px;">${fi(resolved)}</div>
@@ -6617,15 +6637,30 @@ function renderCareSummary(){
         <div style="font-size:11px;color:#64748B;">${Math.round(pending/total*100)}% · click to view with sentiment</div></div>`
     +'</div>';
 
-  // ── Class / Section dropdown filter for the Summary ──
-  const allClasses=[...new Set(rows.map(r=>String(r.Class||'').split(/[-\/]/)[0].trim()).filter(Boolean))].sort();
-  const allSections=[...new Set(rows.map(r=>{const p=String(r.Class||'').split(/[-\/]/);return p.length>1?p[1].trim():'';}).filter(Boolean))].sort();
+  // ── Scope · Sentiment · Pending controls for the Summary ──
+  const _pendCount=rows.filter(r=>{
+    const g=String(r.Grievance||'');
+    return !_CARE_NOTCONCERN.test(g) && !/resolved/i.test(String(r.Status||''));
+  }).length;
   h+='<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">'
     +'<span style="font-size:12px;font-weight:800;color:#0F172A;">📂 Category Mix</span>'
-    +'<select id="care-cls-sel" onchange="renderCareSummary()" style="padding:5px 10px;border:1.5px solid #E0E8FF;border-radius:8px;font-size:11.5px;font-family:Inter,sans-serif;cursor:pointer;">'
-    +'<option value="ALL">All Classes</option>'+allClasses.map(c=>'<option value="'+c+'"'+(_cls===c?' selected':'')+'>'+c+'</option>').join('')+'</select>'
-    +'<select id="care-sec-sel" onchange="renderCareSummary()" style="padding:5px 10px;border:1.5px solid #E0E8FF;border-radius:8px;font-size:11.5px;font-family:Inter,sans-serif;cursor:pointer;">'
-    +'<option value="ALL">All Sections</option>'+allSections.map(s=>'<option value="'+s+'"'+(_sec===s?' selected':'')+'>'+s+'</option>').join('')+'</select>'
+    +'<div style="display:flex;border:1.5px solid #E0E8FF;border-radius:8px;overflow:hidden;font-size:11px;font-family:Inter,sans-serif;">'
+      +[['ALL','All concerns',''],['Academic','Academic','📘 '],['Non-Academic','Non-Academic','🏫 ']].map(x=>{
+        const active=_scope===x[0];
+        const C={'ALL':'#1E4FD8','Academic':'#3B82F6','Non-Academic':'#0D9488'};
+        return '<button onclick="window._CARE_SCOPE=\''+x[0]+'\';renderCareSummary()" style="padding:5px 12px;border:none;'
+          +'background:'+(active?C[x[0]]:'#fff')+';color:'+(active?'#fff':(x[0]==='ALL'?'#334155':C[x[0]]))+';'
+          +'font-weight:'+(active?'700':'500')+';cursor:pointer;font-family:Inter,sans-serif;font-size:11px;white-space:nowrap;">'
+          +x[2]+x[1]+'</button>';
+      }).join('')
+    +'</div>'
+    +'<button onclick="window._CARE_PENDING=!window._CARE_PENDING;renderCareSummary()" '
+      +'title="Show only concerns that are still to be addressed" '
+      +'style="padding:5px 13px;border:1.5px solid '+(_pendOnly?'#DC2626':'#E0E8FF')+';border-radius:8px;'
+      +'background:'+(_pendOnly?'#DC2626':'#fff')+';color:'+(_pendOnly?'#fff':'#DC2626')+';'
+      +'font-weight:'+(_pendOnly?'800':'600')+';cursor:pointer;font-family:Inter,sans-serif;font-size:11px;white-space:nowrap;">'
+      +'⏳ Pending to be Addressed <span style="opacity:.85;">'+fi(_pendCount)+'</span>'
+      +(_pendOnly?' ✕':'')+'</button>'
     +'<div style="display:flex;border:1.5px solid #E0E8FF;border-radius:8px;overflow:hidden;font-size:11px;font-family:Inter,sans-serif;">'
       +['ALL','Positive','Neutral','Negative','No Answer'].map(s=>{
         const active=_sent===s;
@@ -6693,8 +6728,8 @@ function renderCareSummary(){
   el.innerHTML=h;
 
   // Store selected class/section for re-render persistence
-  window._CARE_CLS=document.getElementById('care-cls-sel')?document.getElementById('care-cls-sel').value:'ALL';
-  window._CARE_SEC=document.getElementById('care-sec-sel')?document.getElementById('care-sec-sel').value:'ALL';
+  window._CARE_SCOPE=_scope;
+  window._CARE_PENDING=_pendOnly;
 
   mkChart('care-summary-pie',{type:'doughnut',
     data:{labels:present,datasets:[{data:present.map(c=>cat[c]),backgroundColor:present.map(c=>META[c].c),borderWidth:2,borderColor:'#fff'}]},
