@@ -27,7 +27,7 @@
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);font-size:13px;line-height:1.5}
 
 /* HEADER */
-.hdr{background:linear-gradient(135deg,#1037B0 0%,#1E4FD8 45%,#4C1D95 100%);padding:0;position:sticky;top:0;z-index:200;box-shadow:0 2px 24px rgba(16,55,176,.35)}
+.hdr{background:linear-gradient(135deg,#07361F 0%,#0B5D33 48%,#0A7A41 100%);padding:0;position:sticky;top:0;z-index:200;box-shadow:0 2px 24px rgba(7,54,31,.32)}
 .hdr-in{max-width:1700px;margin:0 auto;padding:13px 28px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .logo-row{display:flex;align-items:center;gap:14px}
 .logo-box{width:44px;height:44px;background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.3);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;color:#fff;flex-shrink:0;font-family:'Plus Jakarta Sans',sans-serif}
@@ -40,6 +40,12 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);font-si
 .hdr-stat{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);border-radius:10px;padding:6px 16px;text-align:center;min-width:76px}
 .hdr-stat .v{font-size:18px;font-weight:800;color:#fff;font-family:'Plus Jakarta Sans',sans-serif}
 .hdr-stat .l{font-size:10px;color:rgba(255,255,255,.65);margin-top:1px}
+.hdr-link{color:rgba(255,255,255,.9);font-size:11.5px;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.4);padding-bottom:1px}
+.hdr-link:hover{color:#FFD75E;border-bottom-color:#FFD75E}
+/* role badge sits in the header row rather than floating over it */
+.role-badge{display:inline-flex;align-items:center;font-size:10.5px;font-weight:800;letter-spacing:.05em;
+  color:#07361F;background:#F2C230;border:1px solid #FFD75E;padding:5px 12px;border-radius:20px;white-space:nowrap}
+.logo-box{background:#fff!important;border-color:#F2C230!important;color:#0B5D33!important}
 
 /* FILTER BAR */
 .fb{background:var(--sur);border-bottom:2px solid var(--bor);position:sticky;top:72px;z-index:190;box-shadow:0 2px 10px rgba(30,79,216,.06)}
@@ -71,7 +77,7 @@ body{padding-left:var(--nav-w);transition:padding-left .22s cubic-bezier(.4,0,.2
 body.nav-min{padding-left:var(--nav-w-min)}
 
 .sidenav{position:fixed;top:0;left:0;bottom:0;width:var(--nav-w);z-index:300;
-  background:linear-gradient(180deg,#0E2A6B 0%,#132F7A 42%,#2E1065 100%);
+  background:linear-gradient(180deg,#062E1A 0%,#0A4D2B 45%,#0B5D33 100%);
   display:flex;flex-direction:column;box-shadow:2px 0 22px rgba(16,55,176,.22);
   transition:width .22s cubic-bezier(.4,0,.2,1)}
 body.nav-min .sidenav{width:var(--nav-w-min)}
@@ -79,18 +85,20 @@ body.nav-min .sidenav{width:var(--nav-w-min)}
 .sn-top{display:flex;align-items:center;gap:10px;padding:14px 14px 12px;
   border-bottom:1px solid rgba(255,255,255,.12);min-height:60px}
 .sn-logo{width:34px;height:34px;border-radius:9px;background:#fff;flex-shrink:0;
-  display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;color:#1E4FD8}
+  display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;color:#0B5D33}
 .sn-ttl{color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:13.5px;
   line-height:1.2;white-space:nowrap;overflow:hidden}
 .sn-ttl small{display:block;font-weight:500;font-size:10px;color:rgba(255,255,255,.6);margin-top:2px}
 body.nav-min .sn-ttl{display:none}
 
-.sn-toggle{position:absolute;top:16px;right:-13px;width:26px;height:26px;border-radius:50%;
-  border:1px solid var(--bor);background:#fff;color:var(--p);cursor:pointer;z-index:2;
-  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;
-  box-shadow:0 2px 8px rgba(16,55,176,.28);transition:transform .22s}
-.sn-toggle:hover{background:var(--pl)}
-body.nav-min .sn-toggle{transform:rotate(180deg)}
+.sn-toggle{width:26px;height:26px;border-radius:50%;flex-shrink:0;margin-left:auto;
+  border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.14);color:#fff;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;
+  transition:transform .22s,background .15s}
+.sn-toggle:hover{background:#F2C230;color:#07361F;border-color:#F2C230}
+body.nav-min .sn-toggle{transform:rotate(180deg);margin:0}
+/* collapsed the rail is only 64px wide, so the button stacks under the logo */
+body.nav-min .sn-top{flex-direction:column;gap:8px;padding:12px 6px}
 
 .sn-scroll{flex:1;overflow-y:auto;overflow-x:hidden;padding:10px 0 18px}
 .sn-scroll::-webkit-scrollbar{width:6px}
@@ -107,7 +115,7 @@ body.nav-min .sn-grp{padding:12px 0 5px;text-align:center;font-size:8px;letter-s
 .sidenav .tb:hover{background:rgba(255,255,255,.09);color:#fff}
 .sidenav .tb.active{background:rgba(255,255,255,.16);color:#fff;font-weight:700}
 .sidenav .tb.active::before{content:'';position:absolute;left:0;top:5px;bottom:5px;width:3px;
-  background:#FBBF24;border-radius:0 3px 3px 0}
+  background:#F2C230;border-radius:0 3px 3px 0}
 .sidenav .tb .ic{font-size:15.5px;width:22px;text-align:center;flex-shrink:0;line-height:1}
 .sidenav .tb .lb{overflow:hidden;text-overflow:ellipsis}
 body.nav-min .sidenav .tb{padding:10px 0;justify-content:center;gap:0}
@@ -681,9 +689,11 @@ function applyRoleAccess(){
   // Small role badge in the header (non-intrusive)
   try{
     let badge=document.getElementById('role-badge');
-    if(!badge){ const host=document.querySelector('.hdr-in')||document.body; badge=document.createElement('div'); badge.id='role-badge';
-      badge.style.cssText='position:absolute;top:8px;right:14px;font-size:10.5px;font-weight:700;color:#fff;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);padding:3px 9px;border-radius:10px;';
-      (document.querySelector('.hdr')||document.body).appendChild(badge); }
+    if(!badge){
+      badge=document.createElement('div'); badge.id='role-badge'; badge.className='role-badge';
+      const host=document.querySelector('.hdr-right')||document.querySelector('.hdr-in')||document.body;
+      host.insertBefore(badge, host.firstChild);
+    }
     const label=role?role.replace(/_/g,' '):'management';
     badge.textContent='🔐 '+label.toUpperCase()+(lockBranch?(' · '+lockBranch):' · ALL BRANCHES');
   }catch(e){}
@@ -736,12 +746,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     </div>
     <button class="sn-burger" id="sn-burger" aria-label="Open menu">☰</button>
     <div class="hdr-right">
+      <div id="role-badge" class="role-badge">&nbsp;</div>
       <div class="live-pill"><span class="ldot"></span> Active</div>
-      <div class="hdr-stat"><div class="v" id="hv-students">—</div><div class="l">Students</div></div>
-      <div class="live-pill"><span class="ldot"></span> Active</div>
-<a href="reset-password.html" style="color:rgba(255,255,255,.85);font-size:11px;text-decoration:underline;margin-left:4px;">Change Password</a>
-      <div class="hdr-stat"><div class="v" id="hv-calls">–</div><div class="l">Calls Made</div></div>
-      <div class="hdr-stat"><div class="v" id="hv-obs">–</div><div class="l">Observations</div></div>
+      <a href="reset-password.html" class="hdr-link">Change Password</a>
+      <!-- the student, call and observation counters live on the Executive
+           Overview, where they can be read against their own context -->
+      <span id="hv-students" hidden></span><span id="hv-calls" hidden></span><span id="hv-obs" hidden></span>
     </div>
   </div>
 </header>
@@ -780,10 +790,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 </div>
 
 <aside class="sidenav" id="sidenav">
-  <button class="sn-toggle" id="sn-toggle" title="Collapse or expand the menu" aria-label="Collapse menu">‹</button>
   <div class="sn-top">
     <div class="sn-logo">P</div>
     <div class="sn-ttl">PBES Analytics<small>2026-27</small></div>
+    <button class="sn-toggle" id="sn-toggle" title="Collapse or expand the menu" aria-label="Collapse menu">‹</button>
   </div>
   <div class="sn-scroll">
     <div class="sn-grp">Overview</div>
@@ -11658,6 +11668,59 @@ async function loadCivil(force){
   var _s=window.showTab, _w=window.switchTab;
   window.showTab=function(id,btn){ _s(id,btn); if(id==='civil') loadCivil(false); };
   window.switchTab=function(id){ _w(id); if(id==='civil') loadCivil(false); };
+})();
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   WARM THE HEAVY TABS IN THE BACKGROUND
+
+   PT-1, School Audit, PTM and Civil each fetch their own sheet the first time
+   they are opened, which is why they used to sit on a spinner for several
+   seconds while every other tab was instant. Nothing about that fetch needs to
+   wait for a click, so it now happens quietly after the main dashboard has
+   painted.
+
+   They are warmed one at a time, not all at once: four parallel requests would
+   compete with whatever the person is actually looking at. Each loader already
+   writes to IndexedDB, so the wait only ever happens on a cold first visit —
+   after that the tab opens from cache and refreshes behind the scenes.
+   ══════════════════════════════════════════════════════════════════════════ */
+(function(){
+  var QUEUE=[
+    { id:'pt1',   fn:function(){ return window.loadPT1Review && loadPT1Review(false); } },
+    { id:'audit', fn:function(){ return window.loadAudit    && loadAudit(false);    } },
+    { id:'ptm',   fn:function(){ return window.loadPTM      && loadPTM(false);      } },
+    { id:'civil', fn:function(){ return window.loadCivil    && loadCivil(false);    } }
+  ];
+
+  function allowed(id){
+    /* only warm what this person can actually open */
+    var b=document.querySelector('.sidenav .tb[onclick*="\''+id+'\'"]');
+    return b && b.style.display!=='none';
+  }
+
+  async function warm(){
+    /* never run before the session exists, or each loader would bounce to login */
+    try{
+      var s=await sb.auth.getSession();
+      if(!s || !s.data || !s.data.session) return;
+    }catch(e){ return; }
+
+    for(var i=0;i<QUEUE.length;i++){
+      var q=QUEUE[i];
+      if(!allowed(q.id)) continue;
+      try{ await q.fn(); }catch(e){ /* a tab that fails to warm still works on click */ }
+      await new Promise(function(r){ setTimeout(r,250); });   // let the UI breathe
+    }
+  }
+
+  function start(){
+    if(window.requestIdleCallback) requestIdleCallback(warm,{timeout:4000});
+    else setTimeout(warm,2500);
+  }
+  if(document.readyState==='complete') setTimeout(start,1800);
+  else window.addEventListener('load',function(){ setTimeout(start,1800); });
 })();
 </script>
 </body>
