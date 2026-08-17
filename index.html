@@ -6479,10 +6479,7 @@ function renderCareSummary(){
     if(_scope==='Academic'){ if(_CARE_NOCONC_RE.test(g)||!_CARE_ACAD_RE.test(g)) return false; }
     else if(_scope==='Non-Academic'){ if(_CARE_NOCONC_RE.test(g)||_CARE_ACAD_RE.test(g)) return false; }
     // the same test the compliance report uses for its Pending column
-    if(_pendOnly){
-      if(_CARE_NOCONC_RE.test(g)) return false;
-      if(/resolved/i.test(String(r.Status||''))) return false;
-    }
+    if(_pendOnly && !_careIsOpenConcern(r)) return false;
     return true;
   });
   // Use filteredRows for all computations below
@@ -6525,9 +6522,13 @@ function renderCareSummary(){
   window._CARE_PIE_CATS=present;
 
   // Status counts
-  const resolved=sentFilteredRows.filter(r=>r.Status==='Resolved').length;
-  const inProg=sentFilteredRows.filter(r=>r.Status==='In Progress').length;
-  const pending=sentFilteredRows.filter(r=>r.Status==='Pending').length;
+  /* An unanswered call has no progress to report, so it is held out of these
+     three the same way it is held out of satisfaction. Otherwise "In Progress"
+     silently counted numbers nobody had reached. */
+  const _statusRows=sentFilteredRows.filter(r=>!_careUnanswered(r));
+  const resolved=_statusRows.filter(r=>r.Status==='Resolved').length;
+  const inProg=_statusRows.filter(r=>r.Status==='In Progress').length;
+  const pending=_statusRows.filter(r=>r.Status==='Pending').length;
 
   // ── Topic rules for ALL categories ──
   const TOPIC_RULES={
@@ -6626,7 +6627,7 @@ function renderCareSummary(){
         <div style="font-size:30px;font-weight:800;color:${satColor};line-height:1.1;margin-top:2px;">${satisfiedPct}%</div>
         <div style="font-size:11px;color:#64748B;">${fi(satisfiedN)} of ${fi(reachable)} answered calls</div>
         <div style="font-size:10px;color:#94A3B8;margin-top:1px;">${_sliced?'across all calls — not the filtered slice':'reading the remark, not just the tag'}</div></div>`
-    +`<div style="flex:1;min-width:160px;background:linear-gradient(135deg,#FFF7ED,#FFFBEB);border:1px solid #FED7AA;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="window._CARE_SENT='No Answer';renderCareSummary()" title="Click to view unanswered calls">
+    +`<div style="flex:1;min-width:160px;background:linear-gradient(135deg,#FFF7ED,#FFFBEB);border:1px solid #FED7AA;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="viewCareNoAnswer()" title="Click to view the unanswered calls">
         <div style="font-size:11px;font-weight:700;color:#C2410C;text-transform:uppercase;">📵 Not Answered</div>
         <div style="font-size:30px;font-weight:800;color:#C2410C;line-height:1.1;margin-top:2px;">${fi(noAnswer)}</div>
         <div style="font-size:11px;color:#64748B;">${rows.length?Math.round(noAnswer/rows.length*100):0}% of ${fi(rows.length)} calls</div>
@@ -6646,10 +6647,8 @@ function renderCareSummary(){
     +'</div>';
 
   // ── Scope · Pending · Sentiment controls for the Summary ──
-  const _pendCount=rows.filter(r=>{
-    const g=String(r.Grievance||'');
-    return !_CARE_NOCONC_RE.test(g) && !/resolved/i.test(String(r.Status||''));
-  }).length;
+  // same test the compliance report's Pending column uses, so the two agree
+  const _pendCount=rows.filter(_careIsOpenConcern).length;
   h+='<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">'
     +'<span style="font-size:12px;font-weight:800;color:#0F172A;">\ud83d\udcc2 Category Mix</span>'
     +'<div style="display:flex;border:1.5px solid #E0E8FF;border-radius:8px;overflow:hidden;font-size:11px;font-family:Inter,sans-serif;">'
@@ -6698,6 +6697,11 @@ function renderCareSummary(){
       if(fn) fn.textContent=(fBranch==='ALL'?'All branches':fBranch)+' · '+fi(sentFilteredRows.length)+' calls grouped by the child\u2019s class';
     }
   }catch(e){ /* the card is optional; the report below still renders */ }
+
+  /* The table view needs the same sub-topic rules the cards use. Re-implementing
+     them there would be a second definition that could drift, so the one that
+     already exists is published instead. */
+  window._careTopics=function(c,rs){ return TOPIC_RULES[c]?extractTopics(c,rs):[]; };
 
   // ── Build individual category cards with sub-topics ──
   const catCards=present.map(c=>{
@@ -6786,6 +6790,26 @@ function _careRowSentiment(r){
    screen excluded. */
 var _CARE_ACAD_RE=/^(academics?|academic|studies|study|teaching|learning|exam|homework)/i;
 var _CARE_NOCONC_RE=/^(no concern|not answering|no response)/i;
+var _CARE_NOANS_RE=/not\s*answer|no\s*answer|no\s*response|not\s*respond|not\s*reach|switch(ed)?\s*off|not\s*picked|busy|call\s*back/i;
+
+/* ── ONE definition of an unanswered call, and ONE of a concern ──
+   The compliance report and the summary used to disagree by a row or two: the
+   report dropped a call whose REMARK said "switched off" even when its category
+   did not, while the summary read only the category. Two reasonable tests, two
+   different answers, and no way to tell from the screen which was right.
+   Every count on the tab now calls these. */
+function _careUnanswered(r){
+  try{ if(window.CARE_NLP && CARE_NLP.isNoAnswer) return CARE_NLP.isNoAnswer(r); }catch(e){}
+  return _CARE_NOANS_RE.test(String(r.Grievance||'')+' '+String(r.Status||'')+' '+String(r.Remarks||''));
+}
+/* A concern is a call that was answered AND carries a real category. */
+function _careIsConcern(r){
+  if(_careUnanswered(r)) return false;
+  return !_CARE_NOCONC_RE.test(String(r.Grievance||''));
+}
+function _careIsOpenConcern(r){
+  return _careIsConcern(r) && !/resolved/i.test(String(r.Status||''));
+}
 function _careActiveFilter(rows){
   const scope=window._CARE_SCOPE||'ALL';
   const pend=!!window._CARE_PENDING;
@@ -6794,10 +6818,7 @@ function _careActiveFilter(rows){
     const g=String(r.Grievance||'');
     if(scope==='Academic'){ if(_CARE_NOCONC_RE.test(g)||!_CARE_ACAD_RE.test(g)) return false; }
     else if(scope==='Non-Academic'){ if(_CARE_NOCONC_RE.test(g)||_CARE_ACAD_RE.test(g)) return false; }
-    if(pend){
-      if(_CARE_NOCONC_RE.test(g)) return false;
-      if(/resolved/i.test(String(r.Status||''))) return false;
-    }
+    if(pend && !_careIsOpenConcern(r)) return false;
     if(sent!=='ALL'&&_careRowSentiment(r)!==sent) return false;
     return true;
   });
@@ -6941,6 +6962,25 @@ function viewCareSatisfied(){
   openModal('\ud83d\ude0a Parents Satisfied',
     rows.length.toLocaleString('en-IN')+' answered call(s) where the tag and the words agree \u00b7 '
       +(fBranch==='ALL'?'All Branches':fBranch), rows, cols);
+}
+
+/* The calls nobody answered, detected exactly as the tile counted them. */
+function viewCareNoAnswer(){
+  const CARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
+  const BR=['Boduppal','Keesara','Pocharam','Bachupally','Gowdavalli'];
+  const scope=(fBranch==='ALL')?BR:[fBranch];
+  const rows=CARE.filter(r=>scope.includes(r.Branch)&&(fMonth==='ALL'||r.Month===fMonth))
+    .filter(_careUnanswered)
+    .map(r=>({Branch:r.Branch,Month:r.Month,Class:r.Class,Student:r.Student,Date:r.Date,
+      Grievance:r.GrievanceRaw||r.Grievance,Remarks:r.Remarks,Followup:r.Followup,
+      Status:r.StatusRaw||r.Status}));
+  openModal('\ud83d\udcf5 Calls nobody answered',
+    rows.length.toLocaleString('en-IN')+' call(s) \u00b7 '+(fBranch==='ALL'?'All Branches':fBranch)
+      +(fMonth==='ALL'?'':' \u00b7 '+fMonth)+' \u00b7 held out of satisfaction and sentiment',
+    rows,[{key:'Branch',label:'Branch'},{key:'Month',label:'Month'},{key:'Class',label:'Class'},
+      {key:'Student',label:'Student',maxW:'170px'},{key:'Date',label:'Date',date:true},
+      {key:'Grievance',label:'Logged as'},{key:'Remarks',label:'Remarks',maxW:'280px'},
+      {key:'Status',label:'Status',pill:true}]);
 }
 
 function viewCareGrievance(cat){
@@ -12478,7 +12518,7 @@ async function loadCivil(force){
       }
 
       /* a call only counts as contact if somebody answered it */
-      var answered=rs.filter(function(r){ return !unanswered(r); });
+      var answered=rs.filter(function(r){ return !_careUnanswered(r); });
       var students={};
       answered.forEach(function(r){
         var nm=String(r.Student||'').trim().toLowerCase();
@@ -12486,7 +12526,7 @@ async function loadCivil(force){
       });
       var reached=Object.keys(students).length||answered.length;
 
-      var concerns=answered.filter(function(r){ return !NOT_A_CONCERN.test(String(r.Grievance||'')); });
+      var concerns=answered.filter(_careIsConcern);
       var aca=concerns.filter(function(r){ return ACADEMIC.test(String(r.Grievance||'')); });
       var non=concerns.filter(function(r){ return !ACADEMIC.test(String(r.Grievance||'')); });
       var done=function(list){ return list.filter(function(r){ return /resolved/i.test(String(r.Status||'')); }).length; };
@@ -12580,8 +12620,8 @@ async function loadCivil(force){
        that was clicked. */
     function rowsFor(branch, kind){
       var base=rows.filter(function(r){ return branch==='*'||r.Branch===branch; });
-      var ans=base.filter(function(r){ return !unanswered(r); });
-      var con=ans.filter(function(r){ return !NOT_A_CONCERN.test(String(r.Grievance||'')); });
+      var ans=base.filter(function(r){ return !_careUnanswered(r); });
+      var con=ans.filter(_careIsConcern);
       var aca=con.filter(function(r){ return ACADEMIC.test(String(r.Grievance||'')); });
       var non=con.filter(function(r){ return !ACADEMIC.test(String(r.Grievance||'')); });
       var done=function(l){ return l.filter(function(r){ return /resolved/i.test(String(r.Status||'')); }); };
@@ -12886,6 +12926,10 @@ async function loadCivil(force){
       return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; });
   }
 
+  /* The table is a summary, not a dump. Listing every call again told you
+     nothing the drill-downs do not already do on click; what the table is for
+     is the shape of the selection — how many calls sit under each category and
+     each sub-topic, and what share of the whole that is. */
   function tableHTML(){
     var rows=selected();
     var lbl=(typeof _careSentLabel==='function')?_careSentLabel():'';
@@ -12893,37 +12937,60 @@ async function loadCivil(force){
       return '<div class="no-data">No calls match this selection.<br>'
         +'<span style="font-size:11.5px;color:#94A3B8">'+esc(lbl)+'</span></div>';
     }
-    var sentOf=(typeof _careRowSentiment==='function')?_careRowSentiment:function(){ return ''; };
-    var SC={'Positive':'#059669','Negative':'#DC2626','Neutral':'#64748B','No Answer':'#C2410C'};
-    var body=rows.slice(0,400).map(function(r){
-      var st=String(r.Status||''), sent=sentOf(r);
-      var stc=/resolved/i.test(st)?'#059669':/progress/i.test(st)?'#7C3AED':'#D97706';
-      return '<tr>'
-        +'<td>'+esc(r.Branch)+'</td>'
-        +'<td>'+esc(r.Month||'')+'</td>'
-        +'<td>'+esc(r.Class||'')+'</td>'
-        +'<td style="font-weight:600">'+esc(r.Student||'')+'</td>'
-        +'<td>'+esc(r.Date||'')+'</td>'
-        +'<td>'+esc(r.GrievanceRaw||r.Grievance||'')+'</td>'
-        +'<td style="color:'+(SC[sent]||'#64748B')+';font-weight:600">'+esc(sent)+'</td>'
-        +'<td style="max-width:300px">'+esc(r.Remarks==='\u2013'?'':r.Remarks||'')+'</td>'
-        +'<td style="max-width:220px">'+esc(r.Followup==='\u2013'?'':r.Followup||'')+'</td>'
-        +'<td style="color:'+stc+';font-weight:600">'+esc(r.StatusRaw||st)+'</td>'
+    var CATS=['No Concern','Not Answering','Academics','Behaviour / Wellbeing','Administration',
+              'Transport','Co Curricular','New Admission','No Response'];
+    var catOf=function(r){ return CATS.indexOf(r.Grievance)>=0?r.Grievance:'Other'; };
+
+    var byCat={};
+    rows.forEach(function(r){ var c=catOf(r); (byCat[c]||(byCat[c]=[])).push(r); });
+    var order=Object.keys(byCat).sort(function(x,y){ return byCat[y].length-byCat[x].length; });
+    var tot=rows.length;
+
+    var body=order.map(function(c){
+      var cr=byCat[c], cp=Math.round(cr.length/tot*100);
+      var subs=[];
+      try{
+        if(typeof window._careTopics==='function') subs=window._careTopics(c,cr)||[];
+      }catch(e){}
+      var head='<tr class="cat-row" data-c="'+esc(c)+'">'
+        +'<td class="nm" style="font-weight:800">'+esc(c)+'</td>'
+        +'<td style="font-weight:800">'+cr.length.toLocaleString('en-IN')+'</td>'
+        +'<td style="font-weight:700;color:#1E4FD8">'+cp+'%</td>'
+        +'<td><div class="au-bar" style="min-width:90px"><i style="width:'+cp+'%;background:#1E4FD8"></i></div></td>'
         +'</tr>';
+      var kids=subs.slice(0,6).map(function(t){
+        var tp=Math.round(t.count/cr.length*100);
+        /* the sub-topic needs its own keywords on the row: without them the
+           click fell through to the category and opened all of it */
+        var _excl=(t.kw&&t.kw.length===0)?subs.reduce(function(a,b){ return a.concat(b.kw||[]); },[]):[];
+        return '<tr class="sub-row" data-c="'+esc(c)+'" data-t="'+esc(t.topic)+'" '
+          +'data-kw="'+esc(JSON.stringify(t.kw||[]))+'" data-ex="'+esc(JSON.stringify(_excl))+'" '
+          +'title="Click to view these calls">'
+          +'<td class="nm" style="padding-left:26px;color:#475569">'
+          +'<span style="color:#94A3B8">\u21b3</span> '+esc(t.topic)+'</td>'
+          +'<td>'+t.count.toLocaleString('en-IN')+'</td>'
+          +'<td style="color:#64748B">'+tp+'% <span style="color:#CBD5E1">of '+esc(c)+'</span></td>'
+          +'<td><div class="au-bar" style="min-width:90px;height:6px"><i style="width:'+tp+'%;background:#93B4FF"></i></div></td>'
+          +'</tr>';
+      }).join('');
+      return head+kids;
     }).join('');
+
     return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">'
-      +'<span style="font-size:12px;font-weight:800;color:#0F172A;">📋 '
-      +rows.length.toLocaleString('en-IN')+' call'+(rows.length===1?'':'s')+' in this selection</span>'
-      +'<span style="font-size:11px;color:#64748B;">'+esc(lbl)+'</span>'
+      +'<span style="font-size:12px;font-weight:800;color:#0F172A;">\ud83d\udcca Category and sub-topic counts</span>'
+      +'<span style="font-size:11px;color:#64748B;">'+tot.toLocaleString('en-IN')+' calls \u00b7 '+esc(lbl)+'</span>'
       +'<button id="care-tbl-copy" style="margin-left:auto;background:var(--pl);border:1px solid var(--bor);'
       +'color:var(--p);font:inherit;font-size:11px;font-weight:700;padding:5px 12px;border-radius:8px;cursor:pointer;">'
-      +'⧉ Copy</button></div>'
-      +'<div style="overflow:auto;max-height:620px;"><table class="hrs" style="min-width:960px">'
-      +'<thead><tr><th class="nm">Branch</th><th>Month</th><th>Class</th><th class="nm">Student</th>'
-      +'<th>Date</th><th>Concern</th><th>Sentiment</th><th class="nm">Remarks</th>'
-      +'<th class="nm">Follow-up</th><th>Status</th></tr></thead><tbody>'+body+'</tbody></table></div>'
-      +(rows.length>400?'<p class="au-note">Showing the first 400 of '
-        +rows.length.toLocaleString('en-IN')+'. Narrow the selection to see the rest.</p>':'');
+      +'\u29c9 Copy</button></div>'
+      +'<div style="overflow:auto;max-height:620px;"><table class="hrs" style="min-width:560px">'
+      +'<thead><tr><th class="nm">Category / sub-topic</th><th>Calls</th><th>Share</th><th></th></tr></thead>'
+      +'<tbody>'+body+'</tbody>'
+      +'<tfoot><tr><td class="nm" style="font-weight:800">TOTAL</td>'
+      +'<td style="font-weight:800">'+tot.toLocaleString('en-IN')+'</td><td style="font-weight:800">100%</td><td></td></tr></tfoot>'
+      +'</table></div>'
+      +'<p class="au-note">A category\u2019s share is of every call in this selection; a sub-topic\u2019s share is '
+      +'of its own category. Sub-topics are read from the remark, so one call can match more than one and they '
+      +'need not add to 100%. Click a category row for the calls behind it.</p>';
   }
 
   function apply(){
@@ -12933,18 +13000,31 @@ async function loadCivil(force){
     if(tog) tog.querySelectorAll('button').forEach(function(b){ b.classList.toggle('on',b.dataset.v===view); });
     if(view!=='table') return;                 // the insight panels are already drawn
     host.innerHTML=tableHTML();
+    host.querySelectorAll('tr.sub-row').forEach(function(tr){
+      tr.addEventListener('click',function(ev){
+        ev.stopPropagation();
+        var kw=[],ex=[];
+        try{ kw=JSON.parse(tr.dataset.kw||'[]'); ex=JSON.parse(tr.dataset.ex||'[]'); }catch(e){}
+        if(typeof viewSubTopic==='function') viewSubTopic(tr.dataset.c,tr.dataset.t,kw,ex);
+      });
+    });
+    host.querySelectorAll('tr.cat-row').forEach(function(tr){
+      tr.style.cursor='pointer';
+      tr.addEventListener('click',function(){
+        if(typeof viewCareGrievance==='function') viewCareGrievance(tr.dataset.c);
+      });
+    });
     var cp=document.getElementById('care-tbl-copy');
     if(cp) cp.addEventListener('click',function(){
-      var rows=selected();
-      var head=['Branch','Month','Class','Student','Date','Concern','Sentiment','Remarks','Follow-up','Status'];
-      var sentOf=(typeof _careRowSentiment==='function')?_careRowSentiment:function(){ return ''; };
-      var txt=[head.join('\t')].concat(rows.map(function(r){
-        return [r.Branch,r.Month,r.Class,r.Student,r.Date,(r.GrievanceRaw||r.Grievance),
-                sentOf(r),(r.Remarks==='\u2013'?'':r.Remarks),
-                (r.Followup==='\u2013'?'':r.Followup),(r.StatusRaw||r.Status)]
-          .map(function(v){ return String(v==null?'':v).replace(/[\t\n]/g,' '); }).join('\t');
-      })).join('\n');
-      var done=function(){ cp.textContent='✓ Copied'; setTimeout(function(){ cp.textContent='⧉ Copy'; },1600); };
+      var lines=[];
+      host.querySelectorAll('table tr').forEach(function(tr){
+        var c=[]; tr.querySelectorAll('th,td').forEach(function(x){
+          var t=x.textContent.replace(/\s+/g,' ').trim(); if(t!=='') c.push(t);
+        });
+        if(c.length) lines.push(c.join('\t'));
+      });
+      var txt=lines.join('\n');
+      var done=function(){ cp.textContent='\u2713 Copied'; setTimeout(function(){ cp.textContent='\u29c9 Copy'; },1600); };
       if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done,function(){});
       else { var ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select();
              try{ document.execCommand('copy'); done(); }catch(e){} document.body.removeChild(ta); }
