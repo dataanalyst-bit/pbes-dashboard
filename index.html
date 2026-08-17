@@ -279,6 +279,27 @@ body.nav-min .sn-foot{display:none}
 .scope-chip small{font-weight:500;color:var(--txm)}
 
 
+
+/* ═══ STAGE-GROUP INFOGRAPHIC (Care Calls + Grievance) ═══ */
+.sg-wrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:13px}
+.sg-card{border:1px solid var(--bor);border-top:3px solid var(--p);border-radius:13px;
+  background:var(--sur);overflow:hidden;display:flex;flex-direction:column}
+.sg-h{color:#fff;font-size:11.5px;font-weight:800;padding:8px 11px;text-align:center;letter-spacing:.01em}
+.sg-n{font-size:12px;font-weight:700;color:var(--tx);text-align:center;padding:9px 8px 2px;
+  display:flex;flex-direction:column;gap:1px}
+.sg-n span{font-size:10px;font-weight:500;color:var(--txm)}
+.sg-svg{width:100%;height:auto;display:block;max-width:200px;margin:2px auto 0}
+.sg-bar{height:6px;background:#EEF2FF;margin:6px 12px 0;border-radius:99px;overflow:hidden}
+.sg-bar i{display:block;height:100%;border-radius:99px}
+.sg-legend{padding:9px 12px 12px;display:flex;flex-direction:column;gap:3px;font-size:10.5px;color:var(--txm)}
+.sg-legend div{display:flex;align-items:center;gap:6px}
+.sg-legend i{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+.sg-legend span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sg-legend b{margin-left:auto;color:var(--tx);font-variant-numeric:tabular-nums}
+.sg-note{font-size:11px;color:var(--txm);margin-top:11px;line-height:1.5}
+.sg-flag{margin-top:12px;border-left:3px solid #D97706;background:#FFFBEB;padding:10px 13px;
+  border-radius:0 8px 8px 0;font-size:12px;color:#3F2E10;line-height:1.55}
+
 /* ═══ CIVIL WORK TAB ═══ */
 .cv-stack{display:flex;flex-direction:column;gap:9px}
 .cv-srow{display:grid;grid-template-columns:150px 1fr;gap:12px;align-items:center}
@@ -949,8 +970,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="cb" id="care-summary-report" style="padding:14px 18px;"></div>
   </div>
 
-  <!-- Monthly Volume chart (Grievance Category Breakdown removed — sub-topics in Summary replace it) -->
-  <div class="card" style="margin-bottom:16px;"><div class="ch"><h3>📊 Monthly Volume — Resolved vs Pending</h3></div><div class="cb"><div class="cw tall"><canvas id="care-vol"></canvas></div></div></div>
+  <!-- Stage-group infographic replaces the monthly volume chart: the volume
+       split told you how many calls each month produced, which the KPI strip
+       already says, while this shows WHERE in the school the concerns sit. -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="ch"><h3>🎓 By stage group — where the concerns actually sit</h3>
+      <span class="fnote" id="care-stage-fn">Every call grouped by the child's class</span></div>
+    <div class="cb"><div id="care-stage"></div></div>
+  </div>
 
   <!-- ── Grievance Inline Records Table (on-demand, triggered by chart/button clicks) ── -->
   <div id="griev-records-panel" style="display:none;margin-bottom:16px;">
@@ -1534,6 +1561,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="row r2">
     <div class="card"><div class="ch"><h3>📋 Category Breakdown</h3><span class="fnote">Click a bar to view</span></div><div class="cb"><div class="cw tall"><canvas id="gr-category"></canvas></div></div></div>
     <div class="card"><div class="ch"><h3>😊 Parent Satisfaction by Branch</h3><span class="fnote">Click a segment to view</span></div><div class="cb"><div class="cw tall"><canvas id="gr-satchart"></canvas></div></div></div>
+  </div>
+
+  <!-- Stage groups: which part of the school the cases come from -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="ch"><h3>🎓 By stage group — where the cases come from</h3>
+      <span class="fnote" id="griev-stage-fn">Every case grouped by the child's grade</span></div>
+    <div class="cb"><div id="griev-stage"></div></div>
   </div>
 
   <!-- Charts row 3 — closure turnaround (raised date → closure date) -->
@@ -5943,6 +5977,364 @@ function renderRankings(){
   tbody.innerHTML=html;
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   CARE CALLS & GRIEVANCE — language engine and stage-group visuals
+
+   WHY THE OLD SENTIMENT READING WAS WRONG
+   ---------------------------------------
+   The previous scorer counted how many words from a "good" list and a "bad"
+   list appeared anywhere in the text, then subtracted. Two consequences:
+
+     "parent is not satisfied"  → matched 'satisfied' (+1) and 'not satisfied'
+                                  (−1) → score 0 → filed as NEUTRAL
+     "no concern, but child is  → matched 'no concern' (+1) and 'crying' (−1)
+      crying every day"           → score 0 → filed as NEUTRAL
+
+   Negation was never handled, so the single most common way a parent expresses
+   unhappiness — putting "not" in front of a positive word — was invisible.
+
+   WHAT REPLACES IT
+   ----------------
+   A negation- and intensifier-aware scorer, the same shape used in classical
+   sentiment analysis before neural models:
+
+     • phrases are matched longest-first, so "not satisfied" is read as one
+       token and can never also count as "satisfied"
+     • a negator (not / no / never / didn't / unable to …) flips the polarity
+       of the next three tokens, which is the window that carries the negation
+       in ordinary speech
+     • intensifiers (very, extremely, repeatedly) scale a term up, hedges
+       (slightly, somewhat, a bit) scale it down
+     • terms carry weights rather than a flat ±1, because "bullying" is not the
+       same strength of signal as "delay"
+     • the final score is normalised by text length, so a long remark does not
+       out-shout a short one, and a dead-band around zero keeps genuinely
+       mixed text as Neutral rather than forcing it one way
+
+   NOT-ANSWERED CALLS ARE NOT AN OPINION
+   -------------------------------------
+   A call nobody picked up carries no parent view at all. Counting it as
+   Neutral inflated the neutral bucket and, worse, counting it in the
+   denominator of satisfaction quietly punished branches for unreachable
+   numbers. It is now its own class, held out of Positive / Neutral / Negative
+   and out of the satisfaction base entirely.
+   ══════════════════════════════════════════════════════════════════════════ */
+window.CARE_NLP = (function () {
+  'use strict';
+
+  /* weighted lexicon: term -> strength. Multi-word entries are matched first. */
+  var POS = {
+    'no concern': 2, 'no issue': 2, 'no problem': 2, 'no complaint': 2,
+    'very happy': 3, 'very satisfied': 3, 'fully satisfied': 3, 'highly satisfied': 3,
+    'thank you': 1.5, 'well settled': 2, 'doing well': 2, 'improving well': 2,
+    happy: 2, satisfied: 2, satisfy: 2, glad: 2, pleased: 2, delighted: 2.5,
+    appreciate: 2, appreciated: 2, appreciates: 2, thankful: 2, thanks: 1.5, thank: 1.5,
+    good: 1.5, great: 2, excellent: 2.5, wonderful: 2.5, nice: 1.2,
+    cooperative: 1.5, supportive: 1.5, helpful: 1.5, understanding: 1.2,
+    improved: 2, improving: 1.8, better: 1.5, progress: 1.2, progressing: 1.5,
+    settled: 1.5, comfortable: 1.5, confident: 1.5, calm: 1.2, regular: 1,
+    interested: 1.2, agreed: 1, positive: 1.5, fine: 1, clear: 1, cleared: 1.2
+  };
+  var NEG = {
+    'not satisfied': 3, 'not happy': 3, 'not good': 2.5, 'not clear': 1.5,
+    'not attending': 2, 'not regular': 2, 'not interested': 2, 'not improving': 2.5,
+    'no improvement': 2.5, 'not done': 2, 'not completed': 2, 'not received': 2,
+    'very poor': 3, 'very bad': 3, 'strongly object': 3,
+    angry: 3, upset: 2.5, unhappy: 3, dissatisfied: 3, furious: 3.5,
+    complaint: 2.5, complain: 2.5, complained: 2.5, grievance: 2,
+    problem: 2, issue: 1.8, issues: 1.8, concern: 1.5, concerned: 1.8,
+    worried: 2, worry: 2, anxious: 2, stress: 2, stressed: 2, pressure: 1.5,
+    poor: 2.5, bad: 2.5, worst: 3, terrible: 3, useless: 3,
+    delay: 2, delayed: 2, pending: 1.5, unresolved: 2.5, repeated: 1.5, repeatedly: 2,
+    rude: 3, harsh: 2.5, misbehave: 3, misbehaviour: 3, misbehavior: 3,
+    fight: 2.5, fighting: 2.5, bully: 3.5, bullying: 3.5, beaten: 3.5, hit: 2.5,
+    cry: 2, crying: 2.5, sad: 2, afraid: 2.5, scared: 2.5, fear: 2.5,
+    absent: 1.5, irregular: 2, missed: 1.5, missing: 1.5, lost: 2,
+    dirty: 2, unhygienic: 2.5, unsafe: 3, injury: 3, injured: 3, sick: 1.5,
+    difficult: 1.5, difficulty: 1.5, struggle: 2, struggling: 2, weak: 1.8,
+    disappoint: 2.5, disappointed: 2.5, frustrated: 2.5, frustration: 2.5,
+    refuse: 2, refused: 2, denied: 2, ignored: 2.5, neglect: 3, neglected: 3,
+    slow: 1.5, expensive: 1.5, costly: 1.5, wrong: 2, error: 1.8, mistake: 1.8,
+    late: 2, waiting: 1.5, noisy: 1.5, careless: 2.5, unfair: 2.5, shouted: 2.5,
+    scolded: 2.2, punished: 2.5, hurt: 2.5, damaged: 2, broken: 1.8, leaking: 2
+  };
+  /* a negator flips the polarity of what follows it */
+  var NEGATORS = { not: 1, no: 1, never: 1, none: 1, nothing: 1, without: 1,
+    cannot: 1, cant: 1, dont: 1, didnt: 1, doesnt: 1, isnt: 1, wasnt: 1,
+    wont: 1, couldnt: 1, hasnt: 1, havent: 1, unable: 1, failed: 1, lack: 1 };
+  var BOOST = { very: 1.6, extremely: 1.9, highly: 1.6, really: 1.4, so: 1.3,
+    too: 1.4, always: 1.5, repeatedly: 1.6, constantly: 1.6, totally: 1.6,
+    completely: 1.6, absolutely: 1.7, strongly: 1.6, much: 1.3, badly: 1.6 };
+  var HEDGE = { slightly: 0.5, somewhat: 0.6, little: 0.6, bit: 0.6, sometimes: 0.6,
+    occasionally: 0.6, minor: 0.5, mildly: 0.5, partially: 0.6, almost: 0.8 };
+
+  /* a call that was never answered carries no opinion */
+  var NO_ANSWER_RE = new RegExp([
+    'not\\s*answer', 'no\\s*answer', 'not\\s*answering', 'no\\s*response',
+    'not\\s*responding', 'not\\s*reachable', 'un\\s*reachable', 'not\\s*picked',
+    'did\\s*not\\s*pick', 'didnt\\s*pick', 'call\\s*not\\s*received',
+    'switch(ed)?\\s*off', 'switchoff', 'phone\\s*off', 'out\\s*of\\s*(coverage|network|service)',
+    'number\\s*(is\\s*)?(busy|invalid|wrong|not\\s*in\\s*use)', 'busy\\s*tone',
+    'ringing\\s*(but\\s*)?no', 'call\\s*back\\s*later', 'not\\s*available\\s*on\\s*(call|phone)'
+  ].join('|'), 'i');
+
+  var PHRASES = [];
+  Object.keys(POS).forEach(function (k) { if (k.indexOf(' ') > 0) PHRASES.push({ t: k, w: POS[k], s: 1 }); });
+  Object.keys(NEG).forEach(function (k) { if (k.indexOf(' ') > 0) PHRASES.push({ t: k, w: NEG[k], s: -1 }); });
+  PHRASES.sort(function (a, b) { return b.t.length - a.t.length; });   // longest first
+
+  function clean(s) {
+    return ' ' + String(s == null ? '' : s)
+      .toLowerCase().replace(/['’]/g, '').replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ').trim() + ' ';
+  }
+
+  /* Is this row a call that never connected? */
+  function isNoAnswer(row) {
+    var cat = String(row.Grievance || row.Category || '');
+    if (/not\s*answer|no\s*response/i.test(cat)) return true;
+    var st = String(row.Status || row.StatusRaw || '');
+    if (/no\s*response|not\s*answer/i.test(st)) return true;
+    var txt = String(row.Remarks || '') + ' ' + String(row.Followup || '');
+    if (!txt.replace(/[–\s]/g, '')) return false;
+    return NO_ANSWER_RE.test(txt);
+  }
+
+  /**
+   * Score a piece of text.
+   * Returns { label, score, pos, neg, hits } where score is roughly −1…+1.
+   */
+  function score(text, opts) {
+    var t = clean(text);
+    /* When the category already asserts "No Concern", the same words appearing
+       in the remark are the label repeating itself, not evidence. Stripping
+       them lets the rest of the sentence speak: "no concern, but the child is
+       crying every day" is then read on "crying every day", which is the part
+       that actually matters. */
+    if (opts && opts.dropSelfLabel) {
+      t = t.replace(/ no concern | no issue | no problem | no complaint /g, ' ');
+    }
+    if (!t.trim() || t.trim() === '–') return { label: 'Neutral', score: 0, pos: 0, neg: 0, hits: [], empty: true };
+
+    var hits = [];
+    /* 1. consume multi-word phrases first so their parts cannot double-count */
+    PHRASES.forEach(function (p) {
+      var pad = ' ' + p.t + ' ', i;
+      while ((i = t.indexOf(pad)) !== -1) {
+        hits.push({ term: p.t, w: p.w * p.s });
+        t = t.slice(0, i + 1) + t.slice(i + pad.length);   // remove, keep a space
+      }
+    });
+
+    /* 2. walk the remaining single tokens with a negation window */
+    var toks = t.trim().split(' ').filter(Boolean);
+    var negFor = 0, mult = 1;
+    toks.forEach(function (w) {
+      if (NEGATORS[w]) { negFor = 3; return; }               // flip the next three
+      if (BOOST[w]) { mult = BOOST[w]; return; }
+      if (HEDGE[w]) { mult = HEDGE[w]; return; }
+      var val = 0;
+      if (POS[w] !== undefined) val = POS[w];
+      else if (NEG[w] !== undefined) val = -NEG[w];
+      if (val !== 0) {
+        if (negFor > 0) val = -val * 0.9;                    // negated, slightly damped
+        hits.push({ term: w, w: val * mult });
+        mult = 1;
+      }
+      if (negFor > 0) negFor--;
+    });
+
+    var pos = 0, neg = 0;
+    hits.forEach(function (h) { if (h.w > 0) pos += h.w; else neg += -h.w; });
+    var raw = pos - neg;
+    /* normalise by length so a long remark cannot simply out-shout a short one */
+    var norm = raw / Math.sqrt(Math.max(4, toks.length + hits.length));
+    var s = Math.max(-1, Math.min(1, norm / 1.6));
+    var label = s > 0.12 ? 'Positive' : s < -0.12 ? 'Negative' : 'Neutral';
+    return { label: label, score: Math.round(s * 100) / 100, pos: pos, neg: neg, hits: hits };
+  }
+
+  /**
+   * Classify one care-call row into exactly one of:
+   *   No Answer · Positive · Neutral · Negative
+   * and decide whether it counts as a satisfied parent.
+   */
+  function classify(row) {
+    if (isNoAnswer(row)) {
+      return { klass: 'No Answer', label: 'No Answer', score: null, satisfied: false, reachable: false };
+    }
+    var txt = ((row.Remarks && row.Remarks !== '\u2013') ? row.Remarks : '') + ' ' +
+              ((row.Followup && row.Followup !== '\u2013') ? row.Followup : '');
+    var cat = String(row.Grievance || row.Category || '');
+    var isNoConcernCat = /no\s*concern/i.test(cat);
+    var s = score(txt, { dropSelfLabel: isNoConcernCat });
+
+    /* A parent counts as satisfied only when the category says there was no
+       concern AND the words agree. A row tagged "No Concern" whose remark
+       reads "child is crying every day" is not a satisfied parent, and that
+       disagreement is exactly what the old count was hiding. */
+    var satisfied = (isNoConcernCat && s.label !== 'Negative') ||
+                    (!isNoConcernCat && s.label === 'Positive' && s.score >= 0.35);
+    var flagged = isNoConcernCat && s.label === 'Negative';
+
+    return {
+      klass: s.label, label: s.label, score: s.score,
+      satisfied: satisfied, reachable: true,
+      flagged: flagged,          // tagged no-concern, but the words say otherwise
+      empty: s.empty, hits: s.hits
+    };
+  }
+
+  /* ── stage grouping, shared by both tabs ── */
+  var GROUPS = [
+    { key: 'ey',   label: 'EY · Pre-primary · Nursery', short: 'EY / Pre-primary', c: '#7C3AED' },
+    { key: 'g12',  label: 'Grade & Stage 1–2',          short: 'Grade 1–2',        c: '#1E4FD8' },
+    { key: 'g35',  label: 'Grade & Stage 3–5',          short: 'Grade 3–5',        c: '#0D9488' },
+    { key: 'g68',  label: 'Grade & Stage 6–8',          short: 'Grade 6–8',        c: '#D97706' },
+    { key: 'g910', label: 'Grade & Stage 9–10',         short: 'Grade 9–10',       c: '#DC2626' }
+  ];
+  var ROMAN = { I:1, II:2, III:3, IV:4, V:5, VI:6, VII:7, VIII:8, IX:9, X:10,
+                XI:11, XII:12 };
+
+  /** Turn "VI-C", "Grade 6 / A", "Stage 3", "PP1", "Nursery" into a group key. */
+  function groupOf(raw) {
+    var s = String(raw == null ? '' : raw).toUpperCase().trim();
+    if (!s || s === '–') return null;
+    if (/NURSERY|NUR\b|PLAY|TODDLER|EY\b/.test(s)) return 'ey';
+    if (/PP\s*-?\s*[12]|LKG|UKG|KG\b|PRE\s*-?\s*PRIMARY|PREPRIMARY/.test(s)) return 'ey';
+
+    /* take the part before a section marker: "VI-C" -> "VI", "Grade 6 / A" -> "Grade 6" */
+    var head = s.split(/[-\/,|]/)[0].trim();
+    var n = null;
+    var m = head.match(/(\d{1,2})/);
+    if (m) n = parseInt(m[1], 10);
+    if (n === null) {
+      /* "IX B" and "Grade IX B" both need the roman numeral picked out of the
+         middle, so every token is tried rather than the whole string */
+      var toks = head.replace(/\./g, ' ').split(/\s+/).filter(Boolean);
+      for (var i = 0; i < toks.length && n === null; i++) {
+        var w = toks[i];
+        if (/^(GRADE|STAGE|CLASS|STD|STANDARD|SEC|SECTION)$/.test(w)) continue;
+        if (ROMAN[w] !== undefined) n = ROMAN[w];
+      }
+    }
+    if (n === null) return null;
+    if (n <= 0) return 'ey';
+    if (n <= 2) return 'g12';
+    if (n <= 5) return 'g35';
+    if (n <= 8) return 'g68';
+    if (n <= 12) return 'g910';
+    return null;
+  }
+
+  /* ── an SVG donut, used by both stage-group panels ── */
+  function donut(slices, cx, cy, rO, rI, centre) {
+    var tot = slices.reduce(function (s, x) { return s + x.v; }, 0);
+    if (!tot) return '';
+    var a = -Math.PI / 2, out = '';
+    slices.forEach(function (s) {
+      if (!s.v) return;
+      var f = s.v / tot, b = a + f * Math.PI * 2;
+      if (f > 0.9999) {
+        out += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((rO + rI) / 2) + '" fill="none" stroke="' +
+          s.c + '" stroke-width="' + (rO - rI) + '"><title>' + s.t + '</title></circle>';
+        a = b; return;
+      }
+      var lg = f > 0.5 ? 1 : 0;
+      var p = function (r, ang) { return [(cx + r * Math.cos(ang)).toFixed(2), (cy + r * Math.sin(ang)).toFixed(2)]; };
+      var A = p(rO, a), B = p(rO, b), C = p(rI, b), D = p(rI, a);
+      out += '<path d="M' + A + ' A' + rO + ' ' + rO + ' 0 ' + lg + ' 1 ' + B +
+        ' L' + C + ' A' + rI + ' ' + rI + ' 0 ' + lg + ' 0 ' + D + ' Z" fill="' + s.c +
+        '" stroke="#fff" stroke-width="1.5"><title>' + s.t + '</title></path>';
+      if (f >= 0.09) {
+        var mid = (a + b) / 2, rl = (rO + rI) / 2;
+        out += '<text x="' + (cx + rl * Math.cos(mid)).toFixed(1) + '" y="' + (cy + rl * Math.sin(mid) + 4).toFixed(1) +
+          '" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">' + Math.round(f * 100) + '%</text>';
+      }
+      a = b;
+    });
+    return out + (centre || '');
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  /**
+   * The stage-group infographic, shared by Care Calls and Grievance.
+   *   rows      the already-filtered records
+   *   gradeOf   fn(row) -> the class/grade text
+   *   catOf     fn(row) -> the category text
+   *   palette   category -> colour
+   *   opts      { title, unit }
+   */
+  function stageGroupHTML(rows, gradeOf, catOf, palette, opts) {
+    opts = opts || {};
+    var unit = opts.unit || 'records';
+    var buckets = {}, unplaced = 0;
+    GROUPS.forEach(function (g) { buckets[g.key] = []; });
+    rows.forEach(function (r) {
+      var k = groupOf(gradeOf(r));
+      if (k && buckets[k]) buckets[k].push(r); else unplaced++;
+    });
+
+    var live = GROUPS.filter(function (g) { return buckets[g.key].length; });
+    if (!live.length) {
+      return '<div class="no-data">No records carry a readable class or grade, so they cannot be grouped.</div>';
+    }
+    var maxN = Math.max.apply(null, live.map(function (g) { return buckets[g.key].length; }));
+
+    var cards = live.map(function (g) {
+      var rs = buckets[g.key];
+      var cats = {};
+      rs.forEach(function (r) { var c = catOf(r) || 'Other'; cats[c] = (cats[c] || 0) + 1; });
+      var mix = Object.keys(cats).map(function (c) { return { c: c, n: cats[c] }; })
+        .sort(function (a, b) { return b.n - a.n; });
+      var top = mix.slice(0, 6);
+      var rest = mix.slice(6).reduce(function (s, x) { return s + x.n; }, 0);
+      if (rest) top.push({ c: 'Everything else', n: rest });
+
+      var slices = top.map(function (x, i) {
+        return { v: x.n, c: (palette[x.c] || ['#94A3B8', '#64748B', '#CBD5E1'][i % 3]),
+                 t: esc(x.c) + ' — ' + x.n + ' (' + Math.round(x.n / rs.length * 100) + '%)' };
+      });
+
+      /* the headline for each group: how much of it is clean */
+      var clean = rs.filter(function (r) { return /no\s*concern/i.test(catOf(r) || ''); }).length;
+      var cleanPct = Math.round(clean / rs.length * 100);
+
+      return '<div class="sg-card" style="border-top-color:' + g.c + '">' +
+        '<div class="sg-h" style="background:' + g.c + '">' + esc(g.label) + '</div>' +
+        '<div class="sg-n">' + rs.length + ' ' + unit +
+          '<span>' + Math.round(rs.length / rows.length * 100) + '% of all</span></div>' +
+        '<svg viewBox="0 0 190 172" class="sg-svg">' +
+          donut(slices, 95, 82, 74, 43,
+            '<text x="95" y="78" text-anchor="middle" font-size="21" font-weight="800" fill="#0F172A">' +
+              cleanPct + '%</text>' +
+            '<text x="95" y="94" text-anchor="middle" font-size="8.5" fill="#64748B">no concern</text>') +
+        '</svg>' +
+        '<div class="sg-bar"><i style="width:' + (rs.length / maxN * 100) + '%;background:' + g.c + '"></i></div>' +
+        '<div class="sg-legend">' + top.map(function (x, i) {
+          return '<div><i style="background:' + (palette[x.c] || ['#94A3B8', '#64748B', '#CBD5E1'][i % 3]) + '"></i>' +
+            '<span>' + esc(x.c) + '</span><b>' + x.n + '</b></div>';
+        }).join('') + '</div>' +
+        '</div>';
+    }).join('');
+
+    return '<div class="sg-wrap">' + cards + '</div>' +
+      (unplaced ? '<div class="sg-note">' + unplaced + ' ' + unit + ' could not be placed in a stage group ' +
+        'because the class or grade field was blank or unreadable.</div>' : '');
+  }
+
+  return {
+    score: score, classify: classify, isNoAnswer: isNoAnswer,
+    GROUPS: GROUPS, groupOf: groupOf, stageGroupHTML: stageGroupHTML,
+    donut: donut, esc: esc
+  };
+})();
+
 // Care Call insight summary — per-branch quality, resolution & data-driven recommendations
 // ── Sentiment lexicon (rule-based NLP for care-call remarks & follow-up text) ──
 const _SENT_POS=['happy','satisfied','satisfy','resolved','resolve','thank','thanks','thankful','good','great','excellent','appreciate','appreciated','positive','cooperative','cooperate','understanding','understood','agreed','agree','interested','join','joined','joining','fine','okay','ok','no concern','no issue','no problem','clear','cleared','well','glad','pleased','support','supportive','helpful','confident','yes','improved','improving','better','settled','calm','comfortable'];
@@ -5980,10 +6372,10 @@ function renderCareSummary(){
   const _sentSel=document.getElementById('care-sent-sel');
   const _sent=(_sentSel?_sentSel.value:window._CARE_SENT)||'ALL';
   window._CARE_SENT=_sent;
-  const sentFilteredRows=(_sent==='ALL')?filteredRows:filteredRows.filter(r=>{
-    const blob=((r.Remarks&&r.Remarks!=='–')?r.Remarks:'')+' '+((r.Followup&&r.Followup!=='–')?r.Followup:'');
-    return _sentiment(blob).label===_sent;
-  });
+  // Sentiment is now read per row by the negation-aware scorer, and an
+  // unanswered call is its own class rather than being filed as Neutral.
+  const sentFilteredRows=(_sent==='ALL')?filteredRows
+    :filteredRows.filter(r=>CARE_NLP.classify(r).klass===_sent);
   if(!sentFilteredRows.length){ el.innerHTML='<div class="no-data">No care-call data for this filter combination.</div>'; return; }
 
   const CATS=['No Concern','Not Answering','Academics','Behaviour / Wellbeing','Administration','Transport','Co Curricular','New Admission','No Response','Other'];
@@ -5995,8 +6387,17 @@ function renderCareSummary(){
   const cat={}; CATS.forEach(c=>cat[c]=0);
   sentFilteredRows.forEach(r=>{ const c=CATS.includes(r.Grievance)?r.Grievance:'Other'; cat[c]++; });
   const total=sentFilteredRows.length;
+
+  // ── Satisfaction, read from the words and not from the label alone ──
+  // A row tagged "No Concern" whose remark says the child is crying is not a
+  // satisfied parent, and a call nobody answered is not an opinion at all.
+  const _nlp=sentFilteredRows.map(r=>CARE_NLP.classify(r));
+  const reachable=_nlp.filter(c=>c.reachable).length;
+  const noAnswer=_nlp.length-reachable;
+  const satisfiedN=_nlp.filter(c=>c.satisfied).length;
+  const flaggedN=_nlp.filter(c=>c.flagged).length;
+  const satisfiedPct=reachable?Math.round(satisfiedN/reachable*100):0;
   const noConcern=cat['No Concern']||0;
-  const satisfiedPct=Math.round(noConcern/total*100);
   const present=CATS.filter(c=>cat[c]>0).sort((a,b)=>cat[b]-cat[a]);
   window._CARE_PIE_CATS=present;
 
@@ -6097,10 +6498,16 @@ function renderCareSummary(){
   // ── KPI strip: Parents Satisfied + Resolved + In Progress + Pending ──
   const satColor=satisfiedPct>=80?'#059669':satisfiedPct>=60?'#D97706':'#DC2626';
   let h='<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;">'
-    +`<div style="flex:1;min-width:170px;background:linear-gradient(135deg,#ECFDF5,#F0FDFA);border:1px solid #A7F3D0;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="viewCareGrievance('No Concern')" title="Click to view satisfied parents">
+    +`<div style="flex:1;min-width:180px;background:linear-gradient(135deg,#ECFDF5,#F0FDFA);border:1px solid #A7F3D0;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="viewCareGrievance('No Concern')" title="Click to view satisfied parents">
         <div style="font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;">😊 Parents Satisfied</div>
         <div style="font-size:30px;font-weight:800;color:${satColor};line-height:1.1;margin-top:2px;">${satisfiedPct}%</div>
-        <div style="font-size:11px;color:#64748B;">${fi(noConcern)} of ${fi(total)} calls · click to view</div></div>`
+        <div style="font-size:11px;color:#64748B;">${fi(satisfiedN)} of ${fi(reachable)} answered calls</div>
+        <div style="font-size:10px;color:#94A3B8;margin-top:1px;">reading the remark, not just the tag</div></div>`
+    +`<div style="flex:1;min-width:160px;background:linear-gradient(135deg,#FFF7ED,#FFFBEB);border:1px solid #FED7AA;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="window._CARE_SENT='No Answer';renderCareSummary()" title="Click to view unanswered calls">
+        <div style="font-size:11px;font-weight:700;color:#C2410C;text-transform:uppercase;">📵 Not Answered</div>
+        <div style="font-size:30px;font-weight:800;color:#C2410C;line-height:1.1;margin-top:2px;">${fi(noAnswer)}</div>
+        <div style="font-size:11px;color:#64748B;">${total?Math.round(noAnswer/total*100):0}% of ${fi(total)} calls</div>
+        <div style="font-size:10px;color:#94A3B8;margin-top:1px;">held out of satisfaction &amp; sentiment</div></div>`
     +`<div style="flex:1;min-width:150px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="viewCareWithSentiment('Resolved')" title="Click to view">
         <div style="font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;">✅ Resolved</div>
         <div style="font-size:30px;font-weight:800;color:#059669;line-height:1.1;margin-top:2px;">${fi(resolved)}</div>
@@ -6125,16 +6532,34 @@ function renderCareSummary(){
     +'<select id="care-sec-sel" onchange="renderCareSummary()" style="padding:5px 10px;border:1.5px solid #E0E8FF;border-radius:8px;font-size:11.5px;font-family:Inter,sans-serif;cursor:pointer;">'
     +'<option value="ALL">All Sections</option>'+allSections.map(s=>'<option value="'+s+'"'+(_sec===s?' selected':'')+'>'+s+'</option>').join('')+'</select>'
     +'<div style="display:flex;border:1.5px solid #E0E8FF;border-radius:8px;overflow:hidden;font-size:11px;font-family:Inter,sans-serif;">'
-      +['ALL','Positive','Neutral','Negative'].map(s=>{
+      +['ALL','Positive','Neutral','Negative','No Answer'].map(s=>{
         const active=_sent===s;
-        const bg=active?(s==='Positive'?'#059669':s==='Negative'?'#DC2626':s==='Neutral'?'#64748B':'#1E4FD8'):'#fff';
-        const fg=active?'#fff':(s==='Positive'?'#059669':s==='Negative'?'#DC2626':s==='Neutral'?'#64748B':'#334155');
-        const emoji=s==='Positive'?'😊 ':s==='Negative'?'😟 ':s==='Neutral'?'😐 ':'';
-        return '<button onclick="window._CARE_SENT=\''+s+'\';renderCareSummary()" style="padding:5px 12px;border:none;background:'+bg+';color:'+fg+';font-weight:'+(active?'700':'500')+';cursor:pointer;font-family:Inter,sans-serif;font-size:11px;">'+emoji+s+'</button>';
+        const C={'Positive':'#059669','Negative':'#DC2626','Neutral':'#64748B','No Answer':'#C2410C','ALL':'#1E4FD8'};
+        const bg=active?C[s]:'#fff';
+        const fg=active?'#fff':(s==='ALL'?'#334155':C[s]);
+        const E={'Positive':'😊 ','Negative':'😟 ','Neutral':'😐 ','No Answer':'📵 ','ALL':''};
+        return '<button onclick="window._CARE_SENT=\''+s+'\';renderCareSummary()" style="padding:5px 12px;border:none;background:'+bg+';color:'+fg+';font-weight:'+(active?'700':'500')+';cursor:pointer;font-family:Inter,sans-serif;font-size:11px;white-space:nowrap;">'+E[s]+s+'</button>';
       }).join('')
     +'</div>'
     +'<span style="font-size:10px;color:#94A3B8;">click any row or sub-topic</span>'
     +'</div>';
+
+  // ── Stage-group infographic (rendered into its own card above) ──
+  try{
+    const sgEl=document.getElementById('care-stage');
+    if(sgEl){
+      const pal={}; CATS.forEach(c=>{ pal[c]=(META[c]||{}).c||'#94A3B8'; });
+      sgEl.innerHTML=CARE_NLP.stageGroupHTML(
+        sentFilteredRows, r=>r.Class, r=>CATS.includes(r.Grievance)?r.Grievance:'Other', pal,
+        {unit:'calls'})
+        +(flaggedN?'<div class="sg-flag"><b>'+flaggedN+' call'+(flaggedN===1?' was':'s were')+
+          ' logged as “No Concern” but the remark reads negatively.</b> Those are excluded from the '+
+          'satisfaction figure above. They are the most useful rows in the whole file: a parent raised '+
+          'something and it was filed as nothing.</div>':'');
+      const fn=document.getElementById('care-stage-fn');
+      if(fn) fn.textContent=(fBranch==='ALL'?'All branches':fBranch)+' · '+fi(sentFilteredRows.length)+' calls grouped by the child\u2019s class';
+    }
+  }catch(e){ /* the card is optional; the report below still renders */ }
 
   // ── Build individual category cards with sub-topics ──
   const catCards=present.map(c=>{
@@ -6430,464 +6855,7 @@ function renderCare(){
   const activeMonths=MONTHS.filter(m=>mv[m].resolved+mv[m].ip+mv[m].pending>0);
   const chartLabels=activeMonths.length>0?activeMonths:MONTHS;
   window._CARE_VOL_LABELS=chartLabels;
-  console.log('[care-vol] TRACKER rows:',TRACKER.length,'CARE_DATA rows:',_CARE_VOL.length,
-    'activeMonths:',activeMonths,'sample mv:',activeMonths.slice(0,3).map(m=>m+':R'+mv[m].resolved+'/IP'+mv[m].ip+'/P'+mv[m].pending));
-
-  mkChart('care-vol',{type:'bar',data:{labels:chartLabels,datasets:[
-    {label:'Resolved',   data:chartLabels.map(m=>mv[m].resolved),backgroundColor:'#059669',borderRadius:4,stack:'s'},
-    {label:'In Progress',data:chartLabels.map(m=>mv[m].ip),       backgroundColor:'#3B82F6',borderRadius:4,stack:'s'},
-    {label:'Pending',    data:chartLabels.map(m=>mv[m].pending),  backgroundColor:'#F59E0B',borderRadius:4,stack:'s'},
-  ]},options:{responsive:true,maintainAspectRatio:true,
-    onClick:(evt,elements)=>{
-      if(!elements||!elements.length)return;
-      const el=elements[0];
-      const month=(window._CARE_VOL_LABELS||MONTHS)[el.index];
-      const statusMap=['Resolved','In Progress','Pending'];
-      const status=statusMap[el.datasetIndex];
-      const ALLCARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
-      const rows=ALLCARE.filter(r=>(fBranch==='ALL'||r.Branch===fBranch)&&r.Month===month&&r.Status===status);
-      const cols=[{key:'Branch',label:'Branch'},{key:'Month',label:'Month'},{key:'Class',label:'Class'},
-        {key:'Student',label:'Student',maxW:'160px'},{key:'Date',label:'Date',date:true},
-        {key:'Grievance',label:'Grievance',pill:true},{key:'Remarks',label:'Remarks',maxW:'260px'},
-        {key:'Status',label:'Status',pill:true}];
-      const bl=fBranch==='ALL'?'All Branches':fBranch;
-      openModal(`📞 ${month} — ${status}`,`${rows.length.toLocaleString('en-IN')} records · ${bl}`,rows,cols);
-    },
-    plugins:{legend:{display:true},tooltip:{mode:'index',intersect:false},
-      datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]>50,
-        anchor:'center',align:'center',font:{weight:'700',size:10},color:'#fff',
-        formatter:(v)=>v>0?fi(v):''
-      }
-    },
-    scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,grid:{color:'#E0E8FF'},ticks:{maxTicksLimit:6}}}
-  }});
-}
-
-// ══════════════════ SCHOOL TRANSPORT ══════════════════
-const TR_BRANCHES=['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam'];
-function _trData(){ return (window._TRANSPORT&&typeof window._TRANSPORT==='object')?window._TRANSPORT:{vehicles:[],routes:[],students:[],mileage:[],repair:[]}; }
-function _trFilt(arr){ return (arr||[]).filter(r=>fBranch==='ALL'||r.Branch===fBranch); }
-function _trExpiring(v){ // expiring within 30 days, already expired, or Compliance flagged
-  const d=v.DaysToExpiry; if(typeof d==='number'&&d<=30) return true;
-  return /expir/i.test(String(v.Compliance||''));
-}
-function renderTransport(){
-  const T=_trData();
-  const bl=fBranch==='ALL'?'All Branches':fBranch;
-  const tag=document.getElementById('tr-tag'); if(tag)tag.textContent='Fleet · Routes · Occupancy · Compliance';
-  const fn=document.getElementById('tr-fn'); if(fn)fn.textContent=bl;
-  if(!document.getElementById('tr-veh')) return;
-
-  const vehicles=_trFilt(T.vehicles), students=_trFilt(T.students), routes=_trFilt(T.routes), mileage=_trFilt(T.mileage), repair=_trFilt(T.repair);
-  if(!vehicles.length && !students.length && !routes.length){
-    ['tr-veh','tr-stu','tr-occ','tr-exp','tr-mil'].forEach(id=>setTxt(id,'–'));
-    const fb=document.getElementById('tr-fleet-tbody'); if(fb)fb.innerHTML='<tr><td colspan="6" class="no-data">Transport sheets not added yet — add Transport_Vehicle / _Route / _Student / _Mileage / _Repair.</td></tr>';
-    ['tr-branch-occ','tr-route-occ','tr-compliance','tr-repair'].forEach(id=>{const e=document.getElementById(id); if(e)mkChart(id,{type:'bar',data:{labels:[],datasets:[]},options:{responsive:true,maintainAspectRatio:true}});});
-    return;
-  }
-  const seats=vehicles.reduce((s,v)=>s+(+v.Seats||0),0);
-  const routeRiders=routes.reduce((s,r)=>s+(+r.ActiveRiders||0),0);
-  const riders=routeRiders>0?routeRiders:students.length;
-  const occ=seats>0?Math.round(riders/seats*100):0;
-  const expiring=vehicles.filter(_trExpiring).length;
-  const mils=mileage.map(m=>+m.Mileage).filter(v=>!isNaN(v)&&v>0);
-  const avgMil=mils.length?+(mils.reduce((a,c)=>a+c,0)/mils.length).toFixed(1):null;
-
-  setTxt('tr-veh',fi(vehicles.length));
-  setTxt('tr-veh-s',(vehicles.filter(v=>/active/i.test(v.Status)).length||vehicles.length)+' active · click to view');
-  setTxt('tr-stu',fi(students.length));
-  setTxt('tr-occ',occ+'%');
-  setTxt('tr-occ-s',fi(riders)+' riders ÷ '+fi(seats)+' seats');
-  // Spare/Extra vehicles: routes named "EXTRA"/"SPARE"/"STANDBY" or vehicles not assigned to a numbered route
-  // Spare vehicles: identified by Status="Spare" in the Transport_Vehicle sheet
-  const spareVehicles=vehicles.filter(v=>/^spare$/i.test(String(v.Status||'').trim()));
-  setTxt('tr-spare',fi(spareVehicles.length));
-  setTxt('tr-spare-s',spareVehicles.length>0?spareVehicles.map(v=>v.Branch).filter((v,i,a)=>a.indexOf(v)===i).join(', ')+' · click to view':'None identified');
-  window._TR_SPARE=spareVehicles;
-  setTxt('tr-exp',fi(expiring));
-  setTxt('tr-mil',avgMil!=null?avgMil:'–');
-
-  // Branch occupancy — riders vs seats
-  const scope=fBranch==='ALL'?TR_BRANCHES:[fBranch];
-  const bSeats={},bRiders={};
-  scope.forEach(b=>{ bSeats[b]=(T.vehicles||[]).filter(v=>v.Branch===b).reduce((s,v)=>s+(+v.Seats||0),0);
-    const rr=(T.routes||[]).filter(r=>r.Branch===b).reduce((s,r)=>s+(+r.ActiveRiders||0),0);
-    bRiders[b]=rr>0?rr:(T.students||[]).filter(s=>s.Branch===b).length; });
-  const boLabels=scope.filter(b=>bSeats[b]||bRiders[b]);
-  window._TR_BRANCH_OCC=boLabels;
-  mkChart('tr-branch-occ',{type:'bar',data:{labels:boLabels,datasets:[
-    {label:'Seats',data:boLabels.map(b=>bSeats[b]),backgroundColor:'#CBD5E1',borderRadius:4},
-    {label:'Riders',data:boLabels.map(b=>bRiders[b]),backgroundColor:'#1E4FD8',borderRadius:4}]},
-    options:{responsive:true,maintainAspectRatio:true,onClick:(e,el)=>{if(el&&el.length)viewTransport('students',boLabels[el[0].index]);},
-      plugins:{legend:{display:true,position:'bottom',labels:{font:{size:10},usePointStyle:true}},datalabels:{display:false}},
-      scales:{y:{beginAtZero:true,grid:{color:'#E0E8FF'}},x:{grid:{display:false}}}}});
-
-  // Route occupancy — top by occupancy%
-  const rsorted=routes.map(r=>({...r,occv:(+r.Occupancy|| (r.Capacity>0?Math.round((+r.ActiveRiders||0)/r.Capacity*100):0))}))
-    .filter(r=>r.occv>0).sort((a,b)=>b.occv-a.occv).slice(0,12);
-  window._TR_ROUTES=rsorted;
-  mkChart('tr-route-occ',{type:'bar',data:{labels:rsorted.map(r=>(r.Branch.slice(0,3))+' '+r.Route),
-    datasets:[{label:'Occupancy %',data:rsorted.map(r=>r.occv),
-      backgroundColor:rsorted.map(r=>r.occv>100?'#DC2626':r.occv>=85?'#059669':r.occv>=60?'#D97706':'#93C5FD'),borderRadius:4,maxBarThickness:26}]},
-    options:{indexAxis:'y',responsive:true,maintainAspectRatio:true,
-      plugins:{legend:{display:false},datalabels:{display:true,clip:false,anchor:'end',align:'right',offset:3,color:'#0F172A',font:{size:10,weight:'bold'},formatter:v=>v+'%'},
-        tooltip:{callbacks:{label:c=>{const r=rsorted[c.dataIndex];return r.occv+'% · '+(r.ActiveRiders||0)+'/'+(r.Capacity||'?')+' · '+r.Vehicle;}}}},
-      layout:{padding:{right:34}},scales:{x:{beginAtZero:true,grid:{color:'#E0E8FF'}},y:{grid:{display:false},ticks:{font:{size:10}}}}}});
-
-  // Fleet compliance
-  const okC=vehicles.filter(v=>/^ok/i.test(String(v.Compliance||''))).length;
-  const expC=vehicles.filter(v=>/expir/i.test(String(v.Compliance||''))).length;
-  const otherC=vehicles.length-okC-expC;
-  mkChart('tr-compliance',{type:'doughnut',data:{labels:['OK','Expired','Other/Unknown'],
-    datasets:[{data:[okC,expC,otherC],backgroundColor:['#059669','#DC2626','#CBD5E1'],borderWidth:2,borderColor:'#fff'}]},
-    options:{responsive:true,maintainAspectRatio:true,cutout:'58%',onClick:(e,el)=>{if(el&&el.length){viewTransport(el[0].index===1?'expired':el[0].index===0?'okdocs':'vehicles');}},
-      plugins:{legend:{position:'bottom',labels:{font:{size:10.5},usePointStyle:true,padding:10}},
-        datalabels:{display:true,color:'#fff',font:{weight:'bold',size:12},formatter:v=>v>0?v:''}}}});
-
-  // Maintenance cost by branch
-  const bCost={}; scope.forEach(b=>bCost[b]=(T.repair||[]).filter(r=>r.Branch===b).reduce((s,r)=>s+(+r.Cost||0),0));
-  const cLabels=scope.filter(b=>bCost[b]>0);
-  window._TR_COSTB=cLabels;
-  mkChart('tr-repair',{type:'bar',data:{labels:cLabels,datasets:[{label:'₹ Maintenance',data:cLabels.map(b=>bCost[b]),backgroundColor:'#7C3AED',borderRadius:5,maxBarThickness:46}]},
-    options:{responsive:true,maintainAspectRatio:true,onClick:(e,el)=>{if(el&&el.length)viewTransport('repair',cLabels[el[0].index]);},
-      plugins:{legend:{display:false},datalabels:{display:true,anchor:'end',align:'top',color:'#0F172A',font:{size:10,weight:'bold'},formatter:v=>'₹'+(v>=100000?(v/100000).toFixed(1)+'L':v>=1000?(v/1000).toFixed(0)+'k':v)}},
-      layout:{padding:{top:18}},scales:{y:{beginAtZero:true,grid:{color:'#E0E8FF'},ticks:{callback:v=>v>=1000?(v/1000)+'k':v}},x:{grid:{display:false}}}}});
-
-  // Fleet register table
-  const fb=document.getElementById('tr-fleet-tbody');
-  if(fb){
-    fb.innerHTML=boLabels.map(b=>{
-      const bv=(T.vehicles||[]).filter(v=>v.Branch===b);
-      const s=bSeats[b], r=bRiders[b]; const o=s>0?Math.round(r/s*100):0;
-      const exp=bv.filter(_trExpiring).length;
-      const oc=o>100?'#DC2626':o>=85?'#059669':o>=60?'#D97706':'#64748B';
-      return `<tr style="cursor:pointer" onclick="viewTransport('vehicles','${b}')">
-        <td style="padding:8px 10px;border-bottom:1px solid #F1F5F9;"><span class="bd b${b}"></span> <strong>${b}</strong></td>
-        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${fi(bv.length)}</td>
-        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${fi(s)}</td>
-        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${fi(r)}</td>
-        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;font-weight:700;color:${oc}">${o}%</td>
-        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${exp>0?'<span style="color:#DC2626;font-weight:700;">'+exp+'</span>':'0'}</td></tr>`;
-    }).join('')||'<tr><td colspan="6" class="no-data">No data</td></tr>';
-  }
-
-  // Populate the Route-wise dropdown (respects branch filter)
-  const rsel=document.getElementById('tr-route-sel');
-  if(rsel){
-    const rlist=(T.routes||[]).filter(r=>fBranch==='ALL'||r.Branch===fBranch)
-      .slice().sort((a,b)=>String(a.Branch).localeCompare(b.Branch)||String(a.Route).localeCompare(String(b.Route),undefined,{numeric:true}));
-    const cur=rsel.value;
-    rsel.innerHTML='<option value="">— Select a route —</option>'+rlist.map((r)=>{
-      const key=r.Branch+'||'+r.Route;
-      return `<option value="${_escAttr(key)}">${r.Branch} · ${r.Route}${r.Vehicle&&r.Vehicle!=='–'?(' ('+r.Vehicle+')'):''}</option>`;
-    }).join('');
-    if(cur && [...rsel.options].some(o=>o.value===cur)){ rsel.value=cur; } else { const rr=document.getElementById('tr-route-report'); if(rr)rr.innerHTML='<div class="no-data" style="padding:16px;">Choose a route above to see its full report.</div>'; }
-  }
-  renderMileageInsights(mileage);
-}
-
-// Mileage & fuel efficiency insights — by vehicle & route (click a bar → logs)
-function renderMileageInsights(mileage){
-  const ins=document.getElementById('tr-mil-insight');
-  const agg=(keyFn)=>{ const m={}; (mileage||[]).forEach(r=>{ const k=keyFn(r); if(!k||k==='–')return;
-    if(!m[k])m[k]={km:0,fuel:0,cost:0,n:0,mils:[]}; m[k].km+=(+r.KMRun||0); m[k].fuel+=(+r.Fuel||0); m[k].cost+=(+r.FuelCost||0); m[k].n++; if(r.Mileage>0)m[k].mils.push(+r.Mileage); });
-    return Object.entries(m).map(([k,v])=>({key:k, kmpl:v.fuel>0?+(v.km/v.fuel).toFixed(2):(v.mils.length?+(v.mils.reduce((a,c)=>a+c,0)/v.mils.length).toFixed(2):0), km:v.km, fuel:v.fuel, cost:v.cost, n:v.n})); };
-  const byVeh=agg(r=>r.VehicleNo).filter(x=>x.kmpl>0).sort((a,b)=>b.kmpl-a.kmpl);
-  const byRoute=agg(r=>(r.Branch!=='–'?r.Branch.slice(0,3)+' ':'')+r.Route).filter(x=>x.kmpl>0).sort((a,b)=>b.kmpl-a.kmpl);
-  window._TR_MIL_VEH=byVeh; window._TR_MIL_ROUTE=byRoute;
-
-  if(ins){
-    if(!byVeh.length){ ins.innerHTML='<span class="no-data">No mileage logs for this selection.</span>'; }
-    else{
-      const totKm=(mileage||[]).reduce((s,r)=>s+(+r.KMRun||0),0);
-      const totFuel=(mileage||[]).reduce((s,r)=>s+(+r.Fuel||0),0);
-      const totCost=(mileage||[]).reduce((s,r)=>s+(+r.FuelCost||0),0);
-      const fleetKmpl=totFuel>0?+(totKm/totFuel).toFixed(2):0;
-      const best=byVeh[0], worst=byVeh[byVeh.length-1];
-      const costPerKm=totKm>0?+(totCost/totKm).toFixed(2):0;
-      ins.innerHTML='🏁 Fleet average <strong>'+fleetKmpl+' KM/L</strong> over '+fi(totKm)+' km · fuel spend <strong>₹'+fi(Math.round(totCost))+'</strong> (₹'+costPerKm+'/km). '
-        +'Most efficient: <strong style="color:#059669">'+best.key+' ('+best.kmpl+' KM/L)</strong>; least: <strong style="color:#DC2626">'+worst.key+' ('+worst.kmpl+' KM/L)</strong>. '
-        +'Vehicles below '+ (fleetKmpl*0.85).toFixed(1) +' KM/L warrant a service/driving-habit check.';
-    }
-  }
-  const mkMil=(id,arr,store)=>{ const el=document.getElementById(id); if(!el)return;
-    const top=arr.slice(0,14);
-    mkChart(id,{type:'bar',data:{labels:top.map(x=>x.key),datasets:[{label:'KM/L',data:top.map(x=>x.kmpl),
-      backgroundColor:top.map(x=>x.kmpl>=8?'#059669':x.kmpl>=5?'#D97706':'#DC2626'),borderRadius:4,maxBarThickness:22}]},
-      options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
-        onClick:(e,el)=>{ if(el&&el.length){ const it=top[el[0].index]; viewMileage(store,it.key); } },
-        plugins:{legend:{display:false},datalabels:{display:true,clip:false,anchor:'end',align:'right',offset:3,color:'#0F172A',font:{size:9.5,weight:'bold'},formatter:v=>v},
-          tooltip:{callbacks:{label:c=>{const it=top[c.dataIndex];return [it.kmpl+' KM/L',fi(it.km)+' km · '+fi(Math.round(it.fuel))+' L · ₹'+fi(Math.round(it.cost)),it.n+' log(s) · click to view'];}}}},
-        layout:{padding:{right:30}},scales:{x:{beginAtZero:true,grid:{color:'#E0E8FF'}},y:{grid:{display:false},ticks:{font:{size:9.5}}}}}});
-  };
-  mkMil('tr-mil-veh',byVeh,'veh'); mkMil('tr-mil-route',byRoute,'route');
-}
-function viewMileage(kind,key){
-  const T=_trData(); const bf=r=>(fBranch==='ALL'||r.Branch===fBranch);
-  let rows=(T.mileage||[]).filter(bf);
-  if(kind==='veh') rows=rows.filter(r=>r.VehicleNo===key);
-  else rows=rows.filter(r=>((r.Branch!=='–'?r.Branch.slice(0,3)+' ':'')+r.Route)===key);
-  rows=rows.sort((a,b)=>String(b.Date).localeCompare(String(a.Date)));
-  const cols=[{key:'Branch',label:'Branch'},{key:'Date',label:'Date',date:true},{key:'Route',label:'Route'},{key:'VehicleNo',label:'Vehicle'},
-    {key:'KMRun',label:'KM Run'},{key:'Fuel',label:'Fuel (L)'},{key:'FuelCost',label:'Fuel ₹'},{key:'Mileage',label:'KM/L'},{key:'CostPerKM',label:'₹/KM'}];
-  openModal('⛽ Mileage Logs — '+key,`${rows.length} log(s)`,rows,cols);
-}
-function viewTransportRoute(key){
-  const box=document.getElementById('tr-route-report'); if(!box)return;
-  if(!key){ box.innerHTML='<div class="no-data" style="padding:16px;">Choose a route above to see its full report.</div>'; return; }
-  const T=_trData();
-  const parts=key.split('||'); const br=parts[0], rt=parts[1];
-  const route=(T.routes||[]).find(r=>r.Branch===br&&String(r.Route)===String(rt))||{};
-  let veh=(T.vehicles||[]).find(v=>v.Branch===br && route.Vehicle && v.VehicleNo===route.Vehicle);
-  if(!veh) veh=(T.vehicles||[]).find(v=>v.Branch===br && String(v.RouteNo)===String(rt));
-  const riders=(T.students||[]).filter(s=>s.Branch===br && String(s.Route)===String(rt));
-  const occ=route.Capacity>0?Math.round((route.ActiveRiders||riders.length||0)/route.Capacity*100):(veh&&veh.Seats?Math.round(riders.length/veh.Seats*100):0);
-  const oc=occ>100?'#DC2626':occ>=85?'#059669':occ>=60?'#D97706':'#64748B';
-  const card=(t,inner,accent)=>`<div style="flex:1;min-width:270px;background:#fff;border:1px solid #E0E8FF;border-left:3px solid ${accent||'#1E4FD8'};border-radius:9px;padding:12px 14px;"><div style="font-weight:800;font-size:12px;color:${accent||'#1E4FD8'};text-transform:uppercase;margin-bottom:8px;">${t}</div>${inner}</div>`;
-  const F=(l,val)=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px dashed #EEF2F7;"><span style="color:#64748B;font-size:11px;">${l}</span><span style="color:#0F172A;font-size:11.5px;font-weight:600;text-align:right;">${(val===undefined||val===null||val===''||val==='–')?'–':val}</span></div>`;
-  const D=x=>(x&&x!=='–'&&typeof fmtDispDate==='function')?fmtDispDate(x):(x||'–');
-  const v=veh||{};
-  let h='<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;padding:10px 14px;background:linear-gradient(135deg,#EEF2FF,#F0FDFA);border-radius:9px;">'
-    +`<div style="font-weight:800;font-size:15px;color:#0F172A;"><span class="bd b${br}"></span> ${br} · ${rt}</div>`
-    +`<div style="font-size:12px;color:#475569;">Vehicle <strong>${v.VehicleNo||route.Vehicle||'–'}</strong> · Riders <strong>${fi(riders.length)}</strong> · Capacity <strong>${v.Seats||route.Capacity||'–'}</strong> · Occupancy <strong style="color:${oc}">${occ}%</strong></div></div>`;
-  if(route.Areas&&route.Areas!=='–') h+='<div style="font-size:11.5px;color:#475569;margin-bottom:10px;">🛣️ <strong>Stops:</strong> '+route.Areas+'</div>';
-  h+='<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;">'
-    +card('Vehicle', F('Vehicle No',v.VehicleNo)+F('Category',v.Category)+F('Make',v.Make)+F('Fuel',v.Fuel)+F('AC',v.AC)+F('Seats',v.Seats)+F('GPS',v.GPS)+F('Engine No',v.EngineNo)+F('Chassis No',v.ChassisNo)+F('Status',v.Status),'#1E4FD8')
-    +card('Driver & Attender', F('Driver',v.Driver)+F('Driver Contact',v.DriverContact)+F('Driver Licence',v.DriverLicence)+F('Heavy Licence Exp',D(v.HeavyLicenceExp))+F('Attender',v.Attender)+F('Attender Contact',v.AttenderContact),'#059669')
-    +card('Documents & Compliance', F('Compliance',v.Compliance)+F('Days To Expiry',v.DaysToExpiry)+F('Insurance Exp',D(v.InsuranceExp))+F('Permit Exp',D(v.PermitExp))+F('Fitness Exp',D(v.FitnessExp))+F('PUC Exp',D(v.PucExp))+F('Road Tax Exp',D(v.RoadTaxExp))+F('Labour Cert Exp',D(v.LabourCertExp))+F('RC',v.RC),'#DC2626')
-    +'</div>';
-  const rcols=[{key:'Student',label:'Student',maxW:'180px'},{key:'Class',label:'Class'},{key:'Section',label:'Section'},{key:'Distance',label:'Distance'},{key:'RiderType',label:'Rider Type'},{key:'Status',label:'Status'}];
-  h+='<div style="font-weight:800;font-size:12.5px;color:#0F172A;margin:4px 0 6px;">🎒 Riders on this route ('+riders.length+')</div>'+_accTable(riders,rcols);
-  box.innerHTML=h;
-}
-
-function viewTransport(kind,branch){
-  const T=_trData(); const bf=r=>(!branch)?(fBranch==='ALL'||r.Branch===fBranch):(r.Branch===branch);
-  const scope=branch?[branch]:(fBranch==='ALL'?TR_BRANCHES:[fBranch]);
-  const bl=branch||(fBranch==='ALL'?'All Branches':fBranch);
-
-  if(kind==='students'){
-    // Branch-wise total riders count with expand dropdown to view all riders
-    const cols=[{key:'Student',label:'Student',maxW:'180px'},{key:'Class',label:'Class'},{key:'Section',label:'Section'},{key:'Route',label:'Route'},{key:'VehicleNo',label:'Vehicle'},{key:'Distance',label:'Distance'},{key:'RiderType',label:'Rider Type'},{key:'Status',label:'Status'}];
-    const groups=scope.map(b=>{const rows=(T.students||[]).filter(r=>r.Branch===b);return {key:b,count:rows.length,rows:rows};});
-    openBranchAccordion('🎒 Transport Students — Branch-wise Riders','Riders per branch · expand to view all riders',groups,cols,'riders');
-    return;
-  }
-  if(kind==='vehicles'||kind==='fleet'){
-    // Branch-wise total vehicles count with expand dropdown to view all vehicles
-    const cols=[{key:'VehicleNo',label:'Vehicle No'},{key:'Category',label:'Type'},{key:'Make',label:'Make'},{key:'Seats',label:'Seats'},{key:'Fuel',label:'Fuel'},{key:'AC',label:'AC'},{key:'Driver',label:'Driver',maxW:'150px'},{key:'GPS',label:'GPS'},{key:'Status',label:'Status'},{key:'Compliance',label:'Compliance'}];
-    const groups=scope.map(b=>{const rows=(T.vehicles||[]).filter(r=>r.Branch===b);return {key:b,count:rows.length,rows:rows};});
-    openBranchAccordion('🚌 Total Vehicles — Branch-wise Fleet','Vehicles per branch · expand to view all vehicles',groups,cols,'vehicles');
-    return;
-  }
-  if(kind==='spare'){
-    const allSpare=(window._TR_SPARE||[]).filter(bf);
-    const cols=_TR_VCOLS();
-    const groups=scope.map(b=>{const rows=allSpare.filter(r=>r.Branch===b);return {key:b,count:rows.length,rows:rows};}).filter(g=>g.count>0);
-    if(groups.length>0){ openBranchAccordion('🔄 Spare / Standby Vehicles — Branch-wise','Status = Spare · expand to view details',groups,cols,'spare'); }
-    else { openModal('🔄 Spare Vehicles','No spare vehicles found · '+bl,[],cols); }
-    return;
-  }
-  if(kind==='expiring'||kind==='expired'){
-    // Per-vehicle expand dropdown showing ALL Vehicle_Master details
-    const rows=(T.vehicles||[]).filter(bf).filter(kind==='expired'?(v=>/expir/i.test(String(v.Compliance||''))):_trExpiring)
-      .sort((a,b)=>(a.DaysToExpiry==null?1e9:a.DaysToExpiry)-(b.DaysToExpiry==null?1e9:b.DaysToExpiry));
-    let h='<div style="font-size:12px;color:#334155;margin-bottom:10px;"><strong>'+rows.length+'</strong> vehicle(s) with documents expiring/expired. Click a vehicle to see every Vehicle_Master detail.</div>';
-    rows.forEach((v,i)=>{
-      const id='veh_'+i+'_'+Math.random().toString(36).slice(2,7);
-      const dcol=(v.DaysToExpiry==null)?'#94A3B8':(v.DaysToExpiry<0?'#DC2626':v.DaysToExpiry<=15?'#DC2626':v.DaysToExpiry<=30?'#D97706':'#059669');
-      const dtxt=(v.DaysToExpiry==null)?'–':(v.DaysToExpiry<0?Math.abs(v.DaysToExpiry)+'d overdue':v.DaysToExpiry+'d left');
-      h+=`<div style="border:1px solid #FECACA;border-radius:9px;margin-bottom:8px;overflow:hidden;">
-        <div onclick="toggleAcc('${id}',this)" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#FEF2F2;">
-          <div style="font-weight:800;font-size:13px;color:#0F172A;"><span class="acc-caret" style="color:#DC2626;margin-right:6px;">▸</span><span class="bd b${v.Branch}"></span> ${v.VehicleNo} <small style="color:#64748B;font-weight:600;">· ${v.Branch} · ${v.Category}</small></div>
-          <div style="font-weight:800;font-size:12.5px;color:${dcol};">${dtxt} <small style="color:#94A3B8;">${v.Compliance||''}</small></div>
-        </div>
-        <div id="${id}" style="display:none;padding:12px 14px;background:#fff;">${_vehicleDetailHTML(v)}</div>
-      </div>`;
-    });
-    openHTMLModal('⚠️ Documents Expiring / Expired', (branch||(fBranch==='ALL'?'All Branches':fBranch)), h);
-    return;
-  }
-  if(kind==='okdocs'){
-    const rows=(T.vehicles||[]).filter(bf).filter(v=>/^ok/i.test(String(v.Compliance||'')));
-    openModal('🛡️ Vehicles — Compliant',`${rows.length} vehicle(s)`,rows,_TR_VCOLS());
-    return;
-  }
-  if(kind==='repair'){
-    const rows=(T.repair||[]).filter(bf);
-    const cols=[{key:'Branch',label:'Branch'},{key:'Date',label:'Date',date:true},{key:'VehicleNo',label:'Vehicle'},{key:'Type',label:'Type'},{key:'Work',label:'Work',maxW:'220px'},{key:'Vendor',label:'Vendor'},{key:'Cost',label:'Cost ₹'},{key:'Status',label:'Status',pill:true}];
-    openModal('🔧 Maintenance Records',`${rows.length} record(s) · ${branch||(fBranch==='ALL'?'All Branches':fBranch)}`,rows,cols);
-    return;
-  }
-  const rows=(T.vehicles||[]).filter(bf);
-  openModal('🚌 Fleet — Vehicles',`${rows.length} vehicle(s)`,rows,_TR_VCOLS());
-}
-// Full detail grid for one vehicle (all Vehicle_Master fields).
-function _vehicleDetailHTML(v){
-  const F=(l,val)=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px dashed #EEF2F7;"><span style="color:#64748B;font-size:11px;">${l}</span><span style="color:#0F172A;font-size:11.5px;font-weight:600;text-align:right;">${(val===undefined||val===null||val===''||val==='–')?'–':val}</span></div>`;
-  const D=x=>(x&&x!=='–'&&typeof fmtDispDate==='function')?fmtDispDate(x):(x||'–');
-  const sec=(t,items)=>`<div style="flex:1;min-width:240px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px;"><div style="font-weight:800;font-size:11.5px;color:#1E4FD8;text-transform:uppercase;margin-bottom:6px;">${t}</div>${items}</div>`;
-  return '<div style="display:flex;flex-wrap:wrap;gap:10px;">'
-    +sec('Vehicle', F('Vehicle No',v.VehicleNo)+F('Vehicle ID',v.VehicleID)+F('Category',v.Category)+F('Make / Company',v.Make)+F('Fuel',v.Fuel)+F('AC / Non-AC',v.AC)+F('Seating',v.Seats)+F('Purchase Year',v.PurchaseYear)+F('Engine No',v.EngineNo)+F('Chassis No',v.ChassisNo)+F('GPS',v.GPS)+F('Status',v.Status)+F('Reg. Date',D(v.RegDate)))
-    +sec('Driver & Attender', F('Driver',v.Driver)+F('Driver Contact',v.DriverContact)+F('Driver Licence',v.DriverLicence)+F('Heavy Licence Exp',D(v.HeavyLicenceExp))+F('Driver Emp ID',v.DriverEmpId)+F('Attender',v.Attender)+F('Attender Contact',v.AttenderContact))
-    +sec('Documents & Compliance', F('Compliance',v.Compliance)+F('Days To Expiry',v.DaysToExpiry)+F('Earliest Doc Exp',D(v.EarliestDocExp))+F('RC',v.RC)+F('Insurance No',v.InsuranceNo)+F('Insurance Co',v.InsuranceCompany)+F('Insurance Exp',D(v.InsuranceExp))+F('Permit No',v.PermitNo)+F('Permit Exp',D(v.PermitExp))+F('Fitness No',v.FitnessNo)+F('Fitness Exp',D(v.FitnessExp))+F('PUC No',v.PucNo)+F('PUC Exp',D(v.PucExp))+F('Road Tax No',v.RoadTaxNo)+F('Road Tax Exp',D(v.RoadTaxExp))+F('Labour Cert No',v.LabourCertNo)+F('Labour Cert Exp',D(v.LabourCertExp)))
-    +sec('Safety & Service', F('Fire Extinguisher',v.FireExt)+F('Medical Kit',v.MedKit)+F('Tool Kit',v.ToolKit)+F('Spare Wheel',v.SpareWheel)+F('Last Service',D(v.LastServiceDate))+F('Last Service KM',v.LastServiceKM)+F('Next Service Due',D(v.NextServiceDue))+F('Next Service KM',v.NextServiceKM)+F('Service Vendor',v.ServiceVendor)+F('Remarks',v.Remarks))
-    +'</div>';
-}
-function _TR_VCOLS(){ return [{key:'Branch',label:'Branch'},{key:'VehicleNo',label:'Vehicle No'},{key:'Category',label:'Type'},{key:'Seats',label:'Seats'},{key:'Fuel',label:'Fuel'},{key:'Driver',label:'Driver',maxW:'150px'},{key:'GPS',label:'GPS'},{key:'Compliance',label:'Compliance',pill:true},{key:'DaysToExpiry',label:'Days To Expiry'},{key:'EarliestDocExp',label:'Earliest Doc Exp',date:true}]; }
-
-// ══════════════════ IT REPORT ══════════════════
-function _itData(){ return (window._IT&&typeof window._IT==='object')?window._IT:{assets:[],health:[]}; }
-// Animated SVG logo per system category (CSS keyframes injected once).
-function _itAnimStyle(){
-  if(document.getElementById('it-anim-style'))return;
-  const s=document.createElement('style'); s.id='it-anim-style';
-  s.textContent='@keyframes itpulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.12);opacity:.75}}'
-    +'@keyframes itspin{from{transform:rotate(0)}to{transform:rotate(360deg)}}'
-    +'@keyframes itblink{0%,100%{opacity:1}50%{opacity:.25}}'
-    +'.it-ic{width:56px;height:56px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:30px;box-shadow:0 6px 16px rgba(30,79,216,.18);}'
-    +'.it-ic.a1{animation:itpulse 1.8s ease-in-out infinite}.it-ic.a2{animation:itblink 1.6s ease-in-out infinite}.it-ic.a3{animation:itspin 6s linear infinite}';
-  document.head.appendChild(s);
-}
-function _itLogo(system){
-  const s=String(system||'').toLowerCase();
-  let emoji='🖥️',bg='linear-gradient(135deg,#EEF2FF,#DBEAFE)',anim='a1';
-  if(/cctv|camera/.test(s)){emoji='📹';bg='linear-gradient(135deg,#FEE2E2,#FECACA)';anim='a2';}
-  else if(/nvr|dvr/.test(s)){emoji='🎛️';bg='linear-gradient(135deg,#E0E7FF,#C7D2FE)';anim='a1';}
-  else if(/pa system|speaker|announce/.test(s)){emoji='📢';bg='linear-gradient(135deg,#FEF3C7,#FDE68A)';anim='a2';}
-  else if(/intercom|phone/.test(s)){emoji='☎️';bg='linear-gradient(135deg,#DCFCE7,#BBF7D0)';anim='a1';}
-  else if(/wifi|internet|network|switch|router/.test(s)){emoji='📶';bg='linear-gradient(135deg,#DBEAFE,#BFDBFE)';anim='a2';}
-  else if(/firewall|security/.test(s)){emoji='🛡️';bg='linear-gradient(135deg,#FEE2E2,#FCA5A5)';anim='a1';}
-  else if(/gps/.test(s)){emoji='🛰️';bg='linear-gradient(135deg,#E0E7FF,#A5B4FC)';anim='a3';}
-  else if(/smart board|ifp|projector/.test(s)){emoji='📽️';bg='linear-gradient(135deg,#F3E8FF,#E9D5FF)';anim='a1';}
-  else if(/computer|desktop|pc/.test(s)){emoji='🖥️';bg='linear-gradient(135deg,#EEF2FF,#DBEAFE)';anim='a1';}
-  else if(/laptop/.test(s)){emoji='💻';bg='linear-gradient(135deg,#EEF2FF,#DBEAFE)';anim='a1';}
-  else if(/printer/.test(s)){emoji='🖨️';bg='linear-gradient(135deg,#F1F5F9,#E2E8F0)';anim='a2';}
-  else if(/biometric|attendance/.test(s)){emoji='🫆';bg='linear-gradient(135deg,#DCFCE7,#A7F3D0)';anim='a1';}
-  else if(/email|erp|account|user/.test(s)){emoji='📧';bg='linear-gradient(135deg,#DBEAFE,#BFDBFE)';anim='a2';}
-  else if(/server/.test(s)){emoji='🗄️';bg='linear-gradient(135deg,#E2E8F0,#CBD5E1)';anim='a3';}
-  else if(/ups|power|battery/.test(s)){emoji='🔋';bg='linear-gradient(135deg,#DCFCE7,#BBF7D0)';anim='a2';}
-  else if(/all systems/.test(s)){emoji='🧩';bg='linear-gradient(135deg,#EEF2FF,#F0FDFA)';anim='a3';}
-  return `<div class="it-ic ${anim}" style="background:${bg}">${emoji}</div>`;
-}
-function renderIT(){
-  _itAnimStyle();
-  const D=_itData();
-  const bl=fBranch==='ALL'?'All Branches':fBranch;
-  const fn=document.getElementById('it-fn'); if(fn)fn.textContent=bl;
-  if(!document.getElementById('it-total')) return;
-  const healthAllSys=(D.health||[]).filter(r=>fBranch==='ALL'||r.Branch===fBranch);
-  const assetsAllSys=(D.assets||[]).filter(r=>fBranch==='ALL'||r.Branch===fBranch);
-  const baseAll=healthAllSys.length?healthAllSys:assetsAllSys;
-
-  // Populate the system-category dropdown from all systems present
-  const sel=document.getElementById('it-sys-sel');
-  const allSystems=[...new Set(baseAll.map(r=>r.System).filter(x=>x&&x!=='–'))].sort();
-  if(sel){
-    const cur=sel.value;
-    sel.innerHTML='<option value="ALL">All Systems</option>'+allSystems.map(s=>`<option value="${_escAttr(s)}">${s}</option>`).join('');
-    sel.value=(cur&&(cur==='ALL'||allSystems.includes(cur)))?cur:'ALL';
-  }
-  const sys=sel?sel.value:'ALL';
-  window._IT_SYS=sys;
-
-  // Update the animated logo + summary
-  const logoEl=document.getElementById('it-logo'); if(logoEl)logoEl.innerHTML=_itLogo(sys==='ALL'?'all systems':sys);
-
-  // Filter to the selected system
-  const health=(sys==='ALL')?healthAllSys:healthAllSys.filter(r=>r.System===sys);
-  const assets=(sys==='ALL')?assetsAllSys:assetsAllSys.filter(r=>r.System===sys);
-  const src=health.length?health:assets;
-  if(!src.length){
-    ['it-total','it-health','it-down','it-pend'].forEach(id=>setTxt(id,'–'));
-    const tb=document.getElementById('it-tbody'); if(tb)tb.innerHTML='<tr><td colspan="6" class="no-data">No IT data for this selection. (Add "IT Assets" &amp; "IT Data" sheets if empty.)</td></tr>';
-    ['it-branch','it-system'].forEach(id=>{const e=document.getElementById(id); if(e)mkChart(id,{type:'bar',data:{labels:[],datasets:[]},options:{responsive:true,maintainAspectRatio:true}});});
-    const su=document.getElementById('it-sys-summary'); if(su)su.textContent='';
-    return;
-  }
-  const total=src.reduce((s,r)=>s+(+r.Total||0),0);
-  const working=health.reduce((s,r)=>s+(+r.Working||0),0);
-  const down=health.reduce((s,r)=>s+(+r.NotWorking||0),0);
-  const pend=health.reduce((s,r)=>s+(+r.Pending||0),0);
-  const healthPct=total>0?Math.round(working/total*100):(health.length?Math.round(health.reduce((s,r)=>s+(+r.Health||0),0)/health.length):0);
-  setTxt('it-total',fi(total)); setTxt('it-health',healthPct+'%'); setTxt('it-down',fi(down)); setTxt('it-pend',fi(pend));
-  const su=document.getElementById('it-sys-summary');
-  if(su)su.innerHTML=(sys==='ALL'?'<strong>'+allSystems.length+'</strong> system categories':'<strong>'+sys+'</strong>')
-    +' · <span style="color:#059669;font-weight:700;">'+healthPct+'% healthy</span>';
-
-  // Assets by branch (for the selected system) — click to view
-  const scope=fBranch==='ALL'?['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam']:[fBranch];
-  const srcB=health.length?health:assets;
-  const bTot={}; scope.forEach(b=>bTot[b]=srcB.filter(r=>r.Branch===b).reduce((s,r)=>s+(+r.Total||0),0));
-  const bLabels=scope.filter(b=>bTot[b]>0);
-  window._IT_BRANCHES=bLabels;
-  mkChart('it-branch',{type:'bar',data:{labels:bLabels,datasets:[{label:'Assets',data:bLabels.map(b=>bTot[b]),backgroundColor:'#1E4FD8',borderRadius:5,maxBarThickness:46}]},
-    options:{responsive:true,maintainAspectRatio:true,onClick:(e,el)=>{if(el&&el.length)viewIT('branch',bLabels[el[0].index]);},
-      plugins:{legend:{display:false},datalabels:{display:true,anchor:'end',align:'top',color:'#0F172A',font:{size:11,weight:'bold'},formatter:v=>fi(v)}},
-      layout:{padding:{top:18}},scales:{y:{beginAtZero:true,grid:{color:'#E0E8FF'}},x:{grid:{display:false}}}}});
-
-  // System health — working/down/pending; click a bar to view that system's records
-  const bySys={};
-  srcB.forEach(r=>{ const k=r.System||'–'; if(!bySys[k])bySys[k]={t:0,w:0,d:0,p:0}; bySys[k].t+=(+r.Total||0); bySys[k].w+=(+r.Working||0); bySys[k].d+=(+r.NotWorking||0); bySys[k].p+=(+r.Pending||0); });
-  const sysTop=Object.entries(bySys).sort((a,b)=>b[1].t-a[1].t).slice(0,12);
-  window._IT_SYSLABELS=sysTop.map(s=>s[0]);
-  mkChart('it-system',{type:'bar',data:{labels:sysTop.map(s=>s[0]),datasets:[
-    {label:'Working',data:sysTop.map(s=>s[1].w),backgroundColor:'#059669'},
-    {label:'Down',data:sysTop.map(s=>s[1].d),backgroundColor:'#DC2626'},
-    {label:'Pending',data:sysTop.map(s=>s[1].p),backgroundColor:'#F59E0B'}]},
-    options:{indexAxis:'y',responsive:true,maintainAspectRatio:true,onClick:(e,el)=>{if(el&&el.length)viewIT('system',null,window._IT_SYSLABELS[el[0].index]);},
-      plugins:{legend:{position:'bottom',labels:{font:{size:10},usePointStyle:true}},datalabels:{display:false}},
-      scales:{x:{stacked:true,beginAtZero:true,grid:{color:'#E0E8FF'}},y:{stacked:true,grid:{display:false},ticks:{font:{size:10}}}}}});
-
-  // Lowest-health systems table (click a row to view that branch+system record)
-  const tb=document.getElementById('it-tbody');
-  if(tb){
-    const rows=srcB.map(r=>({...r,hp:(+r.Total>0&&r.Working!=null)?Math.round((+r.Working)/(+r.Total)*100):(+r.Health||0)}))
-      .filter(r=>+r.Total>0).sort((a,b)=>a.hp-b.hp).slice(0,14);
-    tb.innerHTML=rows.map(r=>{
-      const hc=r.hp>=90?'#059669':r.hp>=70?'#D97706':'#DC2626';
-      return `<tr style="cursor:pointer" onclick="viewIT('system','${_escAttr(r.Branch)}','${_escAttr(r.System)}')">
-        <td style="padding:8px 10px;border-bottom:1px solid #F1F5F9;"><span class="bd b${r.Branch}"></span> ${r.Branch}</td>
-        <td style="padding:8px 10px;border-bottom:1px solid #F1F5F9;">${r.System}</td>
-        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${fi(+r.Total||0)}</td>
-        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;color:#059669;">${fi(+r.Working||0)}</td>
-        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;color:#DC2626;">${fi(+r.NotWorking||0)}</td>
-        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;font-weight:700;color:${hc}">${r.hp}%</td></tr>`;
-    }).join('')||'<tr><td colspan="6" class="no-data">No data</td></tr>';
-  }
-}
-function viewIT(kind,branch,system){
-  const D=_itData(); const health=D.health||[]; const assets=D.assets||[];
-  const base=(health.length?health:assets);
-  // Honor the currently-selected system category (dropdown) unless a specific system was clicked.
-  const selSys=(window._IT_SYS && window._IT_SYS!=='ALL')?window._IT_SYS:null;
-  const sysFilter=system||selSys||null;
-  const bf=r=>(!branch)?(fBranch==='ALL'||r.Branch===fBranch):(r.Branch===branch);
-  let rows=base.filter(bf);
-  if(sysFilter) rows=rows.filter(r=>r.System===sysFilter);
-  if(kind==='down') rows=rows.filter(r=>(+r.NotWorking||0)>0);
-  else if(kind==='pending') rows=rows.filter(r=>(+r.Pending||0)>0);
-  const cols=[{key:'Branch',label:'Branch'},{key:'System',label:'System'},{key:'Total',label:'Total'},{key:'Working',label:'Working'},{key:'NotWorking',label:'Not Working'},{key:'Pending',label:'Pending'},{key:'Health',label:'Health %'},{key:'Remarks',label:'Remarks',maxW:'240px'}];
-  const bl=branch||(fBranch==='ALL'?'All Branches':fBranch);
-  const sysLabel=sysFilter?(' · '+sysFilter):'';
-  const title=kind==='down'?'🔴 Not-Working Assets':kind==='pending'?'⏳ Pending Assets':(kind==='system'&&system)?('🖥️ '+system):'🖥️ IT Assets';
-  openModal(title,`${rows.length} record(s) · ${bl}${sysLabel}`,rows,cols);
-}
-
-
-function _origRenderAll(){
-  // Each render is isolated: if one throws on unexpected live data, the rest still render.
-  const steps=[
-    ['Overview',renderOverview],['GrievanceOfficer',renderGrievanceOfficer],['HR',renderHR],['Rankings',renderRankings],['Insights',renderInsights],
-    ['Care',renderCare],['Observations',renderObservations],['Admin',renderAdmin],
-    ['Vigilance',renderVigilance],['Purchase',renderPurchase],
-    ['Admissions',renderAdmissions],['Grievance',renderGrievance],
-    ['Transport',renderTransport],['IT',renderIT]
-  ];
-  steps.forEach(function(s){
-    try{ s[1](); }
-    catch(err){ console.error('render '+s[0]+' failed:',err && err.message, err && err.stack); }
-  });
+  // the monthly volume chart was replaced by the stage-group infographic
 }
 document.addEventListener('DOMContentLoaded',()=>{ if(_liveDataLoaded) renderAll(); /* else: live loader will call renderAll() once data arrives */ });
 </script>
@@ -11725,6 +11693,61 @@ async function loadCivil(force){
   }
   if(document.readyState==='complete') setTimeout(start,1800);
   else window.addEventListener('load',function(){ setTimeout(start,1800); });
+})();
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   GRIEVANCE — stage-group infographic
+   Reuses the Care Calls language engine so both tabs group and colour the same
+   way, which is what makes them comparable at a glance.
+   ══════════════════════════════════════════════════════════════════════════ */
+(function(){
+  var PALETTE={
+    'Academics':'#3B82F6','Academic':'#3B82F6','Behaviour / Wellbeing':'#EF4444',
+    'Behaviour':'#EF4444','Administration':'#8B5CF6','Admin':'#8B5CF6',
+    'Transport':'#14B8A6','Co Curricular':'#EC4899','Co-Curricular':'#EC4899',
+    'New Admission':'#0EA5E9','Fees':'#F59E0B','Infrastructure':'#0D9488',
+    'Discipline':'#DC2626','Health':'#10B981','Communication':'#6366F1',
+    'No Concern':'#22C55E','Other':'#94A3B8','Everything else':'#CBD5E1'
+  };
+  function render(){
+    var el=document.getElementById('griev-stage'); if(!el) return;
+    var G=(typeof GRIEVANCE_DATA!=='undefined'&&Array.isArray(GRIEVANCE_DATA))?GRIEVANCE_DATA:[];
+    var BR=['Boduppal','Keesara','Pocharam','Bachupally','Gowdavalli'];
+    var scope=(fBranch==='ALL')?BR:[fBranch];
+    var rows=G.filter(function(r){ return scope.indexOf(r.Branch)>=0; });
+    if(!rows.length){ el.innerHTML='<div class="no-data">No grievance records for this filter.</div>'; return; }
+
+    el.innerHTML=CARE_NLP.stageGroupHTML(
+      rows,
+      function(r){ return r.Grade; },
+      function(r){ return (r.Category&&r.Category!=='–')?r.Category:'Other'; },
+      PALETTE, {unit:'cases'});
+
+    /* the same negation-aware read, applied to the case description */
+    var neg=0, tot=0;
+    rows.forEach(function(r){
+      var t=[(r.Description!=='–'?r.Description:''),(r.ActionTaken!=='–'?r.ActionTaken:''),
+             (r.Remarks!=='–'?r.Remarks:'')].join(' ');
+      if(!t.trim()) return;
+      tot++;
+      if(CARE_NLP.score(t).label==='Negative') neg++;
+    });
+    if(tot){
+      el.innerHTML+='<div class="sg-note"><b>'+Math.round(neg/tot*100)+'%</b> of the '+tot+
+        ' cases carrying a written description read negatively once negation is taken into account '+
+        '(&ldquo;not resolved&rdquo;, &ldquo;still waiting&rdquo;). The severity field is set by the '+
+        'person logging the case; this is read from what was actually written about it.</div>';
+    }
+    var fn=document.getElementById('griev-stage-fn');
+    if(fn) fn.textContent=(fBranch==='ALL'?'All branches':fBranch)+' \u00b7 '+rows.length+' cases grouped by the child\u2019s grade';
+  }
+  var _o=window.renderGrievance;
+  if(typeof _o==='function'){
+    window.renderGrievance=function(){ var r=_o.apply(this,arguments); try{ render(); }catch(e){} return r; };
+  }
+  window.__renderGrievStage=render;
 })();
 </script>
 </body>
