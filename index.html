@@ -12234,6 +12234,15 @@ async function loadCivil(force){
 (function(){
   var ACADEMIC = /^(academics?|academic|studies|study|teaching|learning|exam|homework)/i;
   var NOT_A_CONCERN = /^(no concern|not answering|no response)/i;
+  var NO_ANS = /not\s*answer|no\s*answer|no\s*response|not\s*respond|not\s*reach|switch(ed)?\s*off|not\s*picked|busy|call\s*back/i;
+
+  /* The language engine lives in another script block. If anything ever stops
+     it loading, this table must still work, so the not-answered test falls back
+     to reading the row directly rather than the whole card disappearing. */
+  function unanswered(r){
+    try{ if(window.CARE_NLP && CARE_NLP.isNoAnswer) return CARE_NLP.isNoAnswer(r); }catch(e){}
+    return NO_ANS.test(String(r.Grievance||'')+' '+String(r.Status||'')+' '+String(r.Remarks||''));
+  }
 
   function build(){
     var el=document.getElementById('ccr-table'); if(!el) return;
@@ -12249,10 +12258,20 @@ async function loadCivil(force){
 
     var data=scope.map(function(b){
       var rs=rows.filter(function(r){ return r.Branch===b; });
+      /* Total strength comes from the branch tracker. Where that is not
+         available the master sheet is used instead — the distinct students it
+         actually covers — and the column is marked so the two are never
+         mistaken for each other. */
       var strength=+(SB[b]||0);
+      var fromSheet=false;
+      if(!strength){
+        var all={};
+        rs.forEach(function(r){ var k=String(r.Student||'').trim().toLowerCase(); if(k) all[k]=1; });
+        strength=Object.keys(all).length; fromSheet=true;
+      }
 
       /* a call only counts as contact if somebody answered it */
-      var answered=rs.filter(function(r){ return !CARE_NLP.isNoAnswer(r); });
+      var answered=rs.filter(function(r){ return !unanswered(r); });
       var students={};
       answered.forEach(function(r){ var k=String(r.Student||'').trim().toLowerCase(); if(k) students[k]=1; });
       var reached=Object.keys(students).length||answered.length;
@@ -12264,7 +12283,7 @@ async function loadCivil(force){
 
       var acaN=aca.length, nonN=non.length, acaD=done(aca), nonD=done(non);
       return {
-        b:b, strength:strength, calls:rs.length, reached:reached,
+        b:b, strength:strength, fromSheet:fromSheet, calls:rs.length, reached:reached,
         contactPct: strength?Math.round(reached/strength*100):null,
         aca:acaN, acaD:acaD, non:nonN, nonD:nonD,
         pending:(acaN+nonN)-(acaD+nonD)
@@ -12296,7 +12315,8 @@ async function loadCivil(force){
       +data.map(function(d){
         return '<tr>'
           +'<td class="nm">'+d.b+'</td>'
-          +'<td>'+(d.strength?fi(d.strength):'\u2014')+'</td>'
+          +'<td>'+(d.strength?fi(d.strength):'\u2014')
+            +(d.fromSheet?'<span class="sub">from master sheet</span>':'')+'</td>'
           +'<td>'+fi(d.calls)+'</td>'
           +'<td>'+fi(d.reached)+(d.contactPct!==null?'<span class="sub">'+d.contactPct+'% of strength</span>':'')+'</td>'
           +'<td>'+fi(d.aca)+'</td>'
@@ -12374,11 +12394,39 @@ async function loadCivil(force){
     }
   };
 
-  window.__renderComplianceReport=build;
+  /* An empty card tells nobody anything, so a failure is written into it. */
+  function safeBuild(){
+    try{ build(); }
+    catch(err){
+      var el=document.getElementById('ccr-table');
+      if(el) el.innerHTML='<div class="no-data" style="color:var(--r)">The compliance report could not be built: '
+        +String(err&&err.message||err)+'</div>';
+    }
+  }
+  window.__renderComplianceReport=safeBuild;
+
+  /* Drawn from several points rather than one. It used to hang off renderCare
+     alone, and if that threw part-way through on live data the step was caught
+     upstream and this card was simply never reached — which is exactly how it
+     ended up blank while every other panel on the tab was fine. */
   var _o=window.renderCare;
   if(typeof _o==='function'){
-    window.renderCare=function(){ var r=_o.apply(this,arguments); try{ build(); }catch(e){} return r; };
+    window.renderCare=function(){
+      var r;
+      try{ r=_o.apply(this,arguments); } finally { safeBuild(); }
+      return r;
+    };
   }
+  var _af=window.applyFilters;
+  if(typeof _af==='function'){
+    window.applyFilters=function(){ var r=_af.apply(this,arguments); safeBuild(); return r; };
+  }
+  var _st=window.showTab;
+  if(typeof _st==='function'){
+    window.showTab=function(id,btn){ var r=_st(id,btn); if(id==='care') safeBuild(); return r; };
+  }
+  /* and once the live payload has landed */
+  setTimeout(safeBuild,1500); setTimeout(safeBuild,4000);
 })();
 </script>
 </body>
