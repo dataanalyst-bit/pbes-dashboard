@@ -301,6 +301,16 @@ body.nav-min .sn-foot{display:none}
 .ccr tfoot td{background:#0B5D33;color:#fff;font-weight:800;border-color:#0B5D33}
 .ccr tfoot td.nm{text-align:left}
 .ccr .pend{font-weight:800}
+.hrs{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;min-width:620px}
+.hrs th{background:#EEF2FF;color:#1E4FD8;font-size:10.5px;font-weight:700;text-transform:uppercase;
+  padding:8px 11px;border-bottom:2px solid #E0E8FF;text-align:center;line-height:1.25}
+.hrs th.nm{text-align:left}
+.hrs td{padding:8px 11px;border-bottom:1px solid #E0E8FF;text-align:center}
+.hrs td.nm{text-align:left;font-weight:700;color:var(--tx)}
+.hrs td.hrs-c{cursor:pointer;transition:background .12s}
+.hrs td.hrs-c:hover{background:var(--pl);box-shadow:inset 0 0 0 2px var(--p)}
+.hr-cell{cursor:pointer;transition:background .12s}
+.hr-cell:hover{background:#EEF2FF!important;box-shadow:inset 0 0 0 2px #1E4FD8}
 .ccr td.ccr-c{cursor:pointer;position:relative;transition:background .12s}
 .ccr td.ccr-c:hover{background:#DCF3E6!important;box-shadow:inset 0 0 0 2px #0B5D33}
 .ccr tfoot td.ccr-c:hover{background:#0A7A41!important;box-shadow:inset 0 0 0 2px #F2C230}
@@ -1135,7 +1145,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           <tbody id="hr-speed-tbody"></tbody>
         </table>
       </div>
-      <div class="cb" style="margin-top:8px;"><div class="cw" style="height:180px;"><canvas id="hr-score-chart"></canvas></div></div>
+      <div class="cb" style="margin-top:8px;overflow-x:auto;"><div id="hr-score-table"></div></div>
     </div>
   </div>
 
@@ -1592,14 +1602,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   <!-- Charts row 1 -->
   <div class="row r2">
-    <div class="card"><div class="ch"><h3>🏫 Cases by Branch &amp; Status</h3><span class="fnote">Click a segment to drill in</span></div><div class="cb"><div class="cw tall"><canvas id="gr-branch"></canvas></div></div></div>
-    <div class="card"><div class="ch"><h3>⚠️ Severity Distribution</h3><span class="fnote">Click a slice to view</span></div><div class="cb"><div class="cw tall"><canvas id="gr-severity"></canvas></div></div></div>
+    <div class="card"><div class="ch"><h3>🏫 Cases by Branch &amp; Status</h3><span class="fnote">Open work only — click a segment to drill in</span></div><div class="cb"><div class="cw tall"><canvas id="gr-branch"></canvas></div></div></div>
   </div>
 
   <!-- Charts row 2 -->
   <div class="row r2">
     <div class="card"><div class="ch"><h3>📋 Category Breakdown</h3><span class="fnote">Click a bar to view</span></div><div class="cb"><div class="cw tall"><canvas id="gr-category"></canvas></div></div></div>
-    <div class="card"><div class="ch"><h3>😊 Parent Satisfaction by Branch</h3><span class="fnote">Click a segment to view</span></div><div class="cb"><div class="cw tall"><canvas id="gr-satchart"></canvas></div></div></div>
+
   </div>
 
   <!-- Stage groups: which part of the school the cases come from -->
@@ -1609,11 +1618,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="cb"><div id="griev-stage"></div></div>
   </div>
 
-  <!-- Charts row 3 — closure turnaround (raised date → closure date) -->
-  <div class="row r2">
-    <div class="card"><div class="ch"><h3>⚡ Closure Turnaround — raised date vs closed date</h3><span class="fnote">Click a segment to view those cases</span></div><div class="cb"><div class="cw tall"><canvas id="gr-turnaround"></canvas></div></div></div>
-    <div class="card"><div class="ch"><h3>📅 Same-Day Closure Rate</h3><span class="fnote" id="gr-sameday-fn">Share of closed cases settled on the day they were raised</span></div><div class="cb"><div class="cw tall"><canvas id="gr-samedaychart"></canvas></div></div></div>
-  </div>
+
 
   <!-- Grievance Performance Ranking -->
   <div class="card" style="margin-bottom:16px;">
@@ -3979,7 +3984,10 @@ function renderGrievance(){
   setTxt('gr-sat-s', satYes+' of '+satRated.length+' rated');
 
   // ── Chart 1: Cases by Branch & Status (stacked) ──
-  const statusCats=['Resolved','In Progress','Escalated','Open','Pending Parent Response'];
+  // Resolved is left out on purpose. It dwarfs every other status, so the bars
+  // for the work that still needs doing were squeezed into a sliver. This chart
+  // is now about open work; the resolved count is on the KPI tile above.
+  const statusCats=['In Progress','Escalated','Open','Pending Parent Response'];
   const statusColors={'Resolved':'#059669','In Progress':'#3B82F6','Escalated':'#DC2626','Open':'#D97706','Pending Parent Response':'#7C3AED'};
   const brData=statusCats.map(st=>ALLB.map(b=>rows.filter(r=>r.Branch===b&&(r.Status||'')===st).length));
   mkChart('gr-branch',{type:'bar',
@@ -3992,16 +4000,9 @@ function renderGrievance(){
         datalabels:{display:true,color:'#fff',font:{size:10,weight:'bold'},formatter:v=>v>0?v:''}},
       scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,title:{display:true,text:'Cases'}}}}});
 
-  // ── Chart 2: Severity Distribution (doughnut) ──
-  const sevCats=['Critical','High','Medium','Low'];
-  const sevColors={'Critical':'#991B1B','High':'#DC2626','Medium':'#D97706','Low':'#059669'};
-  const sevData=sevCats.map(s=>rows.filter(r=>(r.Severity||'')===s).length);
-  mkChart('gr-severity',{type:'doughnut',
-    data:{labels:sevCats,datasets:[{data:sevData,backgroundColor:sevCats.map(s=>sevColors[s]),borderWidth:2,borderColor:'#fff'}]},
-    options:{responsive:true,maintainAspectRatio:true,
-      onClick:(evt,els)=>{ if(!els||!els.length)return; viewGrievBySeverity(sevCats[els[0].index]); },
-      plugins:{legend:{display:true,position:'right'},
-        datalabels:{display:true,color:'#fff',font:{size:12,weight:'bold'},formatter:(v)=>v>0?v:''}}}});
+
+  // Severity Distribution chart removed: severity is set by whoever logs the case,
+  // so it measured the logger more than the school.
 
   // ── Chart 3: Category Breakdown (horizontal bar) ──
   const catCounts={};
@@ -4015,18 +4016,8 @@ function renderGrievance(){
         datalabels:{display:true,anchor:'end',align:'right',color:'#1E293B',font:{size:10,weight:'bold'}}},
       scales:{x:{beginAtZero:true,title:{display:true,text:'Cases'}}}}});
 
-  // ── Chart 4: Parent Satisfaction by Branch (stacked) ──
-  const satCats=['Satisfied','Partially Satisfied','Not Satisfied'];
-  const satColors={'Satisfied':'#059669','Partially Satisfied':'#D97706','Not Satisfied':'#DC2626'};
-  const satBr=satCats.map(sc=>ALLB.map(b=>rows.filter(r=>r.Branch===b&&(r.ParentSatisfaction||'')===sc).length));
-  mkChart('gr-satchart',{type:'bar',
-    data:{labels:ALLB,datasets:satCats.map((sc,si)=>({label:sc,data:satBr[si],backgroundColor:satColors[sc],borderRadius:4,stack:'s'}))},
-    options:{responsive:true,maintainAspectRatio:true,
-      onClick:(evt,els)=>{ if(!els||!els.length)return;
-        viewGrievBySatisfaction(ALLB[els[0].index],satCats[els[0].datasetIndex]); },
-      plugins:{legend:{display:true,position:'top'},
-        datalabels:{display:true,color:'#fff',font:{size:10,weight:'bold'},formatter:v=>v>0?v:''}},
-      scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,title:{display:true,text:'Responses'}}}}});
+  // Parent Satisfaction by Branch chart removed: it read the Parent Satisfaction
+  // column, which is filled on only a fraction of cases.
 
   // ── Performance Scorecard ──
   renderGrievRanking(rows, ALLB);
@@ -4550,8 +4541,8 @@ function renderHR(){
         <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:700;font-size:14px;color:${k.compliance>=4.5?'#059669':'#D97706'}">${k.compliance}</td>
         <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;"><span style="font-size:18px;font-weight:900;color:${scoreColor}">${k.overall}</span></td>
         <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;"><span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;${badge};">${rIcon} ${k.rating}</span></td>
-        <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:700;color:#059669;font-size:13px;">${k.closed}</td>
-        <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:700;color:${k.open>5?'#DC2626':'#D97706'};font-size:13px;">${k.open}</td>
+        <td class="hr-cell" onclick="event.stopPropagation();viewHRByRecruiter('${h.replace(/'/g,"\\\\'")}','Closed')" title="Click to view the closed positions" style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:700;color:#059669;font-size:13px;">${k.closed}</td>
+        <td class="hr-cell" onclick="event.stopPropagation();viewHRByRecruiter('${h.replace(/'/g,"\\\\'")}','Open')" title="Click to view the open positions" style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:700;color:${k.open>5?'#DC2626':'#D97706'};font-size:13px;">${k.open}</td>
       </tr>`;
     }).join('');
     }
@@ -4632,23 +4623,43 @@ function renderHR(){
     const closed=allRec.filter(r=>r.HR===h&&isClosed(r.Status));
     const dtc=closed.map(r=>hrCloseDays(r)).filter(v=>v!==null&&v>=0);
     const avg=dtc.length>0?(dtc.reduce((a,b)=>a+b,0)/dtc.length):0;
-    return {h,avg:+avg.toFixed(1)};
+    // the speed buckets are carried here too, so the table can show the mix
+    // behind the average rather than only its length
+    return {h, avg:+avg.toFixed(1),
+            fast:dtc.filter(v=>v<=7).length,
+            med:dtc.filter(v=>v>7&&v<=21).length,
+            slow:dtc.filter(v=>v>21).length,
+            total:dtc.length};
   }).sort((a,b)=>a.avg-b.avg);
-  mkChart('hr-score-chart',{type:'bar',data:{
-    labels:recStatsSorted.map(s=>s.h),
-    datasets:[{
-      label:'Avg Days to Close',
-      data:recStatsSorted.map(s=>s.avg),
-      backgroundColor:recStatsSorted.map(s=>s.avg<=7?'#059669':s.avg<=21?'#D97706':'#DC2626'),
-      borderRadius:4,barThickness:16,
-    }]
-  },options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
-    plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.raw} days avg closure`}},
-      datalabels:{anchor:'end',align:'right',font:{weight:'800',size:11},
-        color:ctx=>recStatsSorted[ctx.dataIndex].avg<=7?'#059669':recStatsSorted[ctx.dataIndex].avg<=21?'#D97706':'#DC2626',
-        formatter:v=>v+'d'}},
-    scales:{x:{beginAtZero:true,grid:{color:'#E0E8FF'},ticks:{callback:v=>v+'d'}},y:{grid:{display:false}}}
-  }});
+  // ── Average days to close, as a table rather than a bar chart ──
+  // A bar only shows the length; the table shows the length, the mix behind it
+  // and opens the positions themselves.
+  (function(){
+    var el=document.getElementById('hr-score-table'); if(!el) return;
+    if(!recStatsSorted.length){ el.innerHTML='<div class="no-data">No closed positions yet.</div>'; return; }
+    var mx=Math.max.apply(null,recStatsSorted.map(function(s){ return s.avg||0; }))||1;
+    el.innerHTML='<table class="hrs"><thead><tr>'
+      +'<th class="nm">Recruiter</th><th>Avg days<br>to close</th><th></th>'
+      +'<th>Fast<br>&le;7d</th><th>Medium<br>8&ndash;21d</th><th>Slow<br>&gt;21d</th><th>Closed</th></tr></thead><tbody>'
+      +recStatsSorted.map(function(s){
+        var col=s.avg<=7?'#059669':s.avg<=21?'#D97706':'#DC2626';
+        var tot=(s.total!==undefined)?s.total:((s.fast||0)+(s.med||0)+(s.slow||0));
+        function c(v,kind,colr){
+          return '<td class="hrs-c" data-h="'+String(s.h).replace(/"/g,'&quot;')+'" data-k="'+kind+'"'
+            +(colr?' style="color:'+colr+';font-weight:700"':'')+' title="Click to view these positions">'+v+'</td>';
+        }
+        return '<tr><td class="nm">'+s.h+'</td>'
+          +'<td style="font-weight:800;color:'+col+'">'+s.avg+'d</td>'
+          +'<td style="width:150px"><div class="au-bar"><i style="width:'+(s.avg/mx*100)+'%;background:'+col+'"></i></div></td>'
+          +c(s.fast||0,'fast','#059669')+c(s.med||0,'med','#D97706')+c(s.slow||0,'slow','#DC2626')
+          +c(tot,'closed','')
+          +'</tr>';
+      }).join('')+'</tbody></table>'
+      +'<p class="au-note" style="margin-top:10px">Ranked by average closure speed. Every count opens the positions behind it.</p>';
+    el.querySelectorAll('.hrs-c').forEach(function(td){
+      td.addEventListener('click',function(){ viewHRSpeed(td.dataset.h, td.dataset.k); });
+    });
+  })();
 
   // Priority chart
   const hiData=activeHRs.map(h=>{
@@ -4786,6 +4797,41 @@ function viewHRKpi(status){
 }
 
 // Drill-down by recruiter (status: ALL/Open/Closed/Hold)
+/* Positions behind one speed bucket. The same day-count test the table used to
+   put the position in that bucket decides what appears here, so the list is
+   always the size of the number that was clicked. */
+function viewHRSpeed(hr,kind){
+  var R=(typeof HR_RECORDS!=='undefined'&&Array.isArray(HR_RECORDS))?HR_RECORDS:[];
+  /* The table measures closure days with hrCloseDays(), which prefers the
+     posted-to-closed dates over the DaysToClose column. This uses the very same
+     function, otherwise a position could land in a different bucket here than
+     the one it was counted in, and the number and the list would disagree. */
+  var days=(typeof hrCloseDays==='function')
+    ? hrCloseDays
+    : function(r){ var d=Number(r.DaysToClose); return isFinite(d)?d:null; };
+  var closedFn=(typeof isClosed==='function') ? isClosed
+    : function(s){ return /closed|filled/i.test(String(s||'')); };
+
+  var rows=R.filter(function(r){
+    if(String(r.HR)!==String(hr)) return false;
+    if(fBranch!=='ALL'&&r.Branch!==fBranch) return false;
+    if(!closedFn(r.Status)) return false;
+    var d=days(r);
+    if(d===null||d===undefined||!isFinite(d)||d<0) return false;
+    if(kind==='fast')   return d<=7;
+    if(kind==='med')    return d>7&&d<=21;
+    if(kind==='slow')   return d>21;
+    return true;
+  });
+  var LBL={fast:'closed within 7 days',med:'closed in 8\u201321 days',slow:'closed after 21 days',closed:'closed positions'};
+  openModal('\u26a1 '+hr+' \u2014 '+(LBL[kind]||'positions'),
+    rows.length.toLocaleString('en-IN')+' position(s)'+(fBranch==='ALL'?'':' \u00b7 '+fBranch),
+    rows,[{key:'HR',label:'Recruiter'},{key:'Branch',label:'Branch'},{key:'Position',label:'Position',maxW:'200px'},
+      {key:'Priority',label:'Priority',pill:true},{key:'PostDate',label:'Posted',date:true},
+      {key:'ClosedDate',label:'Closed',date:true},{key:'DaysToClose',label:'Days'},
+      {key:'CandidateName',label:'Candidate',maxW:'160px'},{key:'Status',label:'Status',pill:true}]);
+}
+
 function viewHRByRecruiter(hr,status){
   let rows=(typeof HR_RECORDS!=='undefined'&&Array.isArray(HR_RECORDS))?HR_RECORDS.filter(r=>r.HR===hr):[];
   if(status==='Open') rows=rows.filter(r=>/^open$/i.test(String(r.Status||'').trim()));
@@ -6340,9 +6386,16 @@ window.CARE_NLP = (function () {
                  t: esc(x.c) + ' — ' + x.n + ' (' + Math.round(x.n / rs.length * 100) + '%)' };
       });
 
-      /* the headline for each group: how much of it is clean */
-      var clean = rs.filter(function (r) { return /no\s*concern/i.test(catOf(r) || ''); }).length;
-      var cleanPct = Math.round(clean / rs.length * 100);
+      /* The headline number in the middle of each ring. On Care Calls "no
+         concern" is the useful read; on Grievance every record IS a concern, so
+         that centre always read 0% and told nobody anything. Each tab supplies
+         the measure that actually means something for it. */
+      var centre = opts.centre
+        ? opts.centre(rs)
+        : (function () {
+            var clean = rs.filter(function (r) { return /no\s*concern/i.test(catOf(r) || ''); }).length;
+            return { value: Math.round(clean / rs.length * 100) + '%', label: 'no concern' };
+          })();
 
       return '<div class="sg-card sg-clk" data-g="' + g.key + '" style="border-top-color:' + g.c + '" ' +
         'title="Click to view these records">' +
@@ -6351,9 +6404,9 @@ window.CARE_NLP = (function () {
           '<span>' + Math.round(rs.length / rows.length * 100) + '% of all</span></div>' +
         '<svg viewBox="0 0 190 172" class="sg-svg">' +
           donut(slices, 95, 82, 74, 43,
-            '<text x="95" y="78" text-anchor="middle" font-size="21" font-weight="800" fill="#0F172A">' +
-              cleanPct + '%</text>' +
-            '<text x="95" y="94" text-anchor="middle" font-size="8.5" fill="#64748B">no concern</text>') +
+            '<text x="95" y="78" text-anchor="middle" font-size="' + (String(centre.value).length > 4 ? 17 : 21) +
+              '" font-weight="800" fill="' + (centre.color || '#0F172A') + '">' + esc(centre.value) + '</text>' +
+            '<text x="95" y="94" text-anchor="middle" font-size="8.5" fill="#64748B">' + esc(centre.label) + '</text>') +
         '</svg>' +
         '<div class="sg-bar"><i style="width:' + (rs.length / maxN * 100) + '%;background:' + g.c + '"></i></div>' +
         '<div class="sg-legend">' + top.map(function (x, i) {
@@ -8003,19 +8056,7 @@ function renderGrievTurnaround(rows, ALLB){
       return rows.filter(function(r){ return r.Branch===br && b.test(grDaysToClose(r)); }).length;
     });
   });
-  mkChart('gr-turnaround',{type:'bar',
-    data:{labels:ALLB,datasets:GR_TURN_BUCKETS.map(function(b,bi){
-      return {label:b.label,data:data[bi],backgroundColor:b.color,borderRadius:4,stack:'s'};})},
-    options:{responsive:true,maintainAspectRatio:true,
-      onClick:function(evt,els){ if(!els||!els.length)return;
-        viewGrievByTurnaround(ALLB[els[0].index],GR_TURN_BUCKETS[els[0].datasetIndex].key); },
-      plugins:{legend:{display:true,position:'top'},
-        tooltip:{callbacks:{afterBody:function(items){
-          var br=items[0].label;
-          var closed=rows.filter(function(r){return r.Branch===br&&grDaysToClose(r)!==null;}).length;
-          return closed?['Closed cases at this branch: '+closed]:[];}}},
-        datalabels:{display:true,color:'#fff',font:{size:10,weight:'bold'},formatter:function(v){return v>0?v:'';}}},
-      scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,title:{display:true,text:'Cases'}}}}});
+  // Closure Turnaround chart removed from the Grievance tab.
 
   // ── same-day rate per branch, measured against CLOSED cases only ──
   //   (dividing by all cases would punish a branch simply for having open ones)
@@ -8026,16 +8067,7 @@ function renderGrievTurnaround(rows, ALLB){
     pct.push(closed.length?Math.round(same/closed.length*1000)/10:0);
     sub.push(same+' of '+closed.length);
   });
-  mkChart('gr-samedaychart',{type:'bar',
-    data:{labels:ALLB,datasets:[{label:'Same-day %',data:pct,borderRadius:4,
-      backgroundColor:pct.map(function(p){return p>=60?'#059669':p>=35?'#D97706':'#DC2626';})}]},
-    options:{indexAxis:'y',responsive:true,maintainAspectRatio:true,
-      onClick:function(evt,els){ if(!els||!els.length)return; viewGrievByTurnaround(ALLB[els[0].index],'same'); },
-      plugins:{legend:{display:false},
-        tooltip:{callbacks:{afterLabel:function(it){return sub[it.dataIndex]+' closed cases';}}},
-        datalabels:{display:true,anchor:'end',align:'right',color:'#1E293B',
-          font:{size:10,weight:'bold'},formatter:function(v){return v+'%';}}},
-      scales:{x:{beginAtZero:true,max:100,title:{display:true,text:'% of closed cases settled same day'}}}}});
+  // Same-Day Closure Rate chart removed from the Grievance tab.
 }
 
 /* Drill-down for a turnaround segment */
@@ -12193,7 +12225,14 @@ async function loadCivil(force){
       rows,
       function(r){ return r.Grade; },
       function(r){ return (r.Category&&r.Category!=='–')?r.Category:'Other'; },
-      PALETTE, {unit:'cases'});
+      PALETTE, {unit:'cases', centre:function(rs){
+        /* every grievance is a concern, so "no concern" would always be 0%.
+           What matters here is how much of the group has been closed. */
+        var done=rs.filter(function(r){ return /resolved|closed/i.test(String(r.Status||'')); }).length;
+        var pct=Math.round(done/rs.length*100);
+        return { value:pct+'%', label:'resolved',
+                 color: pct>=80?'#059669' : pct>=50?'#D97706' : '#DC2626' };
+      }});
 
     /* the same negation-aware read, applied to the case description */
     var neg=0, tot=0;
