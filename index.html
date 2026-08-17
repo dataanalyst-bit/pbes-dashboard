@@ -6855,7 +6855,435 @@ function renderCare(){
   const activeMonths=MONTHS.filter(m=>mv[m].resolved+mv[m].ip+mv[m].pending>0);
   const chartLabels=activeMonths.length>0?activeMonths:MONTHS;
   window._CARE_VOL_LABELS=chartLabels;
-  // the monthly volume chart was replaced by the stage-group infographic
+  // The monthly volume chart was replaced by the stage-group infographic above;
+  // the aggregation is kept because the modal drill-downs still read it.
+}
+
+// ══════════════════ SCHOOL TRANSPORT ══════════════════
+const TR_BRANCHES=['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam'];
+function _trData(){ return (window._TRANSPORT&&typeof window._TRANSPORT==='object')?window._TRANSPORT:{vehicles:[],routes:[],students:[],mileage:[],repair:[]}; }
+function _trFilt(arr){ return (arr||[]).filter(r=>fBranch==='ALL'||r.Branch===fBranch); }
+function _trExpiring(v){ // expiring within 30 days, already expired, or Compliance flagged
+  const d=v.DaysToExpiry; if(typeof d==='number'&&d<=30) return true;
+  return /expir/i.test(String(v.Compliance||''));
+}
+function renderTransport(){
+  const T=_trData();
+  const bl=fBranch==='ALL'?'All Branches':fBranch;
+  const tag=document.getElementById('tr-tag'); if(tag)tag.textContent='Fleet · Routes · Occupancy · Compliance';
+  const fn=document.getElementById('tr-fn'); if(fn)fn.textContent=bl;
+  if(!document.getElementById('tr-veh')) return;
+
+  const vehicles=_trFilt(T.vehicles), students=_trFilt(T.students), routes=_trFilt(T.routes), mileage=_trFilt(T.mileage), repair=_trFilt(T.repair);
+  if(!vehicles.length && !students.length && !routes.length){
+    ['tr-veh','tr-stu','tr-occ','tr-exp','tr-mil'].forEach(id=>setTxt(id,'–'));
+    const fb=document.getElementById('tr-fleet-tbody'); if(fb)fb.innerHTML='<tr><td colspan="6" class="no-data">Transport sheets not added yet — add Transport_Vehicle / _Route / _Student / _Mileage / _Repair.</td></tr>';
+    ['tr-branch-occ','tr-route-occ','tr-compliance','tr-repair'].forEach(id=>{const e=document.getElementById(id); if(e)mkChart(id,{type:'bar',data:{labels:[],datasets:[]},options:{responsive:true,maintainAspectRatio:true}});});
+    return;
+  }
+  const seats=vehicles.reduce((s,v)=>s+(+v.Seats||0),0);
+  const routeRiders=routes.reduce((s,r)=>s+(+r.ActiveRiders||0),0);
+  const riders=routeRiders>0?routeRiders:students.length;
+  const occ=seats>0?Math.round(riders/seats*100):0;
+  const expiring=vehicles.filter(_trExpiring).length;
+  const mils=mileage.map(m=>+m.Mileage).filter(v=>!isNaN(v)&&v>0);
+  const avgMil=mils.length?+(mils.reduce((a,c)=>a+c,0)/mils.length).toFixed(1):null;
+
+  setTxt('tr-veh',fi(vehicles.length));
+  setTxt('tr-veh-s',(vehicles.filter(v=>/active/i.test(v.Status)).length||vehicles.length)+' active · click to view');
+  setTxt('tr-stu',fi(students.length));
+  setTxt('tr-occ',occ+'%');
+  setTxt('tr-occ-s',fi(riders)+' riders ÷ '+fi(seats)+' seats');
+  // Spare/Extra vehicles: routes named "EXTRA"/"SPARE"/"STANDBY" or vehicles not assigned to a numbered route
+  // Spare vehicles: identified by Status="Spare" in the Transport_Vehicle sheet
+  const spareVehicles=vehicles.filter(v=>/^spare$/i.test(String(v.Status||'').trim()));
+  setTxt('tr-spare',fi(spareVehicles.length));
+  setTxt('tr-spare-s',spareVehicles.length>0?spareVehicles.map(v=>v.Branch).filter((v,i,a)=>a.indexOf(v)===i).join(', ')+' · click to view':'None identified');
+  window._TR_SPARE=spareVehicles;
+  setTxt('tr-exp',fi(expiring));
+  setTxt('tr-mil',avgMil!=null?avgMil:'–');
+
+  // Branch occupancy — riders vs seats
+  const scope=fBranch==='ALL'?TR_BRANCHES:[fBranch];
+  const bSeats={},bRiders={};
+  scope.forEach(b=>{ bSeats[b]=(T.vehicles||[]).filter(v=>v.Branch===b).reduce((s,v)=>s+(+v.Seats||0),0);
+    const rr=(T.routes||[]).filter(r=>r.Branch===b).reduce((s,r)=>s+(+r.ActiveRiders||0),0);
+    bRiders[b]=rr>0?rr:(T.students||[]).filter(s=>s.Branch===b).length; });
+  const boLabels=scope.filter(b=>bSeats[b]||bRiders[b]);
+  window._TR_BRANCH_OCC=boLabels;
+  mkChart('tr-branch-occ',{type:'bar',data:{labels:boLabels,datasets:[
+    {label:'Seats',data:boLabels.map(b=>bSeats[b]),backgroundColor:'#CBD5E1',borderRadius:4},
+    {label:'Riders',data:boLabels.map(b=>bRiders[b]),backgroundColor:'#1E4FD8',borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:true,onClick:(e,el)=>{if(el&&el.length)viewTransport('students',boLabels[el[0].index]);},
+      plugins:{legend:{display:true,position:'bottom',labels:{font:{size:10},usePointStyle:true}},datalabels:{display:false}},
+      scales:{y:{beginAtZero:true,grid:{color:'#E0E8FF'}},x:{grid:{display:false}}}}});
+
+  // Route occupancy — top by occupancy%
+  const rsorted=routes.map(r=>({...r,occv:(+r.Occupancy|| (r.Capacity>0?Math.round((+r.ActiveRiders||0)/r.Capacity*100):0))}))
+    .filter(r=>r.occv>0).sort((a,b)=>b.occv-a.occv).slice(0,12);
+  window._TR_ROUTES=rsorted;
+  mkChart('tr-route-occ',{type:'bar',data:{labels:rsorted.map(r=>(r.Branch.slice(0,3))+' '+r.Route),
+    datasets:[{label:'Occupancy %',data:rsorted.map(r=>r.occv),
+      backgroundColor:rsorted.map(r=>r.occv>100?'#DC2626':r.occv>=85?'#059669':r.occv>=60?'#D97706':'#93C5FD'),borderRadius:4,maxBarThickness:26}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:true,
+      plugins:{legend:{display:false},datalabels:{display:true,clip:false,anchor:'end',align:'right',offset:3,color:'#0F172A',font:{size:10,weight:'bold'},formatter:v=>v+'%'},
+        tooltip:{callbacks:{label:c=>{const r=rsorted[c.dataIndex];return r.occv+'% · '+(r.ActiveRiders||0)+'/'+(r.Capacity||'?')+' · '+r.Vehicle;}}}},
+      layout:{padding:{right:34}},scales:{x:{beginAtZero:true,grid:{color:'#E0E8FF'}},y:{grid:{display:false},ticks:{font:{size:10}}}}}});
+
+  // Fleet compliance
+  const okC=vehicles.filter(v=>/^ok/i.test(String(v.Compliance||''))).length;
+  const expC=vehicles.filter(v=>/expir/i.test(String(v.Compliance||''))).length;
+  const otherC=vehicles.length-okC-expC;
+  mkChart('tr-compliance',{type:'doughnut',data:{labels:['OK','Expired','Other/Unknown'],
+    datasets:[{data:[okC,expC,otherC],backgroundColor:['#059669','#DC2626','#CBD5E1'],borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:true,cutout:'58%',onClick:(e,el)=>{if(el&&el.length){viewTransport(el[0].index===1?'expired':el[0].index===0?'okdocs':'vehicles');}},
+      plugins:{legend:{position:'bottom',labels:{font:{size:10.5},usePointStyle:true,padding:10}},
+        datalabels:{display:true,color:'#fff',font:{weight:'bold',size:12},formatter:v=>v>0?v:''}}}});
+
+  // Maintenance cost by branch
+  const bCost={}; scope.forEach(b=>bCost[b]=(T.repair||[]).filter(r=>r.Branch===b).reduce((s,r)=>s+(+r.Cost||0),0));
+  const cLabels=scope.filter(b=>bCost[b]>0);
+  window._TR_COSTB=cLabels;
+  mkChart('tr-repair',{type:'bar',data:{labels:cLabels,datasets:[{label:'₹ Maintenance',data:cLabels.map(b=>bCost[b]),backgroundColor:'#7C3AED',borderRadius:5,maxBarThickness:46}]},
+    options:{responsive:true,maintainAspectRatio:true,onClick:(e,el)=>{if(el&&el.length)viewTransport('repair',cLabels[el[0].index]);},
+      plugins:{legend:{display:false},datalabels:{display:true,anchor:'end',align:'top',color:'#0F172A',font:{size:10,weight:'bold'},formatter:v=>'₹'+(v>=100000?(v/100000).toFixed(1)+'L':v>=1000?(v/1000).toFixed(0)+'k':v)}},
+      layout:{padding:{top:18}},scales:{y:{beginAtZero:true,grid:{color:'#E0E8FF'},ticks:{callback:v=>v>=1000?(v/1000)+'k':v}},x:{grid:{display:false}}}}});
+
+  // Fleet register table
+  const fb=document.getElementById('tr-fleet-tbody');
+  if(fb){
+    fb.innerHTML=boLabels.map(b=>{
+      const bv=(T.vehicles||[]).filter(v=>v.Branch===b);
+      const s=bSeats[b], r=bRiders[b]; const o=s>0?Math.round(r/s*100):0;
+      const exp=bv.filter(_trExpiring).length;
+      const oc=o>100?'#DC2626':o>=85?'#059669':o>=60?'#D97706':'#64748B';
+      return `<tr style="cursor:pointer" onclick="viewTransport('vehicles','${b}')">
+        <td style="padding:8px 10px;border-bottom:1px solid #F1F5F9;"><span class="bd b${b}"></span> <strong>${b}</strong></td>
+        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${fi(bv.length)}</td>
+        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${fi(s)}</td>
+        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${fi(r)}</td>
+        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;font-weight:700;color:${oc}">${o}%</td>
+        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${exp>0?'<span style="color:#DC2626;font-weight:700;">'+exp+'</span>':'0'}</td></tr>`;
+    }).join('')||'<tr><td colspan="6" class="no-data">No data</td></tr>';
+  }
+
+  // Populate the Route-wise dropdown (respects branch filter)
+  const rsel=document.getElementById('tr-route-sel');
+  if(rsel){
+    const rlist=(T.routes||[]).filter(r=>fBranch==='ALL'||r.Branch===fBranch)
+      .slice().sort((a,b)=>String(a.Branch).localeCompare(b.Branch)||String(a.Route).localeCompare(String(b.Route),undefined,{numeric:true}));
+    const cur=rsel.value;
+    rsel.innerHTML='<option value="">— Select a route —</option>'+rlist.map((r)=>{
+      const key=r.Branch+'||'+r.Route;
+      return `<option value="${_escAttr(key)}">${r.Branch} · ${r.Route}${r.Vehicle&&r.Vehicle!=='–'?(' ('+r.Vehicle+')'):''}</option>`;
+    }).join('');
+    if(cur && [...rsel.options].some(o=>o.value===cur)){ rsel.value=cur; } else { const rr=document.getElementById('tr-route-report'); if(rr)rr.innerHTML='<div class="no-data" style="padding:16px;">Choose a route above to see its full report.</div>'; }
+  }
+  renderMileageInsights(mileage);
+}
+
+// Mileage & fuel efficiency insights — by vehicle & route (click a bar → logs)
+function renderMileageInsights(mileage){
+  const ins=document.getElementById('tr-mil-insight');
+  const agg=(keyFn)=>{ const m={}; (mileage||[]).forEach(r=>{ const k=keyFn(r); if(!k||k==='–')return;
+    if(!m[k])m[k]={km:0,fuel:0,cost:0,n:0,mils:[]}; m[k].km+=(+r.KMRun||0); m[k].fuel+=(+r.Fuel||0); m[k].cost+=(+r.FuelCost||0); m[k].n++; if(r.Mileage>0)m[k].mils.push(+r.Mileage); });
+    return Object.entries(m).map(([k,v])=>({key:k, kmpl:v.fuel>0?+(v.km/v.fuel).toFixed(2):(v.mils.length?+(v.mils.reduce((a,c)=>a+c,0)/v.mils.length).toFixed(2):0), km:v.km, fuel:v.fuel, cost:v.cost, n:v.n})); };
+  const byVeh=agg(r=>r.VehicleNo).filter(x=>x.kmpl>0).sort((a,b)=>b.kmpl-a.kmpl);
+  const byRoute=agg(r=>(r.Branch!=='–'?r.Branch.slice(0,3)+' ':'')+r.Route).filter(x=>x.kmpl>0).sort((a,b)=>b.kmpl-a.kmpl);
+  window._TR_MIL_VEH=byVeh; window._TR_MIL_ROUTE=byRoute;
+
+  if(ins){
+    if(!byVeh.length){ ins.innerHTML='<span class="no-data">No mileage logs for this selection.</span>'; }
+    else{
+      const totKm=(mileage||[]).reduce((s,r)=>s+(+r.KMRun||0),0);
+      const totFuel=(mileage||[]).reduce((s,r)=>s+(+r.Fuel||0),0);
+      const totCost=(mileage||[]).reduce((s,r)=>s+(+r.FuelCost||0),0);
+      const fleetKmpl=totFuel>0?+(totKm/totFuel).toFixed(2):0;
+      const best=byVeh[0], worst=byVeh[byVeh.length-1];
+      const costPerKm=totKm>0?+(totCost/totKm).toFixed(2):0;
+      ins.innerHTML='🏁 Fleet average <strong>'+fleetKmpl+' KM/L</strong> over '+fi(totKm)+' km · fuel spend <strong>₹'+fi(Math.round(totCost))+'</strong> (₹'+costPerKm+'/km). '
+        +'Most efficient: <strong style="color:#059669">'+best.key+' ('+best.kmpl+' KM/L)</strong>; least: <strong style="color:#DC2626">'+worst.key+' ('+worst.kmpl+' KM/L)</strong>. '
+        +'Vehicles below '+ (fleetKmpl*0.85).toFixed(1) +' KM/L warrant a service/driving-habit check.';
+    }
+  }
+  const mkMil=(id,arr,store)=>{ const el=document.getElementById(id); if(!el)return;
+    const top=arr.slice(0,14);
+    mkChart(id,{type:'bar',data:{labels:top.map(x=>x.key),datasets:[{label:'KM/L',data:top.map(x=>x.kmpl),
+      backgroundColor:top.map(x=>x.kmpl>=8?'#059669':x.kmpl>=5?'#D97706':'#DC2626'),borderRadius:4,maxBarThickness:22}]},
+      options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+        onClick:(e,el)=>{ if(el&&el.length){ const it=top[el[0].index]; viewMileage(store,it.key); } },
+        plugins:{legend:{display:false},datalabels:{display:true,clip:false,anchor:'end',align:'right',offset:3,color:'#0F172A',font:{size:9.5,weight:'bold'},formatter:v=>v},
+          tooltip:{callbacks:{label:c=>{const it=top[c.dataIndex];return [it.kmpl+' KM/L',fi(it.km)+' km · '+fi(Math.round(it.fuel))+' L · ₹'+fi(Math.round(it.cost)),it.n+' log(s) · click to view'];}}}},
+        layout:{padding:{right:30}},scales:{x:{beginAtZero:true,grid:{color:'#E0E8FF'}},y:{grid:{display:false},ticks:{font:{size:9.5}}}}}});
+  };
+  mkMil('tr-mil-veh',byVeh,'veh'); mkMil('tr-mil-route',byRoute,'route');
+}
+function viewMileage(kind,key){
+  const T=_trData(); const bf=r=>(fBranch==='ALL'||r.Branch===fBranch);
+  let rows=(T.mileage||[]).filter(bf);
+  if(kind==='veh') rows=rows.filter(r=>r.VehicleNo===key);
+  else rows=rows.filter(r=>((r.Branch!=='–'?r.Branch.slice(0,3)+' ':'')+r.Route)===key);
+  rows=rows.sort((a,b)=>String(b.Date).localeCompare(String(a.Date)));
+  const cols=[{key:'Branch',label:'Branch'},{key:'Date',label:'Date',date:true},{key:'Route',label:'Route'},{key:'VehicleNo',label:'Vehicle'},
+    {key:'KMRun',label:'KM Run'},{key:'Fuel',label:'Fuel (L)'},{key:'FuelCost',label:'Fuel ₹'},{key:'Mileage',label:'KM/L'},{key:'CostPerKM',label:'₹/KM'}];
+  openModal('⛽ Mileage Logs — '+key,`${rows.length} log(s)`,rows,cols);
+}
+function viewTransportRoute(key){
+  const box=document.getElementById('tr-route-report'); if(!box)return;
+  if(!key){ box.innerHTML='<div class="no-data" style="padding:16px;">Choose a route above to see its full report.</div>'; return; }
+  const T=_trData();
+  const parts=key.split('||'); const br=parts[0], rt=parts[1];
+  const route=(T.routes||[]).find(r=>r.Branch===br&&String(r.Route)===String(rt))||{};
+  let veh=(T.vehicles||[]).find(v=>v.Branch===br && route.Vehicle && v.VehicleNo===route.Vehicle);
+  if(!veh) veh=(T.vehicles||[]).find(v=>v.Branch===br && String(v.RouteNo)===String(rt));
+  const riders=(T.students||[]).filter(s=>s.Branch===br && String(s.Route)===String(rt));
+  const occ=route.Capacity>0?Math.round((route.ActiveRiders||riders.length||0)/route.Capacity*100):(veh&&veh.Seats?Math.round(riders.length/veh.Seats*100):0);
+  const oc=occ>100?'#DC2626':occ>=85?'#059669':occ>=60?'#D97706':'#64748B';
+  const card=(t,inner,accent)=>`<div style="flex:1;min-width:270px;background:#fff;border:1px solid #E0E8FF;border-left:3px solid ${accent||'#1E4FD8'};border-radius:9px;padding:12px 14px;"><div style="font-weight:800;font-size:12px;color:${accent||'#1E4FD8'};text-transform:uppercase;margin-bottom:8px;">${t}</div>${inner}</div>`;
+  const F=(l,val)=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px dashed #EEF2F7;"><span style="color:#64748B;font-size:11px;">${l}</span><span style="color:#0F172A;font-size:11.5px;font-weight:600;text-align:right;">${(val===undefined||val===null||val===''||val==='–')?'–':val}</span></div>`;
+  const D=x=>(x&&x!=='–'&&typeof fmtDispDate==='function')?fmtDispDate(x):(x||'–');
+  const v=veh||{};
+  let h='<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;padding:10px 14px;background:linear-gradient(135deg,#EEF2FF,#F0FDFA);border-radius:9px;">'
+    +`<div style="font-weight:800;font-size:15px;color:#0F172A;"><span class="bd b${br}"></span> ${br} · ${rt}</div>`
+    +`<div style="font-size:12px;color:#475569;">Vehicle <strong>${v.VehicleNo||route.Vehicle||'–'}</strong> · Riders <strong>${fi(riders.length)}</strong> · Capacity <strong>${v.Seats||route.Capacity||'–'}</strong> · Occupancy <strong style="color:${oc}">${occ}%</strong></div></div>`;
+  if(route.Areas&&route.Areas!=='–') h+='<div style="font-size:11.5px;color:#475569;margin-bottom:10px;">🛣️ <strong>Stops:</strong> '+route.Areas+'</div>';
+  h+='<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;">'
+    +card('Vehicle', F('Vehicle No',v.VehicleNo)+F('Category',v.Category)+F('Make',v.Make)+F('Fuel',v.Fuel)+F('AC',v.AC)+F('Seats',v.Seats)+F('GPS',v.GPS)+F('Engine No',v.EngineNo)+F('Chassis No',v.ChassisNo)+F('Status',v.Status),'#1E4FD8')
+    +card('Driver & Attender', F('Driver',v.Driver)+F('Driver Contact',v.DriverContact)+F('Driver Licence',v.DriverLicence)+F('Heavy Licence Exp',D(v.HeavyLicenceExp))+F('Attender',v.Attender)+F('Attender Contact',v.AttenderContact),'#059669')
+    +card('Documents & Compliance', F('Compliance',v.Compliance)+F('Days To Expiry',v.DaysToExpiry)+F('Insurance Exp',D(v.InsuranceExp))+F('Permit Exp',D(v.PermitExp))+F('Fitness Exp',D(v.FitnessExp))+F('PUC Exp',D(v.PucExp))+F('Road Tax Exp',D(v.RoadTaxExp))+F('Labour Cert Exp',D(v.LabourCertExp))+F('RC',v.RC),'#DC2626')
+    +'</div>';
+  const rcols=[{key:'Student',label:'Student',maxW:'180px'},{key:'Class',label:'Class'},{key:'Section',label:'Section'},{key:'Distance',label:'Distance'},{key:'RiderType',label:'Rider Type'},{key:'Status',label:'Status'}];
+  h+='<div style="font-weight:800;font-size:12.5px;color:#0F172A;margin:4px 0 6px;">🎒 Riders on this route ('+riders.length+')</div>'+_accTable(riders,rcols);
+  box.innerHTML=h;
+}
+
+function viewTransport(kind,branch){
+  const T=_trData(); const bf=r=>(!branch)?(fBranch==='ALL'||r.Branch===fBranch):(r.Branch===branch);
+  const scope=branch?[branch]:(fBranch==='ALL'?TR_BRANCHES:[fBranch]);
+  const bl=branch||(fBranch==='ALL'?'All Branches':fBranch);
+
+  if(kind==='students'){
+    // Branch-wise total riders count with expand dropdown to view all riders
+    const cols=[{key:'Student',label:'Student',maxW:'180px'},{key:'Class',label:'Class'},{key:'Section',label:'Section'},{key:'Route',label:'Route'},{key:'VehicleNo',label:'Vehicle'},{key:'Distance',label:'Distance'},{key:'RiderType',label:'Rider Type'},{key:'Status',label:'Status'}];
+    const groups=scope.map(b=>{const rows=(T.students||[]).filter(r=>r.Branch===b);return {key:b,count:rows.length,rows:rows};});
+    openBranchAccordion('🎒 Transport Students — Branch-wise Riders','Riders per branch · expand to view all riders',groups,cols,'riders');
+    return;
+  }
+  if(kind==='vehicles'||kind==='fleet'){
+    // Branch-wise total vehicles count with expand dropdown to view all vehicles
+    const cols=[{key:'VehicleNo',label:'Vehicle No'},{key:'Category',label:'Type'},{key:'Make',label:'Make'},{key:'Seats',label:'Seats'},{key:'Fuel',label:'Fuel'},{key:'AC',label:'AC'},{key:'Driver',label:'Driver',maxW:'150px'},{key:'GPS',label:'GPS'},{key:'Status',label:'Status'},{key:'Compliance',label:'Compliance'}];
+    const groups=scope.map(b=>{const rows=(T.vehicles||[]).filter(r=>r.Branch===b);return {key:b,count:rows.length,rows:rows};});
+    openBranchAccordion('🚌 Total Vehicles — Branch-wise Fleet','Vehicles per branch · expand to view all vehicles',groups,cols,'vehicles');
+    return;
+  }
+  if(kind==='spare'){
+    const allSpare=(window._TR_SPARE||[]).filter(bf);
+    const cols=_TR_VCOLS();
+    const groups=scope.map(b=>{const rows=allSpare.filter(r=>r.Branch===b);return {key:b,count:rows.length,rows:rows};}).filter(g=>g.count>0);
+    if(groups.length>0){ openBranchAccordion('🔄 Spare / Standby Vehicles — Branch-wise','Status = Spare · expand to view details',groups,cols,'spare'); }
+    else { openModal('🔄 Spare Vehicles','No spare vehicles found · '+bl,[],cols); }
+    return;
+  }
+  if(kind==='expiring'||kind==='expired'){
+    // Per-vehicle expand dropdown showing ALL Vehicle_Master details
+    const rows=(T.vehicles||[]).filter(bf).filter(kind==='expired'?(v=>/expir/i.test(String(v.Compliance||''))):_trExpiring)
+      .sort((a,b)=>(a.DaysToExpiry==null?1e9:a.DaysToExpiry)-(b.DaysToExpiry==null?1e9:b.DaysToExpiry));
+    let h='<div style="font-size:12px;color:#334155;margin-bottom:10px;"><strong>'+rows.length+'</strong> vehicle(s) with documents expiring/expired. Click a vehicle to see every Vehicle_Master detail.</div>';
+    rows.forEach((v,i)=>{
+      const id='veh_'+i+'_'+Math.random().toString(36).slice(2,7);
+      const dcol=(v.DaysToExpiry==null)?'#94A3B8':(v.DaysToExpiry<0?'#DC2626':v.DaysToExpiry<=15?'#DC2626':v.DaysToExpiry<=30?'#D97706':'#059669');
+      const dtxt=(v.DaysToExpiry==null)?'–':(v.DaysToExpiry<0?Math.abs(v.DaysToExpiry)+'d overdue':v.DaysToExpiry+'d left');
+      h+=`<div style="border:1px solid #FECACA;border-radius:9px;margin-bottom:8px;overflow:hidden;">
+        <div onclick="toggleAcc('${id}',this)" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#FEF2F2;">
+          <div style="font-weight:800;font-size:13px;color:#0F172A;"><span class="acc-caret" style="color:#DC2626;margin-right:6px;">▸</span><span class="bd b${v.Branch}"></span> ${v.VehicleNo} <small style="color:#64748B;font-weight:600;">· ${v.Branch} · ${v.Category}</small></div>
+          <div style="font-weight:800;font-size:12.5px;color:${dcol};">${dtxt} <small style="color:#94A3B8;">${v.Compliance||''}</small></div>
+        </div>
+        <div id="${id}" style="display:none;padding:12px 14px;background:#fff;">${_vehicleDetailHTML(v)}</div>
+      </div>`;
+    });
+    openHTMLModal('⚠️ Documents Expiring / Expired', (branch||(fBranch==='ALL'?'All Branches':fBranch)), h);
+    return;
+  }
+  if(kind==='okdocs'){
+    const rows=(T.vehicles||[]).filter(bf).filter(v=>/^ok/i.test(String(v.Compliance||'')));
+    openModal('🛡️ Vehicles — Compliant',`${rows.length} vehicle(s)`,rows,_TR_VCOLS());
+    return;
+  }
+  if(kind==='repair'){
+    const rows=(T.repair||[]).filter(bf);
+    const cols=[{key:'Branch',label:'Branch'},{key:'Date',label:'Date',date:true},{key:'VehicleNo',label:'Vehicle'},{key:'Type',label:'Type'},{key:'Work',label:'Work',maxW:'220px'},{key:'Vendor',label:'Vendor'},{key:'Cost',label:'Cost ₹'},{key:'Status',label:'Status',pill:true}];
+    openModal('🔧 Maintenance Records',`${rows.length} record(s) · ${branch||(fBranch==='ALL'?'All Branches':fBranch)}`,rows,cols);
+    return;
+  }
+  const rows=(T.vehicles||[]).filter(bf);
+  openModal('🚌 Fleet — Vehicles',`${rows.length} vehicle(s)`,rows,_TR_VCOLS());
+}
+// Full detail grid for one vehicle (all Vehicle_Master fields).
+function _vehicleDetailHTML(v){
+  const F=(l,val)=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px dashed #EEF2F7;"><span style="color:#64748B;font-size:11px;">${l}</span><span style="color:#0F172A;font-size:11.5px;font-weight:600;text-align:right;">${(val===undefined||val===null||val===''||val==='–')?'–':val}</span></div>`;
+  const D=x=>(x&&x!=='–'&&typeof fmtDispDate==='function')?fmtDispDate(x):(x||'–');
+  const sec=(t,items)=>`<div style="flex:1;min-width:240px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px;"><div style="font-weight:800;font-size:11.5px;color:#1E4FD8;text-transform:uppercase;margin-bottom:6px;">${t}</div>${items}</div>`;
+  return '<div style="display:flex;flex-wrap:wrap;gap:10px;">'
+    +sec('Vehicle', F('Vehicle No',v.VehicleNo)+F('Vehicle ID',v.VehicleID)+F('Category',v.Category)+F('Make / Company',v.Make)+F('Fuel',v.Fuel)+F('AC / Non-AC',v.AC)+F('Seating',v.Seats)+F('Purchase Year',v.PurchaseYear)+F('Engine No',v.EngineNo)+F('Chassis No',v.ChassisNo)+F('GPS',v.GPS)+F('Status',v.Status)+F('Reg. Date',D(v.RegDate)))
+    +sec('Driver & Attender', F('Driver',v.Driver)+F('Driver Contact',v.DriverContact)+F('Driver Licence',v.DriverLicence)+F('Heavy Licence Exp',D(v.HeavyLicenceExp))+F('Driver Emp ID',v.DriverEmpId)+F('Attender',v.Attender)+F('Attender Contact',v.AttenderContact))
+    +sec('Documents & Compliance', F('Compliance',v.Compliance)+F('Days To Expiry',v.DaysToExpiry)+F('Earliest Doc Exp',D(v.EarliestDocExp))+F('RC',v.RC)+F('Insurance No',v.InsuranceNo)+F('Insurance Co',v.InsuranceCompany)+F('Insurance Exp',D(v.InsuranceExp))+F('Permit No',v.PermitNo)+F('Permit Exp',D(v.PermitExp))+F('Fitness No',v.FitnessNo)+F('Fitness Exp',D(v.FitnessExp))+F('PUC No',v.PucNo)+F('PUC Exp',D(v.PucExp))+F('Road Tax No',v.RoadTaxNo)+F('Road Tax Exp',D(v.RoadTaxExp))+F('Labour Cert No',v.LabourCertNo)+F('Labour Cert Exp',D(v.LabourCertExp)))
+    +sec('Safety & Service', F('Fire Extinguisher',v.FireExt)+F('Medical Kit',v.MedKit)+F('Tool Kit',v.ToolKit)+F('Spare Wheel',v.SpareWheel)+F('Last Service',D(v.LastServiceDate))+F('Last Service KM',v.LastServiceKM)+F('Next Service Due',D(v.NextServiceDue))+F('Next Service KM',v.NextServiceKM)+F('Service Vendor',v.ServiceVendor)+F('Remarks',v.Remarks))
+    +'</div>';
+}
+function _TR_VCOLS(){ return [{key:'Branch',label:'Branch'},{key:'VehicleNo',label:'Vehicle No'},{key:'Category',label:'Type'},{key:'Seats',label:'Seats'},{key:'Fuel',label:'Fuel'},{key:'Driver',label:'Driver',maxW:'150px'},{key:'GPS',label:'GPS'},{key:'Compliance',label:'Compliance',pill:true},{key:'DaysToExpiry',label:'Days To Expiry'},{key:'EarliestDocExp',label:'Earliest Doc Exp',date:true}]; }
+
+// ══════════════════ IT REPORT ══════════════════
+function _itData(){ return (window._IT&&typeof window._IT==='object')?window._IT:{assets:[],health:[]}; }
+// Animated SVG logo per system category (CSS keyframes injected once).
+function _itAnimStyle(){
+  if(document.getElementById('it-anim-style'))return;
+  const s=document.createElement('style'); s.id='it-anim-style';
+  s.textContent='@keyframes itpulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.12);opacity:.75}}'
+    +'@keyframes itspin{from{transform:rotate(0)}to{transform:rotate(360deg)}}'
+    +'@keyframes itblink{0%,100%{opacity:1}50%{opacity:.25}}'
+    +'.it-ic{width:56px;height:56px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:30px;box-shadow:0 6px 16px rgba(30,79,216,.18);}'
+    +'.it-ic.a1{animation:itpulse 1.8s ease-in-out infinite}.it-ic.a2{animation:itblink 1.6s ease-in-out infinite}.it-ic.a3{animation:itspin 6s linear infinite}';
+  document.head.appendChild(s);
+}
+function _itLogo(system){
+  const s=String(system||'').toLowerCase();
+  let emoji='🖥️',bg='linear-gradient(135deg,#EEF2FF,#DBEAFE)',anim='a1';
+  if(/cctv|camera/.test(s)){emoji='📹';bg='linear-gradient(135deg,#FEE2E2,#FECACA)';anim='a2';}
+  else if(/nvr|dvr/.test(s)){emoji='🎛️';bg='linear-gradient(135deg,#E0E7FF,#C7D2FE)';anim='a1';}
+  else if(/pa system|speaker|announce/.test(s)){emoji='📢';bg='linear-gradient(135deg,#FEF3C7,#FDE68A)';anim='a2';}
+  else if(/intercom|phone/.test(s)){emoji='☎️';bg='linear-gradient(135deg,#DCFCE7,#BBF7D0)';anim='a1';}
+  else if(/wifi|internet|network|switch|router/.test(s)){emoji='📶';bg='linear-gradient(135deg,#DBEAFE,#BFDBFE)';anim='a2';}
+  else if(/firewall|security/.test(s)){emoji='🛡️';bg='linear-gradient(135deg,#FEE2E2,#FCA5A5)';anim='a1';}
+  else if(/gps/.test(s)){emoji='🛰️';bg='linear-gradient(135deg,#E0E7FF,#A5B4FC)';anim='a3';}
+  else if(/smart board|ifp|projector/.test(s)){emoji='📽️';bg='linear-gradient(135deg,#F3E8FF,#E9D5FF)';anim='a1';}
+  else if(/computer|desktop|pc/.test(s)){emoji='🖥️';bg='linear-gradient(135deg,#EEF2FF,#DBEAFE)';anim='a1';}
+  else if(/laptop/.test(s)){emoji='💻';bg='linear-gradient(135deg,#EEF2FF,#DBEAFE)';anim='a1';}
+  else if(/printer/.test(s)){emoji='🖨️';bg='linear-gradient(135deg,#F1F5F9,#E2E8F0)';anim='a2';}
+  else if(/biometric|attendance/.test(s)){emoji='🫆';bg='linear-gradient(135deg,#DCFCE7,#A7F3D0)';anim='a1';}
+  else if(/email|erp|account|user/.test(s)){emoji='📧';bg='linear-gradient(135deg,#DBEAFE,#BFDBFE)';anim='a2';}
+  else if(/server/.test(s)){emoji='🗄️';bg='linear-gradient(135deg,#E2E8F0,#CBD5E1)';anim='a3';}
+  else if(/ups|power|battery/.test(s)){emoji='🔋';bg='linear-gradient(135deg,#DCFCE7,#BBF7D0)';anim='a2';}
+  else if(/all systems/.test(s)){emoji='🧩';bg='linear-gradient(135deg,#EEF2FF,#F0FDFA)';anim='a3';}
+  return `<div class="it-ic ${anim}" style="background:${bg}">${emoji}</div>`;
+}
+function renderIT(){
+  _itAnimStyle();
+  const D=_itData();
+  const bl=fBranch==='ALL'?'All Branches':fBranch;
+  const fn=document.getElementById('it-fn'); if(fn)fn.textContent=bl;
+  if(!document.getElementById('it-total')) return;
+  const healthAllSys=(D.health||[]).filter(r=>fBranch==='ALL'||r.Branch===fBranch);
+  const assetsAllSys=(D.assets||[]).filter(r=>fBranch==='ALL'||r.Branch===fBranch);
+  const baseAll=healthAllSys.length?healthAllSys:assetsAllSys;
+
+  // Populate the system-category dropdown from all systems present
+  const sel=document.getElementById('it-sys-sel');
+  const allSystems=[...new Set(baseAll.map(r=>r.System).filter(x=>x&&x!=='–'))].sort();
+  if(sel){
+    const cur=sel.value;
+    sel.innerHTML='<option value="ALL">All Systems</option>'+allSystems.map(s=>`<option value="${_escAttr(s)}">${s}</option>`).join('');
+    sel.value=(cur&&(cur==='ALL'||allSystems.includes(cur)))?cur:'ALL';
+  }
+  const sys=sel?sel.value:'ALL';
+  window._IT_SYS=sys;
+
+  // Update the animated logo + summary
+  const logoEl=document.getElementById('it-logo'); if(logoEl)logoEl.innerHTML=_itLogo(sys==='ALL'?'all systems':sys);
+
+  // Filter to the selected system
+  const health=(sys==='ALL')?healthAllSys:healthAllSys.filter(r=>r.System===sys);
+  const assets=(sys==='ALL')?assetsAllSys:assetsAllSys.filter(r=>r.System===sys);
+  const src=health.length?health:assets;
+  if(!src.length){
+    ['it-total','it-health','it-down','it-pend'].forEach(id=>setTxt(id,'–'));
+    const tb=document.getElementById('it-tbody'); if(tb)tb.innerHTML='<tr><td colspan="6" class="no-data">No IT data for this selection. (Add "IT Assets" &amp; "IT Data" sheets if empty.)</td></tr>';
+    ['it-branch','it-system'].forEach(id=>{const e=document.getElementById(id); if(e)mkChart(id,{type:'bar',data:{labels:[],datasets:[]},options:{responsive:true,maintainAspectRatio:true}});});
+    const su=document.getElementById('it-sys-summary'); if(su)su.textContent='';
+    return;
+  }
+  const total=src.reduce((s,r)=>s+(+r.Total||0),0);
+  const working=health.reduce((s,r)=>s+(+r.Working||0),0);
+  const down=health.reduce((s,r)=>s+(+r.NotWorking||0),0);
+  const pend=health.reduce((s,r)=>s+(+r.Pending||0),0);
+  const healthPct=total>0?Math.round(working/total*100):(health.length?Math.round(health.reduce((s,r)=>s+(+r.Health||0),0)/health.length):0);
+  setTxt('it-total',fi(total)); setTxt('it-health',healthPct+'%'); setTxt('it-down',fi(down)); setTxt('it-pend',fi(pend));
+  const su=document.getElementById('it-sys-summary');
+  if(su)su.innerHTML=(sys==='ALL'?'<strong>'+allSystems.length+'</strong> system categories':'<strong>'+sys+'</strong>')
+    +' · <span style="color:#059669;font-weight:700;">'+healthPct+'% healthy</span>';
+
+  // Assets by branch (for the selected system) — click to view
+  const scope=fBranch==='ALL'?['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam']:[fBranch];
+  const srcB=health.length?health:assets;
+  const bTot={}; scope.forEach(b=>bTot[b]=srcB.filter(r=>r.Branch===b).reduce((s,r)=>s+(+r.Total||0),0));
+  const bLabels=scope.filter(b=>bTot[b]>0);
+  window._IT_BRANCHES=bLabels;
+  mkChart('it-branch',{type:'bar',data:{labels:bLabels,datasets:[{label:'Assets',data:bLabels.map(b=>bTot[b]),backgroundColor:'#1E4FD8',borderRadius:5,maxBarThickness:46}]},
+    options:{responsive:true,maintainAspectRatio:true,onClick:(e,el)=>{if(el&&el.length)viewIT('branch',bLabels[el[0].index]);},
+      plugins:{legend:{display:false},datalabels:{display:true,anchor:'end',align:'top',color:'#0F172A',font:{size:11,weight:'bold'},formatter:v=>fi(v)}},
+      layout:{padding:{top:18}},scales:{y:{beginAtZero:true,grid:{color:'#E0E8FF'}},x:{grid:{display:false}}}}});
+
+  // System health — working/down/pending; click a bar to view that system's records
+  const bySys={};
+  srcB.forEach(r=>{ const k=r.System||'–'; if(!bySys[k])bySys[k]={t:0,w:0,d:0,p:0}; bySys[k].t+=(+r.Total||0); bySys[k].w+=(+r.Working||0); bySys[k].d+=(+r.NotWorking||0); bySys[k].p+=(+r.Pending||0); });
+  const sysTop=Object.entries(bySys).sort((a,b)=>b[1].t-a[1].t).slice(0,12);
+  window._IT_SYSLABELS=sysTop.map(s=>s[0]);
+  mkChart('it-system',{type:'bar',data:{labels:sysTop.map(s=>s[0]),datasets:[
+    {label:'Working',data:sysTop.map(s=>s[1].w),backgroundColor:'#059669'},
+    {label:'Down',data:sysTop.map(s=>s[1].d),backgroundColor:'#DC2626'},
+    {label:'Pending',data:sysTop.map(s=>s[1].p),backgroundColor:'#F59E0B'}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:true,onClick:(e,el)=>{if(el&&el.length)viewIT('system',null,window._IT_SYSLABELS[el[0].index]);},
+      plugins:{legend:{position:'bottom',labels:{font:{size:10},usePointStyle:true}},datalabels:{display:false}},
+      scales:{x:{stacked:true,beginAtZero:true,grid:{color:'#E0E8FF'}},y:{stacked:true,grid:{display:false},ticks:{font:{size:10}}}}}});
+
+  // Lowest-health systems table (click a row to view that branch+system record)
+  const tb=document.getElementById('it-tbody');
+  if(tb){
+    const rows=srcB.map(r=>({...r,hp:(+r.Total>0&&r.Working!=null)?Math.round((+r.Working)/(+r.Total)*100):(+r.Health||0)}))
+      .filter(r=>+r.Total>0).sort((a,b)=>a.hp-b.hp).slice(0,14);
+    tb.innerHTML=rows.map(r=>{
+      const hc=r.hp>=90?'#059669':r.hp>=70?'#D97706':'#DC2626';
+      return `<tr style="cursor:pointer" onclick="viewIT('system','${_escAttr(r.Branch)}','${_escAttr(r.System)}')">
+        <td style="padding:8px 10px;border-bottom:1px solid #F1F5F9;"><span class="bd b${r.Branch}"></span> ${r.Branch}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #F1F5F9;">${r.System}</td>
+        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${fi(+r.Total||0)}</td>
+        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;color:#059669;">${fi(+r.Working||0)}</td>
+        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;color:#DC2626;">${fi(+r.NotWorking||0)}</td>
+        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;font-weight:700;color:${hc}">${r.hp}%</td></tr>`;
+    }).join('')||'<tr><td colspan="6" class="no-data">No data</td></tr>';
+  }
+}
+function viewIT(kind,branch,system){
+  const D=_itData(); const health=D.health||[]; const assets=D.assets||[];
+  const base=(health.length?health:assets);
+  // Honor the currently-selected system category (dropdown) unless a specific system was clicked.
+  const selSys=(window._IT_SYS && window._IT_SYS!=='ALL')?window._IT_SYS:null;
+  const sysFilter=system||selSys||null;
+  const bf=r=>(!branch)?(fBranch==='ALL'||r.Branch===fBranch):(r.Branch===branch);
+  let rows=base.filter(bf);
+  if(sysFilter) rows=rows.filter(r=>r.System===sysFilter);
+  if(kind==='down') rows=rows.filter(r=>(+r.NotWorking||0)>0);
+  else if(kind==='pending') rows=rows.filter(r=>(+r.Pending||0)>0);
+  const cols=[{key:'Branch',label:'Branch'},{key:'System',label:'System'},{key:'Total',label:'Total'},{key:'Working',label:'Working'},{key:'NotWorking',label:'Not Working'},{key:'Pending',label:'Pending'},{key:'Health',label:'Health %'},{key:'Remarks',label:'Remarks',maxW:'240px'}];
+  const bl=branch||(fBranch==='ALL'?'All Branches':fBranch);
+  const sysLabel=sysFilter?(' · '+sysFilter):'';
+  const title=kind==='down'?'🔴 Not-Working Assets':kind==='pending'?'⏳ Pending Assets':(kind==='system'&&system)?('🖥️ '+system):'🖥️ IT Assets';
+  openModal(title,`${rows.length} record(s) · ${bl}${sysLabel}`,rows,cols);
+}
+
+
+function _origRenderAll(){
+  // Each render is isolated: if one throws on unexpected live data, the rest still render.
+  const steps=[
+    ['Overview',renderOverview],['GrievanceOfficer',renderGrievanceOfficer],['HR',renderHR],['Rankings',renderRankings],['Insights',renderInsights],
+    ['Care',renderCare],['Observations',renderObservations],['Admin',renderAdmin],
+    ['Vigilance',renderVigilance],['Purchase',renderPurchase],
+    ['Admissions',renderAdmissions],['Grievance',renderGrievance],
+    ['Transport',renderTransport],['IT',renderIT]
+  ];
+  steps.forEach(function(s){
+    try{ s[1](); }
+    catch(err){ console.error('render '+s[0]+' failed:',err && err.message, err && err.stack); }
+  });
 }
 document.addEventListener('DOMContentLoaded',()=>{ if(_liveDataLoaded) renderAll(); /* else: live loader will call renderAll() once data arrives */ });
 </script>
