@@ -301,6 +301,9 @@ body.nav-min .sn-foot{display:none}
 .ccr tfoot td{background:#0B5D33;color:#fff;font-weight:800;border-color:#0B5D33}
 .ccr tfoot td.nm{text-align:left}
 .ccr .pend{font-weight:800}
+.ccr td.ccr-c{cursor:pointer;position:relative;transition:background .12s}
+.ccr td.ccr-c:hover{background:#DCF3E6!important;box-shadow:inset 0 0 0 2px #0B5D33}
+.ccr tfoot td.ccr-c:hover{background:#0A7A41!important;box-shadow:inset 0 0 0 2px #F2C230}
 .ccr-note{font-size:11.5px;color:var(--txm);margin-top:12px;line-height:1.55;max-width:105ch}
 
 /* ═══ STAGE-GROUP INFOGRAPHIC (Care Calls + Grievance) ═══ */
@@ -319,6 +322,10 @@ body.nav-min .sn-foot{display:none}
 .sg-legend i{width:9px;height:9px;border-radius:2px;flex-shrink:0}
 .sg-legend span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sg-legend b{margin-left:auto;color:var(--tx);font-variant-numeric:tabular-nums}
+.sg-card.sg-clk{cursor:pointer;transition:transform .12s,box-shadow .12s}
+.sg-card.sg-clk:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(11,93,51,.18)}
+.sg-lrow{cursor:pointer;border-radius:4px;padding:1px 3px;margin:0 -3px}
+.sg-lrow:hover{background:var(--pl)}
 .sg-note{font-size:11px;color:var(--txm);margin-top:11px;line-height:1.5}
 .sg-flag{margin-top:12px;border-left:3px solid #D97706;background:#FFFBEB;padding:10px 13px;
   border-radius:0 8px 8px 0;font-size:12px;color:#3F2E10;line-height:1.55}
@@ -6337,7 +6344,8 @@ window.CARE_NLP = (function () {
       var clean = rs.filter(function (r) { return /no\s*concern/i.test(catOf(r) || ''); }).length;
       var cleanPct = Math.round(clean / rs.length * 100);
 
-      return '<div class="sg-card" style="border-top-color:' + g.c + '">' +
+      return '<div class="sg-card sg-clk" data-g="' + g.key + '" style="border-top-color:' + g.c + '" ' +
+        'title="Click to view these records">' +
         '<div class="sg-h" style="background:' + g.c + '">' + esc(g.label) + '</div>' +
         '<div class="sg-n">' + rs.length + ' ' + unit +
           '<span>' + Math.round(rs.length / rows.length * 100) + '% of all</span></div>' +
@@ -6349,7 +6357,9 @@ window.CARE_NLP = (function () {
         '</svg>' +
         '<div class="sg-bar"><i style="width:' + (rs.length / maxN * 100) + '%;background:' + g.c + '"></i></div>' +
         '<div class="sg-legend">' + top.map(function (x, i) {
-          return '<div><i style="background:' + (palette[x.c] || ['#94A3B8', '#64748B', '#CBD5E1'][i % 3]) + '"></i>' +
+          return '<div class="sg-lrow" data-g="' + g.key + '" data-c="' + esc(x.c) + '" ' +
+            'title="Click to view these records"><i style="background:' +
+            (palette[x.c] || ['#94A3B8', '#64748B', '#CBD5E1'][i % 3]) + '"></i>' +
             '<span>' + esc(x.c) + '</span><b>' + x.n + '</b></div>';
         }).join('') + '</div>' +
         '</div>';
@@ -12273,7 +12283,10 @@ async function loadCivil(force){
       /* a call only counts as contact if somebody answered it */
       var answered=rs.filter(function(r){ return !unanswered(r); });
       var students={};
-      answered.forEach(function(r){ var k=String(r.Student||'').trim().toLowerCase(); if(k) students[k]=1; });
+      answered.forEach(function(r){
+        var nm=String(r.Student||'').trim().toLowerCase();
+        if(nm) students[String(r.Branch||'')+'\u241f'+nm]=1;
+      });
       var reached=Object.keys(students).length||answered.length;
 
       var concerns=answered.filter(function(r){ return !NOT_A_CONCERN.test(String(r.Grievance||'')); });
@@ -12301,6 +12314,15 @@ async function loadCivil(force){
     function pctCell(n,d){ return d?('<span class="sub">'+Math.round(n/d*100)+'%</span>'):''; }
     function pendColor(n){ return n>0?'#DC2626':'#059669'; }
 
+    /* Every count on this table is a live link to the rows behind it. The cell
+       carries which branch and which measure it is, so clicking "Addressed" on
+       one branch opens exactly those records — not the whole column, and not
+       the same list from every cell. */
+    function cell(val, branch, kind, extra){
+      return '<td class="ccr-c" data-b="'+branch+'" data-k="'+kind+'"'+(extra||'')+' title="Click to view these records">'
+        +val+'</td>';
+    }
+
     var title='PGOS PARENT FEEDBACK COMPLIANCE REPORT'+
       (fMonth==='ALL'?'':' \u00b7 '+fMonth)+' (AY 2026-27)';
 
@@ -12315,27 +12337,27 @@ async function loadCivil(force){
       +data.map(function(d){
         return '<tr>'
           +'<td class="nm">'+d.b+'</td>'
-          +'<td>'+(d.strength?fi(d.strength):'\u2014')
-            +(d.fromSheet?'<span class="sub">from master sheet</span>':'')+'</td>'
-          +'<td>'+fi(d.calls)+'</td>'
-          +'<td>'+fi(d.reached)+(d.contactPct!==null?'<span class="sub">'+d.contactPct+'% of strength</span>':'')+'</td>'
-          +'<td>'+fi(d.aca)+'</td>'
-          +'<td>'+fi(d.acaD)+pctCell(d.acaD,d.aca)+'</td>'
-          +'<td>'+fi(d.non)+'</td>'
-          +'<td>'+fi(d.nonD)+pctCell(d.nonD,d.non)+'</td>'
-          +'<td class="pend" style="color:'+pendColor(d.pending)+'">'+fi(d.pending)+'</td>'
+          +cell((d.strength?fi(d.strength):'\u2014')
+            +(d.fromSheet?'<span class="sub">from master sheet</span>':''), d.b, 'students')
+          +cell(fi(d.calls), d.b, 'calls')
+          +cell(fi(d.reached)+(d.contactPct!==null?'<span class="sub">'+d.contactPct+'% of strength</span>':''), d.b, 'reached')
+          +cell(fi(d.aca), d.b, 'aca')
+          +cell(fi(d.acaD)+pctCell(d.acaD,d.aca), d.b, 'acaD')
+          +cell(fi(d.non), d.b, 'non')
+          +cell(fi(d.nonD)+pctCell(d.nonD,d.non), d.b, 'nonD')
+          +cell(fi(d.pending), d.b, 'pending', ' style="color:'+pendColor(d.pending)+';font-weight:800"')
           +'</tr>';
       }).join('')
       +'</tbody><tfoot><tr>'
       +'<td class="nm">TOTAL</td>'
-      +'<td>'+(T.strength?fi(T.strength):'\u2014')+'</td>'
-      +'<td>'+fi(T.calls)+'</td>'
-      +'<td>'+fi(T.reached)+(T.strength?'<span class="sub" style="color:#BBF7D0">'+Math.round(T.reached/T.strength*100)+'%</span>':'')+'</td>'
-      +'<td>'+fi(T.aca)+'</td>'
-      +'<td>'+fi(T.acaD)+(T.aca?'<span class="sub" style="color:#BBF7D0">'+Math.round(T.acaD/T.aca*100)+'%</span>':'')+'</td>'
-      +'<td>'+fi(T.non)+'</td>'
-      +'<td>'+fi(T.nonD)+(T.non?'<span class="sub" style="color:#BBF7D0">'+Math.round(T.nonD/T.non*100)+'%</span>':'')+'</td>'
-      +'<td>'+fi(T.pending)+'</td>'
+      +cell((T.strength?fi(T.strength):'\u2014'), '*', 'students')
+      +cell(fi(T.calls), '*', 'calls')
+      +cell(fi(T.reached)+(T.strength?'<span class="sub" style="color:#BBF7D0">'+Math.round(T.reached/T.strength*100)+'%</span>':''), '*', 'reached')
+      +cell(fi(T.aca), '*', 'aca')
+      +cell(fi(T.acaD)+(T.aca?'<span class="sub" style="color:#BBF7D0">'+Math.round(T.acaD/T.aca*100)+'%</span>':''), '*', 'acaD')
+      +cell(fi(T.non), '*', 'non')
+      +cell(fi(T.nonD)+(T.non?'<span class="sub" style="color:#BBF7D0">'+Math.round(T.nonD/T.non*100)+'%</span>':''), '*', 'nonD')
+      +cell(fi(T.pending), '*', 'pending')
       +'</tr></tfoot></table></div>';
 
     var worst=data.slice().sort(function(a,b){ return b.pending-a.pending; })[0];
@@ -12355,6 +12377,64 @@ async function loadCivil(force){
     el.innerHTML=html;
     /* keep the figures so the export is built from numbers, not scraped text */
     window._CCR={rows:data,total:T,title:title};
+
+    /* Selecting the rows behind a cell uses the same tests the table used to
+       count them, so the list can never be a different size from the number
+       that was clicked. */
+    function rowsFor(branch, kind){
+      var base=rows.filter(function(r){ return branch==='*'||r.Branch===branch; });
+      var ans=base.filter(function(r){ return !unanswered(r); });
+      var con=ans.filter(function(r){ return !NOT_A_CONCERN.test(String(r.Grievance||'')); });
+      var aca=con.filter(function(r){ return ACADEMIC.test(String(r.Grievance||'')); });
+      var non=con.filter(function(r){ return !ACADEMIC.test(String(r.Grievance||'')); });
+      var done=function(l){ return l.filter(function(r){ return /resolved/i.test(String(r.Status||'')); }); };
+      var open=function(l){ return l.filter(function(r){ return !/resolved/i.test(String(r.Status||'')); }); };
+      /* Contactability counts students, not calls — a child rung three times
+         and answered twice is one student reached. The drill-down therefore
+         shows one row per student, otherwise the list would be longer than the
+         number that was clicked. */
+      var perStudent=function(list){
+        var seen={}, out=[];
+        list.forEach(function(r){
+          /* keyed by branch as well as name: the same name at two campuses is
+             two children, and keying on name alone would make the TOTAL row
+             smaller than the branch rows that make it up */
+          var nm=String(r.Student||'').trim().toLowerCase();
+          if(!nm){ out.push(r); return; }
+          var k=String(r.Branch||'')+'\u241f'+nm;
+          if(seen[k]) return;
+          seen[k]=1; out.push(r);
+        });
+        return out;
+      };
+      switch(kind){
+        case 'calls':    return {rows:base, label:'All calls logged'};
+        case 'reached':  return {rows:perStudent(ans), label:'Students reached (one row per student)'};
+        case 'students': return {rows:perStudent(ans), label:'Students covered by the care-call sheet'};
+        case 'aca':      return {rows:aca,  label:'Academic concerns raised'};
+        case 'acaD':     return {rows:done(aca), label:'Academic concerns addressed'};
+        case 'non':      return {rows:non,  label:'Non-academic concerns raised'};
+        case 'nonD':     return {rows:done(non), label:'Non-academic concerns addressed'};
+        case 'pending':  return {rows:open(aca).concat(open(non)), label:'Concerns still to be addressed'};
+      }
+      return {rows:base, label:'Records'};
+    }
+
+    var CCR_COLS=[{key:'Branch',label:'Branch'},{key:'Month',label:'Month'},{key:'Class',label:'Class'},
+      {key:'Student',label:'Student',maxW:'170px'},{key:'Date',label:'Date',date:true},
+      {key:'Grievance',label:'Concern',pill:true},{key:'Remarks',label:'Remarks',maxW:'280px'},
+      {key:'Followup',label:'Follow-up',maxW:'200px'},{key:'Status',label:'Status',pill:true}];
+
+    el.querySelectorAll('.ccr-c').forEach(function(td){
+      td.addEventListener('click',function(){
+        var b=td.dataset.b, k=td.dataset.k;
+        var sel=rowsFor(b,k);
+        var where=(b==='*')?(fBranch==='ALL'?'All branches':fBranch):b;
+        openModal('📋 '+sel.label,
+          sel.rows.length.toLocaleString('en-IN')+' record(s) · '+where+
+          (fMonth==='ALL'?'':' · '+fMonth), sel.rows, CCR_COLS);
+      });
+    });
 
     var fn=document.getElementById('ccr-fn');
     if(fn) fn.textContent=(fBranch==='ALL'?'All branches':fBranch)+(fMonth==='ALL'?' \u00b7 all months':' \u00b7 '+fMonth)
@@ -12427,6 +12507,99 @@ async function loadCivil(force){
   }
   /* and once the live payload has landed */
   setTimeout(safeBuild,1500); setTimeout(safeBuild,4000);
+})();
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   CLICK-TO-VIEW ON THE STAGE-GROUP CARDS
+   A number nobody can open is a number nobody can act on, so every stage card
+   and every category line inside it opens the records behind it. The selection
+   repeats the same grouping the card used to count, so the list is always the
+   size of the figure that was clicked.
+   ══════════════════════════════════════════════════════════════════════════ */
+(function(){
+  var CARE_COLS=[{key:'Branch',label:'Branch'},{key:'Month',label:'Month'},{key:'Class',label:'Class'},
+    {key:'Student',label:'Student',maxW:'170px'},{key:'Date',label:'Date',date:true},
+    {key:'Grievance',label:'Concern',pill:true},{key:'Remarks',label:'Remarks',maxW:'280px'},
+    {key:'Status',label:'Status',pill:true}];
+  var GRIEV_COLS=[{key:'Branch',label:'Branch'},{key:'Date',label:'Date',date:true},
+    {key:'Grade',label:'Grade'},{key:'Student',label:'Student',maxW:'160px'},
+    {key:'Category',label:'Category',pill:true},{key:'Severity',label:'Severity',pill:true},
+    {key:'Description',label:'Description',maxW:'280px'},{key:'AssignedTo',label:'Assigned To'},
+    {key:'Status',label:'Status',pill:true},{key:'ClosureDate',label:'Closed',date:true}];
+
+  function label(key){
+    var g=(window.CARE_NLP&&CARE_NLP.GROUPS||[]).filter(function(x){ return x.key===key; })[0];
+    return g?g.label:key;
+  }
+
+  function wire(hostId, getRows, gradeOf, catOf, cols, unit){
+    var host=document.getElementById(hostId); if(!host) return;
+    host.querySelectorAll('.sg-card.sg-clk').forEach(function(card){
+      card.addEventListener('click',function(ev){
+        if(ev.target.closest('.sg-lrow')) return;      // the legend handles its own
+        var k=card.dataset.g;
+        var rows=getRows().filter(function(r){ return CARE_NLP.groupOf(gradeOf(r))===k; });
+        openModal('🎓 '+label(k), rows.length.toLocaleString('en-IN')+' '+unit, rows, cols);
+      });
+    });
+    host.querySelectorAll('.sg-lrow').forEach(function(row){
+      row.addEventListener('click',function(ev){
+        ev.stopPropagation();
+        var k=row.dataset.g, c=row.dataset.c;
+        var inGroup=getRows().filter(function(r){ return CARE_NLP.groupOf(gradeOf(r))===k; });
+        var rows=(c==='Everything else')
+          ? inGroup            /* the rolled-up tail: open the group and let the reader sort it */
+          : inGroup.filter(function(r){ return (catOf(r)||'Other')===c; });
+        openModal('🎓 '+label(k)+' · '+c, rows.length.toLocaleString('en-IN')+' '+unit, rows, cols);
+      });
+    });
+  }
+
+  function careRows(){
+    var C=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
+    var ALL=['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam'];
+    var scope=(fBranch==='ALL')?ALL:[fBranch];
+    var rows=C.filter(function(r){ return scope.indexOf(r.Branch)>=0 && (fMonth==='ALL'||r.Month===fMonth); });
+    var s=window._CARE_SENT||'ALL';
+    if(s!=='ALL'&&window.CARE_NLP) rows=rows.filter(function(r){ return CARE_NLP.classify(r).klass===s; });
+    return rows;
+  }
+  function grievRows(){
+    var G=(typeof GRIEVANCE_DATA!=='undefined'&&Array.isArray(GRIEVANCE_DATA))?GRIEVANCE_DATA:[];
+    var ALL=['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam'];
+    var scope=(fBranch==='ALL')?ALL:[fBranch];
+    return G.filter(function(r){ return scope.indexOf(r.Branch)>=0; });
+  }
+
+  var CATS=['No Concern','Not Answering','Academics','Behaviour / Wellbeing','Administration',
+            'Transport','Co Curricular','New Admission','No Response','Other'];
+
+  function wireAll(){
+    try{
+      wire('care-stage', careRows, function(r){ return r.Class; },
+        function(r){ return CATS.indexOf(r.Grievance)>=0?r.Grievance:'Other'; }, CARE_COLS, 'call(s)');
+    }catch(e){}
+    try{
+      wire('griev-stage', grievRows, function(r){ return r.Grade; },
+        function(r){ return (r.Category&&r.Category!=='–')?r.Category:'Other'; }, GRIEV_COLS, 'case(s)');
+    }catch(e){}
+  }
+  window.__wireStageClicks=wireAll;
+
+  /* the cards are rebuilt on every render, so the handlers are reattached after */
+  ['renderCareSummary','renderGrievance','applyFilters'].forEach(function(fn){
+    var o=window[fn];
+    if(typeof o==='function') window[fn]=function(){
+      var r=o.apply(this,arguments); setTimeout(wireAll,0); return r;
+    };
+  });
+  var _st=window.showTab;
+  if(typeof _st==='function') window.showTab=function(id,btn){
+    var r=_st(id,btn); if(id==='care'||id==='grievance') setTimeout(wireAll,0); return r;
+  };
+  setTimeout(wireAll,1500); setTimeout(wireAll,4000);
 })();
 </script>
 </body>
