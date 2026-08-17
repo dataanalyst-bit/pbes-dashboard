@@ -301,6 +301,44 @@ body.nav-min .sn-foot{display:none}
 .ccr tfoot td{background:#0B5D33;color:#fff;font-weight:800;border-color:#0B5D33}
 .ccr tfoot td.nm{text-align:left}
 .ccr .pend{font-weight:800}
+/* chart / table toggle, used wherever a visual has a tabular twin */
+.vt-toggle{margin-left:auto;display:flex;border:1.5px solid var(--bor);border-radius:8px;overflow:hidden}
+.vt-toggle button{padding:4px 11px;border:none;background:#fff;color:var(--txm);cursor:pointer;
+  font-family:Inter,sans-serif;font-size:11px;font-weight:600;white-space:nowrap}
+.vt-toggle button.on{background:var(--p);color:#fff;font-weight:700}
+.vt-toggle button:hover:not(.on){background:var(--pl);color:var(--p)}
+/* branch comparison */
+.cmp-rows{display:flex;flex-direction:column;gap:11px}
+.cmp-row{display:grid;grid-template-columns:120px 1fr 96px;gap:12px;align-items:center}
+.cmp-row .b{font-size:12.5px;font-weight:700;color:var(--tx)}
+.cmp-row .b small{display:block;font-weight:500;color:var(--txm);font-size:10px}
+.cmp-bar{display:flex;height:26px;border-radius:7px;overflow:hidden;background:#F1F5F9}
+.cmp-bar span{display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;
+  font-weight:700;cursor:pointer;transition:filter .12s;min-width:0}
+.cmp-bar span:hover{filter:brightness(1.12)}
+.cmp-row .t{text-align:right;font-variant-numeric:tabular-nums;font-weight:800;font-size:13px}
+.cmp-tbl{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+.cmp-tbl th{background:#EEF2FF;color:var(--p);font-size:10.5px;font-weight:700;text-transform:uppercase;
+  padding:8px 11px;border-bottom:2px solid #E0E8FF;text-align:center}
+.cmp-tbl th.nm{text-align:left}
+.cmp-tbl td{padding:8px 11px;border-bottom:1px solid #E0E8FF;text-align:center}
+.cmp-tbl td.nm{text-align:left;font-weight:700}
+.cmp-tbl td.c{cursor:pointer}
+.cmp-tbl td.c:hover{background:var(--pl);box-shadow:inset 0 0 0 2px var(--p)}
+.cmp-tbl tfoot td{background:#F8FAFF;font-weight:800;border-top:2px solid #E0E8FF}
+/* vertical branch rail inside the Care Call Summary */
+.br-rail{display:flex;flex-direction:column;gap:5px;min-width:132px;flex-shrink:0}
+.br-rail .h{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--txm);font-weight:800;margin-bottom:2px}
+.br-rail button{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;
+  padding:7px 11px;border:1.5px solid var(--bor);border-radius:8px;background:#fff;color:var(--tx);
+  font-family:Inter,sans-serif;font-size:11.5px;font-weight:600;cursor:pointer;text-align:left}
+.br-rail button b{font-variant-numeric:tabular-nums;color:var(--txm);font-weight:700}
+.br-rail button:hover{border-color:var(--p);background:var(--pl)}
+.br-rail button.on{background:var(--p);border-color:var(--p);color:#fff}
+.br-rail button.on b{color:#DBEAFE}
+.care-split{display:flex;gap:16px;align-items:flex-start}
+.care-split>.main{flex:1;min-width:0}
+@media(max-width:820px){.care-split{flex-direction:column}.br-rail{flex-direction:row;flex-wrap:wrap;min-width:0}}
 .hrs{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;min-width:620px}
 .hrs th{background:#EEF2FF;color:#1E4FD8;font-size:10.5px;font-weight:700;text-transform:uppercase;
   padding:8px 11px;border-bottom:2px solid #E0E8FF;text-align:center;line-height:1.25}
@@ -969,39 +1007,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="card"><div class="ch"><h3>🏫 Branch Completion Rate Comparison</h3><span class="fnote">Current month always · follows Branch dropdown (ignores Month filter so it never goes stale)</span></div><div class="cb" id="care-bars"></div></div>
     <div class="card"><div class="ch"><h3>📈 Completion Rate Trend (Month-wise)</h3></div><div class="cb"><div class="cw tall"><canvas id="care-trend"></canvas></div></div></div>
   </div>
-  <!-- Quick View: Pending & In Progress records, live-filtered by branch/month -->
+  <!-- Branch comparison of the work still open. The old Quick View listed the
+       same rows twice, once per status; this compares the branches instead,
+       which is the question a group review actually asks. -->
   <div class="card" style="margin-bottom:16px;">
-    <div class="ch"><h3>⚡ Quick View — Pending &amp; In Progress Calls</h3><span class="fnote" id="cc-quick-fn">All Branches · All Months</span></div>
-    <div class="row r2" style="margin:0;padding:0 14px 14px;">
-      <div>
-        <div style="font-size:11px;font-weight:700;color:#D97706;text-transform:uppercase;margin-bottom:6px;">⏳ Pending — <span id="cc-pend-count">0</span> <span style="font-weight:500;color:#94A3B8;">(click any row to view full record)</span></div>
-        <div style="overflow-x:auto;max-height:260px;overflow-y:auto;border:1px solid #E0E8FF;border-radius:8px;">
-          <table style="width:100%;border-collapse:collapse;font-size:11.5px;">
-            <thead><tr style="background:#FFFBEB;position:sticky;top:0;">
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#D97706;text-transform:uppercase;">Branch</th>
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#D97706;text-transform:uppercase;">Student</th>
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#D97706;text-transform:uppercase;">Grievance</th>
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#D97706;text-transform:uppercase;">Date</th>
-            </tr></thead>
-            <tbody id="cc-pend-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-      <div>
-        <div style="font-size:11px;font-weight:700;color:#7C3AED;text-transform:uppercase;margin-bottom:6px;">🔄 In Progress — <span id="cc-ip-count">0</span> <span style="font-weight:500;color:#94A3B8;">(click any row to view full record)</span></div>
-        <div style="overflow-x:auto;max-height:260px;overflow-y:auto;border:1px solid #E0E8FF;border-radius:8px;">
-          <table style="width:100%;border-collapse:collapse;font-size:11.5px;">
-            <thead><tr style="background:#F5F3FF;position:sticky;top:0;">
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#7C3AED;text-transform:uppercase;">Branch</th>
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#7C3AED;text-transform:uppercase;">Student</th>
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#7C3AED;text-transform:uppercase;">Grievance</th>
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#7C3AED;text-transform:uppercase;">Date</th>
-            </tr></thead>
-            <tbody id="cc-ip-tbody"></tbody>
-          </table>
-        </div>
+    <div class="ch"><h3>⚖️ Branch Comparison — In Progress &amp; Pending</h3>
+      <span class="fnote" id="cc-cmp-fn">All Branches · All Months</span>
+      <div class="vt-toggle" id="cc-cmp-toggle">
+        <button data-v="chart" class="on">📊 Chart</button><button data-v="table">📋 Table</button>
       </div>
     </div>
+    <div class="cb" style="padding:14px 18px;"><div id="cc-compare"></div></div>
   </div>
 
   <!-- Branch-wise compliance report, in the printed PGOS layout -->
@@ -1015,7 +1031,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   <!-- Care Call Summary — Insights & Data-Driven Decisions -->
   <div class="card" style="margin-bottom:16px;">
-    <div class="ch"><h3>🧭 Care Call Summary — Insights &amp; Data-Driven Decisions</h3><span class="fnote" id="care-summary-fn">Parents-satisfied % + grievance-category insights</span></div>
+    <div class="ch"><h3>🧭 Care Call Summary — Insights &amp; Data-Driven Decisions</h3><span class="fnote" id="care-summary-fn">Parents-satisfied % + grievance-category insights</span>
+      <div class="vt-toggle" id="care-sum-toggle">
+        <button data-v="chart" class="on">📊 Insights</button><button data-v="table">📋 Table</button>
+      </div>
+    </div>
     <div class="cb" id="care-summary-report" style="padding:14px 18px;"></div>
   </div>
 
@@ -4001,8 +4021,8 @@ function renderGrievance(){
       scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,title:{display:true,text:'Cases'}}}}});
 
 
-  // Severity Distribution chart removed: severity is set by whoever logs the case,
-  // so it measured the logger more than the school.
+  // Severity Distribution chart removed: severity is set by whoever logs the
+  // case, so it measured the logger more than the school.
 
   // ── Chart 3: Category Breakdown (horizontal bar) ──
   const catCounts={};
@@ -4016,8 +4036,8 @@ function renderGrievance(){
         datalabels:{display:true,anchor:'end',align:'right',color:'#1E293B',font:{size:10,weight:'bold'}}},
       scales:{x:{beginAtZero:true,title:{display:true,text:'Cases'}}}}});
 
-  // Parent Satisfaction by Branch chart removed: it read the Parent Satisfaction
-  // column, which is filled on only a fraction of cases.
+  // Parent Satisfaction by Branch chart removed: it read a column filled on only
+  // a fraction of cases.
 
   // ── Performance Scorecard ──
   renderGrievRanking(rows, ALLB);
@@ -4623,8 +4643,7 @@ function renderHR(){
     const closed=allRec.filter(r=>r.HR===h&&isClosed(r.Status));
     const dtc=closed.map(r=>hrCloseDays(r)).filter(v=>v!==null&&v>=0);
     const avg=dtc.length>0?(dtc.reduce((a,b)=>a+b,0)/dtc.length):0;
-    // the speed buckets are carried here too, so the table can show the mix
-    // behind the average rather than only its length
+    // the speed buckets travel with the average so the table can show the mix
     return {h, avg:+avg.toFixed(1),
             fast:dtc.filter(v=>v<=7).length,
             med:dtc.filter(v=>v>7&&v<=21).length,
@@ -4632,8 +4651,8 @@ function renderHR(){
             total:dtc.length};
   }).sort((a,b)=>a.avg-b.avg);
   // ── Average days to close, as a table rather than a bar chart ──
-  // A bar only shows the length; the table shows the length, the mix behind it
-  // and opens the positions themselves.
+  // A bar shows only the length; the table shows the mix behind it and opens
+  // the positions themselves.
   (function(){
     var el=document.getElementById('hr-score-table'); if(!el) return;
     if(!recStatsSorted.length){ el.innerHTML='<div class="no-data">No closed positions yet.</div>'; return; }
@@ -4797,30 +4816,24 @@ function viewHRKpi(status){
 }
 
 // Drill-down by recruiter (status: ALL/Open/Closed/Hold)
-/* Positions behind one speed bucket. The same day-count test the table used to
-   put the position in that bucket decides what appears here, so the list is
-   always the size of the number that was clicked. */
+/* Positions behind one speed bucket. It uses hrCloseDays(), the very function
+   the table used to put the position in that bucket, so the list is always the
+   size of the number that was clicked. */
 function viewHRSpeed(hr,kind){
   var R=(typeof HR_RECORDS!=='undefined'&&Array.isArray(HR_RECORDS))?HR_RECORDS:[];
-  /* The table measures closure days with hrCloseDays(), which prefers the
-     posted-to-closed dates over the DaysToClose column. This uses the very same
-     function, otherwise a position could land in a different bucket here than
-     the one it was counted in, and the number and the list would disagree. */
-  var days=(typeof hrCloseDays==='function')
-    ? hrCloseDays
-    : function(r){ var d=Number(r.DaysToClose); return isFinite(d)?d:null; };
-  var closedFn=(typeof isClosed==='function') ? isClosed
-    : function(s){ return /closed|filled/i.test(String(s||'')); };
-
+  var days=(typeof hrCloseDays==='function')?hrCloseDays
+    :function(r){ var d=Number(r.DaysToClose); return isFinite(d)?d:null; };
+  var closedFn=(typeof isClosed==='function')?isClosed
+    :function(s){ return /closed|filled/i.test(String(s||'')); };
   var rows=R.filter(function(r){
     if(String(r.HR)!==String(hr)) return false;
     if(fBranch!=='ALL'&&r.Branch!==fBranch) return false;
     if(!closedFn(r.Status)) return false;
     var d=days(r);
     if(d===null||d===undefined||!isFinite(d)||d<0) return false;
-    if(kind==='fast')   return d<=7;
-    if(kind==='med')    return d>7&&d<=21;
-    if(kind==='slow')   return d>21;
+    if(kind==='fast') return d<=7;
+    if(kind==='med')  return d>7&&d<=21;
+    if(kind==='slow') return d>21;
     return true;
   });
   var LBL={fast:'closed within 7 days',med:'closed in 8\u201321 days',slow:'closed after 21 days',closed:'closed positions'};
@@ -6457,22 +6470,17 @@ function renderCareSummary(){
   }
   const rows=CARE.filter(r=>scope.includes(r.Branch)&&(fMonth==='ALL'||r.Month===fMonth));
   // ── Scope + Pending filters (they persist across re-renders) ──
-  // Class and Section have gone: the stage-group panel already answers "which
-  // part of the school", and it does so by grade band rather than by every
-  // individual section, which is the level these decisions are actually taken at.
-  const _CARE_ACADEMIC=/^(academics?|academic|studies|study|teaching|learning|exam|homework)/i;
-  const _CARE_NOTCONCERN=/^(no concern|not answering|no response)/i;
+  // Class and Section have gone: the stage-group panel answers "which part of
+  // the school" by grade band, which is the level these decisions are taken at.
   const _scope=window._CARE_SCOPE||'ALL';
   const _pendOnly=!!window._CARE_PENDING;
   const filteredRows=rows.filter(r=>{
     const g=String(r.Grievance||'');
-    if(_scope==='Academic'){ if(_CARE_NOTCONCERN.test(g)||!_CARE_ACADEMIC.test(g)) return false; }
-    else if(_scope==='Non-Academic'){ if(_CARE_NOTCONCERN.test(g)||_CARE_ACADEMIC.test(g)) return false; }
-    // "Pending to be addressed" is a real concern that has not been resolved —
-    // the same test the compliance report uses for its Pending column, so the
-    // two can never disagree.
+    if(_scope==='Academic'){ if(_CARE_NOCONC_RE.test(g)||!_CARE_ACAD_RE.test(g)) return false; }
+    else if(_scope==='Non-Academic'){ if(_CARE_NOCONC_RE.test(g)||_CARE_ACAD_RE.test(g)) return false; }
+    // the same test the compliance report uses for its Pending column
     if(_pendOnly){
-      if(_CARE_NOTCONCERN.test(g)) return false;
+      if(_CARE_NOCONC_RE.test(g)) return false;
       if(/resolved/i.test(String(r.Status||''))) return false;
     }
     return true;
@@ -6503,7 +6511,7 @@ function renderCareSummary(){
   // satisfied parent, and a call nobody answered is not an opinion at all.
   // Satisfaction and reach describe the whole call set for the branch and month,
   // never a slice of it. Filtering to Negative, or to Academic concerns, removes
-  // every "No Concern" call by definition — so computing satisfaction inside the
+  // every "No Concern" call by definition, so computing satisfaction inside the
   // slice would always read 0% and look like a collapse rather than a filter.
   const _nlp=rows.map(r=>CARE_NLP.classify(r));
   const reachable=_nlp.filter(c=>c.reachable).length;
@@ -6637,15 +6645,15 @@ function renderCareSummary(){
         <div style="font-size:11px;color:#64748B;">${Math.round(pending/total*100)}% · click to view with sentiment</div></div>`
     +'</div>';
 
-  // ── Scope · Sentiment · Pending controls for the Summary ──
+  // ── Scope · Pending · Sentiment controls for the Summary ──
   const _pendCount=rows.filter(r=>{
     const g=String(r.Grievance||'');
-    return !_CARE_NOTCONCERN.test(g) && !/resolved/i.test(String(r.Status||''));
+    return !_CARE_NOCONC_RE.test(g) && !/resolved/i.test(String(r.Status||''));
   }).length;
   h+='<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">'
-    +'<span style="font-size:12px;font-weight:800;color:#0F172A;">📂 Category Mix</span>'
+    +'<span style="font-size:12px;font-weight:800;color:#0F172A;">\ud83d\udcc2 Category Mix</span>'
     +'<div style="display:flex;border:1.5px solid #E0E8FF;border-radius:8px;overflow:hidden;font-size:11px;font-family:Inter,sans-serif;">'
-      +[['ALL','All concerns',''],['Academic','Academic','📘 '],['Non-Academic','Non-Academic','🏫 ']].map(x=>{
+      +[['ALL','All concerns',''],['Academic','Academic','\ud83d\udcd8 '],['Non-Academic','Non-Academic','\ud83c\udfeb ']].map(x=>{
         const active=_scope===x[0];
         const C={'ALL':'#1E4FD8','Academic':'#3B82F6','Non-Academic':'#0D9488'};
         return '<button onclick="window._CARE_SCOPE=\''+x[0]+'\';renderCareSummary()" style="padding:5px 12px;border:none;'
@@ -6659,15 +6667,15 @@ function renderCareSummary(){
       +'style="padding:5px 13px;border:1.5px solid '+(_pendOnly?'#DC2626':'#E0E8FF')+';border-radius:8px;'
       +'background:'+(_pendOnly?'#DC2626':'#fff')+';color:'+(_pendOnly?'#fff':'#DC2626')+';'
       +'font-weight:'+(_pendOnly?'800':'600')+';cursor:pointer;font-family:Inter,sans-serif;font-size:11px;white-space:nowrap;">'
-      +'⏳ Pending to be Addressed <span style="opacity:.85;">'+fi(_pendCount)+'</span>'
-      +(_pendOnly?' ✕':'')+'</button>'
+      +'\u23f3 Pending to be Addressed <span style="opacity:.85;">'+fi(_pendCount)+'</span>'
+      +(_pendOnly?' \u2715':'')+'</button>'
     +'<div style="display:flex;border:1.5px solid #E0E8FF;border-radius:8px;overflow:hidden;font-size:11px;font-family:Inter,sans-serif;">'
       +['ALL','Positive','Neutral','Negative','No Answer'].map(s=>{
         const active=_sent===s;
         const C={'Positive':'#059669','Negative':'#DC2626','Neutral':'#64748B','No Answer':'#C2410C','ALL':'#1E4FD8'};
         const bg=active?C[s]:'#fff';
         const fg=active?'#fff':(s==='ALL'?'#334155':C[s]);
-        const E={'Positive':'😊 ','Negative':'😟 ','Neutral':'😐 ','No Answer':'📵 ','ALL':''};
+        const E={'Positive':'\ud83d\ude0a ','Negative':'\ud83d\ude1f ','Neutral':'\ud83d\ude10 ','No Answer':'\ud83d\udcf5 ','ALL':''};
         return '<button onclick="window._CARE_SENT=\''+s+'\';renderCareSummary()" style="padding:5px 12px;border:none;background:'+bg+';color:'+fg+';font-weight:'+(active?'700':'500')+';cursor:pointer;font-family:Inter,sans-serif;font-size:11px;white-space:nowrap;">'+E[s]+s+'</button>';
       }).join('')
     +'</div>'
@@ -6701,12 +6709,9 @@ function renderCareSummary(){
       +'<div style="font-size:9px;font-weight:700;color:#94A3B8;margin-bottom:2px;">🔍 SUB-TOPICS</div>'
       +topics.slice(0,5).map(t=>{
         const tp=Math.round(t.count/catRows.length*100);
-        // The "General …" bucket holds the rows that matched NO other bucket.
-        // Its drill-down needs the other buckets' keywords to reproduce that,
-        // otherwise clicking it returns the whole category.
-        const _excl=t.kw.length===0
-          ? topics.reduce((a,b)=>a.concat(b.kw||[]),[])
-          : [];
+        // the "General …" bucket holds rows that matched NO other bucket; its
+        // viewer needs the other keywords to reproduce that exclusion
+        const _excl=t.kw.length===0?topics.reduce((a,b)=>a.concat(b.kw||[]),[]):[];
         return '<div style="display:flex;justify-content:space-between;font-size:10px;color:#334155;padding:1px 0;cursor:pointer;" '
           +'onclick="viewSubTopic(\''+c.replace(/'/g,"\\'")+'\',\''+t.topic.replace(/'/g,"\\'")+'\','+JSON.stringify(t.kw).replace(/"/g,'&quot;')+','+JSON.stringify(_excl).replace(/"/g,'&quot;')+')" '
           +'title="Click to view with sentiment">'
@@ -6766,22 +6771,19 @@ function viewCareWithSentiment(status){
 // Drill-down: care calls in a grievance category (respects current branch+month filter)
 // Sub-topic drill-down: filters care calls by category + keyword match
 // Helper: compute sentiment for a care row and check if it matches the active filter
-/* The chips classify each call with CARE_NLP, which understands negation and
-   treats an unanswered call as its own class. This must use the same engine, or
-   a row could be counted under one chip and listed under another — and picking
-   "No Answer" would return nothing at all, because the older scorer has no such
-   class. */
+/* The chips classify with CARE_NLP, which understands negation and treats an
+   unanswered call as its own class. The viewers must use the same engine, or a
+   row counted under one chip could be listed under another — and picking
+   "No Answer" would return nothing, the older scorer having no such class. */
 function _careRowSentiment(r){
   if(window.CARE_NLP&&CARE_NLP.classify){ try{ return CARE_NLP.classify(r).klass; }catch(e){} }
   return _sentiment(((r.Remarks&&r.Remarks!=='–')?r.Remarks:'')+' '+((r.Followup&&r.Followup!=='–')?r.Followup:'')).label;
 }
 
 /* ── the single place the Category Mix controls become a row test ──
-   Scope (All / Academic / Non-Academic), Pending-to-be-Addressed and the
-   sentiment chip are all applied here, and every drill-down goes through it.
-   Previously each viewer applied the sentiment chip only, so opening a category
-   while "Pending to be Addressed" was on listed resolved calls the figure had
-   already excluded. */
+   Scope, Pending-to-be-Addressed and the sentiment chip together. Every
+   drill-down goes through this, so a list cannot contain rows the figure on
+   screen excluded. */
 var _CARE_ACAD_RE=/^(academics?|academic|studies|study|teaching|learning|exam|homework)/i;
 var _CARE_NOCONC_RE=/^(no concern|not answering|no response)/i;
 function _careActiveFilter(rows){
@@ -6793,14 +6795,13 @@ function _careActiveFilter(rows){
     if(scope==='Academic'){ if(_CARE_NOCONC_RE.test(g)||!_CARE_ACAD_RE.test(g)) return false; }
     else if(scope==='Non-Academic'){ if(_CARE_NOCONC_RE.test(g)||_CARE_ACAD_RE.test(g)) return false; }
     if(pend){
-      if(_CARE_NOCONC_RE.test(g)) return false;                       // never a concern
-      if(/resolved/i.test(String(r.Status||''))) return false;        // already dealt with
+      if(_CARE_NOCONC_RE.test(g)) return false;
+      if(/resolved/i.test(String(r.Status||''))) return false;
     }
     if(sent!=='ALL'&&_careRowSentiment(r)!==sent) return false;
     return true;
   });
 }
-/* kept so any older caller still behaves, but it now applies every active control */
 function _careFilterBySentiment(rows){ return _careActiveFilter(rows); }
 
 function _careSentLabel(){
@@ -6811,7 +6812,7 @@ function _careSentLabel(){
   if(sc!=='ALL') bits.push(sc.toLowerCase()+' only');
   if(pd) bits.push('still to be addressed');
   bits.push(sf==='ALL'?'all sentiments':sf.toLowerCase()+' sentiment only');
-  return bits.join(' · ');
+  return bits.join(' \u00b7 ');
 }
 
 function viewSubTopic(catName, topicName, keywords, excludeKeywords){
@@ -6828,7 +6829,6 @@ function viewSubTopic(catName, topicName, keywords, excludeKeywords){
   if(keywords&&keywords.length>0){
     rows=catRows.filter(r=>{ const t=_txt(r); return keywords.some(k=>t.indexOf(k)!==-1); });
   } else if(excludeKeywords&&excludeKeywords.length>0){
-    // the "General …" bucket: everything this category did not match elsewhere
     rows=catRows.filter(r=>{ const t=_txt(r); return !excludeKeywords.some(k=>t.indexOf(k)!==-1); });
   } else { rows=catRows; }
   rows=rows.map(r=>({Branch:r.Branch,Month:r.Month,Student:r.Student,Class:r.Class,Date:r.Date,
@@ -6841,10 +6841,90 @@ function viewSubTopic(catName, topicName, keywords, excludeKeywords){
   openModal('🔍 '+catName+' → '+topicName,`${rows.length} call(s) · ${_careSentLabel()}`,rows,cols);
 }
 
-/* The tile counts satisfied parents, which is not the same set as the calls
-   tagged "No Concern": a row tagged that way whose remark reads negatively is
-   excluded, and a clearly positive call in another category is included. It has
-   to open the set it counted, so it uses the same test. */
+/* The tile counts satisfied parents, which is not the set tagged "No Concern":
+   a No-Concern row reading negatively is excluded, and a clearly positive call
+   in another category is included. It opens the set it counted. */
+/* Branch comparison — In Progress and Pending side by side.
+   Drawn as SVG-free flex bars so it never depends on Chart.js, and every
+   segment and every cell opens the calls behind it. */
+function renderCareCompare(){
+  const el=document.getElementById('cc-compare'); if(!el) return;
+  const CARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
+  const ALL=['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam'];
+  const scope=(fBranch==='ALL')?ALL:[fBranch];
+  const base=CARE.filter(r=>scope.includes(r.Branch)&&(fMonth==='ALL'||r.Month===fMonth));
+  const fn=document.getElementById('cc-cmp-fn');
+  if(fn) fn.textContent=(fBranch==='ALL'?'All Branches':fBranch)+' · '+(fMonth==='ALL'?'All Months':fMonth);
+
+  const data=scope.map(b=>{
+    const rs=base.filter(r=>r.Branch===b);
+    const ip=rs.filter(r=>r.Status==='In Progress').length;
+    const pd=rs.filter(r=>r.Status==='Pending').length;
+    return {b, ip, pd, open:ip+pd, calls:rs.length};
+  }).filter(d=>d.calls).sort((a,z)=>z.open-a.open);
+
+  if(!data.length){ el.innerHTML='<div class="no-data">No care-call records for this filter.</div>'; return; }
+  const T=data.reduce((a,d)=>({ip:a.ip+d.ip,pd:a.pd+d.pd,open:a.open+d.open,calls:a.calls+d.calls}),
+    {ip:0,pd:0,open:0,calls:0});
+  const mx=Math.max.apply(null,data.map(d=>d.open))||1;
+  const view=window._CC_CMP_VIEW||'chart';
+
+  let out;
+  if(view==='table'){
+    out='<table class="cmp-tbl"><thead><tr><th class="nm">Branch</th><th>Calls</th>'
+      +'<th>In Progress</th><th>Pending</th><th>Still Open</th><th>Share of branch</th></tr></thead><tbody>'
+      +data.map(d=>'<tr><td class="nm">'+d.b+'</td>'
+        +'<td class="c" onclick="viewCareCompare(\''+d.b+'\',\'all\')">'+fi(d.calls)+'</td>'
+        +'<td class="c" style="color:#7C3AED;font-weight:700" onclick="viewCareCompare(\''+d.b+'\',\'ip\')">'+fi(d.ip)+'</td>'
+        +'<td class="c" style="color:#D97706;font-weight:700" onclick="viewCareCompare(\''+d.b+'\',\'pd\')">'+fi(d.pd)+'</td>'
+        +'<td class="c" style="font-weight:800" onclick="viewCareCompare(\''+d.b+'\',\'open\')">'+fi(d.open)+'</td>'
+        +'<td>'+(d.calls?Math.round(d.open/d.calls*100):0)+'%</td></tr>').join('')
+      +'</tbody><tfoot><tr><td class="nm">TOTAL</td>'
+      +'<td class="c" onclick="viewCareCompare(\'*\',\'all\')">'+fi(T.calls)+'</td>'
+      +'<td class="c" onclick="viewCareCompare(\'*\',\'ip\')">'+fi(T.ip)+'</td>'
+      +'<td class="c" onclick="viewCareCompare(\'*\',\'pd\')">'+fi(T.pd)+'</td>'
+      +'<td class="c" onclick="viewCareCompare(\'*\',\'open\')">'+fi(T.open)+'</td>'
+      +'<td>'+(T.calls?Math.round(T.open/T.calls*100):0)+'%</td></tr></tfoot></table>';
+  } else {
+    out='<div class="cmp-rows">'+data.map(d=>{
+      const w=d.open/mx*100;
+      const ipW=d.open?d.ip/d.open*100:0, pdW=d.open?d.pd/d.open*100:0;
+      return '<div class="cmp-row"><div class="b">'+d.b+'<small>'+fi(d.calls)+' calls</small></div>'
+        +'<div class="cmp-bar" style="width:'+Math.max(6,w)+'%">'
+          +(d.ip?'<span style="width:'+ipW+'%;background:#7C3AED" title="'+d.b+' · In Progress: '+d.ip+'" '
+            +'onclick="viewCareCompare(\''+d.b+'\',\'ip\')">'+(ipW>13?d.ip:'')+'</span>':'')
+          +(d.pd?'<span style="width:'+pdW+'%;background:#D97706" title="'+d.b+' · Pending: '+d.pd+'" '
+            +'onclick="viewCareCompare(\''+d.b+'\',\'pd\')">'+(pdW>13?d.pd:'')+'</span>':'')
+        +'</div><div class="t">'+fi(d.open)+'</div></div>';
+    }).join('')+'</div>'
+    +'<div class="au-legend" style="margin-top:12px">'
+      +'<span><i style="background:#7C3AED"></i>In Progress '+fi(T.ip)+'</span>'
+      +'<span><i style="background:#D97706"></i>Pending '+fi(T.pd)+'</span>'
+      +'<span style="color:#94A3B8">bar length = calls still open · click a segment to view</span></div>';
+  }
+  el.innerHTML=out+'<p class="au-note">Resolved calls are deliberately absent: this compares only the work '
+    +'still to be done, which is what a branch can act on. Every figure opens the calls behind it.</p>';
+}
+
+/* the calls behind one segment or cell */
+function viewCareCompare(branch,kind){
+  const CARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
+  const ALL=['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam'];
+  const scope=(fBranch==='ALL')?ALL:[fBranch];
+  let rows=CARE.filter(r=>scope.includes(r.Branch)&&(fMonth==='ALL'||r.Month===fMonth));
+  if(branch!=='*') rows=rows.filter(r=>r.Branch===branch);
+  if(kind==='ip')        rows=rows.filter(r=>r.Status==='In Progress');
+  else if(kind==='pd')   rows=rows.filter(r=>r.Status==='Pending');
+  else if(kind==='open') rows=rows.filter(r=>r.Status==='In Progress'||r.Status==='Pending');
+  const LBL={ip:'In Progress',pd:'Pending',open:'still open',all:'all calls'};
+  const cols=[{key:'Branch',label:'Branch'},{key:'Student',label:'Student',maxW:'160px'},{key:'Class',label:'Class'},
+    {key:'Date',label:'Date',date:true},{key:'Grievance',label:'Concern',pill:true},
+    {key:'Remarks',label:'Remarks',maxW:'280px'},{key:'Followup',label:'Follow-up',maxW:'200px'},
+    {key:'Status',label:'Status',pill:true}];
+  openModal('\u2696\ufe0f '+(branch==='*'?(fBranch==='ALL'?'All Branches':fBranch):branch)+' \u2014 '+(LBL[kind]||''),
+    rows.length.toLocaleString('en-IN')+' call(s)'+(fMonth==='ALL'?'':' \u00b7 '+fMonth), rows, cols);
+}
+
 function viewCareSatisfied(){
   const CARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
   const BR=['Boduppal','Keesara','Pocharam','Bachupally','Gowdavalli'];
@@ -6860,8 +6940,7 @@ function viewCareSatisfied(){
     {key:'Remarks',label:'Remarks',maxW:'280px'},{key:'Followup',label:'Follow-up',maxW:'220px'},{key:'Status',label:'Status'}];
   openModal('\ud83d\ude0a Parents Satisfied',
     rows.length.toLocaleString('en-IN')+' answered call(s) where the tag and the words agree \u00b7 '
-      +(fBranch==='ALL'?'All Branches':fBranch),
-    rows, cols);
+      +(fBranch==='ALL'?'All Branches':fBranch), rows, cols);
 }
 
 function viewCareGrievance(cat){
@@ -6899,32 +6978,11 @@ function renderCare(){
   document.getElementById('cc-ip').textContent=fi(s.ip);
   document.getElementById('cc-ip-s').textContent=s.calls>0?fp(s.ip/s.calls*100)+' of calls':'–';
 
-  // ── Quick View: Pending & In Progress records (live-filtered) ──
-  {
-    document.getElementById('cc-quick-fn').textContent=bl+' · '+ml;
-    const ALLCARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
-    const baseRows=ALLCARE.filter(r=>(fBranch==='ALL'||r.Branch===fBranch)&&(fMonth==='ALL'||r.Month===fMonth));
-    const pendRows=baseRows.filter(r=>r.Status==='Pending');
-    const ipRows=baseRows.filter(r=>r.Status==='In Progress');
-    document.getElementById('cc-pend-count').textContent=fi(pendRows.length);
-    document.getElementById('cc-ip-count').textContent=fi(ipRows.length);
-
-    function quickRowsHtml(rows,color){
-      const shown=rows.slice(0,200); // cap for render performance; full list via KPI-card click
-      if(shown.length===0) return '<tr><td colspan="4" style="padding:14px;text-align:center;color:#94A3B8;font-style:italic;">No records</td></tr>';
-      return shown.map((r,i)=>{
-        const bg=i%2===0?'#fff':'#F8FAFF';
-        return `<tr style="background:${bg};cursor:pointer;" onclick="viewCareRecords('${r.Status}')">
-          <td style="padding:6px 10px;border-bottom:1px solid #F1F5F9;"><span class="bd b${r.Branch}"></span>${r.Branch}</td>
-          <td style="padding:6px 10px;border-bottom:1px solid #F1F5F9;">${r.Student}</td>
-          <td style="padding:6px 10px;border-bottom:1px solid #F1F5F9;">${r.Grievance}</td>
-          <td style="padding:6px 10px;border-bottom:1px solid #F1F5F9;color:#94A3B8;">${fmtDispDate(r.Date)}</td>
-        </tr>`;
-      }).join('')+(rows.length>200?`<tr><td colspan="4" style="padding:8px 10px;text-align:center;color:${color};font-weight:600;font-size:11px;cursor:pointer;" onclick="viewCareRecords('${rows[0].Status}')">+ ${rows.length-200} more — click to view all</td></tr>`:'');
-    }
-    document.getElementById('cc-pend-tbody').innerHTML=quickRowsHtml(pendRows,'#D97706');
-    document.getElementById('cc-ip-tbody').innerHTML=quickRowsHtml(ipRows,'#7C3AED');
-  }
+  // ── Branch comparison of the work still open ──
+  // The old Quick View listed the same rows twice, once per status, which the
+  // register below already does. A group review asks a different question:
+  // which branch is carrying the backlog.
+  renderCareCompare();
 
   // Branch bars — ALWAYS the current calendar month by default (never silently substitutes
   // an older month just because it has data); a Month selection in the dropdown overrides it.
@@ -12701,8 +12759,9 @@ async function loadCivil(force){
     var ALL=['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam'];
     var scope=(fBranch==='ALL')?ALL:[fBranch];
     var rows=C.filter(function(r){ return scope.indexOf(r.Branch)>=0 && (fMonth==='ALL'||r.Month===fMonth); });
-    var s=window._CARE_SENT||'ALL';
-    if(s!=='ALL'&&window.CARE_NLP) rows=rows.filter(function(r){ return CARE_NLP.classify(r).klass===s; });
+    /* the same Scope / Pending / sentiment test the cards were counted with —
+       this used to ignore Pending and list resolved calls alongside them */
+    if(typeof _careActiveFilter==='function') return _careActiveFilter(rows);
     return rows;
   }
   function grievRows(){
@@ -12739,6 +12798,171 @@ async function loadCivil(force){
     var r=_st(id,btn); if(id==='care'||id==='grievance') setTimeout(wireAll,0); return r;
   };
   setTimeout(wireAll,1500); setTimeout(wireAll,4000);
+})();
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   CHART / TABLE TOGGLE + VERTICAL BRANCH RAIL
+   Some people read a bar, some want the numbers. Rather than choose for them,
+   each comparison carries both and remembers which was last used.
+   ══════════════════════════════════════════════════════════════════════════ */
+(function(){
+  document.addEventListener('click',function(ev){
+    var b=ev.target.closest('#cc-cmp-toggle button'); if(!b) return;
+    window._CC_CMP_VIEW=b.dataset.v;
+    b.parentNode.querySelectorAll('button').forEach(function(x){ x.classList.toggle('on',x===b); });
+    if(typeof renderCareCompare==='function') renderCareCompare();
+  });
+
+  /* the branch rail drives the global filter, so there is never a second
+     branch state that can disagree with the one in the header */
+  function railHTML(){
+    var CARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
+    var ALL=['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam'];
+    var counts={}, tot=0;
+    CARE.forEach(function(r){
+      if(fMonth!=='ALL'&&r.Month!==fMonth) return;
+      counts[r.Branch]=(counts[r.Branch]||0)+1; tot++;
+    });
+    var lock=window._BRANCH_LOCK||null;
+    var list=lock?[lock]:ALL;
+    var html='<div class="h">Branch</div>';
+    if(!lock) html+='<button data-b="ALL" class="'+(fBranch==='ALL'?'on':'')+'">All branches<b>'+tot.toLocaleString('en-IN')+'</b></button>';
+    list.forEach(function(b){
+      html+='<button data-b="'+b+'" class="'+(fBranch===b?'on':'')+'">'+b+'<b>'+((counts[b]||0)).toLocaleString('en-IN')+'</b></button>';
+    });
+    return html;
+  }
+  function mount(){
+    var host=document.getElementById('care-summary-report'); if(!host) return;
+    var wrap=host.parentNode;
+    var split=document.getElementById('care-split');
+    if(!split){
+      split=document.createElement('div'); split.id='care-split'; split.className='care-split';
+      var rail=document.createElement('div'); rail.className='br-rail'; rail.id='care-rail';
+      var main=document.createElement('div'); main.className='main';
+      wrap.insertBefore(split, host);
+      split.appendChild(rail); split.appendChild(main); main.appendChild(host);
+    }
+    var rail=document.getElementById('care-rail');
+    if(rail) rail.innerHTML=railHTML();
+  }
+  document.addEventListener('click',function(ev){
+    var b=ev.target.closest('#care-rail button'); if(!b) return;
+    var sel=document.getElementById('sel-branch');
+    if(sel){ sel.value=b.dataset.b; if(typeof applyFilters==='function') applyFilters(); }
+  });
+  var _o=window.renderCareSummary;
+  if(typeof _o==='function') window.renderCareSummary=function(){
+    var r=_o.apply(this,arguments); try{ mount(); }catch(e){} return r;
+  };
+  setTimeout(mount,1500); setTimeout(mount,4000);
+})();
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   CARE CALL SUMMARY — TABLE VIEW
+   The insight panels answer "what is going on"; the table answers "show me the
+   rows". Both read the SAME selection — branch, month, Academic / Non-Academic,
+   Pending to be Addressed and the sentiment chip — so switching view can never
+   change which calls you are looking at, only how they are laid out.
+   ══════════════════════════════════════════════════════════════════════════ */
+(function(){
+  function selected(){
+    var CARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
+    var ALL=['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam'];
+    var scope=(fBranch==='ALL')?ALL:[fBranch];
+    var rows=CARE.filter(function(r){
+      return scope.indexOf(r.Branch)>=0 && (fMonth==='ALL'||r.Month===fMonth);
+    });
+    /* the one filter the whole tab shares */
+    return (typeof _careActiveFilter==='function') ? _careActiveFilter(rows) : rows;
+  }
+
+  function esc(s){
+    return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; });
+  }
+
+  function tableHTML(){
+    var rows=selected();
+    var lbl=(typeof _careSentLabel==='function')?_careSentLabel():'';
+    if(!rows.length){
+      return '<div class="no-data">No calls match this selection.<br>'
+        +'<span style="font-size:11.5px;color:#94A3B8">'+esc(lbl)+'</span></div>';
+    }
+    var sentOf=(typeof _careRowSentiment==='function')?_careRowSentiment:function(){ return ''; };
+    var SC={'Positive':'#059669','Negative':'#DC2626','Neutral':'#64748B','No Answer':'#C2410C'};
+    var body=rows.slice(0,400).map(function(r){
+      var st=String(r.Status||''), sent=sentOf(r);
+      var stc=/resolved/i.test(st)?'#059669':/progress/i.test(st)?'#7C3AED':'#D97706';
+      return '<tr>'
+        +'<td>'+esc(r.Branch)+'</td>'
+        +'<td>'+esc(r.Month||'')+'</td>'
+        +'<td>'+esc(r.Class||'')+'</td>'
+        +'<td style="font-weight:600">'+esc(r.Student||'')+'</td>'
+        +'<td>'+esc(r.Date||'')+'</td>'
+        +'<td>'+esc(r.GrievanceRaw||r.Grievance||'')+'</td>'
+        +'<td style="color:'+(SC[sent]||'#64748B')+';font-weight:600">'+esc(sent)+'</td>'
+        +'<td style="max-width:300px">'+esc(r.Remarks==='\u2013'?'':r.Remarks||'')+'</td>'
+        +'<td style="max-width:220px">'+esc(r.Followup==='\u2013'?'':r.Followup||'')+'</td>'
+        +'<td style="color:'+stc+';font-weight:600">'+esc(r.StatusRaw||st)+'</td>'
+        +'</tr>';
+    }).join('');
+    return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">'
+      +'<span style="font-size:12px;font-weight:800;color:#0F172A;">📋 '
+      +rows.length.toLocaleString('en-IN')+' call'+(rows.length===1?'':'s')+' in this selection</span>'
+      +'<span style="font-size:11px;color:#64748B;">'+esc(lbl)+'</span>'
+      +'<button id="care-tbl-copy" style="margin-left:auto;background:var(--pl);border:1px solid var(--bor);'
+      +'color:var(--p);font:inherit;font-size:11px;font-weight:700;padding:5px 12px;border-radius:8px;cursor:pointer;">'
+      +'⧉ Copy</button></div>'
+      +'<div style="overflow:auto;max-height:620px;"><table class="hrs" style="min-width:960px">'
+      +'<thead><tr><th class="nm">Branch</th><th>Month</th><th>Class</th><th class="nm">Student</th>'
+      +'<th>Date</th><th>Concern</th><th>Sentiment</th><th class="nm">Remarks</th>'
+      +'<th class="nm">Follow-up</th><th>Status</th></tr></thead><tbody>'+body+'</tbody></table></div>'
+      +(rows.length>400?'<p class="au-note">Showing the first 400 of '
+        +rows.length.toLocaleString('en-IN')+'. Narrow the selection to see the rest.</p>':'');
+  }
+
+  function apply(){
+    var host=document.getElementById('care-summary-report'); if(!host) return;
+    var tog=document.getElementById('care-sum-toggle');
+    var view=window._CARE_SUM_VIEW||'chart';
+    if(tog) tog.querySelectorAll('button').forEach(function(b){ b.classList.toggle('on',b.dataset.v===view); });
+    if(view!=='table') return;                 // the insight panels are already drawn
+    host.innerHTML=tableHTML();
+    var cp=document.getElementById('care-tbl-copy');
+    if(cp) cp.addEventListener('click',function(){
+      var rows=selected();
+      var head=['Branch','Month','Class','Student','Date','Concern','Sentiment','Remarks','Follow-up','Status'];
+      var sentOf=(typeof _careRowSentiment==='function')?_careRowSentiment:function(){ return ''; };
+      var txt=[head.join('\t')].concat(rows.map(function(r){
+        return [r.Branch,r.Month,r.Class,r.Student,r.Date,(r.GrievanceRaw||r.Grievance),
+                sentOf(r),(r.Remarks==='\u2013'?'':r.Remarks),
+                (r.Followup==='\u2013'?'':r.Followup),(r.StatusRaw||r.Status)]
+          .map(function(v){ return String(v==null?'':v).replace(/[\t\n]/g,' '); }).join('\t');
+      })).join('\n');
+      var done=function(){ cp.textContent='✓ Copied'; setTimeout(function(){ cp.textContent='⧉ Copy'; },1600); };
+      if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done,function(){});
+      else { var ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select();
+             try{ document.execCommand('copy'); done(); }catch(e){} document.body.removeChild(ta); }
+    });
+  }
+
+  document.addEventListener('click',function(ev){
+    var b=ev.target.closest('#care-sum-toggle button'); if(!b) return;
+    window._CARE_SUM_VIEW=b.dataset.v;
+    if(typeof renderCareSummary==='function') renderCareSummary();
+  });
+
+  var _o=window.renderCareSummary;
+  if(typeof _o==='function') window.renderCareSummary=function(){
+    var r=_o.apply(this,arguments); try{ apply(); }catch(e){} return r;
+  };
+  window.__careSummaryView=apply;
+  setTimeout(apply,1500); setTimeout(apply,4000);
 })();
 </script>
 </body>
