@@ -280,6 +280,29 @@ body.nav-min .sn-foot{display:none}
 
 
 
+
+/* ═══ PARENT FEEDBACK COMPLIANCE REPORT ═══ */
+.ccr-copy{margin-left:auto;background:var(--pl);border:1px solid var(--bor);color:var(--p);
+  font:inherit;font-size:11px;font-weight:700;padding:5px 12px;border-radius:8px;cursor:pointer}
+.ccr-copy:hover{background:var(--p);color:#fff;border-color:var(--p)}
+.ccr-scroll{overflow-x:auto}
+.ccr{border-collapse:collapse;width:100%;min-width:900px;font-size:12.5px;
+  font-variant-numeric:tabular-nums;border:2px solid #0B5D33}
+.ccr caption{caption-side:top;background:#0B5D33;color:#fff;font-size:14px;font-weight:800;
+  padding:10px 12px;letter-spacing:.02em;border:2px solid #0B5D33;border-bottom:none}
+.ccr th{background:#F1F7F3;color:#07361F;font-size:10.5px;font-weight:800;text-transform:uppercase;
+  letter-spacing:.03em;padding:8px 9px;border:1px solid #B7CFC0;text-align:center;line-height:1.25}
+.ccr th.nm{text-align:left;min-width:150px}
+.ccr td{padding:8px 9px;border:1px solid #D6E4DB;text-align:center}
+.ccr td.nm{text-align:left;font-weight:700;color:var(--tx)}
+.ccr tbody tr:nth-child(even) td{background:#FAFDFB}
+.ccr tbody tr:hover td{background:#EFF8F3}
+.ccr .sub{display:block;font-size:10px;font-weight:500;color:var(--txm);margin-top:1px}
+.ccr tfoot td{background:#0B5D33;color:#fff;font-weight:800;border-color:#0B5D33}
+.ccr tfoot td.nm{text-align:left}
+.ccr .pend{font-weight:800}
+.ccr-note{font-size:11.5px;color:var(--txm);margin-top:12px;line-height:1.55;max-width:105ch}
+
 /* ═══ STAGE-GROUP INFOGRAPHIC (Care Calls + Grievance) ═══ */
 .sg-wrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:13px}
 .sg-card{border:1px solid var(--bor);border-top:3px solid var(--p);border-radius:13px;
@@ -962,6 +985,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- Branch-wise compliance report, in the printed PGOS layout -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="ch"><h3>📋 Parent Feedback Compliance Report</h3>
+      <span class="fnote" id="ccr-fn">Branch-wise · academic and non-academic concerns</span>
+      <button class="ccr-copy" onclick="copyComplianceReport()" title="Copy as a table you can paste into Sheets or Word">⧉ Copy table</button>
+    </div>
+    <div class="cb" style="padding:14px 18px;"><div id="ccr-table"></div></div>
   </div>
 
   <!-- Care Call Summary — Insights & Data-Driven Decisions -->
@@ -12176,6 +12208,177 @@ async function loadCivil(force){
     window.renderGrievance=function(){ var r=_o.apply(this,arguments); try{ render(); }catch(e){} return r; };
   }
   window.__renderGrievStage=render;
+})();
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   PARENT FEEDBACK COMPLIANCE REPORT
+   The branch-wise table in the printed PGOS layout: strength, contactability,
+   academic and non-academic concerns, what has been addressed, and what is
+   still outstanding.
+
+   CONTACTABILITY is answered calls, not calls dialled. A number that was rung
+   four times and never picked up is not contact, and counting it as such is
+   how a branch can appear to have reached everyone while reaching nobody.
+
+   ACADEMIC vs NON-ACADEMIC follows the grievance category already on each row.
+   Academic covers the teaching and learning categories; everything else that
+   is a concern — transport, administration, wellbeing, co-curricular — is
+   non-academic. "No Concern" and unanswered calls are neither, so they are
+   excluded from both columns rather than padding one of them.
+
+   PENDING is derived, never read from a column: raised minus addressed. It
+   cannot disagree with the two pairs beside it.
+   ══════════════════════════════════════════════════════════════════════════ */
+(function(){
+  var ACADEMIC = /^(academics?|academic|studies|study|teaching|learning|exam|homework)/i;
+  var NOT_A_CONCERN = /^(no concern|not answering|no response)/i;
+
+  function build(){
+    var el=document.getElementById('ccr-table'); if(!el) return;
+    var CARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
+    var SB=window._STUDENTS_BY_BRANCH||{};
+    var ALL=['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam'];
+    var scope=(fBranch==='ALL')?ALL:[fBranch];
+
+    var rows=CARE.filter(function(r){
+      return scope.indexOf(r.Branch)>=0 && (fMonth==='ALL'||r.Month===fMonth);
+    });
+    if(!rows.length){ el.innerHTML='<div class="no-data">No care-call records for this filter.</div>'; return; }
+
+    var data=scope.map(function(b){
+      var rs=rows.filter(function(r){ return r.Branch===b; });
+      var strength=+(SB[b]||0);
+
+      /* a call only counts as contact if somebody answered it */
+      var answered=rs.filter(function(r){ return !CARE_NLP.isNoAnswer(r); });
+      var students={};
+      answered.forEach(function(r){ var k=String(r.Student||'').trim().toLowerCase(); if(k) students[k]=1; });
+      var reached=Object.keys(students).length||answered.length;
+
+      var concerns=answered.filter(function(r){ return !NOT_A_CONCERN.test(String(r.Grievance||'')); });
+      var aca=concerns.filter(function(r){ return ACADEMIC.test(String(r.Grievance||'')); });
+      var non=concerns.filter(function(r){ return !ACADEMIC.test(String(r.Grievance||'')); });
+      var done=function(list){ return list.filter(function(r){ return /resolved/i.test(String(r.Status||'')); }).length; };
+
+      var acaN=aca.length, nonN=non.length, acaD=done(aca), nonD=done(non);
+      return {
+        b:b, strength:strength, calls:rs.length, reached:reached,
+        contactPct: strength?Math.round(reached/strength*100):null,
+        aca:acaN, acaD:acaD, non:nonN, nonD:nonD,
+        pending:(acaN+nonN)-(acaD+nonD)
+      };
+    }).filter(function(d){ return d.calls; });
+
+    if(!data.length){ el.innerHTML='<div class="no-data">No care-call records for this filter.</div>'; return; }
+
+    var T=data.reduce(function(a,d){
+      a.strength+=d.strength; a.calls+=d.calls; a.reached+=d.reached;
+      a.aca+=d.aca; a.acaD+=d.acaD; a.non+=d.non; a.nonD+=d.nonD; a.pending+=d.pending;
+      return a;
+    },{strength:0,calls:0,reached:0,aca:0,acaD:0,non:0,nonD:0,pending:0});
+
+    function pctCell(n,d){ return d?('<span class="sub">'+Math.round(n/d*100)+'%</span>'):''; }
+    function pendColor(n){ return n>0?'#DC2626':'#059669'; }
+
+    var title='PGOS PARENT FEEDBACK COMPLIANCE REPORT'+
+      (fMonth==='ALL'?'':' \u00b7 '+fMonth)+' (AY 2026-27)';
+
+    var html='<div class="ccr-scroll"><table class="ccr"><caption>'+title+'</caption><thead><tr>'
+      +'<th class="nm">School / Branch</th>'
+      +'<th>Total<br>Strength</th>'
+      +'<th>Calls<br>Made</th>'
+      +'<th>Contact&shy;ability</th>'
+      +'<th>Academic<br>Concerns</th><th>Addressed</th>'
+      +'<th>Non&nbsp;Academic<br>Concerns</th><th>Addressed</th>'
+      +'<th>Pending to be<br>Addressed</th></tr></thead><tbody>'
+      +data.map(function(d){
+        return '<tr>'
+          +'<td class="nm">'+d.b+'</td>'
+          +'<td>'+(d.strength?fi(d.strength):'\u2014')+'</td>'
+          +'<td>'+fi(d.calls)+'</td>'
+          +'<td>'+fi(d.reached)+(d.contactPct!==null?'<span class="sub">'+d.contactPct+'% of strength</span>':'')+'</td>'
+          +'<td>'+fi(d.aca)+'</td>'
+          +'<td>'+fi(d.acaD)+pctCell(d.acaD,d.aca)+'</td>'
+          +'<td>'+fi(d.non)+'</td>'
+          +'<td>'+fi(d.nonD)+pctCell(d.nonD,d.non)+'</td>'
+          +'<td class="pend" style="color:'+pendColor(d.pending)+'">'+fi(d.pending)+'</td>'
+          +'</tr>';
+      }).join('')
+      +'</tbody><tfoot><tr>'
+      +'<td class="nm">TOTAL</td>'
+      +'<td>'+(T.strength?fi(T.strength):'\u2014')+'</td>'
+      +'<td>'+fi(T.calls)+'</td>'
+      +'<td>'+fi(T.reached)+(T.strength?'<span class="sub" style="color:#BBF7D0">'+Math.round(T.reached/T.strength*100)+'%</span>':'')+'</td>'
+      +'<td>'+fi(T.aca)+'</td>'
+      +'<td>'+fi(T.acaD)+(T.aca?'<span class="sub" style="color:#BBF7D0">'+Math.round(T.acaD/T.aca*100)+'%</span>':'')+'</td>'
+      +'<td>'+fi(T.non)+'</td>'
+      +'<td>'+fi(T.nonD)+(T.non?'<span class="sub" style="color:#BBF7D0">'+Math.round(T.nonD/T.non*100)+'%</span>':'')+'</td>'
+      +'<td>'+fi(T.pending)+'</td>'
+      +'</tr></tfoot></table></div>';
+
+    var worst=data.slice().sort(function(a,b){ return b.pending-a.pending; })[0];
+    var lowest=data.slice().filter(function(d){ return d.contactPct!==null; })
+      .sort(function(a,b){ return a.contactPct-b.contactPct; })[0];
+    var closed=(T.aca+T.non)?Math.round((T.acaD+T.nonD)/(T.aca+T.non)*100):0;
+
+    html+='<p class="ccr-note"><b>Contactability counts answered calls, not calls dialled</b> — a number rung '
+      +'repeatedly and never picked up is not contact. <b>Pending</b> is calculated as raised minus addressed, so it '
+      +'can never disagree with the columns beside it. Calls logged as “No Concern”, and calls nobody answered, are '
+      +'in neither concern column.<br>'
+      +'Across the branches shown, <b>'+closed+'%</b> of concerns raised have been addressed'
+      +(worst&&worst.pending>0?', and <b>'+worst.b+'</b> carries the largest outstanding load at <b>'+worst.pending+'</b>':'')
+      +(lowest?'. The lowest contactability is <b>'+lowest.b+'</b> at <b>'+lowest.contactPct+'%</b> of strength, '
+        +'which caps how much any of the other columns can tell you about that branch':'')+'.</p>';
+
+    el.innerHTML=html;
+    /* keep the figures so the export is built from numbers, not scraped text */
+    window._CCR={rows:data,total:T,title:title};
+
+    var fn=document.getElementById('ccr-fn');
+    if(fn) fn.textContent=(fBranch==='ALL'?'All branches':fBranch)+(fMonth==='ALL'?' \u00b7 all months':' \u00b7 '+fMonth)
+      +' \u00b7 '+fi(T.calls)+' calls';
+  }
+
+  /* Paste straight into Sheets or Word. Built from the figures rather than by
+     scraping the table, so the line breaks in the headers and the small
+     percentage labels under each count cannot end up glued to the numbers. */
+  window.copyComplianceReport=function(){
+    var C=window._CCR; if(!C) return;
+    var head=['School / Branch','Total Strength','Calls Made','Contactability',
+              'Contactability %','Academic Concerns','Academic Addressed',
+              'Non Academic Concerns','Non Academic Addressed','Pending to be Addressed'];
+    var lines=[C.title, head.join('\t')];
+    C.rows.forEach(function(d){
+      lines.push([d.b, d.strength||'', d.calls, d.reached,
+        (d.contactPct===null?'':d.contactPct+'%'),
+        d.aca, d.acaD, d.non, d.nonD, d.pending].join('\t'));
+    });
+    var T=C.total;
+    lines.push(['TOTAL', T.strength||'', T.calls, T.reached,
+      (T.strength?Math.round(T.reached/T.strength*100)+'%':''),
+      T.aca, T.acaD, T.non, T.nonD, T.pending].join('\t'));
+    var txt=lines.join('\n');
+    var done=function(){
+      var b=document.querySelector('.ccr-copy'); if(!b) return;
+      var o=b.textContent; b.textContent='✓ Copied';
+      setTimeout(function(){ b.textContent=o; },1600);
+    };
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(txt).then(done,function(){});
+    }else{
+      var ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta);
+      ta.select(); try{ document.execCommand('copy'); done(); }catch(e){}
+      document.body.removeChild(ta);
+    }
+  };
+
+  window.__renderComplianceReport=build;
+  var _o=window.renderCare;
+  if(typeof _o==='function'){
+    window.renderCare=function(){ var r=_o.apply(this,arguments); try{ build(); }catch(e){} return r; };
+  }
 })();
 </script>
 </body>
