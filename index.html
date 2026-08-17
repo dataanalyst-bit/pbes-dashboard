@@ -266,6 +266,18 @@ body.nav-min .sn-foot{display:none}
 .scope-chip i{width:6px;height:6px;border-radius:50%;background:var(--g);flex-shrink:0}
 .scope-chip small{font-weight:500;color:var(--txm)}
 
+
+/* ═══ CIVIL WORK TAB ═══ */
+.cv-stack{display:flex;flex-direction:column;gap:9px}
+.cv-srow{display:grid;grid-template-columns:150px 1fr;gap:12px;align-items:center}
+.cv-srow .lb{font-size:12.5px;font-weight:700;color:var(--tx);display:flex;justify-content:space-between;gap:8px}
+.cv-srow .lb span{color:var(--txm);font-weight:500}
+.cv-srow .bar{display:flex;height:26px;border-radius:7px;overflow:hidden;background:#F1F5F9}
+.cv-srow .bar span{display:flex;align-items:center;justify-content:center;color:#fff;
+  font-size:11px;font-weight:700;min-width:0}
+#pane-civil tr.clkr{cursor:pointer}
+#pane-civil tr.clkr:hover td{background:var(--pl)}
+
 /* ═══ PTM FEEDBACK TAB ═══ */
 .pt-warn{border:1px solid #FCD34D;background:linear-gradient(180deg,#FFFBEB,#FFFDF5);
   border-radius:14px;padding:16px 20px}
@@ -608,14 +620,14 @@ const ROLE_TABS = {
   // ── group-wide roles ──
   management:        null,   // every tab
   auditor:           null,   // Academic Auditor — every tab, every branch
-  admin_manager:     ['admin','vigilance','purchase','transport','it'],
-  vigilance_officer: ['admin','vigilance'],
+  admin_manager:     ['admin','vigilance','civil','purchase','transport','it'],
+  vigilance_officer: ['admin','vigilance','civil'],
   // ── branch roles ──
   hr:                ['hr','observations'],
-  admin:             ['admin','vigilance'],
+  admin:             ['admin','vigilance','civil'],
   grievance_officer: ['care','grievance','ptm'],
   hr_grievance:      ['hr','observations','care','grievance','ptm'],
-  principal:         ['overview','care','observations','admissions','grievance','transport','it','pt1','audit','ptm']
+  principal:         ['overview','care','observations','admissions','grievance','transport','it','pt1','audit','ptm','civil']
 };
 // Roles that span every campus. Everyone else with a branch on their account is
 // pinned to it, and the payload is filtered to that branch server-side.
@@ -787,6 +799,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     <button class="tb" onclick="showTab('admissions',this)" title="Admissions 2026-27"><span class="ic">🎓</span><span class="lb">Admissions 2026-27</span></button>
     <div class="sn-grp">Operations</div>
     <button class="tb" onclick="showTab('admin',this)" title="Admin Tracker"><span class="ic">🏗️</span><span class="lb">Admin Tracker</span></button>
+    <button class="tb" onclick="showTab('civil',this)" title="Civil Work"><span class="ic">🧱</span><span class="lb">Civil Work</span></button>
     <button class="tb" onclick="showTab('vigilance',this)" title="Vigilance"><span class="ic">🛡️</span><span class="lb">Vigilance</span></button>
     <button class="tb" onclick="showTab('purchase',this)" title="Purchase"><span class="ic">🛒</span><span class="lb">Purchase</span></button>
     <button class="tb" onclick="showTab('transport',this)" title="Transport"><span class="ic">🚌</span><span class="lb">Transport</span></button>
@@ -1644,6 +1657,123 @@ document.addEventListener('DOMContentLoaded', async () => {
 </div>
 
 
+
+
+<!-- ═══ CIVIL WORK ═══ -->
+<div id="pane-civil" class="pane">
+  <div class="au-wrap">
+
+    <div class="au-head">
+      <div>
+        <h2 style="margin:0;font-size:20px;font-weight:800">Civil Work Tracker</h2>
+        <div style="font-size:12.5px;color:var(--txm);margin-top:3px" id="cv-meta">Loading…</div>
+      </div>
+      <div class="au-ctl">
+        <span class="scope-chip" id="cv-scope"><i></i>All branches</span>
+        <div class="f"><label for="cv-status">Status</label><select id="cv-status"></select></div>
+        <div class="f"><label for="cv-prio">Priority</label><select id="cv-prio"></select></div>
+        <div class="f"><label for="cv-cat">Category</label><select id="cv-cat"></select></div>
+        <div class="f"><label for="cv-q">Search</label>
+          <input id="cv-q" type="search" placeholder="e.g. tiles, auditorium, painting"></div>
+        <button class="exm-refresh" onclick="loadCivil(true)" title="Re-read the Civil sheet">↻ Refresh</button>
+        <span class="exm-status" id="cv-status-msg"></span>
+      </div>
+    </div>
+
+    <div id="cv-loader" class="exm-loader"><div class="sp"></div>
+      <div>Reading the civil work register…<br><span>Civil · every branch</span></div></div>
+
+    <div id="cv-body" style="display:none;flex-direction:column;gap:16px">
+
+      <div class="au-kpis" id="cv-kpis"></div>
+
+      <div class="au-sec">
+        <h3>Branch scorecard</h3>
+        <div class="sub">A task is one line carrying a work description. The Work ID column repeats — ids 1 to 11
+          each appear on several rows — so it cannot be used to count jobs.</div>
+        <div id="cv-branches"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>Where each branch's work stands</h3>
+        <div class="sub">Every work at every branch, by status.</div>
+        <div id="cv-status-chart"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>Priority against progress</h3>
+        <div class="sub">Whether the work called urgent is actually the work being done.</div>
+        <div id="cv-grid"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>Past their target date</h3>
+        <div class="sub">Open work whose target has already passed, longest slip first.</div>
+        <div id="cv-overdue"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>Falling due in the next fortnight</h3>
+        <div class="sub">The list that decides how long the table above gets next month.</div>
+        <div id="cv-atrisk"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>Open work with no target date</h3>
+        <div class="sub">Committed to nobody by no date — and invisible to every overdue count.</div>
+        <div id="cv-unscheduled"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>Raised but never started</h3>
+        <div class="sub">Over thirty days old with no start date recorded.</div>
+        <div id="cv-stalled"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>What kind of work, and who is carrying it</h3>
+        <div class="sub">Category mix, then open workload by the person the job is assigned to.</div>
+        <div id="cv-cats" style="margin-bottom:18px"></div>
+        <div id="cv-people"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>Raised against completed, by month</h3>
+        <div class="sub">Grouped by the month the work was requested.</div>
+        <div id="cv-trend"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>What is holding work up</h3>
+        <div class="sub">Recorded delay reasons and material readiness.</div>
+        <div class="pt-row2" id="cv-blockers"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>How far to trust these numbers</h3>
+        <div class="sub">What the register records well, and what it does not record at all.</div>
+        <div id="cv-quality"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>Full register — <span id="cv-reg-n">0</span> works</h3>
+        <div class="sub">Overdue first, then oldest. Click any row for the whole record.</div>
+        <div style="max-height:640px;overflow:auto"><div id="cv-register"></div></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="au-modal" id="cv-modal">
+  <div class="au-mod">
+    <div class="au-mod-hd">
+      <div><h3 id="cv-mod-title">—</h3><div class="sub" id="cv-mod-sub"></div></div>
+      <button class="au-mod-x" id="cv-mod-x" aria-label="Close">&times;</button>
+    </div>
+    <div class="au-mod-bd" id="cv-mod-body"></div>
+  </div>
+</div>
 
 <!-- ═══ PTM PARENT FEEDBACK ═══ -->
 <div id="pane-ptm" class="pane">
@@ -10642,6 +10772,7 @@ async function loadPTM(force){
     var g=globalScope();
     try{ if(window.__auditSetScope) window.__auditSetScope(g.branch,g.month); }catch(e){}
     try{ if(window.__ptmSetScope)   window.__ptmSetScope(g.branch,g.month);   }catch(e){}
+    try{ if(window.__civilSetScope) window.__civilSetScope(g.branch);         }catch(e){}
     pushPT1(g.branch);
   }
   window.__pushTabScope=push;
@@ -10656,7 +10787,7 @@ async function loadPTM(force){
   var _st=window.showTab;
   if(typeof _st==='function') window.showTab=function(id,btn){
     var r=_st(id,btn);
-    if(id==='pt1'||id==='audit'||id==='ptm'){ push(); setTimeout(push,400); setTimeout(push,1500); }
+    if(id==='pt1'||id==='audit'||id==='ptm'||id==='civil'){ push(); setTimeout(push,400); setTimeout(push,1500); }
     return r;
   };
 
@@ -10668,6 +10799,865 @@ async function loadPTM(force){
   });
 
   setTimeout(push,1200);
+})();
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   CIVIL WORK TRACKER — analytics engine
+
+   COUNTING. A task is one row carrying a Work Description. The Work ID column
+   cannot be used: ids 1–11 each appear more than once, so counting by id would
+   lose about a third of the register. Descriptions do repeat — "Rearranging of
+   tiles" appears twice at Keesara — but those are different jobs (Swimming pool
+   and Basket Ball court), separated by Location. Merging them would hide real
+   work, so rows are kept distinct and Location is carried through.
+
+   DATES. The sheet was typed as dd-mm-yyyy and Google Sheets re-read some cells
+   in US order, turning 10-03-2026 into 3 October. Those cells arrive with day
+   and month swapped. A date is only un-swapped here when doing so repairs an
+   impossible ordering — a job starting after its own target, or requested after
+   it started. Correct dates are never touched.
+   ══════════════════════════════════════════════════════════════════════════ */
+window.CIVIL = (function () {
+  'use strict';
+
+  var BRANCH_MAP = {
+    POCHARAM: 'Pocharam', POC: 'Pocharam', BDPL: 'Boduppal', BODUPPAL: 'Boduppal',
+    BACHUPALLY: 'Bachupally', BCH: 'Bachupally', KEESARA: 'Keesara', KEE: 'Keesara',
+    GOWDAVALLI: 'Gowdavalli', GDVL: 'Gowdavalli'
+  };
+  var STATUS = ['Completed', 'In Progress', 'Pending', 'Not set'];
+  var PRIOS = ['Urgent', 'High', 'Medium', 'Low'];
+  var COL = {
+    Completed: '#059669', 'In Progress': '#1E4FD8', Pending: '#D97706', 'Not set': '#94A3B8',
+    Urgent: '#B91C1C', High: '#DC2626', Medium: '#D97706', Low: '#64748B'
+  };
+
+  function str(v) { return v === null || v === undefined ? '' : String(v).trim(); }
+  function esc(s) {
+    return String(s === null || s === undefined ? '—' : s)
+      .replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+  }
+  function num(v) {
+    if (v === null || v === undefined || v === '') return null;
+    var n = typeof v === 'number' ? v : parseFloat(String(v).replace(/[^0-9.\-]/g, ''));
+    return isFinite(n) ? n : null;
+  }
+  function mean(a) { var s = 0, i; if (!a.length) return null; for (i = 0; i < a.length; i++) s += a[i]; return s / a.length; }
+  function median(a) {
+    if (!a.length) return null;
+    var b = a.slice().sort(function (x, y) { return x - y; }), m = b.length >> 1;
+    return b.length % 2 ? b[m] : (b[m - 1] + b[m]) / 2;
+  }
+  function pct(n, d) { return d ? n / d * 100 : null; }
+  function uniq(a) { var s = {}, o = []; a.forEach(function (x) { if (!s[x]) { s[x] = 1; o.push(x); } }); return o; }
+
+  var MON = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
+  function parseDate(v) {
+    if (v === null || v === undefined || v === '') return null;
+    var s = String(v).trim();
+    if (!s || s === 'None') return null;
+    var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+    m = s.match(/^(\d{1,2})-([A-Za-z]{3,})-(\d{4})/);
+    if (m) { var k = MON[m[2].slice(0, 3).toLowerCase()]; if (k !== undefined) return new Date(+m[3], k, +m[1]); }
+    m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+    if (m) { var y = +m[3]; if (y < 100) y += 2000; return new Date(y, +m[2] - 1, +m[1]); }
+    var d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  function swapDM(d) {
+    if (!d) return null;
+    var day = d.getDate();
+    if (day > 12) return null;
+    return new Date(d.getFullYear(), day - 1, d.getMonth() + 1);
+  }
+  function iso(d) {
+    if (!d) return '';
+    var m = d.getMonth() + 1, dd = d.getDate();
+    return d.getFullYear() + '-' + (m < 10 ? '0' + m : m) + '-' + (dd < 10 ? '0' + dd : dd);
+  }
+  function fmt(d) {
+    if (!d) return '\u2014';
+    var M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return d.getDate() + ' ' + M[d.getMonth()] + ' ' + d.getFullYear();
+  }
+  var DAY = 86400000;
+  function days(a, b) { return (!a || !b) ? null : Math.round((b - a) / DAY); }
+
+  function build(raw) {
+    var tab = raw && raw.civil;
+    if (!tab || !tab.hdr || !tab.rows || !tab.rows.length) {
+      throw new Error('The Civil sheet returned no rows.');
+    }
+    var H = tab.hdr.map(str), ix = function (n) { return H.indexOf(n); };
+    var c = {
+      id: ix('Work ID'), req: ix('Request Date'), branch: ix('Branch'), by: ix('Raised By'),
+      dept: ix('Department'), cat: ix('Work Category'), desc: ix('Work Description'),
+      loc: ix('Location'), prio: ix('Priority'), resp: ix('Responsible Person'),
+      asg: ix('Assigned To'), lab: ix('Labour Contractor'), labd: ix('Labour Contract Date'),
+      mat: ix('Material Status'), rate: ix('Procurement Rate (\u20b9)'), cost: ix('Estimated Cost (\u20b9)'),
+      start: ix('Start Date'), target: ix('Target Date'), done: ix('Completion Date'),
+      status: ix('Work Status'), delay: ix('Delay Reason'), rem: ix('Remarks')
+    };
+    if (c.desc < 0 || c.branch < 0) throw new Error('The Civil sheet needs Branch and Work Description columns.');
+
+    var today = new Date(); today = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    var repaired = 0, noDesc = 0, noBranch = 0;
+
+    var rows = [];
+    tab.rows.forEach(function (r) {
+      var desc = str(r[c.desc]);
+      if (!desc) { noDesc++; return; }
+
+      var b = str(r[c.branch]);
+      var branch = b ? (BRANCH_MAP[b.toUpperCase()] || (b.charAt(0).toUpperCase() + b.slice(1).toLowerCase())) : '';
+      if (!branch) noBranch++;
+
+      var req = parseDate(r[c.req]), start = parseDate(r[c.start]),
+          target = parseDate(r[c.target]), done = parseDate(r[c.done]);
+
+      var fixed = false, t2;
+      if (start && target && start > target) {
+        t2 = swapDM(start); if (t2 && t2 <= target) { start = t2; fixed = true; }
+      }
+      if (req && target && req > target) {
+        t2 = swapDM(req); if (t2 && t2 <= target) { req = t2; fixed = true; }
+      }
+      if (req && start && req > start) {
+        t2 = swapDM(req); if (t2 && t2 <= start) { req = t2; fixed = true; }
+      }
+      if (fixed) repaired++;
+
+      var st = str(r[c.status]);
+      st = /complet/i.test(st) ? 'Completed'
+         : /progress/i.test(st) ? 'In Progress'
+         : /pend/i.test(st) ? 'Pending' : (st || 'Not set');
+
+      var pr = str(r[c.prio]);
+      var prio = PRIOS.filter(function (p) { return p.toLowerCase() === pr.toLowerCase(); })[0] || (pr || 'Not set');
+
+      var dept = str(r[c.dept]);
+      dept = dept ? dept.charAt(0).toUpperCase() + dept.slice(1).toLowerCase() : '';
+
+      var open = st !== 'Completed';
+      var overdue = !!(open && target && target < today);
+
+      rows.push({
+        id: str(r[c.id]), branch: branch, desc: desc,
+        loc: str(r[c.loc]), cat: str(r[c.cat]) || 'Unspecified',
+        dept: dept, by: str(r[c.by]), prio: prio, status: st,
+        resp: str(r[c.resp]), asg: str(r[c.asg]),
+        lab: str(r[c.lab]), mat: str(r[c.mat]),
+        cost: num(r[c.cost]), rate: num(r[c.rate]),
+        req: req, start: start, target: target, done: done,
+        month: req ? iso(req).slice(0, 7) : '',
+        delay: str(r[c.delay]), rem: str(r[c.rem]),
+        open: open, overdue: overdue,
+        age: req ? days(req, today) : null,
+        overdueBy: overdue ? days(target, today) : null,
+        planned: (start && target) ? days(start, target) : null,
+        actual: (start && done) ? days(start, done) : null,
+        dateFixed: fixed,
+        noTarget: !target, noStart: !start,
+        noDoneDate: st === 'Completed' && !done
+      });
+    });
+
+    if (!rows.length) throw new Error('No rows in the Civil sheet carry a Work Description.');
+
+    var branches = uniq(rows.map(function (r) { return r.branch; }).filter(Boolean)).sort();
+    var cats = uniq(rows.map(function (r) { return r.cat; })).sort();
+    var months = uniq(rows.map(function (r) { return r.month; }).filter(Boolean)).sort();
+    var people = uniq(rows.map(function (r) { return r.asg; }).filter(Boolean)).sort();
+
+    function summarise(rs) {
+      var dn = rs.filter(function (r) { return r.status === 'Completed'; });
+      var op = rs.filter(function (r) { return r.open; });
+      var od = rs.filter(function (r) { return r.overdue; });
+      var ages = op.map(function (r) { return r.age; }).filter(function (x) { return x !== null; });
+      var slips = od.map(function (r) { return r.overdueBy; }).filter(function (x) { return x !== null; });
+      var cycles = rs.map(function (r) { return r.actual; }).filter(function (x) { return x !== null && x >= 0; });
+      return {
+        n: rs.length,
+        done: dn.length, doneRate: pct(dn.length, rs.length),
+        inprog: rs.filter(function (r) { return r.status === 'In Progress'; }).length,
+        pending: rs.filter(function (r) { return r.status === 'Pending'; }).length,
+        noStatus: rs.filter(function (r) { return r.status === 'Not set'; }).length,
+        open: op.length,
+        overdue: od.length, overdueRate: pct(od.length, op.length),
+        urgentOpen: op.filter(function (r) { return r.prio === 'Urgent' || r.prio === 'High'; }).length,
+        medAge: median(ages), maxAge: ages.length ? Math.max.apply(null, ages) : null,
+        medSlip: median(slips), maxSlip: slips.length ? Math.max.apply(null, slips) : null,
+        cycle: median(cycles), cycleN: cycles.length,
+        noTarget: rs.filter(function (r) { return r.noTarget; }).length,
+        notStarted: rs.filter(function (r) { return r.open && r.noStart; }).length,
+        matBlocked: rs.filter(function (r) { return r.open && /pending|ordered/i.test(r.mat); }).length
+      };
+    }
+
+    var byBranch = {};
+    branches.forEach(function (b) {
+      byBranch[b] = summarise(rows.filter(function (r) { return r.branch === b; }));
+    });
+
+    var grid = PRIOS.concat(['Not set']).map(function (p) {
+      var rs = rows.filter(function (r) { return r.prio === p; });
+      if (!rs.length) return null;
+      return {
+        prio: p, n: rs.length,
+        cells: STATUS.map(function (s) {
+          return { status: s, n: rs.filter(function (r) { return r.status === s; }).length };
+        }),
+        overdue: rs.filter(function (r) { return r.overdue; }).length
+      };
+    }).filter(Boolean);
+
+    var byPerson = people.map(function (p) {
+      var rs = rows.filter(function (r) { return r.asg === p; });
+      var s = summarise(rs);
+      s.person = p;
+      s.branches = uniq(rs.map(function (r) { return r.branch; }).filter(Boolean));
+      return s;
+    }).sort(function (a, b) { return b.open - a.open || b.n - a.n; });
+
+    var byCat = cats.map(function (k) {
+      var rs = rows.filter(function (r) { return r.cat === k; });
+      var s = summarise(rs); s.cat = k;
+      s.byBranch = {};
+      branches.forEach(function (b) { s.byBranch[b] = rs.filter(function (r) { return r.branch === b; }).length; });
+      return s;
+    }).sort(function (a, b) { return b.n - a.n; });
+
+    var trend = months.map(function (m) {
+      var rs = rows.filter(function (r) { return r.month === m; });
+      return {
+        month: m, raised: rs.length,
+        completed: rs.filter(function (r) { return r.status === 'Completed'; }).length,
+        stillOpen: rs.filter(function (r) { return r.open; }).length
+      };
+    });
+
+    var PR = { Urgent: 0, High: 1, Medium: 2, Low: 3, 'Not set': 4 };
+    var overdueList = rows.filter(function (r) { return r.overdue; })
+      .sort(function (a, b) { return (b.overdueBy || 0) - (a.overdueBy || 0); });
+    var atRisk = rows.filter(function (r) {
+      return r.open && r.target && !r.overdue && days(today, r.target) <= 14;
+    }).sort(function (a, b) { return a.target - b.target; });
+    var unscheduled = rows.filter(function (r) { return r.open && r.noTarget; })
+      .sort(function (a, b) { return (PR[a.prio] - PR[b.prio]) || ((b.age || 0) - (a.age || 0)); });
+    var stalled = rows.filter(function (r) { return r.open && r.noStart && r.age !== null && r.age > 30; })
+      .sort(function (a, b) { return (b.age || 0) - (a.age || 0); });
+
+    var delays = {};
+    rows.forEach(function (r) { if (r.delay) delays[r.delay] = (delays[r.delay] || 0) + 1; });
+    var delayList = Object.keys(delays).map(function (k) { return { reason: k, n: delays[k] }; })
+      .sort(function (a, b) { return b.n - a.n; });
+
+    var mats = {};
+    rows.forEach(function (r) { var k = r.mat || 'Not recorded'; mats[k] = (mats[k] || 0) + 1; });
+    var matList = Object.keys(mats).map(function (k) { return { status: k, n: mats[k] }; })
+      .sort(function (a, b) { return b.n - a.n; });
+
+    var idm = {}, idsReused = 0;
+    rows.forEach(function (r) { if (r.id) idm[r.id] = (idm[r.id] || 0) + 1; });
+    Object.keys(idm).forEach(function (k) { if (idm[k] > 1) idsReused++; });
+
+    var dq = {
+      rows: rows.length, skippedNoDesc: noDesc, noBranch: noBranch, repaired: repaired,
+      idsReused: idsReused,
+      noTarget: rows.filter(function (r) { return r.noTarget; }).length,
+      noStart: rows.filter(function (r) { return r.noStart; }).length,
+      noStatus: rows.filter(function (r) { return r.status === 'Not set'; }).length,
+      doneNoDate: rows.filter(function (r) { return r.noDoneDate; }).length,
+      noCost: rows.filter(function (r) { return r.cost === null; }).length,
+      noLoc: rows.filter(function (r) { return !r.loc; }).length
+    };
+
+    return {
+      rows: rows, branches: branches, cats: cats, months: months, people: people,
+      byBranch: byBranch, overall: summarise(rows),
+      grid: grid, byPerson: byPerson, byCat: byCat, trend: trend,
+      overdueList: overdueList, atRisk: atRisk, unscheduled: unscheduled, stalled: stalled,
+      delayList: delayList, matList: matList, dq: dq,
+      today: today, generatedAt: raw.generatedAt || null,
+      STATUS: STATUS, PRIOS: PRIOS, COL: COL
+    };
+  }
+
+  return {
+    build: build, str: str, esc: esc, num: num, mean: mean, median: median,
+    pct: pct, uniq: uniq, fmt: fmt, iso: iso, days: days,
+    STATUS: STATUS, PRIOS: PRIOS, COL: COL
+  };
+})();
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CIVIL WORK TRACKER — renderer
+   ══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  var C = window.CIVIL;
+  var D = null;
+  var V = { branch: '', status: '', prio: '', cat: '', q: '' };
+
+  function $(id) { return document.getElementById(id); }
+  var esc = C.esc, fmt = C.fmt;
+  function pc(v, dp) { return v === null || v === undefined ? '\u2014' : v.toFixed(dp === undefined ? 0 : dp) + '%'; }
+  function nv(v) { return v === null || v === undefined ? '\u2014' : v; }
+
+  function scope() {
+    return D.rows.filter(function (r) {
+      if (V.branch && r.branch !== V.branch) return false;
+      if (V.status && r.status !== V.status) return false;
+      if (V.prio && r.prio !== V.prio) return false;
+      if (V.cat && r.cat !== V.cat) return false;
+      if (V.q) {
+        var s = (r.desc + ' ' + r.loc + ' ' + r.asg + ' ' + r.resp + ' ' + r.by + ' ' + r.rem).toLowerCase();
+        if (s.indexOf(V.q.toLowerCase()) < 0) return false;
+      }
+      return true;
+    });
+  }
+  function branches() { return V.branch ? [V.branch] : D.branches; }
+
+  function sum(rs) {
+    var dn = rs.filter(function (r) { return r.status === 'Completed'; }).length;
+    var op = rs.filter(function (r) { return r.open; });
+    var od = rs.filter(function (r) { return r.overdue; }).length;
+    var ages = op.map(function (r) { return r.age; }).filter(function (x) { return x !== null; });
+    return {
+      n: rs.length, done: dn, doneRate: C.pct(dn, rs.length),
+      open: op.length, overdue: od, overdueRate: C.pct(od, op.length),
+      urgentOpen: op.filter(function (r) { return r.prio === 'Urgent' || r.prio === 'High'; }).length,
+      medAge: C.median(ages), maxAge: ages.length ? Math.max.apply(null, ages) : null,
+      noTarget: rs.filter(function (r) { return r.noTarget; }).length,
+      notStarted: rs.filter(function (r) { return r.open && r.noStart; }).length
+    };
+  }
+
+  /* ══════════ SCOPE CHIP + FILTERS ══════════ */
+  function renderControls() {
+    var el = $('cv-scope');
+    if (el) {
+      el.innerHTML = '<i></i>' + esc(V.branch || 'All branches') +
+        (V.branch ? ' <small>(from the filter bar above)</small>' : '');
+    }
+    function opts(id, list, cur, all) {
+      var s = $(id); if (!s) return;
+      s.innerHTML = ['<option value="">' + all + '</option>'].concat(list.map(function (x) {
+        return '<option value="' + esc(x) + '"' + (cur === x ? ' selected' : '') + '>' + esc(x) + '</option>';
+      })).join('');
+    }
+    opts('cv-status', C.STATUS, V.status, 'Any status');
+    opts('cv-prio', C.PRIOS.concat(['Not set']), V.prio, 'Any priority');
+    opts('cv-cat', D.cats, V.cat, 'All categories');
+  }
+
+  /* ══════════ 1. HEADLINE ══════════ */
+  function renderKPIs() {
+    var rs = scope(), s = sum(rs);
+    var K = [
+      { v: s.n, k: 'Works in view', c: '#0F172A',
+        d: 'One task is one line carrying a work description. ' + D.dq.skippedNoDesc +
+           ' rows in the sheet have none and are left out.' },
+      { v: pc(s.doneRate), k: 'Completed', c: s.doneRate >= 60 ? '#059669' : s.doneRate >= 35 ? '#D97706' : '#DC2626',
+        d: s.done + ' of ' + s.n + ' closed. ' + s.open + ' still open.' },
+      { v: s.overdue, k: 'Past their target date', c: s.overdue ? '#DC2626' : '#059669',
+        d: s.overdue ? 'Longest is ' + (D.overdueList[0] ? D.overdueList[0].overdueBy + ' days late.' : '') : 'Nothing open has slipped its date.' },
+      { v: s.urgentOpen, k: 'Urgent or high, still open', c: s.urgentOpen ? '#B91C1C' : '#059669',
+        d: 'These are the ones a branch cannot absorb quietly.' },
+      { v: nv(s.medAge) + (s.medAge === null ? '' : ' d'), k: 'Typical age of open work', c: '#1E4FD8',
+        d: 'Days since it was raised. Oldest open item: ' + nv(s.maxAge) + ' days.' },
+      { v: s.noTarget, k: 'No target date set', c: s.noTarget ? '#D97706' : '#059669',
+        d: 'Work without a date cannot be late, so it never appears on any overdue list.' }
+    ];
+    $('cv-kpis').innerHTML = K.map(function (k) {
+      return '<div class="au-kpi"><div class="v" style="color:' + k.c + '">' + k.v + '</div>' +
+        '<div class="k">' + esc(k.k) + '</div><div class="d">' + esc(k.d) + '</div></div>';
+    }).join('');
+  }
+
+  /* ══════════ 2. BRANCH SCORECARD ══════════ */
+  function renderBranches() {
+    var rows = branches().map(function (b) {
+      var rs = scope().filter(function (r) { return r.branch === b; });
+      var s = sum(rs); s.b = b; return s;
+    }).filter(function (r) { return r.n; })
+      .sort(function (a, b) { return (b.doneRate || 0) - (a.doneRate || 0); });
+
+    var maxN = Math.max.apply(null, rows.map(function (r) { return r.n; }).concat([1]));
+
+    $('cv-branches').innerHTML = rows.length
+      ? '<table class="au-tbl"><thead><tr><th>Branch</th><th class="n">Works</th><th></th>' +
+        '<th class="n">Completed</th><th></th><th class="n">Open</th><th class="n">Overdue</th>' +
+        '<th class="n">Urgent open</th><th class="n">Typical age</th><th class="n">No target</th></tr></thead><tbody>' +
+        rows.map(function (r) {
+          var dc = r.doneRate >= 60 ? '#059669' : r.doneRate >= 35 ? '#D97706' : '#DC2626';
+          return '<tr class="clk" data-b="' + esc(r.b) + '"><td><b>' + esc(r.b) + '</b></td>' +
+            '<td class="n">' + r.n + '</td>' +
+            '<td style="width:90px"><div class="au-bar"><i style="width:' + (r.n / maxN * 100) + '%;background:#CBD5E1"></i></div></td>' +
+            '<td class="n" style="font-weight:700;color:' + dc + '">' + pc(r.doneRate) + '</td>' +
+            '<td style="width:110px"><div class="au-bar"><i style="width:' + (r.doneRate || 0) + '%;background:' + dc + '"></i></div></td>' +
+            '<td class="n">' + r.open + '</td>' +
+            '<td class="n" style="font-weight:600;color:' + (r.overdue ? '#DC2626' : '#94A3B8') + '">' + r.overdue + '</td>' +
+            '<td class="n" style="color:' + (r.urgentOpen ? '#B91C1C' : '#94A3B8') + '">' + r.urgentOpen + '</td>' +
+            '<td class="n">' + nv(r.medAge) + (r.medAge === null ? '' : ' d') + '</td>' +
+            '<td class="n" style="color:' + (r.noTarget ? '#D97706' : '#94A3B8') + '">' + r.noTarget + '</td></tr>';
+        }).join('') + '</tbody></table>' +
+        '<p class="au-note">Completion rate and volume have to be read together. Pocharam has by far the largest ' +
+        'register, so its rate is the most reliable; a branch with a handful of works can swing twenty points on one ' +
+        'job closing. <b>No target</b> matters more than it looks — a work with no target date can never be counted ' +
+        'late, so a branch can hold a clean overdue column simply by not committing to dates. Click a branch for its file.</p>'
+      : '<p class="au-empty">No works match the current filters.</p>';
+  }
+
+  /* ══════════ 3. STATUS BY BRANCH ══════════ */
+  function renderStatus() {
+    var rs = scope();
+    var bs = branches().filter(function (b) { return rs.some(function (r) { return r.branch === b; }); });
+    $('cv-status-chart').innerHTML =
+      '<div class="cv-stack">' + bs.map(function (b) {
+        var br = rs.filter(function (r) { return r.branch === b; });
+        var segs = C.STATUS.map(function (s) {
+          return { s: s, n: br.filter(function (r) { return r.status === s; }).length };
+        }).filter(function (x) { return x.n; });
+        return '<div class="cv-srow"><div class="lb">' + esc(b) + '<span>' + br.length + '</span></div>' +
+          '<div class="bar">' + segs.map(function (x) {
+            return '<span style="width:' + (x.n / br.length * 100) + '%;background:' + C.COL[x.s] + '" ' +
+              'title="' + esc(b) + ' \u00b7 ' + esc(x.s) + ': ' + x.n + '">' +
+              (x.n / br.length > 0.11 ? x.n : '') + '</span>';
+          }).join('') + '</div></div>';
+      }).join('') + '</div>' +
+      '<div class="au-legend">' + C.STATUS.map(function (s) {
+        return '<span><i style="background:' + C.COL[s] + '"></i>' + esc(s) + '</span>';
+      }).join('') + '</div>' +
+      '<p class="au-note"><b>Not set</b> is a status nobody chose — the row exists but the work status column is ' +
+      'blank, so the job is neither claimed as done nor tracked as open. Those are invisible to every other figure ' +
+      'on this page.</p>';
+  }
+
+  /* ══════════ 4. PRIORITY × STATUS ══════════ */
+  function renderGrid() {
+    var rs = scope();
+    var rows = C.PRIOS.concat(['Not set']).map(function (p) {
+      var pr = rs.filter(function (r) { return r.prio === p; });
+      if (!pr.length) return null;
+      return { p: p, n: pr.length,
+        cells: C.STATUS.map(function (s) { return { s: s, n: pr.filter(function (r) { return r.status === s; }).length }; }),
+        od: pr.filter(function (r) { return r.overdue; }).length };
+    }).filter(Boolean);
+
+    $('cv-grid').innerHTML =
+      '<table class="au-tbl"><thead><tr><th>Priority</th>' +
+      C.STATUS.map(function (s) { return '<th class="n">' + esc(s) + '</th>'; }).join('') +
+      '<th class="n">Total</th><th class="n">Overdue</th></tr></thead><tbody>' +
+      rows.map(function (r) {
+        return '<tr><td><span class="pill" style="background:' + C.COL[r.p] + '22;color:' +
+          (C.COL[r.p] || '#64748B') + '">' + esc(r.p) + '</span></td>' +
+          r.cells.map(function (c) {
+            var risk = (r.p === 'Urgent' || r.p === 'High') && (c.s === 'Pending' || c.s === 'Not set') && c.n;
+            return '<td class="n" style="' + (risk ? 'background:#FEF2F2;font-weight:800;color:#DC2626' :
+              (c.n ? 'font-weight:600' : 'color:#CBD5E1')) + '">' + c.n + '</td>';
+          }).join('') +
+          '<td class="n" style="font-weight:700">' + r.n + '</td>' +
+          '<td class="n" style="color:' + (r.od ? '#DC2626' : '#94A3B8') + '">' + r.od + '</td></tr>';
+      }).join('') + '</tbody></table>' +
+      '<p class="au-note">The shaded cells are the ones to argue about: work marked <b>Urgent</b> or <b>High</b> that ' +
+      'is still <b>Pending</b> or has no status at all. Something classed urgent that nobody has started is either a ' +
+      'real risk or a priority that was set too high — and both are worth knowing before the next review.</p>';
+  }
+
+  /* ══════════ 5. ACTION LISTS ══════════ */
+  function taskTable(list, opts) {
+    if (!list.length) return '<p class="au-empty">' + (opts.empty || 'Nothing here.') + '</p>';
+    return '<table class="au-tbl"><thead><tr><th>Branch</th><th>Work</th><th>Priority</th>' +
+      '<th>Status</th><th class="n">' + esc(opts.metric) + '</th><th>Owner</th></tr></thead><tbody>' +
+      list.slice(0, opts.limit || 40).map(function (r) {
+        return '<tr class="clkr" data-i="' + D.rows.indexOf(r) + '">' +
+          '<td>' + esc(r.branch) + '</td>' +
+          '<td><b>' + esc(r.desc) + '</b>' + (r.loc ? '<br><span style="font-size:10.5px;color:#94A3B8">' + esc(r.loc) + '</span>' : '') + '</td>' +
+          '<td><span class="pill" style="background:' + (C.COL[r.prio] || '#94A3B8') + '22;color:' +
+            (C.COL[r.prio] || '#64748B') + '">' + esc(r.prio) + '</span></td>' +
+          '<td style="font-size:11.5px;color:' + (C.COL[r.status] || '#64748B') + ';font-weight:600">' + esc(r.status) + '</td>' +
+          '<td class="n" style="font-weight:700;color:' + (opts.color || '#0F172A') + '">' + esc(opts.value(r)) + '</td>' +
+          '<td style="font-size:11.5px;color:#64748B">' + esc(r.asg || r.resp || '\u2014') + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+
+  function renderActions() {
+    var f = function (l) { return l.filter(function (r) { return !V.branch || r.branch === V.branch; }); };
+    var od = f(D.overdueList), ar = f(D.atRisk), un = f(D.unscheduled), st = f(D.stalled);
+
+    $('cv-overdue').innerHTML = taskTable(od, {
+      metric: 'Days late', color: '#DC2626',
+      value: function (r) { return r.overdueBy + ' d'; },
+      empty: 'Nothing open has passed its target date.'
+    }) + (od.length ? '<p class="au-note">Sorted by how far past the target date each one is. ' +
+      'These need a revised date or a reason, not just a reminder.</p>' : '');
+
+    $('cv-atrisk').innerHTML = taskTable(ar, {
+      metric: 'Due in', color: '#D97706',
+      value: function (r) { return C.days(D.today, r.target) + ' d'; },
+      empty: 'Nothing falls due in the next fortnight.'
+    }) + (ar.length ? '<p class="au-note">Due within fourteen days and not yet closed. This is the list that stops ' +
+      'the overdue table above from growing next month.</p>' : '');
+
+    $('cv-unscheduled').innerHTML = taskTable(un, {
+      metric: 'Age', color: '#7C3AED',
+      value: function (r) { return r.age === null ? '\u2014' : r.age + ' d'; },
+      empty: 'Every open work carries a target date.'
+    }) + (un.length ? '<p class="au-note">Open work with <b>no target date</b>, urgent first. Nothing here can ever ' +
+      'show as late, which is exactly why it needs watching: an urgent job with no date is a job with no commitment ' +
+      'attached to it.</p>' : '');
+
+    $('cv-stalled').innerHTML = taskTable(st, {
+      metric: 'Waiting', color: '#B91C1C',
+      value: function (r) { return r.age + ' d'; },
+      empty: 'Nothing has been waiting over a month without starting.'
+    }) + (st.length ? '<p class="au-note">Raised more than thirty days ago and still with no start date recorded.</p>' : '');
+  }
+
+  /* ══════════ 6. CATEGORY + OWNERS ══════════ */
+  function renderMix() {
+    var rs = scope();
+    var cats = D.cats.map(function (k) {
+      var cr = rs.filter(function (r) { return r.cat === k; });
+      return { k: k, n: cr.length, open: cr.filter(function (r) { return r.open; }).length };
+    }).filter(function (x) { return x.n; }).sort(function (a, b) { return b.n - a.n; });
+    var tot = cats.reduce(function (s, x) { return s + x.n; }, 0);
+    var PAL = ['#1E4FD8', '#059669', '#D97706', '#7C3AED', '#0D9488', '#DC2626', '#64748B'];
+
+    $('cv-cats').innerHTML = '<div class="au-sbars">' + cats.map(function (c, i) {
+      return '<div class="au-sbar" style="grid-template-columns:130px 1fr 96px"><div>' + esc(c.k) + '</div>' +
+        '<div class="au-bar"><i style="width:' + (c.n / (cats[0].n || 1) * 100) + '%;background:' + PAL[i % PAL.length] + '"></i></div>' +
+        '<div class="n">' + c.n + ' <span style="color:#94A3B8;font-weight:400">(' + c.open + ' open)</span></div></div>';
+    }).join('') + '</div>' +
+    '<p class="au-note">Civil work is ' + (tot ? Math.round(cats[0].n / tot * 100) : 0) + '% of everything raised. ' +
+    'Categories other than the biggest are thin enough that one or two jobs move them, so read them as examples ' +
+    'rather than trends.</p>';
+
+    var ppl = D.people.map(function (p) {
+      var pr = rs.filter(function (r) { return r.asg === p; });
+      if (!pr.length) return null;
+      var s = sum(pr); s.p = p;
+      s.branches = C.uniq(pr.map(function (r) { return r.branch; }));
+      return s;
+    }).filter(Boolean).sort(function (a, b) { return b.open - a.open || b.n - a.n; });
+    var mx = ppl.length ? Math.max.apply(null, ppl.map(function (x) { return x.n; })) : 1;
+
+    $('cv-people').innerHTML = ppl.length
+      ? '<table class="au-tbl"><thead><tr><th>Assigned to</th><th class="n">Works</th><th></th>' +
+        '<th class="n">Open</th><th class="n">Overdue</th><th class="n">Completed</th><th>Branches</th></tr></thead><tbody>' +
+        ppl.map(function (r) {
+          return '<tr><td><b>' + esc(r.p) + '</b></td><td class="n">' + r.n + '</td>' +
+            '<td style="width:110px"><div class="au-bar"><i style="width:' + (r.n / mx * 100) + '%;background:#1E4FD8"></i></div></td>' +
+            '<td class="n" style="font-weight:600">' + r.open + '</td>' +
+            '<td class="n" style="color:' + (r.overdue ? '#DC2626' : '#94A3B8') + '">' + r.overdue + '</td>' +
+            '<td class="n" style="color:#059669">' + pc(r.doneRate) + '</td>' +
+            '<td style="font-size:11.5px;color:#64748B">' + esc(r.branches.join(', ')) + '</td></tr>';
+        }).join('') + '</tbody></table>' +
+        '<p class="au-note">Ordered by open workload. Names are recorded inconsistently in the sheet — "Dhanunjay" ' +
+        'and "DHANUNJAY/ SAI" are counted separately here because they are written separately there, so a single ' +
+        'spelling per person would make this table considerably sharper.</p>'
+      : '<p class="au-empty">Nothing assigned under the current filters.</p>';
+  }
+
+  /* ══════════ 7. TREND ══════════ */
+  function renderTrend() {
+    var rs = scope();
+    var ms = D.months.filter(function (m) { return rs.some(function (r) { return r.month === m; }); });
+    if (ms.length < 2) { $('cv-trend').innerHTML = '<p class="au-empty">Not enough dated months to draw a trend.</p>'; return; }
+    var data = ms.map(function (m) {
+      var mr = rs.filter(function (r) { return r.month === m; });
+      return { m: m, raised: mr.length, done: mr.filter(function (r) { return r.status === 'Completed'; }).length };
+    });
+    var mx = Math.max.apply(null, data.map(function (d) { return d.raised; }).concat([1]));
+    var W = 720, H = 210, PL = 34, PB = 40, PT = 12;
+    var bw = (W - PL - 12) / data.length;
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto">';
+    [0, 0.5, 1].forEach(function (f) {
+      var y = PT + (H - PT - PB) * (1 - f);
+      s += '<line x1="' + PL + '" x2="' + (W - 12) + '" y1="' + y + '" y2="' + y + '" stroke="#EEF2F7"/>' +
+        '<text x="' + (PL - 6) + '" y="' + (y + 3.5) + '" text-anchor="end" font-size="9.5" fill="#94A3B8">' +
+        Math.round(mx * f) + '</text>';
+    });
+    data.forEach(function (d, i) {
+      var x = PL + i * bw + bw * 0.16, w = bw * 0.68;
+      var hR = (H - PT - PB) * (d.raised / mx), hD = (H - PT - PB) * (d.done / mx);
+      s += '<rect x="' + x + '" y="' + (H - PB - hR) + '" width="' + w + '" height="' + hR +
+        '" fill="#CBD5E1" rx="3"><title>' + d.m + ' \u00b7 ' + d.raised + ' raised</title></rect>';
+      s += '<rect x="' + x + '" y="' + (H - PB - hD) + '" width="' + w + '" height="' + hD +
+        '" fill="#059669" rx="3"><title>' + d.m + ' \u00b7 ' + d.done + ' completed</title></rect>';
+      s += '<text x="' + (x + w / 2) + '" y="' + (H - PB - hR - 5) + '" text-anchor="middle" font-size="10" font-weight="700" fill="#334155">' + d.raised + '</text>';
+      s += '<text x="' + (x + w / 2) + '" y="' + (H - PB + 14) + '" text-anchor="middle" font-size="9.5" fill="#64748B">' +
+        d.m.slice(5) + '/' + d.m.slice(2, 4) + '</text>';
+    });
+    s += '</svg><div class="au-legend"><span><i style="background:#CBD5E1"></i>Raised</span>' +
+      '<span><i style="background:#059669"></i>Completed</span></div>' +
+      '<p class="au-note">Grouped by the month the work was <b>requested</b>, so the green portion shows how much of ' +
+      'each intake has since been closed. A tall grey bar with little green is a month whose work is still outstanding.</p>';
+    $('cv-trend').innerHTML = s;
+  }
+
+  /* ══════════ 8. BLOCKERS ══════════ */
+  function renderBlockers() {
+    var rs = scope();
+    function mini(title, keyf, colorf) {
+      var m = {};
+      rs.forEach(function (r) { var k = keyf(r); if (k) m[k] = (m[k] || 0) + 1; });
+      var arr = Object.keys(m).map(function (k) { return { k: k, n: m[k] }; }).sort(function (a, b) { return b.n - a.n; });
+      if (!arr.length) return '<div class="pt-panel"><h4 class="au-h4">' + title + '</h4><p class="au-empty">Nothing recorded.</p></div>';
+      var mx = arr[0].n;
+      return '<div class="pt-panel"><h4 class="au-h4">' + title + '</h4><div class="au-sbars">' +
+        arr.map(function (x) {
+          return '<div class="au-sbar" style="grid-template-columns:150px 1fr 40px"><div>' + esc(x.k) + '</div>' +
+            '<div class="au-bar"><i style="width:' + (x.n / mx * 100) + '%;background:' + colorf(x.k) + '"></i></div>' +
+            '<div class="n">' + x.n + '</div></div>';
+        }).join('') + '</div></div>';
+    }
+    $('cv-blockers').innerHTML =
+      mini('Why work slipped', function (r) { return r.delay; }, function () { return '#DC2626'; }) +
+      mini('Material status', function (r) { return r.mat || 'Not recorded'; },
+        function (k) { return /pending/i.test(k) ? '#DC2626' : /ordered/i.test(k) ? '#D97706' :
+          /received/i.test(k) ? '#059669' : '#CBD5E1'; });
+  }
+
+  /* ══════════ 9. DATA QUALITY ══════════ */
+  function renderQuality() {
+    var q = D.dq;
+    var items = [
+      { n: q.idsReused, l: 'Work IDs used more than once', bad: q.idsReused > 0,
+        d: 'Ids 1 to 11 each appear on several rows, so the id column cannot identify a job. Counting here is done on the work description instead.' },
+      { n: q.doneNoDate, l: 'Completed, but no completion date', bad: q.doneNoDate > 0,
+        d: 'This is why there is no "average days to complete" on this page — only ' + (q.rows - q.doneNoDate >= 0 ? D.overall.cycleN : 0) + ' closed jobs carry the date needed to measure it.' },
+      { n: q.noTarget, l: 'No target date', bad: q.noTarget > 0,
+        d: 'Cannot appear on an overdue list, whatever happens to it.' },
+      { n: q.noStatus, l: 'No work status', bad: q.noStatus > 0,
+        d: 'Neither open nor closed, so absent from both counts.' },
+      { n: q.noStart, l: 'No start date', bad: false,
+        d: 'Fine for work not yet begun; a problem on anything marked in progress.' },
+      { n: q.repaired, l: 'Dates repaired automatically', bad: false,
+        d: 'Typed as dd-mm-yyyy and stored by Sheets as mm-dd-yyyy. Corrected here only where it fixed an impossible order, such as a job starting after its own target.' },
+      { n: q.noCost, l: 'No estimated cost', bad: q.noCost > q.rows * 0.8,
+        d: 'The cost and procurement-rate columns are almost entirely empty, so this page carries no financial view at all.' },
+      { n: q.skippedNoDesc, l: 'Rows with no work description', bad: false,
+        d: 'Left out of every figure, since there is no way to tell what the job was.' }
+    ];
+    $('cv-quality').innerHTML =
+      '<table class="au-tbl"><thead><tr><th class="n">Rows</th><th>What it is</th><th></th></tr></thead><tbody>' +
+      items.map(function (i) {
+        return '<tr><td class="n" style="font-weight:800;font-size:15px;color:' +
+          (i.bad ? '#DC2626' : i.n ? '#D97706' : '#059669') + '">' + i.n + '</td>' +
+          '<td><b>' + esc(i.l) + '</b></td>' +
+          '<td style="font-size:11.5px;color:#64748B">' + esc(i.d) + '</td></tr>';
+      }).join('') + '</tbody></table>' +
+      '<div class="au-flag"><b>Three columns would change what this page can do.</b> A completion date on every ' +
+      'closed job turns on cycle time and on-time delivery. A target date on the ' + q.noTarget +
+      ' works without one brings them into the overdue count. A cost figure turns on the entire financial view — ' +
+      'budget against spend, cost per branch, cost per category — none of which can be shown today.</div>';
+  }
+
+  /* ══════════ 10. REGISTER ══════════ */
+  function renderRegister() {
+    var rs = scope().slice().sort(function (a, b) {
+      if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
+      return (b.age || 0) - (a.age || 0);
+    });
+    $('cv-reg-n').textContent = rs.length;
+    $('cv-register').innerHTML = rs.length
+      ? '<table class="au-tbl"><thead><tr><th>Branch</th><th>Work</th><th>Category</th><th>Priority</th>' +
+        '<th>Status</th><th class="n">Requested</th><th class="n">Target</th><th class="n">Age</th><th>Owner</th></tr></thead><tbody>' +
+        rs.slice(0, 300).map(function (r) {
+          return '<tr class="clkr" data-i="' + D.rows.indexOf(r) + '"' + (r.overdue ? ' style="background:#FFF7F7"' : '') + '>' +
+            '<td>' + esc(r.branch) + '</td>' +
+            '<td><b>' + esc(r.desc) + '</b>' + (r.loc ? '<br><span style="font-size:10.5px;color:#94A3B8">' + esc(r.loc) + '</span>' : '') + '</td>' +
+            '<td style="font-size:11.5px;color:#64748B">' + esc(r.cat) + '</td>' +
+            '<td><span class="pill" style="background:' + (C.COL[r.prio] || '#94A3B8') + '22;color:' +
+              (C.COL[r.prio] || '#64748B') + '">' + esc(r.prio) + '</span></td>' +
+            '<td style="font-size:11.5px;font-weight:600;color:' + (C.COL[r.status] || '#64748B') + '">' + esc(r.status) + '</td>' +
+            '<td class="n" style="font-size:11.5px">' + esc(fmt(r.req)) + '</td>' +
+            '<td class="n" style="font-size:11.5px;color:' + (r.overdue ? '#DC2626' : '#64748B') + ';font-weight:' +
+              (r.overdue ? 700 : 400) + '">' + esc(fmt(r.target)) + '</td>' +
+            '<td class="n">' + (r.age === null ? '\u2014' : r.age + ' d') + '</td>' +
+            '<td style="font-size:11.5px;color:#64748B">' + esc(r.asg || '\u2014') + '</td></tr>';
+        }).join('') + '</tbody></table>' +
+        (rs.length > 300 ? '<p class="au-note">Showing 300 of ' + rs.length + '.</p>' : '')
+      : '<p class="au-empty">No works match the current filters.</p>';
+  }
+
+  /* ══════════ DRILL-DOWNS ══════════ */
+  function modal(t, s, h) {
+    $('cv-mod-title').textContent = t; $('cv-mod-sub').innerHTML = s; $('cv-mod-body').innerHTML = h;
+    $('cv-modal').classList.add('on'); document.body.style.overflow = 'hidden';
+  }
+  function closeModal() { $('cv-modal').classList.remove('on'); document.body.style.overflow = ''; }
+
+  function taskModal(r) {
+    function row(k, v) { return '<tr><td style="color:#64748B;width:170px">' + k + '</td><td><b>' + v + '</b></td></tr>'; }
+    modal(r.desc, esc(r.branch) + ' \u00b7 ' + esc(r.cat) +
+      ' \u00b7 <span class="pill" style="background:' + (C.COL[r.status] || '#94A3B8') + '22;color:' +
+      (C.COL[r.status] || '#64748B') + '">' + esc(r.status) + '</span>',
+      '<table class="au-tbl"><tbody>' +
+      row('Location', esc(r.loc || '\u2014')) +
+      row('Priority', esc(r.prio)) +
+      row('Raised by', esc(r.by || '\u2014') + (r.dept ? ' <span style="font-weight:400;color:#94A3B8">(' + esc(r.dept) + ')</span>' : '')) +
+      row('Responsible', esc(r.resp || '\u2014')) +
+      row('Assigned to', esc(r.asg || '\u2014')) +
+      row('Labour contractor', esc(r.lab || '\u2014')) +
+      row('Material status', esc(r.mat || 'Not recorded')) +
+      row('Requested', esc(fmt(r.req)) + (r.age !== null ? ' <span style="font-weight:400;color:#94A3B8">(' + r.age + ' days ago)</span>' : '')) +
+      row('Started', esc(fmt(r.start))) +
+      row('Target', esc(fmt(r.target)) + (r.overdue ? ' <span style="color:#DC2626">\u2014 ' + r.overdueBy + ' days late</span>' : '')) +
+      row('Completed', esc(fmt(r.done)) + (r.noDoneDate ? ' <span style="font-weight:400;color:#D97706">(marked complete, no date recorded)</span>' : '')) +
+      row('Planned duration', r.planned === null ? '\u2014' : r.planned + ' days') +
+      row('Estimated cost', r.cost === null ? '<span style="font-weight:400;color:#94A3B8">not recorded</span>' : '\u20b9' + r.cost.toLocaleString('en-IN')) +
+      row('Delay reason', esc(r.delay || '\u2014')) +
+      row('Remarks', esc(r.rem || '\u2014')) +
+      (r.dateFixed ? row('Note', '<span style="color:#D97706">A date on this row was stored with day and month swapped and has been corrected.</span>') : '') +
+      '</tbody></table>');
+  }
+
+  function branchModal(b) {
+    var rs = D.rows.filter(function (r) { return r.branch === b; });
+    var s = sum(rs);
+    var cats = {}; rs.forEach(function (r) { cats[r.cat] = (cats[r.cat] || 0) + 1; });
+    var open = rs.filter(function (r) { return r.open; })
+      .sort(function (a, z) { return (z.overdueBy || 0) - (a.overdueBy || 0) || (z.age || 0) - (a.age || 0); });
+    modal(b, rs.length + ' works \u00b7 ' + s.open + ' open \u00b7 ' + s.overdue + ' overdue',
+      '<div class="au-stats">' +
+      '<div class="au-st"><div class="v">' + rs.length + '</div><div class="l">Works</div></div>' +
+      '<div class="au-st"><div class="v" style="color:#059669">' + pc(s.doneRate) + '</div><div class="l">Completed</div></div>' +
+      '<div class="au-st"><div class="v" style="color:#DC2626">' + s.overdue + '</div><div class="l">Overdue</div></div>' +
+      '<div class="au-st"><div class="v" style="color:#B91C1C">' + s.urgentOpen + '</div><div class="l">Urgent open</div></div>' +
+      '<div class="au-st"><div class="v">' + nv(s.medAge) + '</div><div class="l">Typical age (days)</div></div>' +
+      '<div class="au-st"><div class="v" style="color:#D97706">' + s.noTarget + '</div><div class="l">No target date</div></div>' +
+      '</div>' +
+      '<h4 class="au-h4">Work mix</h4><div class="au-sbars">' +
+      Object.keys(cats).sort(function (a, z) { return cats[z] - cats[a]; }).map(function (k) {
+        return '<div class="au-sbar" style="grid-template-columns:140px 1fr 40px"><div>' + esc(k) + '</div>' +
+          '<div class="au-bar"><i style="width:' + (cats[k] / rs.length * 100) + '%;background:#1E4FD8"></i></div>' +
+          '<div class="n">' + cats[k] + '</div></div>';
+      }).join('') + '</div>' +
+      '<h4 class="au-h4">Everything still open here</h4>' +
+      taskTable(open, { metric: 'Age', value: function (r) { return r.age === null ? '\u2014' : r.age + ' d'; },
+                        limit: 60, empty: 'Nothing open at this branch.' }));
+  }
+
+  /* ══════════ MASTER ══════════ */
+  function renderAll() {
+    renderControls(); renderKPIs(); renderBranches(); renderStatus(); renderGrid();
+    renderActions(); renderMix(); renderTrend(); renderBlockers(); renderQuality(); renderRegister();
+    document.querySelectorAll('#pane-civil tr.clk').forEach(function (tr) {
+      tr.addEventListener('click', function () { branchModal(tr.dataset.b); });
+    });
+    document.querySelectorAll('#pane-civil tr.clkr').forEach(function (tr) {
+      tr.addEventListener('click', function () { taskModal(D.rows[+tr.dataset.i]); });
+    });
+  }
+
+  window.renderCivilTab = function (raw) {
+    D = C.build(raw);
+    window.__CIVIL_D = D;
+    var el = $('cv-meta');
+    if (el) el.textContent = D.rows.length + ' works \u00b7 ' + D.branches.length + ' branches \u00b7 ' +
+      D.overall.open + ' open \u00b7 ' + D.overall.overdue + ' overdue';
+    renderAll();
+
+    $('cv-status').onchange = function (e) { V.status = e.target.value; renderAll(); };
+    $('cv-prio').onchange = function (e) { V.prio = e.target.value; renderAll(); };
+    $('cv-cat').onchange = function (e) { V.cat = e.target.value; renderAll(); };
+    var t; $('cv-q').oninput = function (e) {
+      clearTimeout(t); t = setTimeout(function () { V.q = e.target.value; renderAll(); }, 200);
+    };
+    $('cv-mod-x').onclick = closeModal;
+    $('cv-modal').onclick = function (e) { if (e.target === $('cv-modal')) closeModal(); };
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
+
+    window.__civilSetScope = function (branch) {
+      var b = branch && D.branches.indexOf(branch) >= 0 ? branch : '';
+      if (b === V.branch) return;
+      V.branch = b; renderAll();
+    };
+    if (window.__pushTabScope) window.__pushTabScope();
+  };
+})();
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CIVIL WORK TAB — lazy loader
+   ══════════════════════════════════════════════════════════════════════════ */
+var _cvLoaded=false, _cvLoading=false, _cvRaw=null;
+
+function _cvStatus(msg,isErr){
+  var el=document.getElementById('cv-status-msg'); if(!el) return;
+  el.textContent=msg||''; el.className='exm-status'+(isErr?' err':'');
+}
+function _cvShow(ok){
+  var l=document.getElementById('cv-loader'), b=document.getElementById('cv-body');
+  if(l) l.classList.toggle('hide',!!ok);
+  if(b) b.style.display=ok?'flex':'none';
+}
+function _cvPaint(){
+  try{ window.renderCivilTab(_cvRaw); _cvShow(true); }
+  catch(err){
+    _cvShow(false);
+    var l=document.getElementById('cv-loader');
+    if(l) l.innerHTML='<div style="color:var(--r);font-weight:700">Could not build the civil work view</div>'+
+      '<div style="font-size:11px;color:var(--txm);max-width:460px">'+String(err&&err.message||err)+'</div>';
+  }
+}
+
+async function loadCivil(force){
+  if(_cvLoading) return;
+  if(_cvLoaded && !force){ _cvPaint(); return; }
+  _cvLoading=true; _cvStatus(force?'Refreshing…':'Loading…');
+  try{
+    if(!force){
+      try{
+        var c=await idbGet('pbes_civil');
+        if(c && c.data && c.data.civil && (Date.now()-c.t) < 24*3600*1000){
+          _cvRaw=c.data; _cvLoaded=true; _cvPaint(); _cvStatus('Cached · refreshing in background');
+        }
+      }catch(e){}
+    }
+    var session=null;
+    try{ var s=await sb.auth.getSession(); session=s && s.data && s.data.session; }catch(e){}
+    if(!session){ window.location.href='login.html'; return; }
+
+    var res=await fetch(DATA_API+'?section=civil'+(force?'&nocache=1':'')+'&_t='+Date.now(),
+                        { headers:{ 'Authorization':'Bearer '+session.access_token } });
+    if(res.status===401){ await sb.auth.signOut(); window.location.href='login.html'; return; }
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    var d=await res.json();
+    if(d && d.error) throw new Error(d.message||'Upstream error');
+
+    var raw=(d && d.CIVIL_RAW) ? d.CIVIL_RAW : (d && d.civil ? d : null);
+    if(!raw || !raw.civil || !raw.civil.rows || !raw.civil.rows.length)
+      throw new Error('No civil rows returned. Check that the "Civil" tab exists and that '+
+                      '/api/data forwards ?section=civil');
+
+    _cvRaw=raw; _cvLoaded=true;
+    try{ idbSet('pbes_civil',{ t:Date.now(), data:raw }); }catch(e){}
+    _cvPaint();
+    _cvStatus(raw.generatedAt ? ('Updated '+String(raw.generatedAt).replace('T',' ').slice(0,16)) : '');
+  }catch(err){
+    if(!_cvLoaded){
+      _cvShow(false);
+      var l=document.getElementById('cv-loader');
+      if(l) l.innerHTML='<div style="color:var(--r);font-weight:700">Could not load civil work</div>'+
+        '<div style="font-size:11px;color:var(--txm);max-width:460px">'+String(err&&err.message||err)+'</div>';
+    }
+    _cvStatus(String(err && err.message || err), true);
+  }finally{ _cvLoading=false; }
+}
+
+(function(){
+  var _s=window.showTab, _w=window.switchTab;
+  window.showTab=function(id,btn){ _s(id,btn); if(id==='civil') loadCivil(false); };
+  window.switchTab=function(id){ _w(id); if(id==='civil') loadCivil(false); };
 })();
 </script>
 </body>
