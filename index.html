@@ -281,6 +281,27 @@ body.nav-min .sn-foot{display:none}
 
 
 
+/* ═══ STAGE-GROUP TABLE ═══ */
+.sgt-h{font-size:11.5px;font-weight:800;color:var(--tx);margin:0 0 7px;letter-spacing:.01em}
+table.sgt{min-width:820px}
+table.sgt th{text-align:center;vertical-align:bottom}
+table.sgt th.nm{text-align:left;min-width:210px}
+table.sgt th.tot{background:#E8F3EC;color:#07361F}
+table.sgt td{text-align:center;vertical-align:middle;padding:6px 9px}
+table.sgt td.nm{text-align:left}
+table.sgt tr.cat td{background:#F8FAFF;font-weight:700}
+table.sgt tr.cat td.nm{color:#0F172A;font-weight:800}
+table.sgt tr.sub td.nm{padding-left:24px;color:#64748B;font-weight:500;font-size:11.5px}
+table.sgt tr.sub td{color:#475569}
+table.sgt td.sgt-c{cursor:pointer;transition:background .12s}
+table.sgt td.sgt-c:hover{background:var(--pl)!important;box-shadow:inset 0 0 0 2px var(--p)}
+table.sgt td .n{display:block;font-variant-numeric:tabular-nums;line-height:1.2}
+table.sgt td .p{display:block;font-size:9.5px;font-weight:500;color:#94A3B8;line-height:1.2;margin-top:1px}
+table.sgt td.b .n{font-weight:800}
+table.sgt tr.sgt-tot td{background:#0B5D33;color:#fff;border-color:#0B5D33}
+table.sgt tr.sgt-tot td .p{color:#BBF7D0}
+table.sgt tr.sgt-tot td.sgt-c:hover{background:#0A7A41!important;box-shadow:inset 0 0 0 2px #F2C230}
+
 /* ═══ PARENT FEEDBACK COMPLIANCE REPORT ═══ */
 .ccr-copy{margin-left:auto;background:var(--pl);border:1px solid var(--bor);color:var(--p);
   font:inherit;font-size:11px;font-weight:700;padding:5px 12px;border-radius:8px;cursor:pointer}
@@ -13093,91 +13114,92 @@ async function loadCivil(force){
     var rs=rows(), G=groupsOf();
     if(!rs.length||!G.length){ el.innerHTML='<div class="no-data">No calls match this selection.</div>'; return; }
 
-    var branches=(fBranch==='ALL')?ALL.filter(function(b){
-      return rs.some(function(r){ return r.Branch===b; }); }):[fBranch];
-
-    /* one cell = one branch × one stage group; the same grouping the rings use */
-    function cell(b,g){
-      return rs.filter(function(r){
-        return (b===null||r.Branch===b) && (g===null||gOf(r)===g);
-      });
-    }
-    function td(list,label,extra){
-      return '<td class="sgt-c" data-l="'+esc(label)+'"'+(extra||'')+' title="Click to view these calls">'
-        +list.length.toLocaleString('en-IN')+'</td>';
-    }
-
-    var store={};                       // label -> rows, so the click never recomputes differently
-    function reg(label,list){ store[label]=list; return list; }
-
-    var head='<tr><th class="nm">Branch</th>'
-      +G.map(function(g){ return '<th>'+esc(g.short)+'</th>'; }).join('')
-      +'<th>Unplaced</th><th>Total</th></tr>';
-
-    var body=branches.map(function(b){
-      var tot=reg(b+' · all stages', cell(b,null));
-      var cells=G.map(function(g){
-        var l=b+' · '+g.short, list=reg(l, cell(b,g.key));
-        var pctv=tot.length?Math.round(list.length/tot.length*100):0;
-        return td(list,l,' style="color:'+(list.length?g.c:'#CBD5E1')+';font-weight:'
-          +(list.length?700:400)+'" data-p="'+pctv+'"');
-      }).join('');
-      var un=reg(b+' · unplaced', rs.filter(function(r){ return r.Branch===b && !gOf(r); }));
-      return '<tr><td class="nm">'+esc(b)+'</td>'+cells
-        +td(un,b+' · unplaced',' style="color:#94A3B8"')
-        +td(tot,b+' · all stages',' style="font-weight:800"')+'</tr>';
-    }).join('');
-
-    var totCells=G.map(function(g){
-      var l='All branches · '+g.short;
-      return td(reg(l,cell(null,g.key)),l,' style="font-weight:800;color:'+g.c+'"');
-    }).join('');
-    var unAll=reg('All branches · unplaced', rs.filter(function(r){ return !gOf(r); }));
-    var foot='<tr class="sgt-tot"><td class="nm">ALL BRANCHES</td>'+totCells
-      +td(unAll,'All branches · unplaced')
-      +td(reg('All branches · all stages',rs),'All branches · all stages')+'</tr>';
-
-    /* a second table: within each stage group, what is being raised */
     var CATS=['No Concern','Not Answering','Academics','Behaviour / Wellbeing','Administration',
               'Transport','Co Curricular','New Admission','No Response'];
     var catOf=function(r){ return CATS.indexOf(r.Grievance)>=0?r.Grievance:'Other'; };
-    var cats={}; rs.forEach(function(r){ cats[catOf(r)]=(cats[catOf(r)]||0)+1; });
-    var topCats=Object.keys(cats).sort(function(a,b){ return cats[b]-cats[a]; }).slice(0,6);
 
-    var head2='<tr><th class="nm">Stage group</th>'
-      +topCats.map(function(c){ return '<th>'+esc(c)+'</th>'; }).join('')+'<th>Total</th></tr>';
-    var body2=G.map(function(g){
-      var gr=cell(null,g.key);
-      if(!gr.length) return '';
-      var cells=topCats.map(function(c){
-        var l=g.short+' · '+c;
-        var list=reg(l, gr.filter(function(r){ return catOf(r)===c; }));
-        var pctv=gr.length?Math.round(list.length/gr.length*100):0;
-        return '<td class="sgt-c" data-l="'+esc(l)+'" title="Click to view these calls">'
-          +list.length.toLocaleString('en-IN')
-          +'<span class="sgt-p">'+pctv+'%</span></td>';
+    /* columns: the five stage groups, then anything whose class could not be
+       read, then the row total */
+    var cols=G.map(function(g){ return {key:g.key,label:g.short,c:g.c}; });
+    cols.push({key:null,label:'Unplaced',c:'#94A3B8'});
+
+    var store={};
+    function reg(l,list){ store[l]=list; return list; }
+    function inCol(list,key){
+      return list.filter(function(r){ var k=gOf(r); return key===null ? !k : k===key; });
+    }
+    /* count on top, share underneath — never on the same line, which is what
+       made the previous table unreadable */
+    function cellHTML(list,total,label,colour,bold){
+      var n=list.length;
+      var pctv=total?Math.round(n/total*100):0;
+      return '<td class="sgt-c'+(bold?' b':'')+'" data-l="'+esc(label)+'"'
+        +(colour?' style="color:'+colour+'"':'')+' title="Click to view these calls">'
+        +'<span class="n">'+n.toLocaleString('en-IN')+'</span>'
+        +(n?'<span class="p">'+pctv+'%</span>':'<span class="p">&nbsp;</span>')+'</td>';
+    }
+
+    var byCat={};
+    rs.forEach(function(r){ var c=catOf(r); (byCat[c]||(byCat[c]=[])).push(r); });
+    var order=Object.keys(byCat).sort(function(a,b){ return byCat[b].length-byCat[a].length; });
+    var grand=rs.length;
+
+    var head='<tr><th class="nm">Category / sub-topic</th>'
+      +cols.map(function(c){ return '<th>'+esc(c.label)+'</th>'; }).join('')
+      +'<th class="tot">Total</th></tr>';
+
+    var body=order.map(function(c){
+      var cr=byCat[c], cTot=cr.length;
+      var cells=cols.map(function(col){
+        var l=c+' \u00b7 '+col.label;
+        return cellHTML(reg(l,inCol(cr,col.key)), cTot, l, col.c, true);
       }).join('');
-      return '<tr><td class="nm" style="color:'+g.c+'">'+esc(g.label)+'</td>'+cells
-        +td(reg(g.short+' · all concerns',gr),g.short+' · all concerns',' style="font-weight:800"')+'</tr>';
+      var row='<tr class="cat"><td class="nm">'+esc(c)+'</td>'+cells
+        +cellHTML(reg(c+' \u00b7 all stages',cr), grand, c+' \u00b7 all stages', null, true)+'</tr>';
+
+      var subs=[];
+      try{ if(typeof window._careTopics==='function') subs=window._careTopics(c,cr)||[]; }catch(e){}
+      row+=subs.slice(0,6).map(function(t){
+        var kw=t.kw||[];
+        var match=(kw.length)
+          ? function(r){ var s=((r.Remarks||'')+' '+(r.Followup||'')).toLowerCase();
+              return kw.some(function(k){ return s.indexOf(k)!==-1; }); }
+          : (function(){
+              var all=subs.reduce(function(a,b){ return a.concat(b.kw||[]); },[]);
+              return function(r){ var s=((r.Remarks||'')+' '+(r.Followup||'')).toLowerCase();
+                return !all.some(function(k){ return s.indexOf(k)!==-1; }); };
+            })();
+        var tr=cr.filter(match), tTot=tr.length;
+        var tCells=cols.map(function(col){
+          var l=c+' \u203a '+t.topic+' \u00b7 '+col.label;
+          return cellHTML(reg(l,inCol(tr,col.key)), tTot, l, null, false);
+        }).join('');
+        return '<tr class="sub"><td class="nm">\u21b3 '+esc(t.topic)+'</td>'+tCells
+          +cellHTML(reg(c+' \u203a '+t.topic,tr), cTot, c+' \u203a '+t.topic, null, false)+'</tr>';
+      }).join('');
+      return row;
     }).join('');
 
+    var footCells=cols.map(function(col){
+      var l='All concerns \u00b7 '+col.label;
+      return cellHTML(reg(l,inCol(rs,col.key)), grand, l, null, true);
+    }).join('');
+    var foot='<tr class="sgt-tot"><td class="nm">ALL CATEGORIES</td>'+footCells
+      +cellHTML(reg('All concerns \u00b7 all stages',rs), grand, 'All concerns \u00b7 all stages', null, true)+'</tr>';
+
     el.innerHTML=
-      '<div class="sgt-h">Branch × stage group</div>'
+      '<div class="sgt-h">Category and sub-topic by grade &amp; stage</div>'
       +'<div style="overflow:auto"><table class="hrs sgt">'
       +'<thead>'+head+'</thead><tbody>'+body+'</tbody><tfoot>'+foot+'</tfoot></table></div>'
-      +'<p class="au-note">Read <b>down a column</b> to compare branches within one stage group, and '
-      +'<b>across a row</b> to see where one branch\'s concerns sit. <b>Unplaced</b> are calls whose '
-      +'class field could not be read — they are counted, never hidden.</p>'
-      +'<div class="sgt-h" style="margin-top:14px">Stage group × what is raised</div>'
-      +'<div style="overflow:auto"><table class="hrs sgt">'
-      +'<thead>'+head2+'</thead><tbody>'+body2+'</tbody></table></div>'
-      +'<p class="au-note">Percentages are of that stage group, not of the whole school, so each row '
-      +'reads on its own terms. Every count opens the calls behind it.</p>';
+      +'<p class="au-note">Each cell shows the <b>count</b> with its <b>share of that row</b> beneath, '
+      +'so a category row reads left to right as \u201cwhere in the school this concern sits\u201d and adds to 100%. '
+      +'The <b>Total</b> column shows each category as a share of all '+grand.toLocaleString('en-IN')
+      +' calls in this selection. Sub-topics are shares of their own category, and a call can match more '
+      +'than one, so they need not add to the category total. <b>Unplaced</b> are calls whose class field '
+      +'could not be read \u2014 counted, never hidden. Every cell opens the calls behind it.</p>';
 
     el.querySelectorAll('.sgt-c').forEach(function(c){
-      c.addEventListener('click',function(){
-        var l=c.dataset.l; open(store[l]||[], l);
-      });
+      c.addEventListener('click',function(){ var l=c.dataset.l; open(store[l]||[], l); });
     });
   }
 
