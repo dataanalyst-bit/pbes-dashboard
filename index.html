@@ -289,10 +289,18 @@ table.sgt th.nm{text-align:left;min-width:210px}
 table.sgt th.tot{background:#E8F3EC;color:#07361F}
 table.sgt td{text-align:center;vertical-align:middle;padding:6px 9px}
 table.sgt td.nm{text-align:left}
-table.sgt tr.cat td{background:#F8FAFF;font-weight:700}
-table.sgt tr.cat td.nm{color:#0F172A;font-weight:800}
-table.sgt tr.sub td.nm{padding-left:24px;color:#64748B;font-weight:500;font-size:11.5px}
-table.sgt tr.sub td{color:#475569}
+table.sgt tr.lvl-b td{background:#EEF6F1;font-weight:700;border-top:2px solid #B7CFC0}
+table.sgt tr.lvl-b td.nm{color:#07361F;font-weight:800;font-size:12.5px}
+table.sgt tr.lvl-c td{background:#F8FAFF}
+table.sgt tr.lvl-c td.nm{color:#1E4FD8;font-weight:700}
+table.sgt tr.lvl-s td{color:#475569}
+table.sgt tr.lvl-s td.nm{color:#64748B;font-weight:500;font-size:11.5px}
+table.sgt td.nm.lv1{padding-left:22px}
+table.sgt td.nm.lv2{padding-left:44px}
+table.sgt td.nm.tap{cursor:pointer;user-select:none}
+table.sgt td.nm.tap:hover{background:var(--pl)}
+table.sgt td.nm .car{display:inline-block;width:13px;color:#0B5D33;font-size:10px}
+.sgt-hint{margin-left:9px;font-size:10px;font-weight:500;color:var(--txm)}
 table.sgt td.sgt-c{cursor:pointer;transition:background .12s}
 table.sgt td.sgt-c:hover{background:var(--pl)!important;box-shadow:inset 0 0 0 2px var(--p)}
 table.sgt td .n{display:block;font-variant-numeric:tabular-nums;line-height:1.2}
@@ -13109,6 +13117,10 @@ async function loadCivil(force){
       +((typeof _careSentLabel==='function')?_careSentLabel():''), list, COLS);
   }
 
+  /* Expansion state lives outside the render so opening a branch survives a
+     filter change or a re-draw. */
+  function EXP(){ return window._CARE_STAGE_EXP||(window._CARE_STAGE_EXP={b:{},c:{}}); }
+
   function build(){
     var el=document.getElementById('care-stage'); if(!el) return;
     var rs=rows(), G=groupsOf();
@@ -13118,88 +13130,123 @@ async function loadCivil(force){
               'Transport','Co Curricular','New Admission','No Response'];
     var catOf=function(r){ return CATS.indexOf(r.Grievance)>=0?r.Grievance:'Other'; };
 
-    /* columns: the five stage groups, then anything whose class could not be
-       read, then the row total */
+    /* columns are the stage groups, then anything whose class could not be read */
     var cols=G.map(function(g){ return {key:g.key,label:g.short,c:g.c}; });
     cols.push({key:null,label:'Unplaced',c:'#94A3B8'});
 
-    var store={};
+    var branches=(fBranch==='ALL')
+      ? ALL.filter(function(b){ return rs.some(function(r){ return r.Branch===b; }); })
+      : [fBranch];
+    var multi=branches.length>1;
+    var ex=EXP();
+    /* a single branch in view has nothing to compare against, so open it */
+    if(!multi) ex.b[branches[0]]=true;
+
+    var store={}, grand=rs.length;
     function reg(l,list){ store[l]=list; return list; }
     function inCol(list,key){
       return list.filter(function(r){ var k=gOf(r); return key===null ? !k : k===key; });
     }
-    /* count on top, share underneath — never on the same line, which is what
-       made the previous table unreadable */
-    function cellHTML(list,total,label,colour,bold){
-      var n=list.length;
-      var pctv=total?Math.round(n/total*100):0;
+    /* count above, share below — never on one line */
+    function cell(list,rowTotal,label,colour,bold){
+      var n=list.length, pctv=rowTotal?Math.round(n/rowTotal*100):0;
       return '<td class="sgt-c'+(bold?' b':'')+'" data-l="'+esc(label)+'"'
-        +(colour?' style="color:'+colour+'"':'')+' title="Click to view these calls">'
+        +(colour&&n?' style="color:'+colour+'"':'')+' title="Click to view these calls">'
         +'<span class="n">'+n.toLocaleString('en-IN')+'</span>'
-        +(n?'<span class="p">'+pctv+'%</span>':'<span class="p">&nbsp;</span>')+'</td>';
+        +'<span class="p">'+(n?pctv+'%':'&nbsp;')+'</span></td>';
+    }
+    function nameCell(text,level,expandable,open,key){
+      return '<td class="nm lv'+level+(expandable?' tap':'')+'"'
+        +(expandable?' data-x="'+esc(key)+'"':'')
+        +(expandable?' title="Tap to '+(open?'collapse':'expand')+'"':'')+'>'
+        +(expandable?'<span class="car">'+(open?'\u25be':'\u25b8')+'</span>':'')
+        +esc(text)+'</td>';
     }
 
-    var byCat={};
-    rs.forEach(function(r){ var c=catOf(r); (byCat[c]||(byCat[c]=[])).push(r); });
-    var order=Object.keys(byCat).sort(function(a,b){ return byCat[b].length-byCat[a].length; });
-    var grand=rs.length;
+    var out='';
+    branches.forEach(function(b){
+      var br=rs.filter(function(r){ return r.Branch===b; });
+      if(!br.length) return;
+      var bOpen=!!ex.b[b];
+      out+='<tr class="lvl-b">'+nameCell(b,0,true,bOpen,'b:'+b)
+        +cols.map(function(col){
+          var l=b+' \u00b7 '+col.label;
+          return cell(reg(l,inCol(br,col.key)), br.length, l, col.c, true);
+        }).join('')
+        +cell(reg(b+' \u00b7 all',br), grand, b+' \u00b7 all', null, true)+'</tr>';
+      if(!bOpen) return;
 
-    var head='<tr><th class="nm">Category / sub-topic</th>'
+      var byCat={};
+      br.forEach(function(r){ var c=catOf(r); (byCat[c]||(byCat[c]=[])).push(r); });
+      Object.keys(byCat).sort(function(x,y){ return byCat[y].length-byCat[x].length; })
+        .forEach(function(c){
+          var cr=byCat[c], ck=b+'|'+c, cOpen=!!ex.c[ck];
+          out+='<tr class="lvl-c">'+nameCell(c,1,true,cOpen,'c:'+ck)
+            +cols.map(function(col){
+              var l=b+' \u203a '+c+' \u00b7 '+col.label;
+              return cell(reg(l,inCol(cr,col.key)), cr.length, l, null, false);
+            }).join('')
+            +cell(reg(b+' \u203a '+c, cr), br.length, b+' \u203a '+c, null, false)+'</tr>';
+          if(!cOpen) return;
+
+          var subs=[];
+          try{ if(typeof window._careTopics==='function') subs=window._careTopics(c,cr)||[]; }catch(e){}
+          subs.slice(0,6).forEach(function(t){
+            var kw=t.kw||[];
+            var match=kw.length
+              ? function(r){ var s=((r.Remarks||'')+' '+(r.Followup||'')).toLowerCase();
+                  return kw.some(function(k){ return s.indexOf(k)!==-1; }); }
+              : (function(){
+                  var all=subs.reduce(function(a,x){ return a.concat(x.kw||[]); },[]);
+                  return function(r){ var s=((r.Remarks||'')+' '+(r.Followup||'')).toLowerCase();
+                    return !all.some(function(k){ return s.indexOf(k)!==-1; }); };
+                })();
+            var tr=cr.filter(match);
+            out+='<tr class="lvl-s">'+nameCell('\u21b3 '+t.topic,2,false,false,'')
+              +cols.map(function(col){
+                var l=b+' \u203a '+c+' \u203a '+t.topic+' \u00b7 '+col.label;
+                return cell(reg(l,inCol(tr,col.key)), tr.length, l, null, false);
+              }).join('')
+              +cell(reg(b+' \u203a '+c+' \u203a '+t.topic, tr), cr.length,
+                    b+' \u203a '+c+' \u203a '+t.topic, null, false)+'</tr>';
+          });
+        });
+    });
+
+    var head='<tr><th class="nm">Branch \u203a Category \u203a Sub-topic</th>'
       +cols.map(function(c){ return '<th>'+esc(c.label)+'</th>'; }).join('')
       +'<th class="tot">Total</th></tr>';
-
-    var body=order.map(function(c){
-      var cr=byCat[c], cTot=cr.length;
-      var cells=cols.map(function(col){
-        var l=c+' \u00b7 '+col.label;
-        return cellHTML(reg(l,inCol(cr,col.key)), cTot, l, col.c, true);
-      }).join('');
-      var row='<tr class="cat"><td class="nm">'+esc(c)+'</td>'+cells
-        +cellHTML(reg(c+' \u00b7 all stages',cr), grand, c+' \u00b7 all stages', null, true)+'</tr>';
-
-      var subs=[];
-      try{ if(typeof window._careTopics==='function') subs=window._careTopics(c,cr)||[]; }catch(e){}
-      row+=subs.slice(0,6).map(function(t){
-        var kw=t.kw||[];
-        var match=(kw.length)
-          ? function(r){ var s=((r.Remarks||'')+' '+(r.Followup||'')).toLowerCase();
-              return kw.some(function(k){ return s.indexOf(k)!==-1; }); }
-          : (function(){
-              var all=subs.reduce(function(a,b){ return a.concat(b.kw||[]); },[]);
-              return function(r){ var s=((r.Remarks||'')+' '+(r.Followup||'')).toLowerCase();
-                return !all.some(function(k){ return s.indexOf(k)!==-1; }); };
-            })();
-        var tr=cr.filter(match), tTot=tr.length;
-        var tCells=cols.map(function(col){
-          var l=c+' \u203a '+t.topic+' \u00b7 '+col.label;
-          return cellHTML(reg(l,inCol(tr,col.key)), tTot, l, null, false);
-        }).join('');
-        return '<tr class="sub"><td class="nm">\u21b3 '+esc(t.topic)+'</td>'+tCells
-          +cellHTML(reg(c+' \u203a '+t.topic,tr), cTot, c+' \u203a '+t.topic, null, false)+'</tr>';
-      }).join('');
-      return row;
-    }).join('');
-
-    var footCells=cols.map(function(col){
-      var l='All concerns \u00b7 '+col.label;
-      return cellHTML(reg(l,inCol(rs,col.key)), grand, l, null, true);
-    }).join('');
-    var foot='<tr class="sgt-tot"><td class="nm">ALL CATEGORIES</td>'+footCells
-      +cellHTML(reg('All concerns \u00b7 all stages',rs), grand, 'All concerns \u00b7 all stages', null, true)+'</tr>';
+    var foot=multi
+      ? '<tr class="sgt-tot"><td class="nm">ALL BRANCHES</td>'
+        +cols.map(function(col){
+          var l='All branches \u00b7 '+col.label;
+          return cell(reg(l,inCol(rs,col.key)), grand, l, null, true);
+        }).join('')
+        +cell(reg('All branches \u00b7 all',rs), grand, 'All branches \u00b7 all', null, true)+'</tr>'
+      : '';
 
     el.innerHTML=
-      '<div class="sgt-h">Category and sub-topic by grade &amp; stage</div>'
+      '<div class="sgt-h">Branch \u203a grade &amp; stage \u203a grievance category'
+        +'<span class="sgt-hint">tap a branch or a category to expand</span></div>'
       +'<div style="overflow:auto"><table class="hrs sgt">'
-      +'<thead>'+head+'</thead><tbody>'+body+'</tbody><tfoot>'+foot+'</tfoot></table></div>'
-      +'<p class="au-note">Each cell shows the <b>count</b> with its <b>share of that row</b> beneath, '
-      +'so a category row reads left to right as \u201cwhere in the school this concern sits\u201d and adds to 100%. '
-      +'The <b>Total</b> column shows each category as a share of all '+grand.toLocaleString('en-IN')
-      +' calls in this selection. Sub-topics are shares of their own category, and a call can match more '
-      +'than one, so they need not add to the category total. <b>Unplaced</b> are calls whose class field '
-      +'could not be read \u2014 counted, never hidden. Every cell opens the calls behind it.</p>';
+      +'<thead>'+head+'</thead><tbody>'+out+'</tbody>'+(foot?'<tfoot>'+foot+'</tfoot>':'')+'</table></div>'
+      +'<p class="au-note">Each cell shows the <b>count</b> with its <b>share of that row</b> beneath, so a '
+      +'row reads left to right as \u201cwhere in the school this sits\u201d and adds to 100%. Down the '
+      +'<b>Total</b> column: a branch is a share of all '+grand.toLocaleString('en-IN')+' calls, a category '
+      +'a share of its branch, a sub-topic a share of its category. Sub-topics can overlap, so they need '
+      +'not add to their category. <b>Unplaced</b> are calls whose class field could not be read \u2014 '
+      +'counted, never hidden. Every cell opens the calls behind it.</p>';
 
-    el.querySelectorAll('.sgt-c').forEach(function(c){
-      c.addEventListener('click',function(){ var l=c.dataset.l; open(store[l]||[], l); });
+    el.querySelectorAll('td.sgt-c').forEach(function(c){
+      c.addEventListener('click',function(){ open(store[c.dataset.l]||[], c.dataset.l); });
+    });
+    el.querySelectorAll('td.nm.tap').forEach(function(td){
+      td.addEventListener('click',function(){
+        var d=td.dataset.x, e=EXP();
+        if(d.indexOf('b:')===0){ var k=d.slice(2); e.b[k]=!e.b[k]; }
+        else { var k2=d.slice(2); e.c[k2]=!e.c[k2]; }
+        build();
+      });
     });
   }
 
