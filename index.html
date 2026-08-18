@@ -311,6 +311,9 @@ table.audt tfoot td.nm{text-align:left}
 table.auhm td.nm.tap{cursor:pointer;user-select:none}
 table.auhm td.nm.tap:hover{background:var(--pl)}
 table.auhm td.nm .car{display:inline-block;width:13px;color:#0B5D33;font-size:10px}
+table.auhm td.nm .ico,.au-heat td.cat .ico{display:inline-block;width:20px;font-size:13px;
+  text-align:center;margin-right:3px;line-height:1}
+table.autree td.nm.lv1,table.autree td.nm.lv2{letter-spacing:.005em}
 table.auhm tr.au-secrow td.nm{font-weight:800;color:#07361F}
 table.auhm tr.au-itemrow td.nm.sub{padding-left:26px;font-weight:500;font-size:11.5px;color:#64748B}
 table.auhm td.itm{font-size:11px;font-weight:700;padding:4px 9px}
@@ -9903,6 +9906,65 @@ window.AUDIT = (function () {
 
   /* Expansion state for the section rows, kept outside the render so opening a
      section survives a re-draw or a branch change. */
+  /* ── Icons for the audit sections and their checklist lines ──
+     Thirteen sections and eighty-eight items is a lot of text to read down, and
+     a row of near-identical wording is hard to scan. An icon gives each line a
+     shape the eye can find again without re-reading it.
+
+     Items are matched on their own keywords first, so "Science Lab" gets a
+     flask rather than the generic Lab Usage marker; anything unmatched falls
+     back to its section's icon, which is always meaningful rather than blank. */
+  var AU_SEC_ICON = {
+    'parent connect':'📞', 'academic monitoring':'🔍', 'collaborations':'🤝',
+    'social media':'📱', 'sports / pva':'🏅', 'sports/pva':'🏅', 'lab usage':'🔬',
+    'student & parent prog.':'👨‍👩‍👧', 'student & parent programmes':'👨‍👩‍👧',
+    'activities & comp.':'🎯', 'activities & competitions':'🎯',
+    'annual events':'🎪', 'reg. academic':'📚', 'reg. exam cell':'📝',
+    'reg. admin':'🗂️', 'assessment & analysis':'📊', 'uncategorised':'📌'
+  };
+  /* ordered: the first keyword that appears wins, so specific beats generic */
+  var AU_ITEM_ICON = [
+    [/\bai\s*lab/,'🤖'], [/robotic|cognospace/,'🦾'], [/computer\s*lab|erp\s*usage/,'💻'],
+    [/science\s*lab/,'🔬'], [/math\s*lab/,'📐'], [/library/,'📖'], [/\blab\s*register/,'🧪'],
+    [/swim/,'🏊'], [/skat/,'⛸️'], [/taekwondo/,'🥋'], [/yoga/,'🧘'],
+    /* 'attendance' contains 'dance' — the attendance rule must come first,
+       and the dance rule needs a word boundary, or every register dances */
+    [/attendance/,'✅'], [/\bdance\b|\bdancing\b/,'💃'],
+    [/music/,'🎵'], [/art\s*&\s*craft/,'🎨'], [/\bpet\b/,'🏃'], [/hand\s*writ/,'✍️'],
+    [/sports\s*day/,'🏟️'], [/sports\s*comp|pva\s*comp/,'🏆'], [/inter-?house/,'🎽'],
+    [/annual\s*day/,'🎭'], [/picnic|field\s*trip/,'🚌'], [/ted\s*talk/,'🎤'],
+    [/radio/,'📻'], [/assembl/,'🌅'], [/exhibition/,'🖼️'],
+    [/coffee\s*meet/,'☕'], [/whatsapp/,'💬'], [/news\s*letter|newsletter/,'📰'],
+    [/instagram|facebook|youtube|google/,'📸'], [/website/,'🌐'],
+    [/care\s*calls?/,'📞'], [/parent\s*connect/,'🤝'], [/parent\s*feedback/,'🗳️'],
+    [/parent\s*complaint|grievance/,'📣'], [/student\s*led\s*conference/,'🧑‍🏫'],
+    [/principal\s*classroom/,'👔'], [/vice\s*principal/,'🎓'], [/head\s*mistress/,'👩‍🏫'],
+    [/hod\s*classroom/,'🧑‍💼'], [/coordinator\s*observ/,'📋'], [/pre-?primary\s*incharge/,'🧸'],
+    [/teacher\s*observation/,'👁️'], [/notebook\s*correct/,'🖊️'], [/worksheet/,'📄'],
+    [/syllabus/,'📅'], [/almanac/,'📔'], [/lesson\s*plan|session/,'🗒️'],
+    [/teaching\s*notes/,'📝'], [/day\s*wise\s*planner|timetable/,'🕐'],
+    [/floor\s*inch|signature/,'✒️'], [/weekly\s*rct|^rct$|rct\s*register/,'🧾'],
+    [/cyclic\s*test/,'🔁'], [/\bpt\s*-?\s*[i0-9]/,'🅿️'], [/term\s*-?\s*i|final\s*term/,'🎯'],
+    [/question\s*paper/,'❓'], [/log\s*sheet/,'📑'], [/circular/,'📢'],
+    [/subject\s*resource/,'🗃️'], [/substitution/,'🔄'],
+    [/service\s*file/,'🗄️'], [/stock|fixed\s*asset/,'📦'], [/maintenance/,'🔧'],
+    [/inward|outward/,'📬'], [/udise/,'🏛️'], [/admission/,'🎟️'],
+    [/mindspark/,'💡'], [/wordsworth/,'📗'], [/first\s*mile/,'🚀'], [/caca/,'🧩'],
+    [/iit\s*akash/,'🎓'], [/indfame/,'🌟'], [/health\s*&\s*well|wellness/,'💚'],
+    [/journal|daily\s*log/,'📓'], [/annual\s*calendar/,'🗓️'], [/register/,'📚']
+  ];
+  function auSecIcon(cat){
+    var k = String(cat||'').toLowerCase().trim();
+    return AU_SEC_ICON[k] || '📌';
+  }
+  function auItemIcon(param, cat){
+    var s = cleanItem(param).toLowerCase();
+    for (var i = 0; i < AU_ITEM_ICON.length; i++) {
+      if (AU_ITEM_ICON[i][0].test(s)) return AU_ITEM_ICON[i][1];
+    }
+    return auSecIcon(cat);          // never blank: the section's own marker
+  }
+
   function SEC_EXP(){ return window._AU_SEC_EXP||(window._AU_SEC_EXP={}); }
 
   /* The sheet prefixes each checklist line with its own section —
@@ -9938,7 +10000,8 @@ window.AUDIT = (function () {
       var open = !!ex[row.c];
       var h2 = '<tr class="au-secrow"><td class="nm tap" data-x="' + esc(row.c) + '" ' +
         'title="Tap to ' + (open ? 'collapse' : 'expand') + ' the checklist">' +
-        '<span class="car">' + (open ? '\u25be' : '\u25b8') + '</span>' + esc(row.c) + '</td>' +
+        '<span class="car">' + (open ? '\u25be' : '\u25b8') + '</span>' +
+        '<span class="ico">' + auSecIcon(row.c) + '</span>' + esc(row.c) + '</td>' +
         G.map(function (g, gi) {
           return secCell(catGradeT(row.c, gi, scope),
             (scope || 'All branches') + ' \u00b7 ' + row.c + ' \u00b7 ' + g,
@@ -9976,7 +10039,8 @@ window.AUDIT = (function () {
           'No checklist lines for this section under the current filters.</td></tr>';
       }
       return h2 + list.map(function (it) {
-        return '<tr class="au-itemrow"><td class="nm sub" title="' + esc(it.p) + '">\u21b3 ' + esc(cleanItem(it.p)) + '</td>' +
+        return '<tr class="au-itemrow"><td class="nm sub" title="' + esc(it.p) + '">' +
+            '<span class="ico">' + auItemIcon(it.p, row.c) + '</span>' + esc(cleanItem(it.p)) + '</td>' +
           it.g.map(function (t, gi) {
             var v = A.score(t), sc = A.scored(t);
             var bg = sc ? A.colorFor(v) : '#F8FAFC';
@@ -10088,7 +10152,8 @@ window.AUDIT = (function () {
 
       cats.forEach(function (C) {
         var sk = b + '|' + C.c, sOpen = !!ex.s[sk];
-        out += '<tr class="lvl-c">' + nameCell(C.c, 1, true, sOpen, 's:' + sk) +
+        out += '<tr class="lvl-c">' +
+          nameCell(auSecIcon(C.c) + '  ' + C.c, 1, true, sOpen, 's:' + sk) +
           G.map(function (g, gi) {
             return cell(tally(C.rows, gi), b + ' \u203a ' + C.c + ' \u00b7 ' + g,
               ' data-b="' + esc(b) + '" data-c="' + esc(C.c) + '" data-g="' + gi + '"');
@@ -10108,7 +10173,7 @@ window.AUDIT = (function () {
         }).sort(function (x, y) { return (x.v === null ? 999 : x.v) - (y.v === null ? 999 : y.v); })
           .forEach(function (I) {
             out += '<tr class="lvl-s">' +
-              nameCell('\u21b3 ' + cleanItem(I.p), 2, false, false, '', I.p) +
+              nameCell(auItemIcon(I.p, C.c) + '  ' + cleanItem(I.p), 2, false, false, '', I.p) +
               G.map(function (g, gi) {
                 return cell(tally(I.rows, gi), b + ' \u203a ' + C.c + ' \u203a ' + cleanItem(I.p) + ' \u00b7 ' + g,
                   ' data-b="' + esc(b) + '" data-c="' + esc(C.c) + '" data-p="' + esc(I.p) + '" data-g="' + gi + '"');
@@ -10203,7 +10268,7 @@ window.AUDIT = (function () {
         var t = A.blank(); addRowLocal(t, r, R.cols);
         var v = A.score(t);
         return '<tr><td>' + esc(A.str(r[R.iB])) + '</td><td style="color:#64748B">' + esc(A.str(r[R.iM])) + '</td>' +
-          '<td>' + esc(cleanItem(A.str(r[R.iP]))) + '</td>' +
+          '<td>' + auItemIcon(A.str(r[R.iP]), cat) + ' ' + esc(cleanItem(A.str(r[R.iP]))) + '</td>' +
           R.cols.map(function (ci) {
             var x = ci < 0 ? '' : A.str(r[ci]);
             var col = x === 'Yes' ? '#059669' : x === 'No' ? '#DC2626' : x === 'IP' ? '#D97706' : '#CBD5E1';
@@ -10239,7 +10304,7 @@ window.AUDIT = (function () {
       '<th class="n">Yes</th><th class="n">No</th><th class="n">In progress</th>' +
       '<th class="n">Not scored</th></tr></thead><tbody>' +
       list.map(function (x) {
-        return '<tr><td>' + esc(x.c) + '</td>' +
+        return '<tr><td>' + auSecIcon(x.c) + ' ' + esc(x.c) + '</td>' +
           '<td class="n" style="font-weight:700;color:' + A.colorFor(x.v) + '">' +
             (x.v === null ? '\u2014' : x.v.toFixed(0) + '%') + '</td>' +
           '<td style="width:110px"><div class="au-bar"><i style="width:' +
@@ -10263,7 +10328,7 @@ window.AUDIT = (function () {
       return ms.indexOf(A.str(r[R.iM])) >= 0;
     });
     var only = (gi !== null && gi !== undefined) ? R.cols[gi] : null;
-    modal(cleanItem(param),
+    modal(auItemIcon(param, cat) + '  ' + cleanItem(param),
       (branch || 'All branches') + ' \u00b7 ' + cat +
       (only !== null ? ' \u00b7 ' + A.GRADES[gi] : '') + ' \u00b7 ' + items.length + ' audit line(s)',
       '<table class="au-tbl"><thead><tr><th>Branch</th><th>Month</th>' +
@@ -10303,7 +10368,8 @@ window.AUDIT = (function () {
       items.map(function (r) {
         var x = ci < 0 ? '' : A.str(r[ci]);
         var col = x === 'Yes' ? '#059669' : x === 'No' ? '#DC2626' : x === 'IP' ? '#D97706' : '#CBD5E1';
-        return '<tr><td>' + esc(A.str(r[R.iB])) + '</td><td>' + esc(cleanItem(A.str(r[R.iP]))) + '</td>' +
+        return '<tr><td>' + esc(A.str(r[R.iB])) + '</td><td>' +
+          auItemIcon(A.str(r[R.iP]), cat) + ' ' + esc(cleanItem(A.str(r[R.iP]))) + '</td>' +
           '<td class="n" style="color:' + col + ';font-weight:700">' + (x || '·') + '</td>' +
           '<td style="font-size:12px;color:#64748B;max-width:320px">' +
           esc(R.iR >= 0 ? A.str(r[R.iR]) : '') + '</td></tr>';
