@@ -313,6 +313,9 @@ table.auhm td.nm.tap:hover{background:var(--pl)}
 table.auhm td.nm .car{display:inline-block;width:13px;color:#0B5D33;font-size:10px}
 table.auhm td.nm .ico,.au-heat td.cat .ico{display:inline-block;width:20px;font-size:13px;
   text-align:center;margin-right:3px;line-height:1}
+table.auhm th .ico{display:block;font-size:14px;margin-bottom:2px}
+table.auhm th{font-size:9px;padding:6px 5px;max-width:74px;white-space:normal}
+table.auhm td.au-t{padding:5px 6px}
 table.autree td.nm.lv1,table.autree td.nm.lv2{letter-spacing:.005em}
 table.auhm tr.au-secrow td.nm{font-weight:800;color:#07361F}
 table.auhm tr.au-itemrow td.nm.sub{padding-left:26px;font-weight:500;font-size:11.5px;color:#64748B}
@@ -2130,6 +2133,18 @@ document.addEventListener('DOMContentLoaded', async () => {
           </div>
         </div>
         <div id="au-heat" style="margin-top:14px"></div>
+      </div>
+
+      <div class="au-sec">
+        <div style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap">
+          <div style="flex:1;min-width:260px">
+            <h3 style="margin:0">Stage by stage, branch against branch</h3>
+            <div class="sub" style="margin-bottom:0">One stage at a time, every branch underneath it, across all
+              thirteen sections. Tap a stage to open its branches.</div>
+          </div>
+          <button class="exm-refresh" id="au-cmp-all" title="Open or close every stage">⇕ Expand all</button>
+        </div>
+        <div id="au-stage-cmp" style="margin-top:14px"></div>
       </div>
 
       <div class="au-sec">
@@ -10387,6 +10402,107 @@ window.AUDIT = (function () {
     }
   }
 
+  /* ── Stage → branch, with the thirteen sections across ──
+     The heatmap answers "where is this branch weak?". This answers the other
+     way round: at one stage, which branch is weak and in which section. Rows are
+     the stage groups; opening one lists every branch beneath it. */
+  var AU_GRADE_ICON = { 'Prep':'\ud83e\uddf8', '1 & 2':'\ud83c\udf88', '3\u20135':'\u270f\ufe0f',
+                        '6\u20138':'\ud83d\udcd7', '9\u201310':'\ud83c\udf93' };
+  function CMP_EXP(){ return window._AU_CMP_EXP||(window._AU_CMP_EXP={}); }
+
+  function renderStageCompare(){
+    var el = $('au-stage-cmp'); if (!el) return;
+    var G = A.GRADES, R = D.raw, ms = months(), ex = CMP_EXP();
+    var bs = D.branches;
+
+    /* sections ordered weakest first across the network, so the widest columns
+       carry the group-level problems */
+    var cats = D.cats.map(function (c) {
+      var t = netCatT(c); return { c: c, v: t ? A.score(t) : null };
+    }).sort(function (a, b) { return (a.v === null ? 999 : a.v) - (b.v === null ? 999 : b.v); })
+      .map(function (x) { return x.c; });
+
+    function tally(branch, cat, gi){
+      var t = A.blank();
+      R.rows.forEach(function (r) {
+        if (ms.indexOf(A.str(r[R.iM])) < 0) return;
+        if (branch && A.str(r[R.iB]) !== branch) return;
+        if (cat && A.str(r[R.iC]) !== cat) return;
+        var cells = (gi === null) ? R.cols : [R.cols[gi]];
+        cells.forEach(function (ci) {
+          if (ci < 0) return;
+          var v = A.str(r[ci]);
+          if (v === 'Yes') t.yes++; else if (v === 'No') t.no++; else if (v === 'IP') t.ip++;
+          else if (v === 'NA') t.na++; else if (v === 'NR') t.nr++; else t.none++;
+        });
+      });
+      return t;
+    }
+    function cell(t, label, data, bold){
+      var v = A.score(t), sc = A.scored(t);
+      return '<td class="au-t' + (bold ? ' b' : '') + '" style="background:' +
+        (sc ? A.colorFor(v) : '#F1F5F9') + ';color:' + (sc ? '#fff' : '#94A3B8') + '"' + (data || '') +
+        ' title="' + esc(label) + ' \u2014 ' + (sc ? v.toFixed(1) + '% of ' + sc + ' checks' : 'not audited') + '">' +
+        '<span class="n">' + (sc ? Math.round(v) : '\u00b7') + '</span>' +
+        '<span class="s">' + (sc ? sc : '&nbsp;') + '</span></td>';
+    }
+
+    var out = '';
+    G.forEach(function (g, gi) {
+      var open = !!ex[g];
+      var icon = AU_GRADE_ICON[g] || '\ud83d\udcda';
+      out += '<tr class="lvl-b"><td class="nm tap" data-x="' + esc(g) + '" ' +
+        'title="Tap to ' + (open ? 'collapse' : 'expand') + ' the branches">' +
+        '<span class="car">' + (open ? '\u25be' : '\u25b8') + '</span>' +
+        '<span class="ico">' + icon + '</span>' + esc(g) + '</td>' +
+        cats.map(function (c) {
+          return cell(tally(null, c, gi), 'All branches \u00b7 ' + g + ' \u00b7 ' + c,
+            ' data-c="' + esc(c) + '" data-g="' + gi + '"', true);
+        }).join('') +
+        cell(tally(null, null, gi), 'All branches \u00b7 ' + g, ' data-g="' + gi + '"', true) + '</tr>';
+      if (!open) return;
+
+      /* branches at this stage, weakest first — that is the comparison */
+      bs.map(function (b) {
+        return { b: b, t: tally(b, null, gi) };
+      }).filter(function (x) { return A.scored(x.t); })
+        .sort(function (x, y) { return (A.score(x.t) || 0) - (A.score(y.t) || 0); })
+        .forEach(function (B) {
+          out += '<tr class="lvl-s"><td class="nm sub">\u21b3 ' + esc(B.b) + '</td>' +
+            cats.map(function (c) {
+              return cell(tally(B.b, c, gi), B.b + ' \u00b7 ' + g + ' \u00b7 ' + c,
+                ' data-b="' + esc(B.b) + '" data-c="' + esc(c) + '" data-g="' + gi + '"');
+            }).join('') +
+            cell(B.t, B.b + ' \u00b7 ' + g, ' data-b="' + esc(B.b) + '" data-g="' + gi + '"') + '</tr>';
+        });
+    });
+
+    el.innerHTML =
+      '<div class="au-heat-scroll"><table class="audt auhm autree"><thead><tr>' +
+      '<th class="nm">Grade &amp; stage \u203a branch</th>' +
+      cats.map(function (c) {
+        return '<th title="' + esc(c) + '"><span class="ico">' + auSecIcon(c) + '</span><br>' +
+          esc(c.length > 15 ? c.slice(0, 14) + '\u2026' : c) + '</th>';
+      }).join('') +
+      '<th>Overall</th></tr></thead><tbody>' + out + '</tbody></table></div>' +
+      '<p class="au-note">Read <b>across a stage row</b> to see which section is weakest for the group at that ' +
+      'stage; open it and read <b>down a column</b> to see which branch is dragging it. Branches are listed ' +
+      'weakest first within each stage, and sections are ordered weakest first across the network. Each cell shows ' +
+      'the compliance percentage with the number of scored checks beneath. Every cell opens the audit lines behind it.</p>';
+
+    el.querySelectorAll('td.nm.tap').forEach(function (td) {
+      td.addEventListener('click', function () {
+        var e = CMP_EXP(), k = td.dataset.x; e[k] = !e[k]; renderStageCompare();
+      });
+    });
+    el.querySelectorAll('td.au-t').forEach(function (td) {
+      td.addEventListener('click', function () {
+        var b = td.dataset.b || null, c = td.dataset.c, g = +td.dataset.g;
+        if (c) gradeModal(c, g, b); else stageModal(g, b);
+      });
+    });
+  }
+
   /* ══════════════════ 5. STAGE STRIP ══════════════════ */
   function renderStages() {
     var rows = A.GRADES.map(function (g) {
@@ -10649,7 +10765,7 @@ window.AUDIT = (function () {
   function renderAll() {
     renderControls();
     renderKPIs(); renderScorecard(); renderTrend(); renderHeat();
-    renderStages(); renderChronic(); renderMovers(); renderWorst();
+    renderStages(); renderStageCompare(); renderChronic(); renderMovers(); renderWorst();
     renderQuality(); renderRemarks();
     wire();
   }
@@ -10689,6 +10805,13 @@ window.AUDIT = (function () {
     if (window.__pushTabScope) window.__pushTabScope();
     var qt; $('au-q').oninput = function (e) {
       clearTimeout(qt); qt = setTimeout(function () { VIEW.q = e.target.value; renderRemarks(); }, 200);
+    };
+    var ca = $('au-cmp-all');
+    if (ca) ca.onclick = function () {
+      var e = CMP_EXP(), anyClosed = A.GRADES.some(function (g) { return !e[g]; });
+      A.GRADES.forEach(function (g) { e[g] = anyClosed; });
+      ca.textContent = anyClosed ? '\u21d5 Collapse all' : '\u21d5 Expand all';
+      renderStageCompare();
     };
     var ht = $('au-heat-toggle');
     if (ht) ht.querySelectorAll('button').forEach(function (b) {
