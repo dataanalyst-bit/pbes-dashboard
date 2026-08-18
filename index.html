@@ -1206,7 +1206,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="card" style="margin-bottom:16px;">
     <div class="ch"><h3>🏆 Recruiter Rankings &amp; Awards</h3><span class="fnote">Unified score: Workload 35% + Closure Efficiency 25% + Closure Speed (TAT) 20% + Overdue Control 20% · resigned staff excluded · click a row to view</span></div>
     <div class="cb-0" style="overflow-x:auto"><table class="dt">
-      <thead><tr><th>Rank</th><th>Recruiter</th><th>Closed</th><th>Open</th><th>Avg Days</th><th>Fast Closure %</th><th>Slow Closures</th><th>Score</th></tr></thead>
+      <thead><tr><th>Rank</th><th>Recruiter</th><th>Closed</th><th>Open</th>
+        <th>Workload<br><small>35%</small></th>
+        <th>Closure Efficiency<br><small>25% · avg closing / month</small></th>
+        <th>Closure Speed (TAT)<br><small>20%</small></th>
+        <th>Overdue Control<br><small>20%</small></th>
+        <th>Score</th></tr></thead>
       <tbody id="hr-rank-tbody"></tbody>
     </table></div>
   </div>
@@ -4797,85 +4802,164 @@ function renderHRRanking(){
     const closurePct=total>0?+(closed/total*100).toFixed(1):0;
     return {hr:h,branch:branchOf(h),closed,open,closurePct,avgDays,fastPct,slow,samples:days.length};
   });
-  // ── Ranking by unified formula: WH 35% + CE 25% + CS(TAT) 20% + OC 20% ──
-  // HR target TAT = 15 days (fast closure threshold).
-  const maxClosed=Math.max(1,...base.map(s=>s.closed+s.open));
-  const stats=base.map(s=>{
+  // ── Unified score: WH 35% + CE 25% + CS(TAT) 20% + OC 20% ──
+  //
+  // OVERDUE CONTROL was returning 0 for everyone. It divided a SUM OF DAYS by a
+  // COUNT OF POSITIONS and treated the result as a percentage — a recruiter with
+  // 80 positions and 500 overdue days scored 100 − 620 = negative, clamped to 0.
+  // The units never matched. It is now the share of positions that did NOT run
+  // past 30 days, which is bounded, comparable between recruiters, and is what
+  // "overdue control" actually means.
+  //
+  // CLOSURE EFFICIENCY is now the recruiter's AVERAGE CLOSINGS PER MONTH, over
+  // the months they were actually carrying positions — first posting to last
+  // activity, idle months included. A ratio of closed-to-assigned rewarded a
+  // recruiter holding two easy roles over one clearing thirty.
+  const OVERDUE_DAYS = 30, targetTAT = 15;
+
+  function monthSpan(rows){
+    var ds=[];
+    rows.forEach(function(r){
+      [r.PostDate, r.ClosedDate].forEach(function(v){
+        if(!v||v==='–') return;
+        var d=new Date(v); if(!isNaN(d.getTime())) ds.push(d);
+      });
+    });
+    if(!ds.length) return 1;
+    var min=new Date(Math.min.apply(null,ds)), max=new Date(Math.max.apply(null,ds));
+    // any position still open runs to today, so the span includes idle months
+    if(rows.some(function(r){ return isOpen(r.Status); })) max=new Date();
+    var m=(max.getFullYear()-min.getFullYear())*12 + (max.getMonth()-min.getMonth()) + 1;
+    return Math.max(1,m);
+  }
+
+  const enriched=base.map(function(s){
+    const rows=allRec.filter(function(r){ return r.HR===s.hr; });
     const assigned=s.closed+s.open;
-    const targetTAT=15;
-    const actualTAT=s.avgDays||targetTAT;
-    // Total overdue days: sum of (days - 30) for each position > 30 days
-    const odDays=(()=>{const rows=allRec.filter(r=>r.HR===s.hr);
-      return rows.filter(r=>isClosed(r.Status)).map(r=>{const d=parseFloat(r.DaysToClose); return (!isNaN(d)&&d>30)?(d-30):0;}).reduce((a,b)=>a+b,0)
-        + rows.filter(r=>isOpen(r.Status)).map(r=>{const pd=r.PostDate; if(!pd||pd==='–')return 0; const age=Math.round((Date.now()-new Date(pd))/86400000); return age>30?(age-30):0;}).reduce((a,b)=>a+b,0);
-    })();
-    const u=unifiedScore(assigned, s.closed, targetTAT, actualTAT, odDays, maxClosed);
-    return {...s,score:u.score,u};
-  }).sort((a,b)=>b.score-a.score || b.closed-a.closed);
+
+    // a position is overdue if it took, or has taken, more than 30 days
+    const odClosed=rows.filter(function(r){
+      if(!isClosed(r.Status)) return false;
+      var d=parseFloat(r.DaysToClose);
+      if(isNaN(d)){ var c=hrCloseDays(r); d=(c===null?NaN:c); }
+      return !isNaN(d) && d>OVERDUE_DAYS;
+    }).length;
+    const odOpen=rows.filter(function(r){
+      if(!isOpen(r.Status)) return false;
+      var pd=r.PostDate; if(!pd||pd==='–') return false;
+      var age=Math.round((Date.now()-new Date(pd))/86400000);
+      return age>OVERDUE_DAYS;
+    }).length;
+    const overdue=odClosed+odOpen;
+
+    const months=monthSpan(rows);
+    const perMonth=+(s.closed/months).toFixed(1);
+    return Object.assign({},s,{assigned:assigned,overdue:overdue,months:months,perMonth:perMonth});
+  });
+
+  const maxAssigned=Math.max(1,...enriched.map(function(s){ return s.assigned; }));
+  const maxPerMonth=Math.max(0.1,...enriched.map(function(s){ return s.perMonth; }));
+
+  const stats=enriched.map(function(s){
+    const wh = s.assigned/maxAssigned*100;
+    const ce = s.perMonth/maxPerMonth*100;                     // rate, not ratio
+    const cs = (s.avgDays!==null && s.avgDays>0)
+      ? Math.min(100, targetTAT/s.avgDays*100) : 0;            // no closures = no speed to show
+    const oc = s.assigned ? (1 - s.overdue/s.assigned)*100 : 0;
+    const score = Math.min(100, Math.round(wh*0.35 + ce*0.25 + cs*0.20 + oc*0.20));
+    return Object.assign({},s,{score:score,u:{wh:wh,ce:ce,cs:cs,oc:oc}});
+  }).sort(function(a,b){ return b.score-a.score || b.closed-a.closed; });
 
   const medals=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣'];
+  /* a component bar, matching the scorecard elsewhere on the dashboard */
+  function hrComp(v,colour,sub){
+    return '<div style="display:flex;align-items:center;gap:6px">'
+      +'<span style="font-weight:700;min-width:26px;color:'+colour+'">'+Math.round(v)+'</span>'
+      +'<span style="flex:1;height:5px;border-radius:3px;background:#E8EEFF;overflow:hidden;min-width:30px">'
+      +'<span style="display:block;height:100%;width:'+Math.max(0,Math.min(100,v))+'%;background:'+colour+'"></span>'
+      +'</span></div>'
+      +(sub?'<small style="color:#94A3B8;display:block;font-size:9px;margin-top:1px">'+sub+'</small>':'');
+  }
+
   tbody.innerHTML=stats.map((s,i)=>{
     const scoreColor=s.score>=80?'#059669':s.score>=60?'#D97706':'#DC2626';
-    const adColor=s.avgDays===null?'#94A3B8':s.avgDays<=15?'#059669':s.avgDays<=30?'#D97706':'#DC2626';
-    const fpColor=s.fastPct>=60?'#059669':s.fastPct>=30?'#D97706':'#DC2626';
-    return `<tr style="cursor:pointer" onclick="viewHRByRecruiter('${s.hr.replace(/'/g,"\\\\'")}','ALL')">
+    const esc=x=>String(x).replace(/'/g,"\\'");
+    return `<tr>
       <td style="font-size:17px;text-align:center">${medals[i]||(i+1)}</td>
-      <td><strong>${s.hr}</strong><br><small style="color:#94A3B8;font-size:10px;">${s.branch}</small></td>
-      <td><strong>${fi(s.closed)}</strong></td><td>${s.open>0?`<span style="color:#DC2626;font-weight:600">${s.open}</span>`:'0'}</td>
-      <td><strong style="color:${adColor}">${s.avgDays===null?'–':s.avgDays+'d'}</strong></td>
-      <td><strong style="color:${fpColor}">${s.fastPct}%</strong> <small style="color:#94A3B8;">≤15d</small></td>
-      <td>${s.slow>0?`<span style="color:#DC2626;font-weight:600">${s.slow}</span>`:'0'} <small style="color:#94A3B8;">&gt;30d</small></td>
-      <td><span style="display:inline-block;min-width:44px;padding:2px 8px;border-radius:8px;background:${scoreColor};color:#fff;font-weight:800;font-size:11px;text-align:center">${s.score}</span>
-        <div style="font-size:9px;color:#94A3B8;margin-top:1px;display:flex;gap:3px;flex-wrap:wrap;">
-          <span title="Workload 35%">WH${s.u.wh.toFixed(0)}</span>·<span title="Closure 25%">CE${s.u.ce.toFixed(0)}</span>·<span title="Speed 20%">CS${s.u.cs.toFixed(0)}</span>·<span title="Overdue 20%">OC${s.u.oc.toFixed(0)}</span>
-        </div></td></tr>`;
-  }).join('');
+      <td style="cursor:pointer" onclick="viewHRByRecruiter('${esc(s.hr)}','ALL')" title="Click to view every position">
+        <strong>${s.hr}</strong><br><small style="color:#94A3B8;font-size:10px;">${s.branch}</small></td>
+      <td class="hr-cell" onclick="viewHRByRecruiter('${esc(s.hr)}','Closed')" title="Click to view the closed positions"><strong>${fi(s.closed)}</strong></td>
+      <td class="hr-cell" onclick="viewHRByRecruiter('${esc(s.hr)}','Open')" title="Click to view the open positions">${s.open>0?`<span style="color:#DC2626;font-weight:600">${s.open}</span>`:'0'}</td>
+      <td>${hrComp(s.u.wh,'#7C3AED',fi(s.assigned)+' assigned')}</td>
+      <td>${hrComp(s.u.ce,'#1E4FD8',s.perMonth+' / month over '+s.months+' month'+(s.months===1?'':'s'))}</td>
+      <td>${hrComp(s.u.cs,'#0891B2',s.avgDays===null?'no closures yet':s.avgDays+'d average · target 15d')}</td>
+      <td class="hr-cell" onclick="viewHROverdue('${esc(s.hr)}')" title="Click to view the overdue positions">
+        ${hrComp(s.u.oc,s.overdue>0?'#D97706':'#059669',s.overdue+' over 30 days')}</td>
+      <td><span style="display:inline-block;min-width:44px;padding:2px 8px;border-radius:8px;background:${scoreColor};color:#fff;font-weight:800;font-size:11px;text-align:center">${s.score}</span></td>
+    </tr>`;
+  }).join('')||'<tr><td colspan="9" class="no-data">No recruiter records</td></tr>';
 }
 
-// KPI-card drill-down (respects branch filter)
-function viewHRKpi(status){
-  let rows=(typeof HR_RECORDS!=='undefined'&&Array.isArray(HR_RECORDS))?HR_RECORDS.slice():[];
-  if(fBranch!=='ALL') rows=rows.filter(r=>r.Branch===fBranch);
-  let label='All Positions';
-  if(status==='Open'){ rows=rows.filter(r=>/^open$/i.test(String(r.Status||'').trim())); label='Open / Pending'; }
-  else if(status==='Closed'){ rows=rows.filter(r=>/closed|filled/i.test(String(r.Status||''))); label='Closed Positions'; }
-  else if(status==='Hold'){ rows=rows.filter(r=>/hold/i.test(String(r.Status||''))); label='On Hold'; }
-  const cols=[{key:'HR',label:'Recruiter'},{key:'PostDate',label:'Posted',date:true},{key:'Priority',label:'Priority',pill:true},
-    {key:'Position',label:'Position',maxW:'180px'},{key:'Branch',label:'Branch'},{key:'Status',label:'Status',pill:true},
-    {key:'ClosedDate',label:'Closed',date:true},{key:'DaysToClose',label:'Days'},
-    {key:'CandidateName',label:'Candidate',maxW:'150px'},{key:'Notes',label:'Notes',maxW:'220px'}];
-  const bl=fBranch==='ALL'?'All Branches':fBranch;
-  openModal(`👥 HR — ${label}`,`${rows.length} positions · ${bl}`,rows,cols);
-}
-
-// Drill-down by recruiter (status: ALL/Open/Closed/Hold)
-/* Positions behind one speed bucket. It uses hrCloseDays(), the very function
-   the table used to put the position in that bucket, so the list is always the
-   size of the number that was clicked. */
+/* Positions behind one speed bucket in the Recruiter Speed table. The table
+   measures closure days with hrCloseDays(), which prefers the posted-to-closed
+   dates over the DaysToClose column, so this uses the very same function —
+   otherwise a position could land in a different bucket here than the one it
+   was counted in. */
 function viewHRSpeed(hr,kind){
   var R=(typeof HR_RECORDS!=='undefined'&&Array.isArray(HR_RECORDS))?HR_RECORDS:[];
-  var days=(typeof hrCloseDays==='function')?hrCloseDays
-    :function(r){ var d=Number(r.DaysToClose); return isFinite(d)?d:null; };
-  var closedFn=(typeof isClosed==='function')?isClosed
-    :function(s){ return /closed|filled/i.test(String(s||'')); };
+  var days=(typeof hrCloseDays==='function')
+    ? hrCloseDays
+    : function(r){ var d=Number(r.DaysToClose); return isFinite(d)?d:null; };
+  var closedFn=(typeof isClosed==='function') ? isClosed
+    : function(s){ return /closed|filled/i.test(String(s||'')); };
+
   var rows=R.filter(function(r){
     if(String(r.HR)!==String(hr)) return false;
     if(fBranch!=='ALL'&&r.Branch!==fBranch) return false;
     if(!closedFn(r.Status)) return false;
     var d=days(r);
     if(d===null||d===undefined||!isFinite(d)||d<0) return false;
-    if(kind==='fast') return d<=7;
-    if(kind==='med')  return d>7&&d<=21;
-    if(kind==='slow') return d>21;
+    if(kind==='fast')   return d<=7;
+    if(kind==='med')    return d>7&&d<=21;
+    if(kind==='slow')   return d>21;
     return true;
   });
-  var LBL={fast:'closed within 7 days',med:'closed in 8\u201321 days',slow:'closed after 21 days',closed:'closed positions'};
+  var LBL={fast:'closed within 7 days',med:'closed in 8\u201321 days',
+           slow:'closed after 21 days',closed:'closed positions'};
   openModal('\u26a1 '+hr+' \u2014 '+(LBL[kind]||'positions'),
     rows.length.toLocaleString('en-IN')+' position(s)'+(fBranch==='ALL'?'':' \u00b7 '+fBranch),
     rows,[{key:'HR',label:'Recruiter'},{key:'Branch',label:'Branch'},{key:'Position',label:'Position',maxW:'200px'},
       {key:'Priority',label:'Priority',pill:true},{key:'PostDate',label:'Posted',date:true},
       {key:'ClosedDate',label:'Closed',date:true},{key:'DaysToClose',label:'Days'},
       {key:'CandidateName',label:'Candidate',maxW:'160px'},{key:'Status',label:'Status',pill:true}]);
+}
+
+/* Positions that ran past the 30-day line — the rows behind Overdue Control.
+   Uses the same test the column counts with, so the list matches the figure. */
+function viewHROverdue(hr){
+  const R=(typeof HR_RECORDS!=='undefined'&&Array.isArray(HR_RECORDS))?HR_RECORDS:[];
+  const isClosed=s=>/closed|filled/i.test(String(s||''));
+  const isOpen=s=>/^open$/i.test(String(s||'').trim());
+  const rows=R.filter(r=>{
+    if(String(r.HR)!==String(hr)) return false;
+    if(fBranch!=='ALL'&&r.Branch!==fBranch) return false;
+    if(isClosed(r.Status)){
+      let d=parseFloat(r.DaysToClose);
+      if(isNaN(d)){ const c=hrCloseDays(r); d=(c===null?NaN:c); }
+      return !isNaN(d)&&d>30;
+    }
+    if(isOpen(r.Status)){
+      const pd=r.PostDate; if(!pd||pd==='–') return false;
+      return Math.round((Date.now()-new Date(pd))/86400000)>30;
+    }
+    return false;
+  });
+  openModal('⏳ '+hr+' — positions over 30 days',
+    rows.length.toLocaleString('en-IN')+' position(s)'+(fBranch==='ALL'?'':' · '+fBranch),
+    rows,[{key:'HR',label:'Recruiter'},{key:'Branch',label:'Branch'},{key:'Position',label:'Position',maxW:'200px'},
+      {key:'Priority',label:'Priority',pill:true},{key:'PostDate',label:'Posted',date:true},
+      {key:'ClosedDate',label:'Closed',date:true},{key:'DaysToClose',label:'Days'},
+      {key:'Status',label:'Status',pill:true}]);
 }
 
 function viewHRByRecruiter(hr,status){
