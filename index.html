@@ -996,7 +996,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="card" style="margin-bottom:16px;">
     <div class="ch">
       <h3>🏆 Branch Performance Scorecard — Head-to-Head Comparison</h3>
-      <span class="fnote">Care Call &amp; Observation rows use PREVIOUS month · HR Overall Score pulled from the HR Analytics scorecard</span>
+      <span class="fnote">Care Call &amp; Observation rows use PREVIOUS month · every department scored as a % on the same formula: Workload 35% + Closure Efficiency 25% + Closure Speed (TAT) 20% + Overdue Control 20%</span>
       <span style="font-size:11px;background:#FFFBEB;border:1px solid rgba(217,119,6,.25);color:#D97706;padding:3px 10px;border-radius:6px;font-weight:600;" id="rank-tag">🥇 Rankings &amp; Awards — Current / Latest Month Per Branch</span>
     </div>
     <div class="cb" style="overflow-x:auto;">
@@ -5913,6 +5913,52 @@ function hrCloseDays(r){
 // (assigned, closed, targetTAT, actualTAT, totalOverdueDays) from its data shape.
 // ══════════════════════════════════════════════════════════════════════════
 
+/* ══════════════════════════════════════════════════════════════════════════
+   ONE SCORE FOR EVERY DEPARTMENT
+   Workload 35% + Closure Efficiency 25% + Closure Speed (TAT) 20% +
+   Overdue Control 20%, all expressed as a percentage.
+
+   Each department supplies only what it means by "closed", "started",
+   "finished", "due" and "overdue". The arithmetic is identical, which is the
+   whole point: Admin, Vigilance, HR and Grievance become comparable on one
+   axis instead of each carrying a private scale.
+
+   CLOSURE SPEED prefers the department's OWN due date — the share of closed
+   items finished on or before it. Only where no due date exists (HR) does it
+   fall back to a target number of days. Scoring a department against a
+   deadline it never set would be inventing a standard for it.
+   ══════════════════════════════════════════════════════════════════════════ */
+function _deptDate(v){
+  if(!v||v==='–') return null;
+  var d=new Date(v); return isNaN(d.getTime())?null:d;
+}
+function deptStats(rows, cfg){
+  var total=rows.length;
+  if(!total) return null;
+  var closedRows=rows.filter(cfg.isClosed);
+  var days=[], tatN=0, tatOk=0;
+  closedRows.forEach(function(r){
+    var st=_deptDate(cfg.start(r)), dn=_deptDate(cfg.done(r));
+    var tg=cfg.target?_deptDate(cfg.target(r)):null;
+    if(st&&dn){ var d=Math.round((dn-st)/86400000); if(d>=0) days.push(d); }
+    if(dn&&tg){ tatN++; if(dn<=tg) tatOk++; }
+  });
+  var avgDays=days.length?days.reduce(function(a,b){return a+b;},0)/days.length:null;
+  var cs;
+  if(tatN)                            cs=tatOk/tatN*100;              // met its own due date
+  else if(avgDays!==null&&avgDays>0)  cs=Math.min(100,cfg.targetDays/avgDays*100);
+  else                                cs=0;                          // nothing closed yet
+  var overdue=rows.filter(cfg.isOverdue).length;
+  return { total:total, closed:closedRows.length, overdue:overdue,
+           avgDays:avgDays, tatN:tatN, tatOk:tatOk,
+           ce:closedRows.length/total*100, cs:cs, oc:(1-overdue/total)*100 };
+}
+function deptScore(s, maxTotal){
+  if(!s) return null;
+  var wh=s.total/(maxTotal||s.total)*100;
+  return Math.round(wh*0.35 + s.ce*0.25 + s.cs*0.20 + s.oc*0.20);
+}
+
 function unifiedScore(assigned, closed, targetTAT, actualTAT, totalOverdueDays, maxAssigned){
   if(!assigned || assigned===0) return {score:0,wh:0,ce:0,cs:0,oc:0};
   const wh = (assigned / (maxAssigned||assigned)) * 100;          // workload handled
@@ -6118,56 +6164,75 @@ function renderRankings(){
     html+=`<td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;">${winnerBadge(win)}</td></tr>`;
   }
 
-  // Row: HR Overall Score (from HR Performance Scorecard — higher is better)
-  {
-    const valMap={}; ALLB.forEach(b=>{valMap[b]=hrStats[b]&&hrStats[b].overall!=null?hrStats[b].overall:null;});
-    const win=winners(valMap,true);
-    html+=`<tr><td style="padding:10px 14px;font-size:12.5px;font-weight:600;border-bottom:1px solid #E0E8FF;color:#0F172A;">🏆 HR Overall Score</td>`;
-    ALLB.forEach(b=>{
-      const d=hrStats[b];
-      if(!d||d.overall==null){html+=cell('<span style="color:#94A3B8;">No data</span>',false);return;}
-      const color=d.overall>=4.3?'#059669':d.overall>=3.5?'#16A34A':d.overall>=2.8?'#D97706':'#DC2626';
-      html+=cell(`<span style="font-weight:800;color:${color};font-size:15px;">${d.overall.toFixed(2)}</span><small style="color:#94A3B8;font-size:10px;"> /5</small><small style="color:#94A3B8;display:block;font-size:10px;">${d.recruiters} recruiter${d.recruiters===1?'':'s'}</small>`,win.includes(b));
-    });
-    html+=`<td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;">${winnerBadge(win)}</td></tr>`;
-  }
+  // ── Rows: one unified percentage per department ──
+  // The same four components everywhere, so a branch can be read across
+  // departments rather than only within one.
+  const _today=new Date();
+  const _isOv=v=>{ const n=parseFloat(v); return !isNaN(n)&&n>0; };
+  const DEPTS=[
+    { key:'admin', label:'🏗️ Admin Tracker', targetDays:30,
+      rows:(typeof ADMIN_DATA!=='undefined'?ADMIN_DATA:[]),
+      isClosed:r=>/done|completed/i.test(String(r.Status||'')),
+      start:r=>r.StartDate, done:r=>r.CompletionDate, target:r=>r.Deadline,
+      isOverdue:r=>{ if(/done|completed/i.test(String(r.Status||''))) return false;
+        if(/overdue/i.test(String(r.DaysDue||''))) return true;
+        const d=_deptDate(r.Deadline); return !!(d&&d<_today); } },
+    { key:'vig', label:'🛡️ Vigilance', targetDays:30,
+      rows:(typeof VIG_DATA!=='undefined'?VIG_DATA:[]),
+      isClosed:r=>/closed|completed|resolved|done/i.test(String(r.Status||'')),
+      start:r=>r.VisitDate, done:r=>r.CompletionDate, target:r=>r.TargetDate,
+      isOverdue:r=>{ if(/closed|completed|resolved|done/i.test(String(r.Status||''))) return false;
+        if(_isOv(r.OverDue)) return true;
+        const d=_deptDate(r.TargetDate); return !!(d&&d<_today); } },
+    { key:'hr', label:'👥 HR Analytics', targetDays:15,
+      rows:(typeof HR_RECORDS!=='undefined'?HR_RECORDS:[]),
+      isClosed:r=>/closed|filled/i.test(String(r.Status||'')),
+      start:r=>r.PostDate, done:r=>r.ClosedDate, target:null,
+      isOverdue:r=>{ const cl=/closed|filled/i.test(String(r.Status||''));
+        if(cl){ let d=parseFloat(r.DaysToClose);
+          if(isNaN(d)){ const st=_deptDate(r.PostDate),dn=_deptDate(r.ClosedDate);
+            d=(st&&dn)?Math.round((dn-st)/86400000):NaN; }
+          return !isNaN(d)&&d>30; }
+        const pd=_deptDate(r.PostDate);
+        return !!(pd&&Math.round((_today-pd)/86400000)>30); } },
+    { key:'griev', label:'📣 Grievance Tracker', targetDays:7,
+      rows:(typeof GRIEVANCE_DATA!=='undefined'?GRIEVANCE_DATA:[]),
+      isClosed:r=>/resolved|closed/i.test(String(r.Status||'')),
+      start:r=>r.Date, done:r=>r.ClosureDate, target:r=>r.TargetDate,
+      isOverdue:r=>{ if(/resolved|closed/i.test(String(r.Status||''))) return false;
+        if(_isOv(r.OverDue)) return true;
+        const d=_deptDate(r.TargetDate); return !!(d&&d<_today); } }
+  ];
 
-  // Row: Admin Closing Speed — Score = Completion×0.6 + OnSchedule×0.4 − overdue-ageing penalty
-  {
-    const valMap={}; ALLB.forEach(b=>{valMap[b]=adminStats[b].total>0?adminStats[b].score:null;});
+  const deptWins={};
+  DEPTS.forEach((D,di)=>{
+    const per={}, maxT=Math.max(1,...ALLB.map(b=>D.rows.filter(r=>r.Branch===b).length));
+    ALLB.forEach(b=>{ per[b]=deptStats(D.rows.filter(r=>r.Branch===b), D); });
+    const valMap={}; ALLB.forEach(b=>{ valMap[b]=per[b]?deptScore(per[b],maxT):null; });
     const win=winners(valMap);
-    html+=`<tr style="background:#F8FAFF;"><td style="padding:10px 14px;font-size:12.5px;font-weight:600;border-bottom:1px solid #E0E8FF;color:#0F172A;">🏗️ Admin Closing Speed</td>`;
+    deptWins[D.key]=win;
+    html+=`<tr${di%2?' style="background:#F8FAFF;"':''}><td style="padding:10px 14px;font-size:12.5px;font-weight:600;border-bottom:1px solid #E0E8FF;color:#0F172A;">${D.label}</td>`;
     ALLB.forEach(b=>{
-      const d=adminStats[b];
-      if(d.total===0){html+=cell('<span style="color:#94A3B8;">No data</span>',false);return;}
-      const color=d.score>=80?'#059669':d.score>=60?'#D97706':'#DC2626';
-      html+=cell(`<span style="font-weight:800;color:${color};font-size:15px;">${d.score}</span><small style="color:#94A3B8;display:block;font-size:10px;">${d.done}/${d.total} done · ${d.overdue} overdue${d.overdue>0?' (~'+d.avgOd+'d)':''}</small>${d.avgEarly!==null?`<small style="color:#94A3B8;display:block;font-size:10px;">avg ${Math.abs(d.avgEarly)}d ${d.avgEarly>=0?'early':'late'} vs deadline</small>`:''}`,win.includes(b));
+      const s=per[b];
+      if(!s){ html+=cell('<span style="color:#94A3B8;">No data</span>',false); return; }
+      const v=deptScore(s,maxT);
+      const color=v>=80?'#059669':v>=60?'#D97706':'#DC2626';
+      const tat=s.tatN?`${Math.round(s.cs)}% by due date`
+        :(s.avgDays!==null?`${s.avgDays.toFixed(1)}d avg · target ${D.targetDays}d`:'nothing closed');
+      html+=cell(`<span style="font-weight:800;color:${color};font-size:15px;">${v}%</span>`
+        +`<small style="color:#94A3B8;display:block;font-size:9.5px;">WH${Math.round(s.total/maxT*100)} · CE${Math.round(s.ce)} · CS${Math.round(s.cs)} · OC${Math.round(s.oc)}</small>`
+        +`<small style="color:#94A3B8;display:block;font-size:9.5px;">${fi(s.closed)}/${fi(s.total)} closed · ${s.overdue} overdue</small>`
+        +`<small style="color:#94A3B8;display:block;font-size:9.5px;">${tat}</small>`, win.includes(b));
     });
     html+=`<td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;">${winnerBadge(win)}</td></tr>`;
-  }
-
-  // Row: Safety Score — Closure×0.5 + Admin Follow-Up×0.3 + On-Time×0.2 (higher is better)
-  {
-    const valMap={}; ALLB.forEach(b=>{valMap[b]=vigStats[b].total>0?vigStats[b].score:null;});
-    const win=winners(valMap);
-    html+=`<tr><td style="padding:10px 14px;font-size:12.5px;font-weight:600;border-bottom:1px solid #E0E8FF;color:#0F172A;">🛡️ Safety Score</td>`;
-    ALLB.forEach(b=>{
-      const d=vigStats[b];
-      if(d.total===0){html+=cell('<span style="color:#94A3B8;">No data</span>',false);return;}
-      const color=d.score>=80?'#059669':d.score>=60?'#D97706':'#DC2626';
-      html+=cell(`<span style="font-weight:800;color:${color};font-size:15px;">${d.score}</span><small style="color:#94A3B8;display:block;font-size:10px;">${d.open} open · ${d.closed} closed</small><small style="color:#94A3B8;display:block;font-size:10px;">admin verified ${d.adminPct}%${d.awaitingAdmin>0?' · '+d.awaitingAdmin+' awaiting admin':''}</small>`,win.includes(b));
-    });
-    html+=`<td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;">${winnerBadge(win)}</td></tr>`;
-  }
+  });
 
   // ── Overall Ranking row: sum of win-counts across rows ──
   const winCounts={}; ALLB.forEach(b=>winCounts[b]=0);
   [
     winners(Object.fromEntries(ALLB.map(b=>[b,careStats[b]?careStats[b].pct:null]))),
     winners(Object.fromEntries(ALLB.map(b=>[b,obsCompletionStats[b]?obsCompletionStats[b].pct:null]))),
-    winners(Object.fromEntries(ALLB.map(b=>[b,hrStats[b]&&hrStats[b].avgDays!=null?hrStats[b].avgDays:null])),false),
-    winners(Object.fromEntries(ALLB.map(b=>[b,adminStats[b].total>0?adminStats[b].score:null]))),
-    winners(Object.fromEntries(ALLB.map(b=>[b,vigStats[b].total>0?vigStats[b].score:null]))),
+    deptWins.admin, deptWins.vig, deptWins.hr, deptWins.griev
   ].forEach(arr=>arr.forEach(b=>winCounts[b]++));
 
   const ranked=ALLB.slice().sort((a,b)=>winCounts[b]-winCounts[a]);
@@ -8733,7 +8798,8 @@ function renderRankings(){
   function ucomp(u,labels){
     if(!u) return '';
     const L=labels||['W','C','S','O'];
-    return `<small style="color:#94A3B8;display:block;font-size:9.5px;margin-top:2px;">`+
+    return `<small style="color:#94A3B8;display:block;font-size:9.5px;margin-top:2px;" `+
+      `title="Workload 35% · Closure Efficiency 25% · Closure Speed (TAT) 20% · Overdue Control 20%">`+
       `${L[0]} ${Math.round(u.wh)} · ${L[1]} ${Math.round(u.ce)} · ${L[2]} ${Math.round(u.cs)} · ${L[3]} ${Math.round(u.oc)}</small>`;
   }
   function scoreRow(icon,title,statMap,render,alt){
@@ -8786,9 +8852,9 @@ function renderRankings(){
   {
     const r=scoreRow('🧑‍💼','HR Hiring Score',hrStats,d=>{
       if(!d||!d.total) return {value:null};
-      return {value:d.score,html:`<span style="font-weight:800;color:${scoreColor(d.score)};font-size:15px;">${d.score}</span>`+
+      return {value:d.score,html:`<span style="font-weight:800;color:${scoreColor(d.score)};font-size:15px;">${d.score}%</span>`+
         `<small style="color:#94A3B8;display:block;font-size:10px;">${d.closed}/${d.total} filled${d.avgDays!=null?' · avg '+d.avgDays+'d':''}</small>`+
-        ucomp(d.u,['Vol','Fill','Speed','Age'])};
+        ucomp(d.u,['WH','CE','CS','OC'])};
     },false);
     html+=r.html; contrib.push(r.valMap);
   }
@@ -8797,9 +8863,9 @@ function renderRankings(){
   {
     const r=scoreRow('🏗️','Admin Closing Speed',adminStats,d=>{
       if(!d||!d.total) return {value:null};
-      return {value:d.score,html:`<span style="font-weight:800;color:${scoreColor(d.score)};font-size:15px;">${d.score}</span>`+
+      return {value:d.score,html:`<span style="font-weight:800;color:${scoreColor(d.score)};font-size:15px;">${d.score}%</span>`+
         `<small style="color:#94A3B8;display:block;font-size:10px;">${d.done}/${d.total} done · ${d.overdue} overdue${d.overdue>0?' (~'+d.avgOd+'d)':''}</small>`+
-        ucomp(d.u,['Load','Done','Speed','OD'])};
+        ucomp(d.u,['WH','CE','CS','OC'])};
     },true);
     html+=r.html; contrib.push(r.valMap);
   }
@@ -8808,9 +8874,9 @@ function renderRankings(){
   {
     const r=scoreRow('🛡️','Vigilance &amp; Safety Score',vigStats,d=>{
       if(!d||!d.total) return {value:null};
-      return {value:d.score,html:`<span style="font-weight:800;color:${scoreColor(d.score)};font-size:15px;">${d.score}</span>`+
+      return {value:d.score,html:`<span style="font-weight:800;color:${scoreColor(d.score)};font-size:15px;">${d.score}%</span>`+
         `<small style="color:#94A3B8;display:block;font-size:10px;">${d.open} open · ${d.closed} closed · admin verified ${d.adminPct}%</small>`+
-        ucomp(d.u,['Load','Closed','Speed','OD'])};
+        ucomp(d.u,['WH','CE','CS','OC'])};
     },false);
     html+=r.html; contrib.push(r.valMap);
   }
@@ -8820,9 +8886,9 @@ function renderRankings(){
     const r=scoreRow('📣','Grievance Handling Score',grievStats,d=>{
       if(!d||!d.total) return {value:null};
       const sd=d.closedN?Math.round(d.sameDay/d.closedN*100):0;
-      return {value:d.score,html:`<span style="font-weight:800;color:${scoreColor(d.score)};font-size:15px;">${d.score}</span>`+
+      return {value:d.score,html:`<span style="font-weight:800;color:${scoreColor(d.score)};font-size:15px;">${d.score}%</span>`+
         `<small style="color:#94A3B8;display:block;font-size:10px;">${d.resolved}/${d.total} resolved · ${sd}% same-day</small>`+
-        ucomp(d.u,['Load','Closed','Speed','OD'])};
+        ucomp(d.u,['WH','CE','CS','OC'])};
     },true);
     html+=r.html; contrib.push(r.valMap);
   }
@@ -8831,7 +8897,7 @@ function renderRankings(){
   {
     const r=scoreRow('📝','Exam Performance Score',(examStats||{}),d=>{
       if(!d||!d.assessed) return {value:null};
-      return {value:d.score,html:`<span style="font-weight:800;color:${scoreColor(d.score)};font-size:15px;">${d.score}</span>`+
+      return {value:d.score,html:`<span style="font-weight:800;color:${scoreColor(d.score)};font-size:15px;">${d.score}%</span>`+
         `<small style="color:#94A3B8;display:block;font-size:10px;">avg ${d.avg.toFixed(1)}% · ${d.passPct.toFixed(0)}% pass · ${fi(d.assessed)} assessed</small>`+
         ucomp(d.u,['Vol','Cover','Attain','Pass'])};
     },false);
