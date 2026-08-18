@@ -2139,8 +2139,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap">
           <div style="flex:1;min-width:260px">
             <h3 style="margin:0">Stage by stage, branch against branch</h3>
-            <div class="sub" style="margin-bottom:0">One stage at a time, every branch underneath it, across all
-              thirteen sections. Tap a stage to open its branches.</div>
+            <div class="sub" style="margin-bottom:0">Branches across the top, one stage at a time. Tap a stage to
+              open the thirteen audit sections beneath it.</div>
           </div>
           <button class="exm-refresh" id="au-cmp-all" title="Open or close every stage">⇕ Expand all</button>
         </div>
@@ -10415,8 +10415,8 @@ window.AUDIT = (function () {
     var G = A.GRADES, R = D.raw, ms = months(), ex = CMP_EXP();
     var bs = D.branches;
 
-    /* sections ordered weakest first across the network, so the widest columns
-       carry the group-level problems */
+    /* sections ordered weakest first across the network, so the rows that need
+       attention sit at the top of every stage once it is opened */
     var cats = D.cats.map(function (c) {
       var t = netCatT(c); return { c: c, v: t ? A.score(t) : null };
     }).sort(function (a, b) { return (a.v === null ? 999 : a.v) - (b.v === null ? 999 : b.v); })
@@ -10451,44 +10451,42 @@ window.AUDIT = (function () {
     G.forEach(function (g, gi) {
       var open = !!ex[g];
       var icon = AU_GRADE_ICON[g] || '\ud83d\udcda';
+      /* the stage line: each branch's standing at this stage, all sections together */
       out += '<tr class="lvl-b"><td class="nm tap" data-x="' + esc(g) + '" ' +
-        'title="Tap to ' + (open ? 'collapse' : 'expand') + ' the branches">' +
+        'title="Tap to ' + (open ? 'collapse' : 'expand') + ' the thirteen sections">' +
         '<span class="car">' + (open ? '\u25be' : '\u25b8') + '</span>' +
         '<span class="ico">' + icon + '</span>' + esc(g) + '</td>' +
-        cats.map(function (c) {
-          return cell(tally(null, c, gi), 'All branches \u00b7 ' + g + ' \u00b7 ' + c,
-            ' data-c="' + esc(c) + '" data-g="' + gi + '"', true);
+        bs.map(function (b) {
+          return cell(tally(b, null, gi), b + ' \u00b7 ' + g, ' data-b="' + esc(b) + '" data-g="' + gi + '"', true);
         }).join('') +
         cell(tally(null, null, gi), 'All branches \u00b7 ' + g, ' data-g="' + gi + '"', true) + '</tr>';
       if (!open) return;
 
-      /* branches at this stage, weakest first — that is the comparison */
-      bs.map(function (b) {
-        return { b: b, t: tally(b, null, gi) };
-      }).filter(function (x) { return A.scored(x.t); })
-        .sort(function (x, y) { return (A.score(x.t) || 0) - (A.score(y.t) || 0); })
-        .forEach(function (B) {
-          out += '<tr class="lvl-s"><td class="nm sub">\u21b3 ' + esc(B.b) + '</td>' +
-            cats.map(function (c) {
-              return cell(tally(B.b, c, gi), B.b + ' \u00b7 ' + g + ' \u00b7 ' + c,
-                ' data-b="' + esc(B.b) + '" data-c="' + esc(c) + '" data-g="' + gi + '"');
-            }).join('') +
-            cell(B.t, B.b + ' \u00b7 ' + g, ' data-b="' + esc(B.b) + '" data-g="' + gi + '"') + '</tr>';
-        });
+      /* one row per section, every branch across */
+      cats.forEach(function (c) {
+        var net = tally(null, c, gi);
+        if (!A.scored(net) && !bs.some(function (b) { return A.scored(tally(b, c, gi)); })) return;
+        out += '<tr class="lvl-s"><td class="nm sub" title="' + esc(c) + '">' +
+          '<span class="ico">' + auSecIcon(c) + '</span>' + esc(c) + '</td>' +
+          bs.map(function (b) {
+            return cell(tally(b, c, gi), b + ' \u00b7 ' + g + ' \u00b7 ' + c,
+              ' data-b="' + esc(b) + '" data-c="' + esc(c) + '" data-g="' + gi + '"');
+          }).join('') +
+          cell(net, 'All branches \u00b7 ' + g + ' \u00b7 ' + c, ' data-c="' + esc(c) + '" data-g="' + gi + '"') +
+          '</tr>';
+      });
     });
 
     el.innerHTML =
       '<div class="au-heat-scroll"><table class="audt auhm autree"><thead><tr>' +
-      '<th class="nm">Grade &amp; stage \u203a branch</th>' +
-      cats.map(function (c) {
-        return '<th title="' + esc(c) + '"><span class="ico">' + auSecIcon(c) + '</span><br>' +
-          esc(c.length > 15 ? c.slice(0, 14) + '\u2026' : c) + '</th>';
-      }).join('') +
-      '<th>Overall</th></tr></thead><tbody>' + out + '</tbody></table></div>' +
-      '<p class="au-note">Read <b>across a stage row</b> to see which section is weakest for the group at that ' +
-      'stage; open it and read <b>down a column</b> to see which branch is dragging it. Branches are listed ' +
-      'weakest first within each stage, and sections are ordered weakest first across the network. Each cell shows ' +
-      'the compliance percentage with the number of scored checks beneath. Every cell opens the audit lines behind it.</p>';
+      '<th class="nm">Grade &amp; stage \u203a audit section</th>' +
+      bs.map(function (b) { return '<th>' + esc(b) + '</th>'; }).join('') +
+      '<th>Network</th></tr></thead><tbody>' + out + '</tbody></table></div>' +
+      '<p class="au-note">Each stage line shows where every branch stands at that stage. <b>Open it</b> and the ' +
+      'thirteen sections appear as rows, weakest first, so you can read <b>down a branch column</b> to see what is ' +
+      'failing there, or <b>across a section row</b> to see whether it is one branch or all of them. Each cell shows ' +
+      'the compliance percentage with the number of scored checks beneath \u2014 a high figure on two checks is not ' +
+      'the same finding as a high figure on twenty. Every cell opens the audit lines behind it.</p>';
 
     el.querySelectorAll('td.nm.tap').forEach(function (td) {
       td.addEventListener('click', function () {
