@@ -8963,20 +8963,44 @@ function renderRankings(){
    Finishing late is still finishing late, so completed-late days now count.
    ══════════════════════════════════════════════════════════════════════════ */
 
-/* Days Due → overdue days. Handles every variant the sheet formula emits:
-     "Completed (14 days overdue)"  → 14   (finished late)
-     "Overdue (7 days)"             →  7   (running late, still open)
-     "Completed 3 days early"       →  0
-     "Completed On Time"            →  0
-     "Completed" / "Due in 4 days" / "Not Started" / blank → 0            */
-function admOverdueDays(r){
+/* ── Overdue days for one admin task ──
+   DATES FIRST, text second. The Days Due column is a sheet formula, and when
+   its inputs are text rather than real dates it emits things like
+   "Overdue (1755561600000 days)" — an epoch timestamp, not a day count. Read
+   literally that produced 36,288,258,102,034 overdue days for one branch.
+
+   Deadline against Completion (or against today, while still open) cannot go
+   wrong that way, so it is the primary source. The Days Due text is used only
+   when a date is missing, and anything it yields beyond ten years is discarded
+   as unparseable rather than trusted.
+
+     done  → max(0, Completion − Deadline)
+     open  → max(0, today − Deadline)                                        */
+var ADM_MAX_OVERDUE = 3650;          // 10 years; beyond this it is not a day count
+
+function admOverdueFromText(r){
   const s=String(r.DaysDue||'').trim();
-  if(!s||s==='–') return 0;
+  if(!s||s==='–') return null;
   if(/early|on\s*time|not\s*started|due\s*in/i.test(s)) return 0;
-  const m=s.match(/(\d+)\s*days?\s*overdue/i)     // "(14 days overdue)"
-       || s.match(/overdue\s*\(?\s*(\d+)/i);      // "Overdue (7 days)"
-  if(m) return parseInt(m[1],10);
-  return /overdue/i.test(s) ? 1 : 0;              // "Overdue", no number
+  const m=s.match(/(\d+)\s*days?\s*overdue/i) || s.match(/overdue\s*\(?\s*(\d+)/i);
+  if(m){
+    const n=parseInt(m[1],10);
+    return (isFinite(n)&&n>=0&&n<=ADM_MAX_OVERDUE) ? n : null;   // absurd → unusable
+  }
+  return /overdue/i.test(s) ? 1 : 0;
+}
+
+function admOverdueDays(r){
+  const done=/done|completed/i.test(String(r.Status||''));
+  const dl=r.Deadline;
+  if(dl&&dl!=='–'){
+    const end = done ? r.CompletionDate
+                     : new Date().toISOString().slice(0,10);
+    const d=admDays(dl,end);                       // deadline → finish (or today)
+    if(d!==null) return Math.max(0,d);
+  }
+  const t=admOverdueFromText(r);
+  return t===null?0:t;
 }
 function admIsDone(r){ return /^done$/i.test(String(r.Status||'').trim())||/done|completed/i.test(String(r.Status||'')); }
 function admDays(a,b){
@@ -8984,7 +9008,10 @@ function admDays(a,b){
   const x=new Date(a), y=new Date(b);
   if(isNaN(x)||isNaN(y)) return null;
   const d=Math.round((y-x)/86400000);
-  return (d>=-400&&d<=400)?d:null;
+  /* A gap beyond a decade is a bad date, not a long task. The old ±400 window
+     was tight enough to silently drop real multi-year overruns, so it is wider
+     here and the absurd values are what get rejected. */
+  return (d>=-ADM_MAX_OVERDUE&&d<=ADM_MAX_OVERDUE)?d:null;
 }
 
 function adminSpeedStats(rows){
