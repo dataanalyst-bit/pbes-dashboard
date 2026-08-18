@@ -10012,64 +10012,139 @@ window.AUDIT = (function () {
       'problem, not a branch one. Every cell opens the lines behind it.</p>';
   }
 
-  function renderHeatTable() {
-    var bs = D.branches, cs = D.cats, G = A.GRADES;
-    var ordered = cs.map(function (c) {
-      var t = netCatT(c); return { c: c, v: t ? A.score(t) : null, t: t };
-    }).sort(function (a, b) { return (a.v === null ? 999 : a.v) - (b.v === null ? 999 : b.v); });
+  /* Expansion state for the table tree: branches, and branch|section. Kept
+     outside the render so opening a branch survives a re-draw. */
+  function TBL_EXP(){ return window._AU_TBL_EXP||(window._AU_TBL_EXP={b:{},s:{}}); }
 
-    /* Table 1 — every section against every branch */
-    var t1 = '<div class="audt-h">All thirteen sections × every branch</div>' +
-      '<div class="au-heat-scroll"><table class="audt"><thead><tr><th class="nm">Audit section</th>' +
-      bs.map(function (b) { return '<th>' + esc(b) + '</th>'; }).join('') +
-      '<th>Network</th></tr></thead><tbody>' +
-      ordered.map(function (row) {
-        return '<tr><td class="nm">' + esc(row.c) + '</td>' +
-          bs.map(function (b) {
-            return heatCell(brCatT(b, row.c), b + ' · ' + row.c,
-              ' data-b="' + esc(b) + '" data-c="' + esc(row.c) + '"');
-          }).join('') +
-          heatCell(row.t, 'All branches · ' + row.c, ' data-c="' + esc(row.c) + '"') + '</tr>';
-      }).join('') + '</tbody><tfoot><tr><td class="nm">ALL SECTIONS</td>' +
-      bs.map(function (b) {
-        var t = brT(b), v = t ? A.score(t) : null;
-        return '<td>' + (v === null ? '—' : Math.round(v) + '%') + '</td>';
-      }).join('') +
-      (function () { var t = netT(), v = t ? A.score(t) : null;
-        return '<td>' + (v === null ? '—' : Math.round(v) + '%') + '</td>'; })() +
-      '</tr></tfoot></table></div>';
+  /* ── Branch › Audit section › Checklist item, with grade and stage across ──
+     The same shape as the Care Calls stage table: it opens on the branch
+     comparison, and every level below is a tap away. Reading down a column
+     compares branches at one stage; reading across a row shows where in the
+     school one branch, section or item is weak. */
+  function renderHeatTable(){
+    var G = A.GRADES, R = D.raw, ms = months(), ex = TBL_EXP();
+    var bs = VIEW.branch ? [VIEW.branch] : D.branches;
+    var multi = bs.length > 1;
+    if (!multi) ex.b[bs[0]] = true;          // nothing to compare against: open it
 
-    /* Table 2 — the same sections against grade and stage */
-    var scope = VIEW.branch || null;
-    var t2 = '<div class="audt-h" style="margin-top:16px">All thirteen sections × grade &amp; stage' +
-      '<span style="font-weight:500;color:var(--txm);margin-left:8px;font-size:10.5px">' +
-      esc(scope || 'all branches') + '</span></div>' +
-      '<div class="au-heat-scroll"><table class="audt"><thead><tr><th class="nm">Audit section</th>' +
-      G.map(function (g) { return '<th>' + esc(g) + '</th>'; }).join('') +
-      '<th>All stages</th></tr></thead><tbody>' +
-      ordered.map(function (row) {
-        return '<tr><td class="nm">' + esc(row.c) + '</td>' +
+    function tally(rows, gi){
+      var t = A.blank();
+      rows.forEach(function (r) {
+        var cells = (gi === null) ? R.cols : [R.cols[gi]];
+        cells.forEach(function (ci) {
+          if (ci < 0) return;
+          var v = A.str(r[ci]);
+          if (v === 'Yes') t.yes++; else if (v === 'No') t.no++; else if (v === 'IP') t.ip++;
+          else if (v === 'NA') t.na++; else if (v === 'NR') t.nr++; else t.none++;
+        });
+      });
+      return t;
+    }
+    function rowsFor(branch, cat, param){
+      return R.rows.filter(function (r) {
+        if (ms.indexOf(A.str(r[R.iM])) < 0) return false;
+        if (branch && A.str(r[R.iB]) !== branch) return false;
+        if (cat && A.str(r[R.iC]) !== cat) return false;
+        if (param && A.str(r[R.iP]) !== param) return false;
+        return true;
+      });
+    }
+    function cell(t, label, data, bold){
+      var v = A.score(t), sc = A.scored(t);
+      return '<td class="au-t' + (bold ? ' b' : '') + '" style="background:' +
+        (sc ? A.colorFor(v) : '#F1F5F9') + ';color:' + (sc ? '#fff' : '#94A3B8') + '"' + (data || '') +
+        ' title="' + esc(label) + ' — ' + (sc ? v.toFixed(1) + '% of ' + sc + ' checks (' +
+          t.yes + ' yes, ' + t.no + ' no, ' + t.ip + ' in progress)' : 'not audited') + '">' +
+        '<span class="n">' + (sc ? Math.round(v) : '\u00b7') + '</span>' +
+        '<span class="s">' + (sc ? sc : '&nbsp;') + '</span></td>';
+    }
+    function nameCell(text, level, expandable, open, key, title){
+      return '<td class="nm lv' + level + (expandable ? ' tap' : '') + '"' +
+        (expandable ? ' data-x="' + esc(key) + '"' : '') +
+        (title ? ' title="' + esc(title) + '"' : '') + '>' +
+        (expandable ? '<span class="car">' + (open ? '\u25be' : '\u25b8') + '</span>' : '') +
+        esc(text) + '</td>';
+    }
+
+    var out = '';
+    bs.forEach(function (b) {
+      var brRows = rowsFor(b, null, null);
+      if (!brRows.length) return;
+      var bOpen = !!ex.b[b];
+      out += '<tr class="lvl-b">' + nameCell(b, 0, true, bOpen, 'b:' + b) +
+        G.map(function (g, gi) {
+          return cell(tally(brRows, gi), b + ' \u00b7 ' + g,
+            ' data-b="' + esc(b) + '" data-g="' + gi + '"', true);
+        }).join('') +
+        cell(tally(brRows, null), b + ' \u00b7 all stages', ' data-b="' + esc(b) + '"', true) + '</tr>';
+      if (!bOpen) return;
+
+      /* sections inside this branch, weakest first */
+      var cats = D.cats.map(function (c) {
+        var rs = rowsFor(b, c, null);
+        return { c: c, rows: rs, v: rs.length ? A.score(tally(rs, null)) : null };
+      }).filter(function (x) { return x.rows.length; })
+        .sort(function (x, y) { return (x.v === null ? 999 : x.v) - (y.v === null ? 999 : y.v); });
+
+      cats.forEach(function (C) {
+        var sk = b + '|' + C.c, sOpen = !!ex.s[sk];
+        out += '<tr class="lvl-c">' + nameCell(C.c, 1, true, sOpen, 's:' + sk) +
           G.map(function (g, gi) {
-            return heatCell(catGradeT(row.c, gi, scope), (scope || 'All branches') + ' · ' + row.c + ' · ' + g,
-              ' data-c="' + esc(row.c) + '" data-g="' + gi + '"');
+            return cell(tally(C.rows, gi), b + ' \u203a ' + C.c + ' \u00b7 ' + g,
+              ' data-b="' + esc(b) + '" data-c="' + esc(C.c) + '" data-g="' + gi + '"');
           }).join('') +
-          heatCell(scope ? brCatT(scope, row.c) : row.t,
-            (scope || 'All branches') + ' · ' + row.c, ' data-c="' + esc(row.c) + '"' +
-            (scope ? ' data-b="' + esc(scope) + '"' : '')) + '</tr>';
-      }).join('') + '</tbody><tfoot><tr><td class="nm">ALL SECTIONS</td>' +
-      G.map(function (g) {
-        var t = scope ? brGradeT(scope, g) : netGradeT(g), v = t ? A.score(t) : null;
-        return '<td>' + (v === null ? '—' : Math.round(v) + '%') + '</td>';
-      }).join('') +
-      (function () { var t = scope ? brT(scope) : netT(), v = t ? A.score(t) : null;
-        return '<td>' + (v === null ? '—' : Math.round(v) + '%') + '</td>'; })() +
-      '</tr></tfoot></table></div>';
+          cell(tally(C.rows, null), b + ' \u203a ' + C.c,
+            ' data-b="' + esc(b) + '" data-c="' + esc(C.c) + '"') + '</tr>';
+        if (!sOpen) return;
 
-    return t1 + t2 +
-      '<p class="au-note">Every figure is <b>Yes ÷ (Yes + No + IP)</b> with the number of scored checks beneath it, ' +
-      'so a high percentage on three checks is never mistaken for a high percentage on ninety. Sections read ' +
-      'weakest-first across the network. The grade table follows the branch chosen on the left. Click any cell ' +
-      'for the checklist behind it.</p>';
+        /* checklist items inside this section, weakest first */
+        var byP = {};
+        C.rows.forEach(function (r) {
+          var p = A.str(r[R.iP]); if (!p) return;
+          (byP[p] || (byP[p] = [])).push(r);
+        });
+        Object.keys(byP).map(function (p) {
+          return { p: p, rows: byP[p], v: A.score(tally(byP[p], null)) };
+        }).sort(function (x, y) { return (x.v === null ? 999 : x.v) - (y.v === null ? 999 : y.v); })
+          .forEach(function (I) {
+            out += '<tr class="lvl-s">' +
+              nameCell('\u21b3 ' + cleanItem(I.p), 2, false, false, '', I.p) +
+              G.map(function (g, gi) {
+                return cell(tally(I.rows, gi), b + ' \u203a ' + C.c + ' \u203a ' + cleanItem(I.p) + ' \u00b7 ' + g,
+                  ' data-b="' + esc(b) + '" data-c="' + esc(C.c) + '" data-p="' + esc(I.p) + '" data-g="' + gi + '"');
+              }).join('') +
+              cell(tally(I.rows, null), b + ' \u203a ' + C.c + ' \u203a ' + cleanItem(I.p),
+                ' data-b="' + esc(b) + '" data-c="' + esc(C.c) + '" data-p="' + esc(I.p) + '"') + '</tr>';
+          });
+      });
+    });
+
+    var foot = multi ? (function () {
+      var all = rowsFor(null, null, null);
+      return '<tr class="sgt-tot"><td class="nm">ALL BRANCHES</td>' +
+        G.map(function (g, gi) {
+          return cell(tally(all, gi), 'All branches \u00b7 ' + g, ' data-g="' + gi + '"', true);
+        }).join('') +
+        cell(tally(all, null), 'All branches \u00b7 all stages', '', true) + '</tr>';
+    })() : '';
+
+    return '<div class="audt-h">Branch \u203a audit section \u203a checklist item' +
+      '<span class="sgt-hint">tap a branch or a section to expand</span></div>' +
+      '<div class="au-heat-scroll"><table class="audt auhm autree"><thead><tr>' +
+      '<th class="nm">Branch \u203a Section \u203a Item</th>' +
+      G.map(function (g) { return '<th>' + esc(g) + '</th>'; }).join('') +
+      '<th>Overall</th></tr></thead><tbody>' + out + '</tbody>' +
+      (foot ? '<tfoot>' + foot + '</tfoot>' : '') + '</table></div>' +
+      '<div class="au-legend">' +
+      '<span><i style="background:#059669"></i>' + A.ON_TRACK + '%+ on track</span>' +
+      '<span><i style="background:#D97706"></i>' + A.REVIEW + '\u2013' + (A.ON_TRACK - 1) + '% review</span>' +
+      '<span><i style="background:#DC2626"></i>under ' + A.REVIEW + '% critical</span>' +
+      '<span><i style="background:#F1F5F9;border:1px solid #E0E8FF"></i>not audited</span>' +
+      '</div>' +
+      '<p class="au-note">Each cell is <b>Yes \u00f7 (Yes + No + IP)</b> with the number of scored checks beneath, ' +
+      'so a high figure on three checks is never mistaken for one on ninety. Read <b>down a column</b> to compare ' +
+      'branches at one stage, <b>across a row</b> to see where a branch, section or item is weak. Sections and items ' +
+      'are ordered weakest first. Every cell opens the audit lines behind it.</p>';
   }
 
   function renderHeat() {
@@ -10094,16 +10169,21 @@ window.AUDIT = (function () {
     el.querySelectorAll('td.au-t').forEach(function (td) {
       td.addEventListener('click', function () {
         var b = td.dataset.b, c = td.dataset.c, g = td.dataset.g, p = td.dataset.p;
-        if (p) itemModal(c, p, (g !== undefined && g !== '') ? +g : null, VIEW.branch || null);
-        else if (g !== undefined && g !== '') gradeModal(c, +g, b || VIEW.branch || null);
-        else if (b) cellModal(b, c);
-        else sectionModal(c);
+        var gi = (g !== undefined && g !== '') ? +g : null;
+        /* A total row carries no section, so it needs its own view: every
+           section at that stage, rather than an empty section drill-down. */
+        if (p)        itemModal(c, p, gi, b || VIEW.branch || null);
+        else if (c)   { if (gi !== null) gradeModal(c, gi, b || VIEW.branch || null);
+                        else if (b) cellModal(b, c); else sectionModal(c); }
+        else          stageModal(gi, b || VIEW.branch || null);
       });
     });
     el.querySelectorAll('td.nm.tap').forEach(function (td) {
       td.addEventListener('click', function () {
-        var e = SEC_EXP(), k = td.dataset.x;
-        e[k] = !e[k];
+        var k = td.dataset.x || '';
+        if (k.indexOf('b:') === 0) { var e = TBL_EXP(); var b = k.slice(2); e.b[b] = !e.b[b]; }
+        else if (k.indexOf('s:') === 0) { var e2 = TBL_EXP(); var s = k.slice(2); e2.s[s] = !e2.s[s]; }
+        else { var e3 = SEC_EXP(); e3[k] = !e3[k]; }
         renderHeat();
       });
     });
@@ -10132,6 +10212,45 @@ window.AUDIT = (function () {
           '<td class="n" style="font-weight:700;color:' + A.colorFor(v) + '">' +
           (v === null ? '—' : v.toFixed(0) + '%') + '</td></tr>';
       }).join('') + '</tbody></table>');
+  }
+
+  /* every section at one stage — the drill-down behind a total-row cell */
+  function stageModal(gi, branch) {
+    var R = D.raw, ms = months();
+    var rows = R.rows.filter(function (r) {
+      if (branch && A.str(r[R.iB]) !== branch) return false;
+      return ms.indexOf(A.str(r[R.iM])) >= 0;
+    });
+    var cells = (gi === null) ? R.cols : [R.cols[gi]];
+    var by = {};
+    rows.forEach(function (r) {
+      var c = A.str(r[R.iC]) || 'Uncategorised';
+      var t = by[c] || (by[c] = A.blank());
+      addRowLocal(t, r, cells);
+    });
+    var list = Object.keys(by).map(function (c) { return { c: c, t: by[c], v: A.score(by[c]) }; })
+      .sort(function (x, y) { return (x.v === null ? 999 : x.v) - (y.v === null ? 999 : y.v); });
+    var tot = A.blank(); rows.forEach(function (r) { addRowLocal(tot, r, cells); });
+
+    modal((branch || 'All branches') + (gi === null ? ' \u00b7 all stages' : ' \u00b7 ' + A.GRADES[gi]),
+      list.length + ' audit sections \u00b7 ' + A.scored(tot) + ' scored checks \u00b7 ' +
+      (A.score(tot) === null ? '\u2014' : A.score(tot).toFixed(1) + '%'),
+      '<table class="au-tbl"><thead><tr><th>Audit section</th><th class="n">Compliance</th><th></th>' +
+      '<th class="n">Yes</th><th class="n">No</th><th class="n">In progress</th>' +
+      '<th class="n">Not scored</th></tr></thead><tbody>' +
+      list.map(function (x) {
+        return '<tr><td>' + esc(x.c) + '</td>' +
+          '<td class="n" style="font-weight:700;color:' + A.colorFor(x.v) + '">' +
+            (x.v === null ? '\u2014' : x.v.toFixed(0) + '%') + '</td>' +
+          '<td style="width:110px"><div class="au-bar"><i style="width:' +
+            (x.v === null ? 0 : Math.max(1, x.v)) + '%;background:' + A.colorFor(x.v) + '"></i></div></td>' +
+          '<td class="n" style="color:#059669">' + x.t.yes + '</td>' +
+          '<td class="n" style="color:#DC2626">' + x.t.no + '</td>' +
+          '<td class="n" style="color:#D97706">' + x.t.ip + '</td>' +
+          '<td class="n" style="color:#94A3B8">' + (x.t.na + x.t.nr + x.t.none) + '</td></tr>';
+      }).join('') + '</tbody></table>' +
+      '<p class="au-note">Weakest section first. <b>Not scored</b> is NA, NR or blank \u2014 excluded from the ' +
+      'percentage rather than counted against the branch.</p>');
   }
 
   /* one checklist item, optionally at one stage */
