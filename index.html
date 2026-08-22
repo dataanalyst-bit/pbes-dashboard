@@ -4009,11 +4009,10 @@ function renderGrievance(){
   // ── Chart 2: Severity Distribution (doughnut) ──
   const sevCats=['Critical','High','Medium','Low'];
   const sevColors={'Critical':'#991B1B','High':'#DC2626','Medium':'#D97706','Low':'#059669'};
-  const sevData=sevCats.map(s=>rows.filter(r=>(r.Severity||'')===s).length);
-  // chart removed from the Grievance tab
-
-
-  renderPurchaseManagerPerf(_pRows,BRANCHES);
+  // The Severity Distribution and Parent Satisfaction charts were removed from
+  // this tab. The line that used to follow them belonged to renderPurchase and
+  // was left behind by an earlier bad edit — it referenced _pRows, a variable
+  // that only exists inside that other function, so every Grievance render threw.
 }
 
 // Purchase Manager Performance per branch
@@ -12575,6 +12574,204 @@ async function loadSyl(force){
   window.showTab=function(id,btn){ _s(id,btn); if(id==='syl') loadSyl(false); };
   window.switchTab=function(id){ _w(id); if(id==='syl') loadSyl(false); };
 })();
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   RESTORED HELPERS
+   These grievance, vigilance and purchase functions were removed by an earlier
+   edit that deleted more than it should have. They are reinstated verbatim from
+   the original dashboard, in their own block so nothing around them is touched.
+   ══════════════════════════════════════════════════════════════════════════ */
+const GV_POS_ACTION=['resolved','solved','sorted','informed','spoke','spoken','discussed','explained',
+  'counsel','warned','warning','meeting','arranged','follow-up','followup','follow up','taken care',
+  'addressed','apolog','assured','reassured','confirmed','appreciated','satisfied','thanked','monitor',
+  'action taken','cctv','checked','verified','shared','updated','instructed','ensured','provided','fixed'];
+const GV_WEAK_ACTION=['pending','yet to','waiting','no response','not responded','no action','not done',
+  'will be','to be','escalated','not yet','awaiting','unable','denied','refused'];
+const _GR_COLS=[
+  {key:'Branch',label:'Branch'},{key:'Date',label:'Date',date:true},{key:'Student',label:'Student'},
+  {key:'Grade',label:'Grade'},{key:'Parent',label:'Parent'},{key:'Source',label:'Source'},
+  {key:'Category',label:'Category'},{key:'Severity',label:'Severity',pill:true},
+  {key:'Description',label:'Description',maxW:'260px'},{key:'AssignedTo',label:'Assigned To'},
+  {key:'ActionTaken',label:'Action Taken',maxW:'220px'},{key:'Status',label:'Status',pill:true},
+  {key:'TargetDate',label:'Target Date',date:true},{key:'ClosureDate',label:'Closure Date',date:true},
+  {key:'ParentSatisfaction',label:'Satisfaction',pill:true}
+];
+
+const GV_NEG_DESC=['slap','hit','beat','hurt','injur','bleed','blood','unsafe','danger','abus','harass',
+  'bully','target','threat','scared','afraid','fear','distress','cry','angry','anger','fight','wound',
+  'accident','fell','slip','lost','stolen','steal','miss','complain','scold','yell','shout','rude',
+  'inappropriate','negligen','ignore','discomfort','uncomfortable','sick','pain','worry','worried',
+  'serious','escalat','transfer certificate','withdraw','strict action','not satisfied','unhappy'];
+
+function gvScoreText(text,lexicon){
+  const t=String(text||'').toLowerCase();
+  if(!t||t==='–'||t==='nan') return 0;
+  let hits=0; lexicon.forEach(w=>{ if(t.indexOf(w)!==-1) hits++; });
+  return hits;
+}
+
+function gvSentiment(r){
+  const negD=gvScoreText(r.Description,GV_NEG_DESC);
+  const posA=gvScoreText(r.ActionTaken,GV_POS_ACTION);
+  const wkA =gvScoreText(r.ActionTaken,GV_WEAK_ACTION);
+  const hasAction=r.ActionTaken&&r.ActionTaken!=='–'&&!/^nan$/i.test(r.ActionTaken);
+  // severity: 0 hits→0 … 4+ hits→100 (capped)
+  const severity=Math.min(100,negD*25);
+  // action quality: positive hits push up, weak/no-action pulls down; no action text at all = 20
+  let actionQ;
+  if(!hasAction) actionQ=20;
+  else actionQ=Math.max(0,Math.min(100,50+posA*15-wkA*25));
+  return {severity,actionQ};
+}
+
+function viewGrievRecords(filterKey){
+  let rows=_grievRows();
+  let title='📣 Grievance';
+  if(filterKey==='Open'){ rows=rows.filter(r=>_isOpen(r.Status)); title='📂 Open Grievance Cases'; }
+  else if(filterKey==='Resolved'){ rows=rows.filter(r=>_isResolved(r.Status)); title='✅ Resolved Cases'; }
+  else if(filterKey==='Overdue'){ rows=rows.filter(r=>_isOverdue(r)); title='⏰ Overdue Cases'; }
+  else if(filterKey==='Satisfied'){ rows=rows.filter(r=>r.ParentSatisfaction&&!/^nan$/i.test(r.ParentSatisfaction)); title='😊 Parent Satisfaction'; }
+  else { title='📋 All Grievance Records'; }
+  const bl=fBranch==='ALL'?'All Branches':fBranch;
+  openModal(title,`${rows.length.toLocaleString('en-IN')} records · ${bl}`,rows,_GR_COLS);
+}
+
+function viewGrievByBranchStatus(branch,status){
+  const rows=_grievRows().filter(r=>r.Branch===branch&&(r.Status||'')===status);
+  openModal(`📣 ${branch} — ${status}`,`${rows.length} records`,rows,_GR_COLS);
+}
+
+function viewGrievBySeverity(sev){
+  const rows=_grievRows().filter(r=>(r.Severity||'')===sev);
+  const bl=fBranch==='ALL'?'All Branches':fBranch;
+  openModal(`⚠️ ${sev} Severity`,`${rows.length} records · ${bl}`,rows,_GR_COLS);
+}
+
+function viewGrievByCategory(cat){
+  const rows=_grievRows().filter(r=>{let c=(r.Category||'Others').trim();if(/^nan$/i.test(c)||!c)c='Others';if(c==='Academic')c='Academics';return c===cat;});
+  const bl=fBranch==='ALL'?'All Branches':fBranch;
+  openModal(`📋 ${cat}`,`${rows.length} records · ${bl}`,rows,_GR_COLS);
+}
+
+function viewGrievBySatisfaction(branch,sat){
+  const rows=_grievRows().filter(r=>r.Branch===branch&&(r.ParentSatisfaction||'')===sat);
+  openModal(`😊 ${branch} — ${sat}`,`${rows.length} records`,rows,_GR_COLS);
+}
+
+function openGrievDetail(r){
+  openModal(`📣 ${r.Student} — ${r.Branch}`,`${r.Category} · ${r.Severity} · ${r.Status}`,[r],_GR_COLS);
+}
+
+function installVigilanceClick(){
+  if(vigChartClickInstalled) return;
+  const canvas=document.getElementById('vig-br');
+  if(!canvas) return;
+  canvas.style.cursor='pointer';
+  canvas.addEventListener('click', function(e){
+    const chart=CHARTS['vig-br'];
+    if(!chart) return;
+    const pts=chart.getElementsAtEventForMode(e,'nearest',{intersect:true},true);
+    if(!pts.length) return;
+    const {datasetIndex,index}=pts[0];
+    const statusLabel=chart.data.datasets[datasetIndex].label; // 'Closed' | 'In Progress' | 'Open'
+    const vigBranches=fBranch==='ALL'?BRANCHES:[fBranch];
+    const branch=vigBranches[index];
+    if(!branch) return;
+    const _prevBranch=fBranch;
+    fBranch=branch;
+    viewVigilanceRecords(statusLabel);
+    fBranch=_prevBranch;
+  });
+  vigChartClickInstalled=true;
+}
+
+function renderPurchase(){
+  const BRANCHES=['Gowdavalli','Bachupally','Boduppal','Pocharam','Keesara'];
+  const _pRows=(typeof PUR_DATA!=='undefined'&&Array.isArray(PUR_DATA))
+    ? PUR_DATA.filter(r=>fBranch==='ALL'||r.Branch===fBranch)
+    : [];
+  // Status matchers (data has Delivered / In Progress / Pending; Ordered & Rejected supported if present)
+  const isDelivered=r=>/delivered/i.test(r.PurchaseStatus||'');
+  const isOrdered=r=>/ordered|order placed/i.test(r.PurchaseStatus||'');
+  const isRejected=r=>/rejected|cancel/i.test(r.PurchaseStatus||'');
+  const isInProg=r=>/in progress/i.test(r.PurchaseStatus||'');
+
+  const delivered=BRANCHES.map(b=>_pRows.filter(r=>r.Branch===b&&isDelivered(r)).length);
+  const ordered=  BRANCHES.map(b=>_pRows.filter(r=>r.Branch===b&&isOrdered(r)).length);
+  const rejected= BRANCHES.map(b=>_pRows.filter(r=>r.Branch===b&&isRejected(r)).length);
+  const inprog=   BRANCHES.map(b=>_pRows.filter(r=>r.Branch===b&&isInProg(r)).length);
+  const totals=   BRANCHES.map((b,i)=>delivered[i]+ordered[i]+rejected[i]+inprog[i]);
+  const labels=   BRANCHES.map((b,i)=>`${b}\n(${totals[i]})`);
+
+  const bl=fBranch==='ALL'?'All Branches':fBranch;
+  setTxt('pur-tag',bl+' · '+fi(_pRows.length)+' Requests');
+
+  const nDelivered=_pRows.filter(isDelivered).length;
+  const nOrdered=_pRows.filter(isOrdered).length;
+  const nRejected=_pRows.filter(isRejected).length;
+  const nInProg=_pRows.filter(isInProg).length;
+  setTxt('pur-delivered',fi(nDelivered));
+  setTxt('pur-delivered-s',_pRows.length>0?fp(nDelivered/_pRows.length*100)+' of all requests':'–');
+  setTxt('pur-ordered',fi(nOrdered));
+  setTxt('pur-ordered-s',nOrdered>0?'Click to view':'None ordered');
+  setTxt('pur-rejected',fi(nRejected));
+  setTxt('pur-rejected-s',nRejected>0?'Click to view':'None rejected');
+  setTxt('pur-inprog',fi(nInProg));
+  setTxt('pur-inprog-s',nInProg>0?fi(nInProg)+' ongoing — click to view':'–');
+
+  // ── Quick View: In Progress & Delivered ──
+  {
+    setTxt('pur-quick-fn',bl);
+    const ipRows=_pRows.filter(isInProg);
+    const delivRows=_pRows.filter(isDelivered);
+    setTxt('pur-ip-count',fi(ipRows.length));
+    setTxt('pur-delivered-count',fi(delivRows.length));
+
+    function purQuickHtml(rowsArr,clickFilter){
+      const shown=rowsArr.slice(0,200);
+      if(shown.length===0) return '<tr><td colspan="4" style="padding:14px;text-align:center;color:#94A3B8;font-style:italic;">No records</td></tr>';
+      return shown.map((r,i)=>{
+        const bg=i%2===0?'#fff':'#F8FAFF';
+        const amt=r.Amount!=='–'&&!isNaN(+r.Amount)?'₹'+fi(+r.Amount):'–';
+        return `<tr style="background:${bg};cursor:pointer;" onclick="viewPurchaseRecords('${clickFilter}')">
+          <td style="padding:6px 10px;border-bottom:1px solid #F1F5F9;"><span class="bd b${r.Branch}"></span>${r.Branch}</td>
+          <td style="padding:6px 10px;border-bottom:1px solid #F1F5F9;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.Item}</td>
+          <td style="padding:6px 10px;border-bottom:1px solid #F1F5F9;">${r.Dept}</td>
+          <td style="padding:6px 10px;border-bottom:1px solid #F1F5F9;color:#94A3B8;">${r.Priority}</td>
+        </tr>`;
+      }).join('')+(rowsArr.length>200?`<tr><td colspan="4" style="padding:8px 10px;text-align:center;font-weight:600;font-size:11px;cursor:pointer;" onclick="viewPurchaseRecords('${clickFilter}')">+ ${rowsArr.length-200} more — click to view all</td></tr>`:'');
+    }
+    setHtml('pur-ip-tbody',purQuickHtml(ipRows,'In Progress'));
+    setHtml('pur-delivered-tbody',purQuickHtml(delivRows,'Delivered'));
+  }
+
+  mkChart('pur-st',{type:'bar',data:{
+    labels,
+    datasets:[
+      {label:'Delivered',  data:delivered,backgroundColor:'#059669',borderRadius:4,stack:'s'},
+      {label:'Ordered',    data:ordered,  backgroundColor:'#0D9488',borderRadius:4,stack:'s'},
+      {label:'In Progress',data:inprog,   backgroundColor:'#3B82F6',borderRadius:4,stack:'s'},
+      {label:'Rejected',   data:rejected, backgroundColor:'#DC2626',borderRadius:4,stack:'s'},
+    ]
+  },options:{responsive:true,maintainAspectRatio:true,
+    onClick:(evt,elements)=>{
+      if(!elements||!elements.length)return;
+      const branch=BRANCHES[elements[0].index];
+      const statusMap=['Delivered','Ordered','In Progress','Rejected'];
+      const status=statusMap[elements[0].datasetIndex];
+      viewPurchaseByBranchStatus(branch,status);
+    },
+    plugins:{legend:{display:true,position:'top'},tooltip:{mode:'index',intersect:false},
+      datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]>0,anchor:'center',align:'center',
+        font:{weight:'800',size:11},color:'#fff',formatter:v=>v>0?v:''}
+    },
+    scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,grid:{color:'#E0E8FF'},ticks:{maxTicksLimit:5}}}
+  }});
+
+  renderPurchaseManagerPerf(_pRows,BRANCHES);
+}
 </script>
 </body>
 </html>
