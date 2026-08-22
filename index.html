@@ -399,6 +399,51 @@ body.nav-min .sn-foot{display:none}
 .pt-cat .vl span{font-size:11px;font-weight:600;color:var(--txl)}
 .pt-cat .pcv{font-size:10px;color:var(--txl);margin-top:5px;font-variant-numeric:tabular-nums}
 
+
+/* ═══ AUDIT: BRANCH RAIL, GRADE TABLES, ICONS ═══ */
+.au-split{display:flex;gap:14px;align-items:flex-start}
+.au-rail{flex:0 0 168px;display:flex;flex-direction:column;gap:5px}
+.au-rail .lbl{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--txm);font-weight:800;margin-bottom:2px}
+.au-rail button{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;
+  font:inherit;font-size:12px;font-weight:600;padding:8px 11px;border-radius:9px;cursor:pointer;
+  border:1px solid var(--bor);background:var(--sur);color:var(--tx);text-align:left}
+.au-rail button:hover{background:var(--pl);border-color:var(--p)}
+.au-rail button.on{background:var(--p);border-color:var(--p);color:#fff}
+.au-rail button span{font-variant-numeric:tabular-nums;font-weight:700;font-size:11px;opacity:.85}
+.au-split .au-main{flex:1;min-width:0}
+@media(max-width:900px){.au-split{flex-direction:column}.au-rail{flex:none;width:100%;flex-direction:row;flex-wrap:wrap}
+  .au-rail button{width:auto}}
+table.audt{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;min-width:760px}
+table.audt th{background:#F1F7F3;color:#07361F;font-size:10px;font-weight:800;text-transform:uppercase;
+  padding:7px 9px;border:1px solid #B7CFC0;text-align:center;line-height:1.25}
+table.audt th.nm{text-align:left;min-width:200px}
+table.audt td{padding:6px 9px;border:1px solid #D6E4DB;text-align:center}
+table.audt td.nm{text-align:left;font-weight:600;color:var(--tx)}
+table.audt td.au-t{cursor:pointer;transition:background .12s}
+table.audt td.au-t:hover{box-shadow:inset 0 0 0 2px #0B5D33}
+table.audt td .n{display:block;font-weight:700;line-height:1.2}
+table.audt td .s{display:block;font-size:9px;font-weight:500;opacity:.75;line-height:1.2}
+table.audt tfoot td,table.audt tr.sgt-tot td{background:#0B5D33;color:#fff;font-weight:800;border-color:#0B5D33}
+table.audt tfoot td.nm,table.audt tr.sgt-tot td.nm{text-align:left}
+.audt-h{font-size:11.5px;font-weight:800;color:var(--tx);margin:0 0 7px}
+.audt-h .hint{margin-left:9px;font-size:10px;font-weight:500;color:var(--txm)}
+table.auhm td.nm.tap{cursor:pointer;user-select:none}
+table.auhm td.nm.tap:hover{background:var(--pl)}
+table.auhm td.nm .car{display:inline-block;width:13px;color:#0B5D33;font-size:10px}
+table.auhm td.nm .ico,.au-heat td.cat .ico{display:inline-block;width:20px;font-size:13px;
+  text-align:center;margin-right:3px;line-height:1}
+table.auhm th .ico{display:block;font-size:14px;margin-bottom:2px}
+table.auhm tr.au-secrow td.nm,table.auhm tr.lvl-b td.nm{font-weight:800;color:#07361F}
+table.auhm tr.lvl-b td{background:#EEF6F1;border-top:2px solid #B7CFC0}
+table.auhm tr.lvl-c td{background:#F8FAFF}
+table.auhm tr.lvl-c td.nm{color:#1E4FD8;font-weight:700}
+table.auhm tr.au-itemrow td.nm.sub,table.auhm tr.lvl-s td.nm.sub{padding-left:26px;font-weight:500;
+  font-size:11.5px;color:#64748B}
+table.auhm td.nm.lv1{padding-left:22px}
+table.auhm td.nm.lv2{padding-left:44px}
+table.auhm td.itm{font-size:11px;font-weight:700;padding:4px 9px}
+table.auhm tr.au-itemrow td{border-color:#E8EEF2}
+
 /* ═══ SCHOOL AUDIT TAB ═══ */
 #pane-audit .au-wrap{display:flex;flex-direction:column;gap:16px}
 .au-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
@@ -2029,10 +2074,29 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
 
       <div class="au-sec">
-        <h3>Where the gaps actually are</h3>
+        <div style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap">
+          <div style="flex:1;min-width:260px">
+            <h3 style="margin:0">Where the gaps actually are</h3>
+          </div>
+          <div class="vt-toggle" id="au-heat-toggle">
+            <button data-v="chart" class="on">🔥 Heatmap</button><button data-v="table">📋 Table</button>
+          </div>
+        </div>
         <div class="sub">Each of the thirteen audit sections, for every branch. This is the one view that separates a
           branch problem from a policy problem.</div>
         <div id="au-heat"></div>
+      </div>
+
+      <div class="au-sec">
+        <div style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap">
+          <div style="flex:1;min-width:260px">
+            <h3 style="margin:0">Stage by stage, branch against branch</h3>
+            <div class="sub" style="margin-bottom:0">Branches across the top, one stage at a time. Tap a stage to
+              open the thirteen audit sections beneath it.</div>
+          </div>
+          <button class="exm-refresh" id="au-cmp-all" title="Open or close every stage">⇕ Expand all</button>
+        </div>
+        <div id="au-stage-cmp" style="margin-top:14px"></div>
       </div>
 
       <div class="au-sec">
@@ -9083,44 +9147,499 @@ window.AUDIT = (function () {
   }
 
   /* ══════════════════ 4. HEATMAP ══════════════════ */
-  function renderHeat() {
-    var bs = branches(), cs = D.cats;
-    var h = '<div class="au-heat-scroll"><table class="au-heat"><thead><tr><th class="cat">Section</th>' +
-      bs.map(function (b) { return '<th>' + esc(b) + '</th>'; }).join('') +
-      '<th class="net">Network</th></tr></thead><tbody>';
+  /* ── Icons for the thirteen sections and their checklist lines ──
+     Eighty-eight near-identical lines is hard to scan; an icon gives each row a
+     shape the eye can find again. Items are matched on their own keywords
+     first, so "Science Lab" gets a flask rather than the generic Lab marker,
+     and anything unmatched inherits its section's icon rather than showing
+     blank. */
+  var AU_SEC_ICON = {
+    'parent connect':'\ud83d\udcde', 'academic monitoring':'\ud83d\udd0d', 'collaborations':'\ud83e\udd1d',
+    'social media':'\ud83d\udcf1', 'sports / pva':'\ud83c\udfc5', 'sports/pva':'\ud83c\udfc5',
+    'lab usage':'\ud83d\udd2c', 'student & parent prog.':'\ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67',
+    'activities & comp.':'\ud83c\udfaf', 'annual events':'\ud83c\udfaa', 'reg. academic':'\ud83d\udcda',
+    'reg. exam cell':'\ud83d\udcdd', 'reg. admin':'\ud83d\uddc2\ufe0f', 'assessment & analysis':'\ud83d\udcca',
+    'uncategorised':'\ud83d\udccc'
+  };
+  var AU_ITEM_ICON = [
+    [/\bai\s*lab/,'\ud83e\udd16'], [/robotic|cognospace/,'\ud83e\uddbe'], [/computer\s*lab|erp\s*usage/,'\ud83d\udcbb'],
+    [/science\s*lab/,'\ud83d\udd2c'], [/math\s*lab/,'\ud83d\udcd0'], [/library/,'\ud83d\udcd6'], [/\blab\s*register/,'\ud83e\uddea'],
+    [/swim/,'\ud83c\udfca'], [/skat/,'\u26f8\ufe0f'], [/taekwondo/,'\ud83e\udd4b'], [/yoga/,'\ud83e\uddd8'],
+    /* "attendance" contains "dance": attendance must be tested first, and the
+       dance rule needs a word boundary, or every register dances */
+    [/attendance/,'\u2705'], [/\bdance\b|\bdancing\b/,'\ud83d\udc83'],
+    [/music/,'\ud83c\udfb5'], [/art\s*&\s*craft/,'\ud83c\udfa8'], [/\bpet\b/,'\ud83c\udfc3'], [/hand\s*writ/,'\u270d\ufe0f'],
+    [/sports\s*day/,'\ud83c\udfdf\ufe0f'], [/sports\s*comp|pva\s*comp/,'\ud83c\udfc6'], [/inter-?house/,'\ud83c\udfbd'],
+    [/annual\s*day/,'\ud83c\udfad'], [/picnic|field\s*trip/,'\ud83d\ude8c'], [/ted\s*talk/,'\ud83c\udfa4'],
+    [/radio/,'\ud83d\udcfb'], [/assembl/,'\ud83c\udf05'], [/exhibition/,'\ud83d\uddbc\ufe0f'],
+    [/coffee\s*meet/,'\u2615'], [/whatsapp/,'\ud83d\udcac'], [/news\s*letter|newsletter/,'\ud83d\udcf0'],
+    [/instagram|facebook|youtube|google/,'\ud83d\udcf8'], [/website/,'\ud83c\udf10'],
+    [/care\s*calls?/,'\ud83d\udcde'], [/parent\s*connect/,'\ud83e\udd1d'], [/parent\s*feedback/,'\ud83d\uddf3\ufe0f'],
+    [/parent\s*complaint|grievance/,'\ud83d\udce3'], [/student\s*led\s*conference/,'\ud83e\uddd1\u200d\ud83c\udfeb'],
+    [/principal\s*classroom/,'\ud83d\udc54'], [/vice\s*principal/,'\ud83c\udf93'], [/head\s*mistress/,'\ud83d\udc69\u200d\ud83c\udfeb'],
+    [/hod\s*classroom/,'\ud83e\uddd1\u200d\ud83d\udcbc'], [/coordinator\s*observ/,'\ud83d\udccb'], [/pre-?primary\s*incharge/,'\ud83e\uddf8'],
+    [/teacher\s*observation/,'\ud83d\udc41\ufe0f'], [/notebook\s*correct/,'\ud83d\udd8a\ufe0f'], [/worksheet/,'\ud83d\udcc4'],
+    [/syllabus/,'\ud83d\udcc5'], [/almanac/,'\ud83d\udcd4'], [/lesson\s*plan|session/,'\ud83d\uddd2\ufe0f'],
+    [/teaching\s*notes/,'\ud83d\udcdd'], [/day\s*wise\s*planner|timetable/,'\ud83d\udd50'],
+    [/floor\s*inch|signature/,'\u2712\ufe0f'], [/weekly\s*rct|^rct$|rct\s*register/,'\ud83e\uddfe'],
+    [/cyclic\s*test/,'\ud83d\udd01'], [/\bpt\s*-?\s*[i0-9]/,'\ud83c\udd7f\ufe0f'], [/term\s*-?\s*i|final\s*term/,'\ud83c\udfaf'],
+    [/question\s*paper/,'\u2753'], [/log\s*sheet/,'\ud83d\udcd1'], [/circular/,'\ud83d\udce2'],
+    [/subject\s*resource/,'\ud83d\uddc3\ufe0f'], [/substitution/,'\ud83d\udd04'], [/service\s*file/,'\ud83d\uddc4\ufe0f'],
+    [/stock|fixed\s*asset/,'\ud83d\udce6'], [/maintenance/,'\ud83d\udd27'], [/inward|outward/,'\ud83d\udcec'],
+    [/udise/,'\ud83c\udfdb\ufe0f'], [/admission/,'\ud83c\udf9f\ufe0f'], [/mindspark/,'\ud83d\udca1'],
+    [/wordsworth/,'\ud83d\udcd7'], [/first\s*mile/,'\ud83d\ude80'], [/caca/,'\ud83e\udde9'], [/iit\s*akash/,'\ud83c\udf93'],
+    [/indfame/,'\ud83c\udf1f'], [/health\s*&\s*well|wellness/,'\ud83d\udc9a'], [/journal|daily\s*log/,'\ud83d\udcd3'],
+    [/annual\s*calendar/,'\ud83d\uddd3\ufe0f'], [/register/,'\ud83d\udcda']
+  ];
+  var AU_GRADE_ICON = { 'Prep':'\ud83e\uddf8', '1 & 2':'\ud83c\udf88', '3\u20135':'\u270f\ufe0f',
+                        '6\u20138':'\ud83d\udcd7', '9\u201310':'\ud83c\udf93' };
 
-    /* weakest section at the top: that is the reading order for a decision */
-    var ordered = cs.map(function (c) {
-      var t = netCatT(c);
-      return { c: c, v: t ? A.score(t) : null, t: t };
-    }).sort(function (a, b) {
-      return (a.v === null ? 999 : a.v) - (b.v === null ? 999 : b.v);
+  /* the sheet prefixes each line with its own section: "[Collaborations] Wordsworth" */
+  function cleanItem(p){ return String(p||'').replace(/^\s*\[[^\]]*\]\s*/,'').trim() || String(p||''); }
+  function auSecIcon(cat){ return AU_SEC_ICON[String(cat||'').toLowerCase().trim()] || '\ud83d\udccc'; }
+  function auItemIcon(param, cat){
+    var s = cleanItem(param).toLowerCase();
+    for (var i = 0; i < AU_ITEM_ICON.length; i++) if (AU_ITEM_ICON[i][0].test(s)) return AU_ITEM_ICON[i][1];
+    return auSecIcon(cat);
+  }
+
+  function SEC_EXP(){ return window._AU_SEC_EXP||(window._AU_SEC_EXP={}); }
+  function TBL_EXP(){ return window._AU_TBL_EXP||(window._AU_TBL_EXP={b:{},s:{}}); }
+  function CMP_EXP(){ return window._AU_CMP_EXP||(window._AU_CMP_EXP={}); }
+
+  function addRowLocal(t, row, cols){
+    for (var i = 0; i < cols.length; i++) {
+      if (cols[i] < 0) continue;
+      var v = A.str(row[cols[i]]);
+      if (v === 'Yes') t.yes++; else if (v === 'No') t.no++; else if (v === 'IP') t.ip++;
+      else if (v === 'NA') t.na++; else if (v === 'NR') t.nr++; else t.none++;
+    }
+  }
+  /* section × one grade column, which the pre-computed tallies do not cover */
+  function catGradeT(cat, gi, branch){
+    var R = D.raw, ms = months(), t = A.blank();
+    R.rows.forEach(function (r) {
+      if ((R.iC >= 0 ? A.str(r[R.iC]) : '') !== cat) return;
+      if (branch && A.str(r[R.iB]) !== branch) return;
+      if (ms.indexOf(A.str(r[R.iM])) < 0) return;
+      addRowLocal(t, r, [R.cols[gi]]);
     });
+    return t;
+  }
+  function auCell(t, label, data, bold){
+    var v = A.score(t), sc = A.scored(t);
+    return '<td class="au-t' + (bold ? ' b' : '') + '" style="background:' +
+      (sc ? A.colorFor(v) : '#F1F5F9') + ';color:' + (sc ? '#fff' : '#94A3B8') + '"' + (data || '') +
+      ' title="' + esc(label) + ' \u2014 ' + (sc ? v.toFixed(1) + '% of ' + sc + ' checks (' +
+        t.yes + ' yes, ' + t.no + ' no, ' + t.ip + ' in progress)' : 'not audited') + '">' +
+      '<span class="n">' + (sc ? Math.round(v) : '\u00b7') + '</span>' +
+      '<span class="s">' + (sc ? sc : '&nbsp;') + '</span></td>';
+  }
 
-    ordered.forEach(function (row) {
-      h += '<tr><td class="cat">' + esc(row.c) + '</td>';
-      bs.forEach(function (b) {
-        var t = brCatT(b, row.c), v = t ? A.score(t) : null;
-        var lbl = v === null ? '·' : Math.round(v);
-        h += '<td><button class="au-cell" style="background:' + (v === null ? '#F1F5F9' : A.colorFor(v)) +
-          ';color:' + (v === null ? '#94A3B8' : '#fff') + '" data-b="' + esc(b) + '" data-c="' + esc(row.c) + '" ' +
-          'title="' + esc(b) + ' · ' + esc(row.c) + ' — ' + (v === null ? 'not audited' : v.toFixed(1) + '%' +
-            ' (' + t.yes + ' yes, ' + t.no + ' no, ' + t.ip + ' in progress)') + '">' + lbl + '</button></td>';
+  /* the branch rail: it drives the page's own branch filter rather than keeping
+     a second one, so the rail and the bar at the top can never disagree */
+  function railHTML(){
+    var all = netT();
+    return '<div class="au-rail"><div class="lbl">Branch</div>' +
+      '<button data-b="" class="' + (VIEW.branch ? '' : 'on') + '">All branches' +
+        '<span>' + (all ? Math.round(A.score(all)) + '%' : '\u2014') + '</span></button>' +
+      D.branches.map(function (b) {
+        var t = brT(b), v = t ? A.score(t) : null;
+        return '<button data-b="' + esc(b) + '" class="' + (VIEW.branch === b ? 'on' : '') + '">' +
+          esc(b) + '<span>' + (v === null ? '\u2014' : Math.round(v) + '%') + '</span></button>';
+      }).join('') + '</div>';
+  }
+  function wireRail(host){
+    host.querySelectorAll('.au-rail button').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var sel = document.getElementById('sel-branch');
+        if (sel) { sel.value = btn.dataset.b || 'ALL'; sel.dispatchEvent(new Event('change')); }
+        else { VIEW.branch = btn.dataset.b || ''; renderAll(); }
       });
-      h += '<td class="net"><span style="color:' + A.colorFor(row.v) + '">' +
-        (row.v === null ? '—' : row.v.toFixed(0)) + '</span></td></tr>';
     });
-    h += '</tbody></table></div>' +
-      '<div class="au-legend">' +
+  }
+
+  /* ── heatmap: sections down, GRADE AND STAGE across, sections expandable ──
+     The branch is chosen on the rail, so a branch column here would only repeat
+     it. Tapping a section opens its checklist items, which is the level a gap
+     is actually fixed at. */
+  function renderHeatGrades(){
+    var G = A.GRADES, scope = VIEW.branch || null, ex = SEC_EXP(), R = D.raw, ms = months();
+    var ordered = D.cats.map(function (c) {
+      var t = scope ? brCatT(scope, c) : netCatT(c);
+      return { c: c, v: t ? A.score(t) : null, t: t };
+    }).sort(function (a, b) { return (a.v === null ? 999 : a.v) - (b.v === null ? 999 : b.v); });
+
+    var out = ordered.map(function (row) {
+      var open = !!ex[row.c];
+      var h2 = '<tr class="au-secrow"><td class="nm tap" data-x="' + esc(row.c) + '" ' +
+        'title="Tap to ' + (open ? 'collapse' : 'expand') + ' the checklist">' +
+        '<span class="car">' + (open ? '\u25be' : '\u25b8') + '</span>' +
+        '<span class="ico">' + auSecIcon(row.c) + '</span>' + esc(row.c) + '</td>' +
+        G.map(function (g, gi) {
+          return auCell(catGradeT(row.c, gi, scope), (scope || 'All branches') + ' \u00b7 ' + row.c + ' \u00b7 ' + g,
+            ' data-c="' + esc(row.c) + '" data-g="' + gi + '"');
+        }).join('') +
+        auCell(row.t, (scope || 'All branches') + ' \u00b7 ' + row.c,
+          ' data-c="' + esc(row.c) + '"' + (scope ? ' data-b="' + esc(scope) + '"' : '')) + '</tr>';
+      if (!open) return h2;
+
+      var items = {};
+      R.rows.forEach(function (r) {
+        if (A.str(r[R.iC]) !== row.c) return;
+        if (scope && A.str(r[R.iB]) !== scope) return;
+        if (ms.indexOf(A.str(r[R.iM])) < 0) return;
+        var p = A.str(r[R.iP]); if (!p) return;
+        var rec = items[p] || (items[p] = { p: p, g: G.map(function () { return A.blank(); }), all: A.blank() });
+        R.cols.forEach(function (ci, gi) {
+          if (ci < 0) return;
+          addRowLocal(rec.g[gi], r, [ci]);
+          addRowLocal(rec.all, r, [ci]);
+        });
+      });
+      var list = Object.keys(items).map(function (k) { return items[k]; })
+        .sort(function (a, b) {
+          var x = A.score(a.all), y = A.score(b.all);
+          return (x === null ? 999 : x) - (y === null ? 999 : y);
+        });
+      if (!list.length) return h2 + '<tr class="au-itemrow"><td class="nm sub" colspan="' + (G.length + 2) +
+        '">No checklist lines under the current filters.</td></tr>';
+      return h2 + list.map(function (it) {
+        return '<tr class="au-itemrow"><td class="nm sub" title="' + esc(it.p) + '">' +
+          '<span class="ico">' + auItemIcon(it.p, row.c) + '</span>' + esc(cleanItem(it.p)) + '</td>' +
+          it.g.map(function (t, gi) {
+            var v = A.score(t), sc = A.scored(t);
+            return '<td class="au-t itm" style="background:' + (sc ? A.colorFor(v) : '#F8FAFC') +
+              ';color:' + (sc ? '#fff' : '#CBD5E1') + '" data-c="' + esc(row.c) + '" data-g="' + gi +
+              '" data-p="' + esc(it.p) + '" title="' + esc(cleanItem(it.p)) + ' \u00b7 ' + esc(G[gi]) + ' \u2014 ' +
+              (sc ? v.toFixed(0) + '% of ' + sc + ' checks' : 'not scored at this stage') + '">' +
+              (sc ? Math.round(v) : '\u00b7') + '</td>';
+          }).join('') +
+          (function () {
+            var v = A.score(it.all), sc = A.scored(it.all);
+            return '<td class="au-t itm" style="background:' + (sc ? A.colorFor(v) : '#F8FAFC') +
+              ';color:' + (sc ? '#fff' : '#CBD5E1') + '" data-c="' + esc(row.c) + '" data-p="' + esc(it.p) +
+              '" title="' + esc(cleanItem(it.p)) + ' \u2014 overall">' + (sc ? Math.round(v) : '\u00b7') + '</td>';
+          })() + '</tr>';
+      }).join('');
+    }).join('');
+
+    return '<div class="au-heat-scroll"><table class="audt auhm"><thead><tr>' +
+      '<th class="nm">Audit section <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--txm)">' +
+      '\u00b7 tap to open its checklist</span></th>' +
+      G.map(function (g) { return '<th>' + esc(g) + '</th>'; }).join('') +
+      '<th>Overall</th></tr></thead><tbody>' + out + '</tbody></table></div>' +
+      auLegend() +
+      '<p class="au-note">Branch is chosen on the left; the columns are grade and stage, so a row reads as ' +
+      '\u201cwhere in the school this section is weak\u201d. Sections are ordered weakest first. <b>Tap a section</b> ' +
+      'to open its checklist items, each shown at every stage and ordered weakest first. A section strong overall but ' +
+      'red in one column is a stage problem, not a branch one. Every cell opens the lines behind it.</p>';
+  }
+  function auLegend(){
+    return '<div class="au-legend">' +
       '<span><i style="background:#059669"></i>' + A.ON_TRACK + '%+ on track</span>' +
-      '<span><i style="background:#D97706"></i>' + A.REVIEW + '–' + (A.ON_TRACK - 1) + '% review</span>' +
+      '<span><i style="background:#D97706"></i>' + A.REVIEW + '\u2013' + (A.ON_TRACK - 1) + '% review</span>' +
       '<span><i style="background:#DC2626"></i>under ' + A.REVIEW + '% critical</span>' +
-      '<span><i style="background:#F1F5F9;border:1px solid #E0E8FF"></i>not audited</span>' +
-      '</div><p class="au-note">Sections are ordered weakest first across the network, so the top rows are the ' +
-      'group-wide problems and the bottom rows are settled. A red cell beside green ones in the same row is a ' +
-      'single-branch problem with a fix already working next door. A row that is red all the way across is a ' +
-      'policy or resourcing question, and no amount of branch-level chasing will close it. Click any cell for the checklist behind it.</p>';
-    $('au-heat').innerHTML = h;
+      '<span><i style="background:#F1F5F9;border:1px solid #E0E8FF"></i>not audited</span></div>';
+  }
+
+  /* ── table: Branch › Section › Item, grades across ── */
+  function renderHeatTable(){
+    var G = A.GRADES, R = D.raw, ms = months(), ex = TBL_EXP();
+    var bs = VIEW.branch ? [VIEW.branch] : D.branches;
+    var multi = bs.length > 1;
+    if (!multi) ex.b[bs[0]] = true;
+
+    function tally(rows, gi){
+      var t = A.blank();
+      rows.forEach(function (r) { addRowLocal(t, r, gi === null ? R.cols : [R.cols[gi]]); });
+      return t;
+    }
+    function rowsFor(branch, cat, param){
+      return R.rows.filter(function (r) {
+        if (ms.indexOf(A.str(r[R.iM])) < 0) return false;
+        if (branch && A.str(r[R.iB]) !== branch) return false;
+        if (cat && A.str(r[R.iC]) !== cat) return false;
+        if (param && A.str(r[R.iP]) !== param) return false;
+        return true;
+      });
+    }
+    function nameCell(text, level, expandable, open, key, title){
+      return '<td class="nm lv' + level + (expandable ? ' tap' : '') + '"' +
+        (expandable ? ' data-x="' + esc(key) + '"' : '') + (title ? ' title="' + esc(title) + '"' : '') + '>' +
+        (expandable ? '<span class="car">' + (open ? '\u25be' : '\u25b8') + '</span>' : '') + esc(text) + '</td>';
+    }
+
+    var out = '';
+    bs.forEach(function (b) {
+      var brRows = rowsFor(b, null, null);
+      if (!brRows.length) return;
+      var bOpen = !!ex.b[b];
+      out += '<tr class="lvl-b">' + nameCell(b, 0, true, bOpen, 'b:' + b) +
+        G.map(function (g, gi) {
+          return auCell(tally(brRows, gi), b + ' \u00b7 ' + g, ' data-b="' + esc(b) + '" data-g="' + gi + '"', true);
+        }).join('') +
+        auCell(tally(brRows, null), b + ' \u00b7 all stages', ' data-b="' + esc(b) + '"', true) + '</tr>';
+      if (!bOpen) return;
+
+      D.cats.map(function (c) {
+        var rs = rowsFor(b, c, null);
+        return { c: c, rows: rs, v: rs.length ? A.score(tally(rs, null)) : null };
+      }).filter(function (x) { return x.rows.length; })
+        .sort(function (x, y) { return (x.v === null ? 999 : x.v) - (y.v === null ? 999 : y.v); })
+        .forEach(function (C) {
+          var sk = b + '|' + C.c, sOpen = !!ex.s[sk];
+          out += '<tr class="lvl-c">' + nameCell(auSecIcon(C.c) + '  ' + C.c, 1, true, sOpen, 's:' + sk) +
+            G.map(function (g, gi) {
+              return auCell(tally(C.rows, gi), b + ' \u203a ' + C.c + ' \u00b7 ' + g,
+                ' data-b="' + esc(b) + '" data-c="' + esc(C.c) + '" data-g="' + gi + '"');
+            }).join('') +
+            auCell(tally(C.rows, null), b + ' \u203a ' + C.c,
+              ' data-b="' + esc(b) + '" data-c="' + esc(C.c) + '"') + '</tr>';
+          if (!sOpen) return;
+
+          var byP = {};
+          C.rows.forEach(function (r) { var p = A.str(r[R.iP]); if (p) (byP[p] || (byP[p] = [])).push(r); });
+          Object.keys(byP).map(function (p) { return { p: p, rows: byP[p], v: A.score(tally(byP[p], null)) }; })
+            .sort(function (x, y) { return (x.v === null ? 999 : x.v) - (y.v === null ? 999 : y.v); })
+            .forEach(function (I) {
+              out += '<tr class="lvl-s">' +
+                nameCell(auItemIcon(I.p, C.c) + '  ' + cleanItem(I.p), 2, false, false, '', I.p) +
+                G.map(function (g, gi) {
+                  return auCell(tally(I.rows, gi), b + ' \u203a ' + C.c + ' \u203a ' + cleanItem(I.p) + ' \u00b7 ' + g,
+                    ' data-b="' + esc(b) + '" data-c="' + esc(C.c) + '" data-p="' + esc(I.p) + '" data-g="' + gi + '"');
+                }).join('') +
+                auCell(tally(I.rows, null), b + ' \u203a ' + C.c + ' \u203a ' + cleanItem(I.p),
+                  ' data-b="' + esc(b) + '" data-c="' + esc(C.c) + '" data-p="' + esc(I.p) + '"') + '</tr>';
+            });
+        });
+    });
+
+    var foot = multi ? (function () {
+      var all = rowsFor(null, null, null);
+      return '<tr class="sgt-tot"><td class="nm">ALL BRANCHES</td>' +
+        G.map(function (g, gi) { return auCell(tally(all, gi), 'All branches \u00b7 ' + g, ' data-g="' + gi + '"', true); }).join('') +
+        auCell(tally(all, null), 'All branches \u00b7 all stages', '', true) + '</tr>';
+    })() : '';
+
+    return '<div class="audt-h">Branch \u203a audit section \u203a checklist item' +
+      '<span class="hint">tap a branch or a section to expand</span></div>' +
+      '<div class="au-heat-scroll"><table class="audt auhm"><thead><tr>' +
+      '<th class="nm">Branch \u203a Section \u203a Item</th>' +
+      G.map(function (g) { return '<th>' + esc(g) + '</th>'; }).join('') +
+      '<th>Overall</th></tr></thead><tbody>' + out + '</tbody>' +
+      (foot ? '<tfoot>' + foot + '</tfoot>' : '') + '</table></div>' + auLegend() +
+      '<p class="au-note">Each cell is <b>Yes \u00f7 (Yes + No + IP)</b> with the number of scored checks beneath, so a ' +
+      'high figure on three checks is never mistaken for one on ninety. Read <b>down a column</b> to compare branches ' +
+      'at one stage, <b>across a row</b> to see where a branch, section or item is weak. Every cell opens its lines.</p>';
+  }
+
+  function renderHeat(){
+    var view = window._AU_HEAT_VIEW || 'chart';
+    var tog = $('au-heat-toggle');
+    if (tog) tog.querySelectorAll('button').forEach(function (b) { b.classList.toggle('on', b.dataset.v === view); });
+    var body = (view === 'table') ? renderHeatTable() : renderHeatGrades();
+    var el = $('au-heat');
+    el.innerHTML = '<div class="au-split">' + railHTML() + '<div class="au-main">' + body + '</div></div>';
+    wireRail(el);
+    el.querySelectorAll('td.au-t').forEach(function (td) {
+      td.addEventListener('click', function () {
+        var b = td.dataset.b || null, c = td.dataset.c, g = td.dataset.g, p = td.dataset.p;
+        var gi = (g !== undefined && g !== '') ? +g : null;
+        if (p)      itemModal(c, p, gi, b || VIEW.branch || null);
+        else if (c) { if (gi !== null) gradeModal(c, gi, b || VIEW.branch || null);
+                      else if (b) cellModal(b, c); else sectionModal(c); }
+        else        stageModal(gi, b || VIEW.branch || null);
+      });
+    });
+    el.querySelectorAll('td.nm.tap').forEach(function (td) {
+      td.addEventListener('click', function () {
+        var k = td.dataset.x || '';
+        if (k.indexOf('b:') === 0) { var e = TBL_EXP(); e.b[k.slice(2)] = !e.b[k.slice(2)]; }
+        else if (k.indexOf('s:') === 0) { var e2 = TBL_EXP(); e2.s[k.slice(2)] = !e2.s[k.slice(2)]; }
+        else { var e3 = SEC_EXP(); e3[k] = !e3[k]; }
+        renderHeat();
+      });
+    });
+  }
+
+  /* ── stage by stage, branches as columns, sections as rows ── */
+  function renderStageCompare(){
+    var el = $('au-stage-cmp'); if (!el) return;
+    var G = A.GRADES, R = D.raw, ms = months(), ex = CMP_EXP(), bs = D.branches;
+    var cats = D.cats.map(function (c) {
+      var t = netCatT(c); return { c: c, v: t ? A.score(t) : null };
+    }).sort(function (a, b) { return (a.v === null ? 999 : a.v) - (b.v === null ? 999 : b.v); })
+      .map(function (x) { return x.c; });
+
+    function tally(branch, cat, gi){
+      var t = A.blank();
+      R.rows.forEach(function (r) {
+        if (ms.indexOf(A.str(r[R.iM])) < 0) return;
+        if (branch && A.str(r[R.iB]) !== branch) return;
+        if (cat && A.str(r[R.iC]) !== cat) return;
+        addRowLocal(t, r, gi === null ? R.cols : [R.cols[gi]]);
+      });
+      return t;
+    }
+
+    var out = '';
+    G.forEach(function (g, gi) {
+      var open = !!ex[g];
+      out += '<tr class="lvl-b"><td class="nm tap" data-x="' + esc(g) + '" ' +
+        'title="Tap to ' + (open ? 'collapse' : 'expand') + ' the thirteen sections">' +
+        '<span class="car">' + (open ? '\u25be' : '\u25b8') + '</span>' +
+        '<span class="ico">' + (AU_GRADE_ICON[g] || '\ud83d\udcda') + '</span>' + esc(g) + '</td>' +
+        bs.map(function (b) {
+          return auCell(tally(b, null, gi), b + ' \u00b7 ' + g, ' data-b="' + esc(b) + '" data-g="' + gi + '"', true);
+        }).join('') +
+        auCell(tally(null, null, gi), 'All branches \u00b7 ' + g, ' data-g="' + gi + '"', true) + '</tr>';
+      if (!open) return;
+      cats.forEach(function (c) {
+        var net = tally(null, c, gi);
+        if (!A.scored(net) && !bs.some(function (b) { return A.scored(tally(b, c, gi)); })) return;
+        out += '<tr class="lvl-s"><td class="nm sub" title="' + esc(c) + '">' +
+          '<span class="ico">' + auSecIcon(c) + '</span>' + esc(c) + '</td>' +
+          bs.map(function (b) {
+            return auCell(tally(b, c, gi), b + ' \u00b7 ' + g + ' \u00b7 ' + c,
+              ' data-b="' + esc(b) + '" data-c="' + esc(c) + '" data-g="' + gi + '"');
+          }).join('') +
+          auCell(net, 'All branches \u00b7 ' + g + ' \u00b7 ' + c, ' data-c="' + esc(c) + '" data-g="' + gi + '"') + '</tr>';
+      });
+    });
+
+    el.innerHTML = '<div class="au-heat-scroll"><table class="audt auhm"><thead><tr>' +
+      '<th class="nm">Grade &amp; stage \u203a audit section</th>' +
+      bs.map(function (b) { return '<th>' + esc(b) + '</th>'; }).join('') +
+      '<th>Network</th></tr></thead><tbody>' + out + '</tbody></table></div>' +
+      '<p class="au-note">Each stage line shows where every branch stands at that stage. <b>Open it</b> and the ' +
+      'thirteen sections appear as rows, weakest first, so you can read <b>down a branch column</b> to see what is ' +
+      'failing there, or <b>across a section row</b> to see whether it is one branch or all of them. Every cell shows ' +
+      'the compliance percentage with the number of scored checks beneath, and opens the audit lines behind it.</p>';
+
+    el.querySelectorAll('td.nm.tap').forEach(function (td) {
+      td.addEventListener('click', function () { var e = CMP_EXP(); e[td.dataset.x] = !e[td.dataset.x]; renderStageCompare(); });
+    });
+    el.querySelectorAll('td.au-t').forEach(function (td) {
+      td.addEventListener('click', function () {
+        var b = td.dataset.b || null, c = td.dataset.c, g = +td.dataset.g;
+        if (c) gradeModal(c, g, b); else stageModal(g, b);
+      });
+    });
+  }
+
+  /* ── drill-downs ── */
+  function sectionModal(cat){
+    var R = D.raw, ms = months();
+    var items = R.rows.filter(function (r) {
+      return A.str(r[R.iC]) === cat && ms.indexOf(A.str(r[R.iM])) >= 0;
+    });
+    modal(auSecIcon(cat) + '  All branches \u00b7 ' + cat, items.length + ' checklist lines',
+      '<table class="au-tbl"><thead><tr><th>Branch</th><th>Month</th><th>Checklist item</th>' +
+      A.GRADES.map(function (g) { return '<th class="n">' + esc(g) + '</th>'; }).join('') +
+      '<th class="n">Score</th></tr></thead><tbody>' +
+      items.map(function (r) {
+        var t = A.blank(); addRowLocal(t, r, R.cols);
+        var v = A.score(t);
+        return '<tr><td>' + esc(A.str(r[R.iB])) + '</td><td style="color:#64748B">' + esc(A.str(r[R.iM])) + '</td>' +
+          '<td>' + auItemIcon(A.str(r[R.iP]), cat) + ' ' + esc(cleanItem(A.str(r[R.iP]))) + '</td>' +
+          R.cols.map(function (ci) {
+            var x = ci < 0 ? '' : A.str(r[ci]);
+            var col = x === 'Yes' ? '#059669' : x === 'No' ? '#DC2626' : x === 'IP' ? '#D97706' : '#CBD5E1';
+            return '<td class="n" style="color:' + col + ';font-weight:600">' + (x || '\u00b7') + '</td>';
+          }).join('') +
+          '<td class="n" style="font-weight:700;color:' + A.colorFor(v) + '">' +
+          (v === null ? '\u2014' : v.toFixed(0) + '%') + '</td></tr>';
+      }).join('') + '</tbody></table>');
+  }
+  function gradeModal(cat, gi, branch){
+    var R = D.raw, ms = months(), ci = R.cols[gi];
+    var items = R.rows.filter(function (r) {
+      if (A.str(r[R.iC]) !== cat) return false;
+      if (branch && A.str(r[R.iB]) !== branch) return false;
+      return ms.indexOf(A.str(r[R.iM])) >= 0;
+    });
+    modal(auSecIcon(cat) + '  ' + (branch || 'All branches') + ' \u00b7 ' + cat + ' \u00b7 ' + A.GRADES[gi],
+      items.length + ' checklist lines at this stage',
+      '<table class="au-tbl"><thead><tr><th>Branch</th><th>Checklist item</th>' +
+      '<th class="n">' + esc(A.GRADES[gi]) + '</th><th>Observation</th></tr></thead><tbody>' +
+      items.map(function (r) {
+        var x = ci < 0 ? '' : A.str(r[ci]);
+        var col = x === 'Yes' ? '#059669' : x === 'No' ? '#DC2626' : x === 'IP' ? '#D97706' : '#CBD5E1';
+        return '<tr><td>' + esc(A.str(r[R.iB])) + '</td><td>' +
+          auItemIcon(A.str(r[R.iP]), cat) + ' ' + esc(cleanItem(A.str(r[R.iP]))) + '</td>' +
+          '<td class="n" style="color:' + col + ';font-weight:700">' + (x || '\u00b7') + '</td>' +
+          '<td style="font-size:12px;color:#64748B;max-width:320px">' + esc(R.iR >= 0 ? A.str(r[R.iR]) : '') + '</td></tr>';
+      }).join('') + '</tbody></table>' +
+      '<p class="au-note"><b>NA</b> means the item does not apply at this stage and <b>NR</b> that it was not ' +
+      'reviewed \u2014 both are excluded from the percentage rather than counted against the branch.</p>');
+  }
+  function itemModal(cat, param, gi, branch){
+    var R = D.raw, ms = months();
+    var items = R.rows.filter(function (r) {
+      if (A.str(r[R.iC]) !== cat || A.str(r[R.iP]) !== param) return false;
+      if (branch && A.str(r[R.iB]) !== branch) return false;
+      return ms.indexOf(A.str(r[R.iM])) >= 0;
+    });
+    var only = (gi !== null && gi !== undefined) ? R.cols[gi] : null;
+    modal(auItemIcon(param, cat) + '  ' + cleanItem(param),
+      (branch || 'All branches') + ' \u00b7 ' + cat + (only !== null ? ' \u00b7 ' + A.GRADES[gi] : '') +
+      ' \u00b7 ' + items.length + ' audit line(s)',
+      '<table class="au-tbl"><thead><tr><th>Branch</th><th>Month</th>' +
+      (only !== null ? '<th class="n">' + esc(A.GRADES[gi]) + '</th>'
+                     : A.GRADES.map(function (g) { return '<th class="n">' + esc(g) + '</th>'; }).join('')) +
+      '<th class="n">Score</th><th>Observation</th></tr></thead><tbody>' +
+      items.map(function (r) {
+        var cells = (only !== null ? [only] : R.cols);
+        var t = A.blank(); addRowLocal(t, r, cells);
+        var v = A.score(t);
+        return '<tr><td>' + esc(A.str(r[R.iB])) + '</td><td style="color:#64748B">' + esc(A.str(r[R.iM])) + '</td>' +
+          cells.map(function (ci) {
+            var x = ci < 0 ? '' : A.str(r[ci]);
+            var col = x === 'Yes' ? '#059669' : x === 'No' ? '#DC2626' : x === 'IP' ? '#D97706' : '#CBD5E1';
+            return '<td class="n" style="color:' + col + ';font-weight:600">' + (x || '\u00b7') + '</td>';
+          }).join('') +
+          '<td class="n" style="font-weight:700;color:' + A.colorFor(v) + '">' +
+          (v === null ? '\u2014' : v.toFixed(0) + '%') + '</td>' +
+          '<td style="font-size:12px;color:#64748B;max-width:300px">' + esc(R.iR >= 0 ? A.str(r[R.iR]) : '') + '</td></tr>';
+      }).join('') + '</tbody></table>');
+  }
+  /* a total-row cell carries no section, so it gets its own view rather than an
+     empty section drill-down */
+  function stageModal(gi, branch){
+    var R = D.raw, ms = months();
+    var rows = R.rows.filter(function (r) {
+      if (branch && A.str(r[R.iB]) !== branch) return false;
+      return ms.indexOf(A.str(r[R.iM])) >= 0;
+    });
+    var cells = (gi === null) ? R.cols : [R.cols[gi]];
+    var by = {};
+    rows.forEach(function (r) {
+      var c = A.str(r[R.iC]) || 'Uncategorised';
+      addRowLocal(by[c] || (by[c] = A.blank()), r, cells);
+    });
+    var list = Object.keys(by).map(function (c) { return { c: c, t: by[c], v: A.score(by[c]) }; })
+      .sort(function (x, y) { return (x.v === null ? 999 : x.v) - (y.v === null ? 999 : y.v); });
+    var tot = A.blank(); rows.forEach(function (r) { addRowLocal(tot, r, cells); });
+    modal((branch || 'All branches') + (gi === null ? ' \u00b7 all stages' : ' \u00b7 ' + A.GRADES[gi]),
+      list.length + ' audit sections \u00b7 ' + A.scored(tot) + ' scored checks \u00b7 ' +
+      (A.score(tot) === null ? '\u2014' : A.score(tot).toFixed(1) + '%'),
+      '<table class="au-tbl"><thead><tr><th>Audit section</th><th class="n">Compliance</th><th></th>' +
+      '<th class="n">Yes</th><th class="n">No</th><th class="n">In progress</th><th class="n">Not scored</th>' +
+      '</tr></thead><tbody>' +
+      list.map(function (x) {
+        return '<tr><td>' + auSecIcon(x.c) + ' ' + esc(x.c) + '</td>' +
+          '<td class="n" style="font-weight:700;color:' + A.colorFor(x.v) + '">' +
+          (x.v === null ? '\u2014' : x.v.toFixed(0) + '%') + '</td>' +
+          '<td style="width:110px"><div class="au-bar"><i style="width:' + (x.v === null ? 0 : Math.max(1, x.v)) +
+          '%;background:' + A.colorFor(x.v) + '"></i></div></td>' +
+          '<td class="n" style="color:#059669">' + x.t.yes + '</td>' +
+          '<td class="n" style="color:#DC2626">' + x.t.no + '</td>' +
+          '<td class="n" style="color:#D97706">' + x.t.ip + '</td>' +
+          '<td class="n" style="color:#94A3B8">' + (x.t.na + x.t.nr + x.t.none) + '</td></tr>';
+      }).join('') + '</tbody></table>' +
+      '<p class="au-note">Weakest section first. <b>Not scored</b> is NA, NR or blank \u2014 excluded from the ' +
+      'percentage rather than counted against the branch.</p>');
   }
 
   /* ══════════════════ 5. STAGE STRIP ══════════════════ */
@@ -9385,7 +9904,7 @@ window.AUDIT = (function () {
   function renderAll() {
     renderControls();
     renderKPIs(); renderScorecard(); renderTrend(); renderHeat();
-    renderStages(); renderChronic(); renderMovers(); renderWorst();
+    renderStages(); renderStageCompare(); renderChronic(); renderMovers(); renderWorst();
     renderQuality(); renderRemarks();
     wire();
   }
@@ -9425,6 +9944,17 @@ window.AUDIT = (function () {
     if (window.__pushTabScope) window.__pushTabScope();
     var qt; $('au-q').oninput = function (e) {
       clearTimeout(qt); qt = setTimeout(function () { VIEW.q = e.target.value; renderRemarks(); }, 200);
+    };
+    var ht = $('au-heat-toggle');
+    if (ht) ht.querySelectorAll('button').forEach(function (b) {
+      b.onclick = function () { window._AU_HEAT_VIEW = b.dataset.v; renderHeat(); };
+    });
+    var ca = $('au-cmp-all');
+    if (ca) ca.onclick = function () {
+      var e = CMP_EXP(), anyClosed = A.GRADES.some(function (g) { return !e[g]; });
+      A.GRADES.forEach(function (g) { e[g] = anyClosed; });
+      ca.textContent = anyClosed ? '\u21d5 Collapse all' : '\u21d5 Expand all';
+      renderStageCompare();
     };
     $('au-mod-x').onclick = closeModal;
     $('au-modal').onclick = function (e) { if (e.target === $('au-modal')) closeModal(); };
