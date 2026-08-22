@@ -2452,6 +2452,25 @@ function sumT(rows){
   const stu=studentsForFilter();
   const s={students:stu,calls:0,resolved:0,pending:0,ip:0};
   rows.filter(r=>r.calls>0).forEach(r=>{s.calls+=r.calls;s.resolved+=r.resolved;s.pending+=r.pending;s.ip+=r.ip;});
+
+  // The Tracker sheet is filled in monthly, by hand. Until someone updates it for
+  // the current month it holds no row, and these KPIs read zero — while the
+  // Branch Completion card beside them already falls back to the Master sheet and
+  // shows real figures. Two panels on the same screen disagreeing is worse than
+  // either being late, so the fallback is applied here too: when the Tracker has
+  // nothing for the selected month and branch, the calls are counted straight
+  // from CARE_DATA.
+  if(s.calls===0){
+    const CARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
+    const sel=CARE.filter(r=>(fBranch==='ALL'||r.Branch===fBranch)&&(fMonth==='ALL'||r.Month===fMonth));
+    if(sel.length){
+      s.calls=sel.length;
+      s.resolved=sel.filter(r=>/^resolved$/i.test(String(r.Status||'').trim())).length;
+      s.pending=sel.filter(r=>/^pending$/i.test(String(r.Status||'').trim())).length;
+      s.ip=sel.filter(r=>/^in\s*progress$/i.test(String(r.Status||'').trim())).length;
+      s.fromMaster=true;          // so the caption can say where the number came from
+    }
+  }
   return s;
 }
 function brComp(rows){
@@ -6534,7 +6553,9 @@ function renderCare(){
   const compPct=s.students>0?+(Math.min(s.calls/s.students*100,100).toFixed(1)):0;
   const resPct=s.calls>0?+((s.resolved/s.calls*100).toFixed(1)):0;
   document.getElementById('cc-calls').textContent=fi(s.calls);
-  document.getElementById('cc-calls-s').textContent=compPct>0?compPct+'% completion':'No data';
+  document.getElementById('cc-calls-s').textContent =
+    compPct>0 ? (compPct+'% completion'+(s.fromMaster?' · from master sheet':''))
+              : (s.fromMaster?'from master sheet':'No data');
   document.getElementById('cc-res').textContent=fi(s.resolved);
   document.getElementById('cc-res-s').textContent=s.calls>0?resPct+'% resolved':'–';
   document.getElementById('cc-pend').textContent=fi(s.pending);
