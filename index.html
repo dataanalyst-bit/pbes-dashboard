@@ -1696,6 +1696,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   <!-- Charts row 1 -->
   <div class="row r2">
     <div class="card"><div class="ch"><h3>🏫 Cases by Branch &amp; Status</h3><span class="fnote">Open work only — click a segment to drill in</span></div><div class="cb"><div class="cw tall"><canvas id="gr-branch"></canvas></div></div></div>
+    <div class="card"><div class="ch"><h3>🔟 Top 10 unresolved problems</h3>
+      <span class="fnote" id="gt-fn">Read from the case description, ranked by how long they have been open</span></div>
+      <div class="cb" style="padding:12px 14px"><div id="gr-top10"></div></div></div>
   </div>
 
   <!-- Charts row 2 -->
@@ -14711,6 +14714,164 @@ window.CARE_PROBLEMS = (function () {
   var _af = window.applyFilters;
   if (typeof _af === 'function') window.applyFilters = function () {
     var r = _af.apply(this, arguments); try { safe(); } catch (e) {} return r;
+  };
+  setTimeout(safe, 1500); setTimeout(safe, 4000);
+})();
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   GRIEVANCE — TOP 10 UNRESOLVED PROBLEMS
+
+   The Category Breakdown answers "which box are cases filed in". It cannot
+   answer "what is actually still broken", because a category holds many
+   different problems and says nothing about how long any of them has waited.
+
+   This reads the CASE DESCRIPTION through the same problem lexicon the Care
+   Calls panel uses, keeps only cases that are still open, and ranks them by a
+   pressure score rather than by volume alone:
+
+       pressure  =  open cases  ×  log(1 + median days open)
+
+   Volume alone puts the biggest category on top every month, which is never
+   news. Age alone promotes a single forgotten case above a systemic one. The
+   product moves a problem up when it is either widespread or stale, and hard
+   up when it is both — which is the combination worth acting on.
+
+   Overdue is counted separately and shown, because a case past its own target
+   date is a different failure from one that is simply recent.
+   ══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  var ALLB = ['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam'];
+
+  function isOpen(r){ return !/resolved|closed/i.test(String(r.Status || '')); }
+  function dnum(v){ if (!v || v === '\u2013') return null; var d = new Date(v); return isNaN(d.getTime()) ? null : d; }
+  function daysOpen(r, today){
+    var d = dnum(r.Date); return d ? Math.max(0, Math.round((today - d) / 86400000)) : null;
+  }
+  function isOverdue(r, today){
+    var t = dnum(r.TargetDate);
+    var n = parseFloat(r.OverDue);
+    if (!isNaN(n) && n > 0) return true;
+    return !!(t && t < today);
+  }
+  function median(a){
+    if (!a.length) return 0;
+    var s = a.slice().sort(function (x, y) { return x - y; }), m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  }
+
+  function build(){
+    var el = document.getElementById('gr-top10'); if (!el) return;
+    var G = (typeof GRIEVANCE_DATA !== 'undefined' && Array.isArray(GRIEVANCE_DATA)) ? GRIEVANCE_DATA : [];
+    var scope = (fBranch === 'ALL') ? ALLB : [fBranch];
+    var rows = G.filter(function (r) { return scope.indexOf(r.Branch) >= 0 && isOpen(r); });
+
+    if (!G.length) { el.innerHTML = '<div class="no-data">No grievance records loaded.</div>'; return; }
+    if (!rows.length) {
+      el.innerHTML = '<div class="no-data">Every grievance in this scope is closed \u2014 nothing outstanding.</div>';
+      return;
+    }
+    var today = new Date(); today = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+    /* group by problem theme read from the words, falling back to the filed
+       category when the description matches no known pattern */
+    var THEMES = (window.CARE_PROBLEMS && CARE_PROBLEMS.THEMES) ? CARE_PROBLEMS.THEMES : [];
+    var by = {};
+    rows.forEach(function (r) {
+      var probe = {
+        Remarks: [r.Description, r.ActionTaken, r.Remarks].filter(function (x) {
+          return x && x !== '\u2013'; }).join(' '),
+        Followup: ''
+      };
+      var hits = (window.CARE_PROBLEMS && CARE_PROBLEMS.themesOf) ? CARE_PROBLEMS.themesOf(probe) : [];
+      if (!hits.length) {
+        var cat = (r.Category && r.Category !== '\u2013') ? r.Category : 'Uncategorised';
+        hits = [{ k: 'cat:' + cat, label: cat, icon: '\ud83d\udcc1', c: '#94A3B8', _fallback: true }];
+      }
+      hits.forEach(function (t) { (by[t.k] || (by[t.k] = { t: t, rows: [] })).rows.push(r); });
+    });
+
+    var list = Object.keys(by).map(function (k) {
+      var b = by[k];
+      var ages = b.rows.map(function (r) { return daysOpen(r, today); })
+        .filter(function (x) { return x !== null; });
+      var med = median(ages), oldest = ages.length ? Math.max.apply(null, ages) : 0;
+      var od = b.rows.filter(function (r) { return isOverdue(r, today); }).length;
+      return {
+        t: b.t, rows: b.rows, n: b.rows.length,
+        med: med, oldest: oldest, overdue: od,
+        pressure: b.rows.length * Math.log(1 + med)
+      };
+    }).sort(function (a, b) { return b.pressure - a.pressure || b.n - a.n; }).slice(0, 10);
+
+    var maxN = Math.max.apply(null, list.map(function (r) { return r.n; }).concat([1]));
+    var totOpen = rows.length;
+    var totOverdue = rows.filter(function (r) { return isOverdue(r, today); }).length;
+
+    el.innerHTML =
+      '<div style="font-size:11.5px;color:var(--txm);margin-bottom:11px;line-height:1.6">' +
+        '<b>' + totOpen.toLocaleString('en-IN') + '</b> cases still open, <b>' + totOverdue +
+        '</b> past their own target date. Ranked by <b>open cases \u00d7 how long they have waited</b>, not by ' +
+        'volume alone \u2014 the biggest category is rarely the most urgent one.</div>' +
+      '<div style="max-height:330px;overflow:auto">' +
+      list.map(function (r, i) {
+        var col = r.overdue > 0 ? '#DC2626' : r.med > 30 ? '#D97706' : (r.t.c || '#1E4FD8');
+        return '<div class="gt-row" data-i="' + i + '" title="Click to view these cases" ' +
+          'style="display:grid;grid-template-columns:20px 1fr 74px;gap:9px;align-items:center;' +
+          'padding:7px 4px;border-bottom:1px solid var(--bor);cursor:pointer">' +
+          '<div style="font-size:14px;text-align:center">' + (r.t.icon || '\ud83d\udccc') + '</div>' +
+          '<div>' +
+            '<div style="font-size:12.5px;font-weight:700;color:var(--tx);display:flex;justify-content:space-between;gap:8px">' +
+              '<span>' + esc(r.t.label) + (r.t._fallback ? '<small style="color:#94A3B8;font-weight:500"> \u00b7 by category</small>' : '') + '</span>' +
+              '<span style="font-variant-numeric:tabular-nums">' + r.n + '</span></div>' +
+            '<div style="height:7px;background:#EEF2FF;border-radius:99px;overflow:hidden;margin-top:3px">' +
+              '<i style="display:block;height:100%;width:' + (r.n / maxN * 100) + '%;background:' + col + ';border-radius:99px"></i></div>' +
+            '<div style="font-size:9.5px;color:#94A3B8;margin-top:2px">' +
+              'median ' + Math.round(r.med) + 'd open \u00b7 oldest ' + r.oldest + 'd' +
+              (r.overdue ? ' \u00b7 <b style="color:#DC2626">' + r.overdue + ' past target</b>' : '') + '</div>' +
+          '</div>' +
+          '<div style="text-align:right;font-size:12px;font-weight:800;color:' + col + '">' +
+            Math.round(r.med) + 'd<small style="display:block;font-size:9px;font-weight:500;color:#94A3B8">median wait</small></div>' +
+          '</div>';
+      }).join('') + '</div>' +
+      '<p class="au-note" style="margin-top:9px">A case can carry more than one problem, so the rows add to more ' +
+      'than the total. Where a description matches no known pattern the case is grouped by the category it was ' +
+      'filed under and marked <i>by category</i> \u2014 those are the ones whose wording is too thin to read.</p>';
+
+    var fn = document.getElementById('gt-fn');
+    if (fn) fn.textContent = (fBranch === 'ALL' ? 'All branches' : fBranch) + ' \u00b7 ' +
+      totOpen.toLocaleString('en-IN') + ' open cases';
+
+    window._GT = list;
+    el.querySelectorAll('.gt-row').forEach(function (d) {
+      d.addEventListener('click', function () {
+        var r = window._GT[+d.dataset.i]; if (!r || typeof openModal !== 'function') return;
+        openModal((r.t.icon || '') + '  ' + r.t.label + ' \u2014 still open',
+          r.n + ' case(s) \u00b7 median ' + Math.round(r.med) + ' days open \u00b7 ' +
+          r.overdue + ' past target', r.rows,
+          [{key:'Branch',label:'Branch'},{key:'Date',label:'Raised',date:true},
+           {key:'Grade',label:'Grade'},{key:'Student',label:'Student',maxW:'150px'},
+           {key:'Category',label:'Filed as',pill:true},{key:'Severity',label:'Severity',pill:true},
+           {key:'Description',label:'What was reported',maxW:'300px'},
+           {key:'AssignedTo',label:'Assigned to'},{key:'TargetDate',label:'Target',date:true},
+           {key:'Status',label:'Status',pill:true}]);
+      });
+    });
+  }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]; }); }
+
+  function safe(){ try { build(); } catch (e) {
+    var el = document.getElementById('gr-top10');
+    if (el) el.innerHTML = '<div class="no-data" style="color:var(--r)">Could not build: ' +
+      String(e && e.message || e) + '</div>';
+  } }
+  window.__renderGrievTop10 = safe;
+  var _o = window.renderGrievance;
+  if (typeof _o === 'function') window.renderGrievance = function () {
+    var r = _o.apply(this, arguments); try { safe(); } catch (e) {} return r;
   };
   setTimeout(safe, 1500); setTimeout(safe, 4000);
 })();
