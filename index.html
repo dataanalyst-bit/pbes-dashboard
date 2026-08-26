@@ -444,6 +444,32 @@ table.auhm td.nm.lv2{padding-left:44px}
 table.auhm td.itm{font-size:11px;font-weight:700;padding:4px 9px}
 table.auhm tr.au-itemrow td{border-color:#E8EEF2}
 
+
+/* ═══ MEETING ACTIONS ═══ */
+.mt-drop{border:2px dashed var(--bor);border-radius:14px;padding:26px 22px;text-align:center;background:var(--sur)}
+.mt-drop.on{border-color:var(--p);background:var(--pl)}
+.mt-drop h4{font-size:14px;font-weight:800;color:var(--tx);margin:0 0 6px}
+.mt-drop p{font-size:12px;color:var(--txm);margin:0 auto 12px;max-width:66ch;line-height:1.6}
+.mt-ta{width:100%;min-height:150px;font:12px/1.55 ui-monospace,Menlo,monospace;padding:11px 13px;
+  border:1px solid var(--bor);border-radius:10px;background:var(--bg);color:var(--tx);resize:vertical}
+.mt-btn{background:var(--p);color:#fff;border:none;font:inherit;font-size:12.5px;font-weight:700;
+  padding:9px 20px;border-radius:9px;cursor:pointer}
+.mt-btn:hover{filter:brightness(1.08)}
+.mt-btn.ghost{background:var(--pl);color:var(--p);border:1px solid var(--bor)}
+.mt-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.mt-tbl th{background:#F1F7F3;color:#07361F;font-size:10px;font-weight:800;text-transform:uppercase;
+  padding:8px 10px;border-bottom:2px solid #B7CFC0;text-align:left;white-space:nowrap}
+.mt-tbl td{padding:9px 10px;border-bottom:1px solid #E6EEF7;vertical-align:top}
+.mt-tbl tr.clk{cursor:pointer}
+.mt-tbl tr.clk:hover td{background:var(--pl)}
+.mt-tbl .n{text-align:right;font-variant-numeric:tabular-nums}
+.mt-pill{display:inline-block;font-size:10px;font-weight:800;padding:2px 8px;border-radius:99px;white-space:nowrap}
+.mt-ev{background:#ECFDF5;color:#059669}
+.mt-part{background:#FFFBEB;color:#D97706}
+.mt-none{background:#FEF2F2;color:#DC2626}
+.mt-quote{font-size:11.5px;color:#475569;line-height:1.55;border-left:3px solid var(--bor);padding-left:9px}
+.mt-meta{font-size:10px;color:#94A3B8;margin-top:3px}
+
 /* ═══ SCHOOL AUDIT TAB ═══ */
 #pane-audit .au-wrap{display:flex;flex-direction:column;gap:16px}
 .au-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
@@ -735,7 +761,7 @@ const ROLE_TABS = {
   admin:             ['admin','vigilance','civil'],
   grievance_officer: ['care','grievance','ptm'],
   hr_grievance:      ['hr','observations','care','grievance','ptm'],
-  principal:         ['overview','care','observations','admissions','grievance','transport','it','pt1','audit','ptm','civil','syl']
+  principal:         ['overview','care','observations','admissions','grievance','transport','it','pt1','audit','ptm','civil','syl','meet']
 };
 // Roles that span every campus. Everyone else with a branch on their account is
 // pinned to it, and the payload is filtered to that branch server-side.
@@ -898,6 +924,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="sn-scroll">
     <div class="sn-grp">Overview</div>
     <button class="tb active" onclick="showTab('overview',this)" title="Executive Overview"><span class="ic">📊</span><span class="lb">Executive Overview</span></button>
+    <button class="tb" onclick="showTab('meet',this)" title="Meeting Actions"><span class="ic">🎙️</span><span class="lb">Meeting Actions</span></button>
     <div class="sn-grp">Academics</div>
     <button class="tb" onclick="showTab('pt1',this)" title="PT-1 Academic Review"><span class="ic">📝</span><span class="lb">PT-1 Academic Review</span></button>
     <button class="tb" onclick="showTab('observations',this)" title="Teacher Observations"><span class="ic">👁️</span><span class="lb">Teacher Observations</span></button>
@@ -2040,6 +2067,98 @@ document.addEventListener('DOMContentLoaded', async () => {
   <iframe id="syl-frame" title="Syllabus and notebook monitoring"
     style="display:none;width:100%;border:0;background:transparent;
            height:calc(100vh - 200px);min-height:520px;border-radius:12px"></iframe>
+</div>
+
+
+<!-- ═══ MEETING ACTIONS ═══ -->
+<div id="pane-meet" class="pane">
+  <div class="au-wrap">
+
+    <div class="au-head">
+      <div>
+        <h2 style="margin:0;font-size:20px;font-weight:800">Meeting Actions</h2>
+        <div style="font-size:12.5px;color:var(--txm);margin-top:3px" id="mt-meta">
+          Paste a meeting transcript to see which directives left a trace in the trackers</div>
+      </div>
+      <div class="au-ctl">
+        <button class="mt-btn ghost" id="mt-clear">Clear</button>
+        <span class="exm-status" id="mt-status"></span>
+      </div>
+    </div>
+
+    <div class="au-sec" id="mt-input-card">
+      <div class="mt-drop" id="mt-drop">
+        <h4>🎙️ Drop a transcript file here, or paste the text below</h4>
+        <p>A transcript on its own contains no facts about the school — only statements of intent.
+          What matters is which of those intentions left a record. Every directive found here is matched
+          against the <b>Admin Tracker</b> and <b>Vigilance Tracker</b> already loaded in this dashboard,
+          and anything with no matching record is reported as untraceable rather than assumed done.
+          Nothing is uploaded; the text is processed in this browser.</p>
+        <textarea class="mt-ta" id="mt-text" placeholder="Paste the Zoom transcript or meeting summary here…"></textarea>
+        <div style="display:flex;gap:9px;justify-content:center;margin-top:12px;flex-wrap:wrap">
+          <button class="mt-btn" id="mt-run">Analyse transcript</button>
+          <label class="mt-btn ghost" style="cursor:pointer">Choose file
+            <input type="file" id="mt-file" accept=".txt,.md,.vtt,.srt,.csv" style="display:none"></label>
+          <input id="mt-date" type="date" style="font:inherit;font-size:12.5px;padding:8px 11px;
+            border:1px solid var(--bor);border-radius:9px;background:var(--sur);color:var(--tx)"
+            title="Meeting date — used to judge whether a deadline has passed">
+        </div>
+      </div>
+    </div>
+
+    <div id="mt-body" style="display:none;flex-direction:column;gap:16px">
+      <div class="au-kpis" id="mt-kpis"></div>
+
+      <div class="au-sec">
+        <h3>Department scorecard</h3>
+        <div class="sub">Every directive found, grouped by the department it lands on, with how much of it
+          the trackers can actually evidence.</div>
+        <div id="mt-depts"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>Directives with no trace</h3>
+        <div class="sub">Nothing in either tracker matches these. That is not proof they were ignored — it
+          means there is no field, log or artefact by which they could ever be shown to have happened.</div>
+        <div id="mt-untraced"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>Every directive found</h3>
+        <div class="sub">Owner, deadline and department are read from the sentence itself. Click any row for
+          the wording it came from and the records matched to it.</div>
+        <div class="au-ctl" style="margin-bottom:12px">
+          <div class="f"><label for="mt-filter">Show</label>
+            <select id="mt-filter">
+              <option value="">All directives</option>
+              <option value="none">Untraceable only</option>
+              <option value="part">Partially evidenced</option>
+              <option value="ev">Evidenced</option>
+              <option value="overdue">Past deadline</option>
+            </select></div>
+          <div class="f"><label for="mt-q">Search</label>
+            <input id="mt-q" type="search" placeholder="e.g. CCTV, hydrant, timer"></div>
+        </div>
+        <div style="max-height:620px;overflow:auto"><div id="mt-list"></div></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>How this was worked out</h3>
+        <div class="sub">The method, and where it can be wrong.</div>
+        <div id="mt-method"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="au-modal" id="mt-modal">
+  <div class="au-mod">
+    <div class="au-mod-hd">
+      <div><h3 id="mt-mod-title">—</h3><div class="sub" id="mt-mod-sub"></div></div>
+      <button class="au-mod-x" id="mt-mod-x" aria-label="Close">&times;</button>
+    </div>
+    <div class="au-mod-bd" id="mt-mod-body"></div>
+  </div>
 </div>
 
 <!-- ═══ SCHOOL AUDIT ═══ -->
@@ -6306,12 +6425,19 @@ function renderCareSummary(){
   // ── Satisfaction, read from the words and not from the label alone ──
   // A row tagged "No Concern" whose remark says the child is crying is not a
   // satisfied parent, and a call nobody answered is not an opinion at all.
-  const _nlp=sentFilteredRows.map(r=>CARE_NLP.classify(r));
-  const reachable=_nlp.filter(c=>c.reachable).length;
-  const noAnswer=_nlp.length-reachable;
-  const satisfiedN=_nlp.filter(c=>c.satisfied).length;
-  const flaggedN=_nlp.filter(c=>c.flagged).length;
+  /* Satisfaction and Not-Answered are read across EVERY call for the branch and
+     month, not across the slice. Selecting "Academic" or "Pending to be
+     Addressed" removes the No Concern rows by definition, so a slice-based
+     figure collapsed to 0% and read as a catastrophe rather than as an artefact
+     of the filter. The three status tiles do follow the slice, which is what
+     their "click to view with sentiment" labels promise. */
+  const _nlpAll=filteredRows.map(r=>CARE_NLP.classify(r));
+  const reachable=_nlpAll.filter(c=>c.reachable).length;
+  const noAnswer=_nlpAll.length-reachable;
+  const satisfiedN=_nlpAll.filter(c=>c.satisfied).length;
+  const flaggedN=_nlpAll.filter(c=>c.flagged).length;
   const satisfiedPct=reachable?Math.round(satisfiedN/reachable*100):0;
+  const _sliced=(sentFilteredRows.length!==filteredRows.length);
   const noConcern=cat['No Concern']||0;
   const present=CATS.filter(c=>cat[c]>0).sort((a,b)=>cat[b]-cat[a]);
   window._CARE_PIE_CATS=present;
@@ -6417,12 +6543,12 @@ function renderCareSummary(){
         <div style="font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;">😊 Parents Satisfied</div>
         <div style="font-size:30px;font-weight:800;color:${satColor};line-height:1.1;margin-top:2px;">${satisfiedPct}%</div>
         <div style="font-size:11px;color:#64748B;">${fi(satisfiedN)} of ${fi(reachable)} answered calls</div>
-        <div style="font-size:10px;color:#94A3B8;margin-top:1px;">reading the remark, not just the tag</div></div>`
+        <div style="font-size:10px;color:#94A3B8;margin-top:1px;">${_sliced?'across all calls — not the filtered slice':'reading the remark, not just the tag'}</div></div>`
     +`<div style="flex:1;min-width:160px;background:linear-gradient(135deg,#FFF7ED,#FFFBEB);border:1px solid #FED7AA;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="window._CARE_SENT='No Answer';renderCareSummary()" title="Click to view unanswered calls">
         <div style="font-size:11px;font-weight:700;color:#C2410C;text-transform:uppercase;">📵 Not Answered</div>
         <div style="font-size:30px;font-weight:800;color:#C2410C;line-height:1.1;margin-top:2px;">${fi(noAnswer)}</div>
-        <div style="font-size:11px;color:#64748B;">${total?Math.round(noAnswer/total*100):0}% of ${fi(total)} calls</div>
-        <div style="font-size:10px;color:#94A3B8;margin-top:1px;">held out of satisfaction &amp; sentiment</div></div>`
+        <div style="font-size:11px;color:#64748B;">${filteredRows.length?Math.round(noAnswer/filteredRows.length*100):0}% of ${fi(filteredRows.length)} calls</div>
+        <div style="font-size:10px;color:#94A3B8;margin-top:1px;">${_sliced?'across all calls — not the filtered slice':'held out of satisfaction &amp; sentiment'}</div></div>`
     +`<div style="flex:1;min-width:150px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="viewCareWithSentiment('Resolved')" title="Click to view">
         <div style="font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;">✅ Resolved</div>
         <div style="font-size:30px;font-weight:800;color:#059669;line-height:1.1;margin-top:2px;">${fi(resolved)}</div>
@@ -13482,6 +13608,676 @@ function _sylPushBranch(){
     var r=_af.apply(this,arguments); _sylPushBranch(); return r;
   };
 })();
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   MEETING ACTIONS — directive extraction and evidence reconciliation
+
+   A transcript contains no facts about the school. Every sentence in it is a
+   statement of intent, and intent is not progress. The only question worth
+   asking of it is: which of these commitments left a trace in the records the
+   school actually keeps?
+
+   That is what this does. It reads the transcript, pulls out the sentences that
+   are genuinely directives, works out who owns each one and by when, then goes
+   looking for matching Admin tasks and Vigilance observations. What it reports
+   is not "done / not done" — the trackers cannot support that claim — but
+   "evidenced / partly evidenced / no trace", which they can.
+
+   The distinction matters. "No trace" is not an accusation that nothing
+   happened; it means no field exists by which it could ever be shown to have
+   happened, which is a different and more fixable problem.
+   ══════════════════════════════════════════════════════════════════════════ */
+window.MEET = (function () {
+  'use strict';
+
+  /* ── departments, and the vocabulary that signals each ── */
+  var DEPTS = [
+    { key:'admin',      label:'Admin',                icon:'🏗️', c:'#7C3AED',
+      kw:['admin','maintenance','housekeeping','repair','furniture','plumbing','electrical','carpenter',
+          'painting','whitewash','civil work','inspection','round','facility','washroom','toilet','water',
+          'leak','tiles','door','glass','railing','net','scavenger','sweeper','cleaning'] },
+    { key:'vigilance',  label:'Vigilance & Safety',   icon:'🛡️', c:'#DC2626',
+      kw:['vigilance','safety','fire','hydrant','extinguisher','hose','fan','lock','terrace','sump',
+          'septic','mcb','barricade','stray dog','risk','hazard','audit','observation','visit report',
+          'emergency','first aid','evacuation'] },
+    { key:'cctv',       label:'CCTV & Security',      icon:'📹', c:'#0891B2',
+      kw:['cctv','camera','nvr','surveillance','blind spot','walkie','guard','security','footage','angle'] },
+    { key:'transport',  label:'Transport',            icon:'🚌', c:'#0D9488',
+      kw:['transport','bus','route','driver','occupancy','gps','rfid','neotrack','licence','license',
+          'permit','fitness','vehicle','breath analyser','alcohol','gate pass','fuel','diesel'] },
+    { key:'grievance',  label:'Grievance & Care Calls', icon:'📣', c:'#F59E0B',
+      kw:['grievance','care call','parent call','complaint','floor in-charge','portal','feedback',
+          'escalation','pending call'] },
+    { key:'hr',         label:'HR & Recruitment',     icon:'👥', c:'#EC4899',
+      kw:['hr','hr1','recruit','hiring','vacancy','bond','attendance','biometric','leave','payroll',
+          'substaff','interview','onboard'] },
+    { key:'admissions', label:'Admissions & Marketing', icon:'🎓', c:'#1E4FD8',
+      kw:['admission','enquiry','lead','conversion','walk-in','walkin','prospectus','marketing','campaign',
+          'branding','ambience','tie-up','corporate','digital lead','open day'] },
+    { key:'it',         label:'IT',                   icon:'💻', c:'#6366F1',
+      kw:['it team','network','internet','wifi','server','erp','software','system','cable','panel',
+          'projector','digital board','biometric machine','email'] },
+    { key:'academics',  label:'Academics',            icon:'📚', c:'#059669',
+      kw:['syllabus','notebook','lesson','teacher','class','exam','assessment','curriculum','academic',
+          'worksheet','correction','pt-1','term'] }
+  ];
+
+  /* ── directive signals ── */
+  var MODAL = /\b(must|should|shall|need to|needs to|have to|has to|will be|is to|are to|to be|ensure|make sure|see to it)\b/i;
+  var IMPERATIVE = /^(please\s+)?(ensure|check|verify|submit|send|share|prepare|complete|close|fix|install|conduct|arrange|organise|organize|maintain|update|review|audit|inspect|report|confirm|coordinate|implement|start|stop|remove|replace|provide|issue|collect|identify|train|escalate|follow up|clean|repair|paint|label|standardise|standardize)\b/i;
+  var ASSIGN = /\b(is responsible|will take|to take|assigned to|owner|responsible for|takes ownership|to handle|to own)\b/i;
+  /* "Madhu should submit…", "Jashwanth will arrange…", "Grievance team to close…"
+     are the three commonest ways a commitment is phrased in these meetings, and
+     none of them starts with an imperative verb. Without this a third of the
+     real directives scored below threshold and were silently dropped. */
+  var NAMED_TASK = /\b([A-Z][a-z]{2,15}(?:\s+[A-Z][a-z]{2,15})?|[A-Za-z]+\s+team)\s+(?:will|to|should|must|has to|needs? to)\s+([a-z]{3,})/;
+  var TO_VERB = /\bto\s+(close|submit|complete|arrange|train|fix|ensure|conduct|prepare|share|send|install|verify|check|audit|review|maintain|update|report|coordinate|implement|identify|escalate|provide|issue|collect|replace|remove)\b/i;
+  /* sentences that look like instructions but are not commitments */
+  var NOISE = /^(thank you|thanks|good morning|good evening|hello|hi\b|yes\b|no\b|ok\b|okay\b|right\b|sure\b|welcome|any questions|that'?s all|over to you|next slide|can you hear|you'?re on mute)/i;
+
+  var DEADLINE = [
+    [/\bby\s+(\d{1,2}\s*(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}(?:\s+\d{4})?)/i, 'abs'],
+    [/\bbefore\s+(\d{1,2}\s*(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}(?:\s+\d{4})?)/i, 'abs'],
+    [/\bon\s+(\d{1,2}\s*(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}(?:\s+\d{4})?)/i, 'abs'],
+    [/\bwithin\s+(\w+)\s+(day|days|week|weeks|month|months)\b/i, 'rel'],
+    [/\bin\s+(\w+)\s+(day|days|week|weeks|month|months)\b/i, 'rel'],
+    [/\b(today|tomorrow|this week|next week|this month|next month|immediately|at once|right away)\b/i, 'soft']
+  ];
+  var NUMWORD = { one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,
+                  a:1,an:1,fortnight:14 };
+  var MONTHS = ['january','february','march','april','may','june','july','august',
+                'september','october','november','december'];
+
+  var BRANCHES = [
+    { name:'Bachupally', alt:['bachupally','bachupalli','bachhupally'] },
+    { name:'Boduppal',   alt:['boduppal','bodhupal','bodupal','bdpl'] },
+    { name:'Gowdavalli', alt:['gowdavalli','gowdavally','gdvl'] },
+    { name:'Keesara',    alt:['keesara','kisara','kesara'] },
+    { name:'Pocharam',   alt:['pocharam','ocharam','pocharm'] }
+  ];
+
+  /* words too common to carry meaning when matching a directive to a record */
+  var STOP = ('the a an and or of to in on for with by at from is are be been will shall must should ' +
+    'we you they it that this these those all any each every not no need needs have has had do does did ' +
+    'as if then than so such our your their there here about into over under after before during ' +
+    'please ensure make sure take taken taking give given also more most only just very can could would ' +
+    'branch branches school schools campus campuses team teams department departments meeting').split(' ');
+  var STOPSET = {}; STOP.forEach(function (w) { STOPSET[w] = 1; });
+
+  function norm(s) {
+    return String(s == null ? '' : s).toLowerCase()
+      .replace(/[\u2018\u2019\u201c\u201d]/g, "'")
+      .replace(/[^a-z0-9\s'-]/g, ' ')
+      .replace(/\s+/g, ' ').trim();
+  }
+  /* A directive says "classroom" and the record says "classrooms"; "timer" and
+     "timers"; "report" and "reports". Without collapsing those the match rate
+     drops sharply, so plurals and a few common endings are stripped. */
+  function stem(w) {
+    return w.replace(/(ies)$/, 'y').replace(/(sses|shes|ches|xes)$/, function (m) { return m.slice(0, -2); })
+            .replace(/([^s])s$/, '$1').replace(/(ing|ed)$/, function (m, _o, str) {
+              return str.length > 6 ? '' : m; });
+  }
+  function tokens(s) {
+    return norm(s).split(' ').filter(function (w) {
+      return w.length > 2 && !STOPSET[w] && !/^\d+$/.test(w);
+    }).map(stem).filter(function (w) { return w.length > 2; });
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c];
+    });
+  }
+
+  /* ── 1. segment ──
+     Transcripts arrive in many shapes: VTT with timecodes, "Name: text" lines,
+     or prose. Speaker labels are kept because they are the best evidence of who
+     owns a directive, then stripped from the sentence itself. */
+  function segment(raw) {
+    var text = String(raw || '')
+      .replace(/^\uFEFF/, '')
+      .replace(/^\s*\d+\s*$/gm, '')                                  // SRT indices
+      .replace(/^\s*\d{2}:\d{2}:\d{2}[.,]\d{3}\s*-->.*$/gm, '')      // VTT/SRT timing
+      .replace(/^WEBVTT.*$/gm, '')
+      .replace(/\r/g, '');
+
+    var out = [], speaker = '';
+    text.split('\n').forEach(function (line) {
+      var l = line.trim();
+      if (!l) return;
+      var m = l.match(/^([A-Z][A-Za-z .'-]{1,38}?)\s*(?:\(\d{1,2}:\d{2}\))?\s*:\s*(.*)$/);
+      if (m && m[2] !== undefined) { speaker = m[1].trim(); l = m[2].trim(); }
+      if (!l) return;
+      /* bullet and heading markers carry no meaning once segmented */
+      l = l.replace(/^[\-\u2022\*\d.)\s]+/, '').replace(/^#+\s*/, '').trim();
+      if (!l) return;
+      l.split(/(?<=[.!?;])\s+(?=[A-Z0-9])/).forEach(function (s) {
+        s = s.trim();
+        if (s.length < 12) return;
+        out.push({ text: s, speaker: speaker });
+      });
+    });
+    return out;
+  }
+
+  /* ── 2. classify ──
+     A directive is signalled by modality ("must", "should"), imperative mood
+     ("Ensure…", "Submit…"), explicit assignment, or the presence of a deadline.
+     Confidence rises when several signals agree, which is what lets weak
+     one-signal sentences be reported separately rather than mixed in. */
+  function isDirective(s) {
+    var t = s.text;
+    if (NOISE.test(t.trim())) return 0;
+    if (/\?\s*$/.test(t)) return 0;                       // a question is not an instruction
+    var score = 0;
+    if (MODAL.test(t)) score += 2;
+    if (IMPERATIVE.test(t.trim())) score += 3;
+    if (ASSIGN.test(t)) score += 2;
+    if (NAMED_TASK.test(t)) score += 3;
+    if (TO_VERB.test(t)) score += 1;
+    if (findDeadline(t).label) score += 2;
+    if (/\b(target|deadline|by when|action|follow up|followup)\b/i.test(t)) score += 1;
+    /* past tense reporting is narration, not a directive */
+    if (/\b(was|were|had been|has been done|completed already|we did|i did)\b/i.test(t)) score -= 2;
+    return Math.max(0, score);
+  }
+
+  /* ── 3. extract ── */
+  function findDeadline(t) {
+    for (var i = 0; i < DEADLINE.length; i++) {
+      var m = t.match(DEADLINE[i][0]);
+      if (m) return { label: m[0].trim(), kind: DEADLINE[i][1], raw: m[1] || m[0], unit: m[2] || '' };
+    }
+    return { label: '', kind: '', raw: '', unit: '' };
+  }
+  function deadlineDate(dl, meetingDate) {
+    if (!dl.label || !meetingDate) return null;
+    var base = new Date(meetingDate);
+    if (isNaN(base.getTime())) return null;
+    if (dl.kind === 'rel') {
+      var n = parseInt(dl.raw, 10);
+      if (isNaN(n)) n = NUMWORD[String(dl.raw).toLowerCase()] || 0;
+      if (!n) return null;
+      var mult = /week/i.test(dl.unit) ? 7 : /month/i.test(dl.unit) ? 30 : 1;
+      return new Date(base.getTime() + n * mult * 86400000);
+    }
+    if (dl.kind === 'soft') {
+      var s = dl.label.toLowerCase();
+      var add = /tomorrow/.test(s) ? 1 : /this week/.test(s) ? 7 : /next week/.test(s) ? 14
+              : /this month/.test(s) ? 30 : /next month/.test(s) ? 60 : 0;
+      return new Date(base.getTime() + add * 86400000);
+    }
+    var m = String(dl.raw).match(/(\d{1,2})\s*(?:st|nd|rd|th)?\s+([A-Za-z]{3,9})(?:\s+(\d{4}))?/);
+    if (!m) return null;
+    var mi = MONTHS.findIndex(function (x) { return x.indexOf(m[2].toLowerCase().slice(0, 3)) === 0; });
+    if (mi < 0) return null;
+    var yr = m[3] ? +m[3] : base.getFullYear();
+    var d = new Date(yr, mi, +m[1]);
+    /* a bare month earlier than the meeting almost always means next year */
+    if (!m[3] && d < base) d = new Date(yr + 1, mi, +m[1]);
+    return d;
+  }
+  function findOwner(s) {
+    var t = s.text;
+    var m = t.match(/\b([A-Z][a-z]{2,15}(?:\s+[A-Z][a-z]{2,15})?)\s+(?:to|will|should|must|is responsible)/);
+    if (m && !/^(The|This|That|All|Every|Each|We|They|It|Please)$/.test(m[1])) return m[1];
+    m = t.match(/\b(?:assigned to|owner[:\s]+|responsible[:\s]+)\s*([A-Z][a-z]{2,15}(?:\s+[A-Z][a-z]{2,15})?)/i);
+    if (m) return m[1];
+    if (/\ball admins?\b/i.test(t)) return 'All Admins';
+    if (/\ball principals?\b/i.test(t)) return 'All Principals';
+    if (/\bit team\b/i.test(t)) return 'IT Team';
+    return s.speaker || '';
+  }
+  function findBranch(t) {
+    var n = norm(t), hits = [];
+    BRANCHES.forEach(function (b) {
+      if (b.alt.some(function (a) { return n.indexOf(a) !== -1; })) hits.push(b.name);
+    });
+    return hits;
+  }
+  function findDept(t) {
+    var n = ' ' + norm(t) + ' ';
+    var best = null, bestScore = 0;
+    DEPTS.forEach(function (d) {
+      var sc = 0;
+      d.kw.forEach(function (k) { if (n.indexOf(' ' + k) !== -1 || n.indexOf(k + ' ') !== -1) sc++; });
+      if (sc > bestScore) { bestScore = sc; best = d; }
+    });
+    return best ? { dept: best, score: bestScore } : { dept: null, score: 0 };
+  }
+
+  /* ── 4. match against the trackers ──
+     Weighted token overlap. A word that appears in few records is worth more
+     than one that appears everywhere — the same idea as TF-IDF, which is what
+     stops "branch" or "school" from matching a directive to half the tracker. */
+  function buildIndex(records) {
+    var df = {}, docs = records.map(function (r) {
+      var t = tokens(r.text);
+      var seen = {};
+      t.forEach(function (w) { if (!seen[w]) { seen[w] = 1; df[w] = (df[w] || 0) + 1; } });
+      return { rec: r, tf: t };
+    });
+    var N = Math.max(1, docs.length);
+    return {
+      docs: docs,
+      idf: function (w) { return Math.log((N + 1) / ((df[w] || 0) + 1)) + 1; }
+    };
+  }
+  function matchOne(dirTokens, idx, branchHint) {
+    if (!dirTokens.length) return [];
+    var wanted = {};
+    dirTokens.forEach(function (w) { wanted[w] = idx.idf(w); });
+    var total = 0;
+    Object.keys(wanted).forEach(function (w) { total += wanted[w]; });
+    if (!total) return [];
+
+    var hits = [];
+    idx.docs.forEach(function (d) {
+      var seen = {}, got = 0;
+      d.tf.forEach(function (w) { if (wanted[w] && !seen[w]) { seen[w] = 1; got += wanted[w]; } });
+      if (!got) return;
+      var score = got / total;
+      /* a branch named in the directive that disagrees with the record is a
+         strong signal against, but only when the directive named one at all */
+      if (branchHint && branchHint.length && d.rec.branch &&
+          branchHint.indexOf(d.rec.branch) === -1) score *= 0.45;
+      if (score >= 0.34) hits.push({ rec: d.rec, score: score });
+    });
+    hits.sort(function (a, b) { return b.score - a.score; });
+    return hits.slice(0, 12);
+  }
+
+  /* ── evidence sources already loaded in the dashboard ── */
+  function evidenceRecords() {
+    var out = [];
+    var A = (typeof ADMIN_DATA !== 'undefined' && Array.isArray(ADMIN_DATA)) ? ADMIN_DATA : [];
+    A.forEach(function (r, i) {
+      out.push({
+        src: 'Admin', id: r.TaskID || ('A' + i), branch: r.Branch || '',
+        text: [r.Task, r.Department, r.Priority].filter(Boolean).join(' '),
+        status: r.Status || '', deadline: r.Deadline || '', done: r.CompletionDate || '',
+        raw: r
+      });
+    });
+    var V = (typeof VIG_DATA !== 'undefined' && Array.isArray(VIG_DATA)) ? VIG_DATA : [];
+    V.forEach(function (r, i) {
+      out.push({
+        src: 'Vigilance', id: 'V' + i, branch: r.Branch || '',
+        text: [r.Issue, r.Area, r.Action, r.Owner, r.RiskLevel].filter(Boolean).join(' '),
+        status: r.Status || '', deadline: r.TargetDate || '', done: r.CompletionDate || '',
+        raw: r
+      });
+    });
+    return out;
+  }
+  function isClosedRec(r) { return /closed|completed|done|resolved/i.test(String(r.status)); }
+
+  /* ── the whole pipeline ── */
+  function analyse(rawText, meetingDate) {
+    var sentences = segment(rawText);
+    if (!sentences.length) throw new Error('No readable sentences were found in that text.');
+
+    var recs = evidenceRecords();
+    var idx = buildIndex(recs);
+    var today = new Date(); today = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+    var directives = [];
+    sentences.forEach(function (s, i) {
+      var conf = isDirective(s);
+      if (conf < 3) return;                       // one weak signal is not a commitment
+      var dl = findDeadline(s.text);
+      var dd = deadlineDate(dl, meetingDate);
+      var dep = findDept(s.text);
+      var br = findBranch(s.text);
+      var tks = tokens(s.text);
+      var hits = matchOne(tks, idx, br);
+      var closed = hits.filter(function (h) { return isClosedRec(h.rec); }).length;
+
+      var evidence = hits.length === 0 ? 'none'
+                   : (closed === hits.length ? 'ev' : 'part');
+
+      directives.push({
+        i: i, text: s.text, speaker: s.speaker, confidence: conf,
+        owner: findOwner(s), deadline: dl.label, deadlineDate: dd,
+        overdue: !!(dd && dd < today && evidence !== 'ev'),
+        dept: dep.dept, deptScore: dep.score, branches: br,
+        hits: hits, closedHits: closed, evidence: evidence
+      });
+    });
+
+    if (!directives.length) {
+      throw new Error('No directives were found. This reads as narration rather than instructions — ' +
+        'check the transcript contains the discussion itself, not only a list of attendees or a summary of topics.');
+    }
+
+    /* per-department roll-up */
+    var byDept = {};
+    DEPTS.forEach(function (d) {
+      byDept[d.key] = { d: d, list: [], ev: 0, part: 0, none: 0, overdue: 0 };
+    });
+    byDept.unassigned = { d: { key:'unassigned', label:'Not attributable', icon:'❓', c:'#94A3B8' },
+                          list: [], ev: 0, part: 0, none: 0, overdue: 0 };
+    directives.forEach(function (x) {
+      var k = x.dept ? x.dept.key : 'unassigned';
+      var b = byDept[k];
+      b.list.push(x); b[x.evidence]++;
+      if (x.overdue) b.overdue++;
+    });
+
+    return {
+      directives: directives,
+      sentences: sentences.length,
+      records: recs.length,
+      byDept: byDept,
+      meetingDate: meetingDate,
+      generatedAt: new Date()
+    };
+  }
+
+  return { analyse: analyse, DEPTS: DEPTS, esc: esc, segment: segment, tokens: tokens };
+})();
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MEETING ACTIONS — renderer
+   ══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  var M = window.MEET, D = null, V = { filter: '', q: '' };
+  function $(id) { return document.getElementById(id); }
+  var esc = M.esc;
+  function pc(n, d) { return d ? Math.round(n / d * 100) + '%' : '—'; }
+  function fmtD(d) {
+    if (!d) return '—';
+    var MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return d.getDate() + ' ' + MO[d.getMonth()] + ' ' + d.getFullYear();
+  }
+  function evPill(e) {
+    return e === 'ev'   ? '<span class="mt-pill mt-ev">Evidenced</span>'
+         : e === 'part' ? '<span class="mt-pill mt-part">Partly evidenced</span>'
+         :                '<span class="mt-pill mt-none">No trace</span>';
+  }
+
+  /* ═════════ KPIs ═════════ */
+  function renderKPIs() {
+    var d = D.directives, n = d.length;
+    var ev = d.filter(function (x) { return x.evidence === 'ev'; }).length;
+    var part = d.filter(function (x) { return x.evidence === 'part'; }).length;
+    var none = d.filter(function (x) { return x.evidence === 'none'; }).length;
+    var over = d.filter(function (x) { return x.overdue; }).length;
+    var withDate = d.filter(function (x) { return x.deadline; }).length;
+    var depts = Object.keys(D.byDept).filter(function (k) { return D.byDept[k].list.length; }).length;
+
+    var K = [
+      { v: n, k: 'Directives found', c: '#0F172A',
+        d: 'From ' + D.sentences.toLocaleString('en-IN') + ' sentences. Narration, questions and pleasantries are excluded.' },
+      { v: none, k: 'Leave no trace', c: none ? '#DC2626' : '#059669',
+        d: pc(none, n) + ' of them. Nothing in either tracker could be matched — so there is no way to show they happened.' },
+      { v: part, k: 'Partly evidenced', c: '#D97706',
+        d: 'Matching records exist but some are still open.' },
+      { v: ev, k: 'Fully evidenced', c: '#059669',
+        d: 'Every matched record is closed.' },
+      { v: over, k: 'Past their deadline', c: over ? '#B91C1C' : '#94A3B8',
+        d: withDate + ' of ' + n + ' carried a date at all. A directive with no date cannot be late.' },
+      { v: depts, k: 'Departments touched', c: '#1E4FD8',
+        d: 'Assigned from the wording of each directive, not from who was speaking.' }
+    ];
+    $('mt-kpis').innerHTML = K.map(function (x) {
+      return '<div class="au-kpi"><div class="v" style="color:' + x.c + '">' + x.v + '</div>' +
+        '<div class="k">' + esc(x.k) + '</div><div class="d">' + esc(x.d) + '</div></div>';
+    }).join('');
+  }
+
+  /* ═════════ department scorecard ═════════ */
+  function renderDepts() {
+    var rows = Object.keys(D.byDept).map(function (k) { return D.byDept[k]; })
+      .filter(function (b) { return b.list.length; })
+      .sort(function (a, b) { return b.none - a.none || b.list.length - a.list.length; });
+    var maxN = Math.max.apply(null, rows.map(function (r) { return r.list.length; }).concat([1]));
+
+    $('mt-depts').innerHTML =
+      '<table class="mt-tbl"><thead><tr><th>Department</th><th class="n">Directives</th><th></th>' +
+      '<th class="n">Evidenced</th><th class="n">Partly</th><th class="n">No trace</th>' +
+      '<th class="n">Traceable</th><th class="n">Overdue</th></tr></thead><tbody>' +
+      rows.map(function (r) {
+        var traced = r.ev + r.part, pctT = Math.round(traced / r.list.length * 100);
+        var col = pctT >= 60 ? '#059669' : pctT >= 30 ? '#D97706' : '#DC2626';
+        return '<tr class="clk" data-k="' + esc(r.d.key) + '">' +
+          '<td><b>' + r.d.icon + ' ' + esc(r.d.label) + '</b></td>' +
+          '<td class="n"><b>' + r.list.length + '</b></td>' +
+          '<td style="width:130px"><div class="au-bar"><i style="width:' +
+            (r.list.length / maxN * 100) + '%;background:' + r.d.c + '"></i></div></td>' +
+          '<td class="n" style="color:#059669">' + r.ev + '</td>' +
+          '<td class="n" style="color:#D97706">' + r.part + '</td>' +
+          '<td class="n" style="color:' + (r.none ? '#DC2626' : '#94A3B8') + ';font-weight:700">' + r.none + '</td>' +
+          '<td class="n" style="font-weight:800;color:' + col + '">' + pctT + '%</td>' +
+          '<td class="n" style="color:' + (r.overdue ? '#B91C1C' : '#94A3B8') + '">' + r.overdue + '</td></tr>';
+      }).join('') + '</tbody></table>' +
+      '<p class="au-note"><b>Traceable</b> is the share of a department\u2019s directives that matched any record ' +
+      'at all. It is a measure of whether the work is <i>visible</i>, not whether it was done \u2014 a department ' +
+      'at 0% may be working hard with nothing to show for it in these two trackers, which is a reporting gap ' +
+      'rather than a performance one. Departments whose work lives in other systems (grievance portal, HR1, ' +
+      'admissions CRM) will always read low here until those exports are added.</p>';
+
+    $('mt-depts').querySelectorAll('tr.clk').forEach(function (tr) {
+      tr.addEventListener('click', function () { deptModal(tr.dataset.k); });
+    });
+  }
+
+  /* ═════════ untraced ═════════ */
+  function renderUntraced() {
+    var list = D.directives.filter(function (x) { return x.evidence === 'none'; })
+      .sort(function (a, b) { return (b.overdue ? 1 : 0) - (a.overdue ? 1 : 0) || b.confidence - a.confidence; });
+    $('mt-untraced').innerHTML = list.length
+      ? '<table class="mt-tbl"><thead><tr><th>Department</th><th>Directive</th><th>Owner</th>' +
+        '<th>Deadline</th></tr></thead><tbody>' +
+        list.map(function (x) {
+          return '<tr class="clk" data-i="' + D.directives.indexOf(x) + '">' +
+            '<td>' + (x.dept ? x.dept.icon + ' ' + esc(x.dept.label) : '<span style="color:#94A3B8">—</span>') + '</td>' +
+            '<td style="max-width:520px">' + esc(x.text) +
+              (x.branches.length ? '<div class="mt-meta">' + esc(x.branches.join(', ')) + '</div>' : '') + '</td>' +
+            '<td>' + esc(x.owner || '—') + '</td>' +
+            '<td style="color:' + (x.overdue ? '#DC2626;font-weight:700' : '#64748B') + '">' +
+              esc(x.deadline || '—') + (x.overdue ? ' · overdue' : '') + '</td></tr>';
+        }).join('') + '</tbody></table>' +
+        '<p class="au-note">The fix for these is structural rather than managerial: at the moment a directive is ' +
+        'issued, name the tracker field that will evidence it. A directive with no field attached cannot be ' +
+        'followed up in any system, only remembered.</p>'
+      : '<div class="no-data">Every directive matched at least one record.</div>';
+    wireRows('mt-untraced');
+  }
+
+  /* ═════════ full list ═════════ */
+  function renderList() {
+    var list = D.directives.filter(function (x) {
+      if (V.filter === 'none' && x.evidence !== 'none') return false;
+      if (V.filter === 'part' && x.evidence !== 'part') return false;
+      if (V.filter === 'ev' && x.evidence !== 'ev') return false;
+      if (V.filter === 'overdue' && !x.overdue) return false;
+      if (V.q) {
+        var s = (x.text + ' ' + x.owner + ' ' + (x.dept ? x.dept.label : '')).toLowerCase();
+        if (s.indexOf(V.q.toLowerCase()) < 0) return false;
+      }
+      return true;
+    });
+    $('mt-list').innerHTML = list.length
+      ? '<table class="mt-tbl"><thead><tr><th>Department</th><th>Directive</th><th>Owner</th>' +
+        '<th>Deadline</th><th class="n">Records</th><th>Evidence</th></tr></thead><tbody>' +
+        list.map(function (x) {
+          return '<tr class="clk" data-i="' + D.directives.indexOf(x) + '">' +
+            '<td style="white-space:nowrap">' + (x.dept ? x.dept.icon + ' ' + esc(x.dept.label) : '—') + '</td>' +
+            '<td style="max-width:460px">' + esc(x.text) +
+              (x.speaker ? '<div class="mt-meta">said by ' + esc(x.speaker) + '</div>' : '') + '</td>' +
+            '<td style="white-space:nowrap">' + esc(x.owner || '—') + '</td>' +
+            '<td style="white-space:nowrap;color:' + (x.overdue ? '#DC2626;font-weight:700' : '#64748B') + '">' +
+              esc(x.deadline || '—') + (x.deadlineDate ? '<div class="mt-meta">' + fmtD(x.deadlineDate) + '</div>' : '') + '</td>' +
+            '<td class="n">' + x.hits.length + (x.hits.length ? '<div class="mt-meta">' + x.closedHits + ' closed</div>' : '') + '</td>' +
+            '<td>' + evPill(x.evidence) + '</td></tr>';
+        }).join('') + '</tbody></table>'
+      : '<div class="no-data">Nothing matches this filter.</div>';
+    wireRows('mt-list');
+  }
+  function wireRows(id) {
+    $(id).querySelectorAll('tr.clk').forEach(function (tr) {
+      tr.addEventListener('click', function () { dirModal(D.directives[+tr.dataset.i]); });
+    });
+  }
+
+  /* ═════════ method ═════════ */
+  function renderMethod() {
+    $('mt-method').innerHTML =
+      '<table class="mt-tbl"><tbody>' +
+      [['1 · Segment', 'The transcript is split into sentences. Speaker labels, VTT timecodes and bullet markers are stripped, but the speaker is kept — it is often the best clue to who owns a directive.'],
+       ['2 · Classify', 'A sentence counts as a directive when it carries modality (<i>must, should, needs to</i>), imperative mood (<i>Ensure…, Submit…</i>), a named assignment (<i>Madhu will…</i>) or a deadline. Several weak signals must agree, so a single "should" is not enough. Questions and past-tense reporting are excluded.'],
+       ['3 · Extract', 'Owner, deadline, branch and department are read from the sentence. Relative deadlines (<i>within one month</i>) are resolved against the meeting date you entered.'],
+       ['4 · Match', 'Each directive is scored against every Admin task and Vigilance observation by weighted word overlap — rare words count for more than common ones, so <i>hydrant</i> carries far more weight than <i>branch</i>. Plurals are collapsed. A match needs to clear 34% of the directive\u2019s total weight.'],
+       ['5 · Report', 'Evidenced = every matched record is closed. Partly = matches exist, some still open. No trace = nothing matched.']
+      ].map(function (r) {
+        return '<tr><td style="width:120px;font-weight:800;color:#07361F;white-space:nowrap">' + r[0] + '</td>' +
+          '<td style="font-size:12px;line-height:1.6;color:#334155">' + r[1] + '</td></tr>';
+      }).join('') + '</tbody></table>' +
+      '<div class="au-flag"><b>Where this can be wrong.</b> Matching is on wording, so a directive recorded in the ' +
+      'tracker under different language will read as untraceable — <b>"no trace" means "not evidenced in these two ' +
+      'trackers", never "not done"</b>. It can also match the wrong record when a directive is phrased very ' +
+      'generally. Treat the untraced list as a set of questions to ask, not a set of failures, and read every ' +
+      'match before acting on it — which is what the record links are for.</div>';
+  }
+
+  /* ═════════ modals ═════════ */
+  function modal(t, s, h) {
+    $('mt-mod-title').textContent = t; $('mt-mod-sub').innerHTML = s; $('mt-mod-body').innerHTML = h;
+    $('mt-modal').classList.add('on'); document.body.style.overflow = 'hidden';
+  }
+  function closeModal() { $('mt-modal').classList.remove('on'); document.body.style.overflow = ''; }
+
+  function recTable(hits) {
+    if (!hits.length) return '<div class="no-data">No record in either tracker matched this wording.</div>';
+    return '<table class="mt-tbl"><thead><tr><th>Source</th><th>Branch</th><th>Record</th>' +
+      '<th>Status</th><th>Target</th><th class="n">Match</th></tr></thead><tbody>' +
+      hits.map(function (h) {
+        var closed = /closed|completed|done|resolved/i.test(h.rec.status);
+        return '<tr><td>' + esc(h.rec.src) + '</td><td>' + esc(h.rec.branch || '—') + '</td>' +
+          '<td style="max-width:400px">' + esc(h.rec.text) + '</td>' +
+          '<td style="color:' + (closed ? '#059669' : '#D97706') + ';font-weight:600">' + esc(h.rec.status || '—') + '</td>' +
+          '<td style="white-space:nowrap">' + esc(h.rec.deadline || '—') + '</td>' +
+          '<td class="n">' + Math.round(h.score * 100) + '%</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+  function dirModal(x) {
+    modal((x.dept ? x.dept.icon + '  ' : '') + (x.dept ? x.dept.label : 'Directive'),
+      evPill(x.evidence) + ' · ' + x.hits.length + ' matching record(s)' +
+      (x.owner ? ' · owner ' + esc(x.owner) : '') + (x.deadline ? ' · ' + esc(x.deadline) : ''),
+      '<div class="mt-quote" style="margin-bottom:14px;font-size:13px">' + esc(x.text) + '</div>' +
+      '<div class="au-stats" style="margin-bottom:14px">' +
+      '<div class="au-st"><div class="v">' + x.hits.length + '</div><div class="l">Records matched</div></div>' +
+      '<div class="au-st"><div class="v" style="color:#059669">' + x.closedHits + '</div><div class="l">Closed</div></div>' +
+      '<div class="au-st"><div class="v" style="color:#D97706">' + (x.hits.length - x.closedHits) + '</div><div class="l">Still open</div></div>' +
+      '<div class="au-st"><div class="v">' + fmtD(x.deadlineDate) + '</div><div class="l">Deadline</div></div>' +
+      '</div>' + recTable(x.hits));
+  }
+  function deptModal(key) {
+    var b = D.byDept[key]; if (!b) return;
+    modal(b.d.icon + '  ' + b.d.label,
+      b.list.length + ' directive(s) · ' + b.ev + ' evidenced · ' + b.part + ' partly · ' + b.none + ' with no trace',
+      '<table class="mt-tbl"><thead><tr><th>Directive</th><th>Owner</th><th>Deadline</th>' +
+      '<th class="n">Records</th><th>Evidence</th></tr></thead><tbody>' +
+      b.list.map(function (x) {
+        return '<tr><td style="max-width:440px">' + esc(x.text) + '</td>' +
+          '<td>' + esc(x.owner || '—') + '</td>' +
+          '<td style="color:' + (x.overdue ? '#DC2626' : '#64748B') + '">' + esc(x.deadline || '—') + '</td>' +
+          '<td class="n">' + x.hits.length + '</td><td>' + evPill(x.evidence) + '</td></tr>';
+      }).join('') + '</tbody></table>');
+  }
+
+  /* ═════════ run ═════════ */
+  function renderAllMeet() {
+    renderKPIs(); renderDepts(); renderUntraced(); renderList(); renderMethod();
+  }
+
+  window.meetAnalyse = function (text, dateStr) {
+    var st = $('mt-status');
+    try {
+      D = M.analyse(text, dateStr || null);
+      window.__MEET_D = D;
+      $('mt-body').style.display = 'flex';
+      $('mt-meta').textContent = D.directives.length + ' directives · ' +
+        D.sentences.toLocaleString('en-IN') + ' sentences · matched against ' +
+        D.records.toLocaleString('en-IN') + ' tracker records';
+      if (st) { st.textContent = ''; st.className = 'exm-status'; }
+      renderAllMeet();
+      try { idbSet('pbes_meet_txt', { t: Date.now(), text: text, date: dateStr }); } catch (e) {}
+    } catch (err) {
+      $('mt-body').style.display = 'none';
+      if (st) { st.textContent = String(err && err.message || err); st.className = 'exm-status err'; }
+      var card = $('mt-input-card');
+      if (card && !$('mt-err')) {
+        var e = document.createElement('div');
+        e.id = 'mt-err'; e.className = 'au-flag bad'; e.style.marginTop = '12px';
+        e.textContent = String(err && err.message || err);
+        card.appendChild(e);
+      } else if ($('mt-err')) { $('mt-err').textContent = String(err && err.message || err); }
+    }
+  };
+
+  document.addEventListener('DOMContentLoaded', wire);
+  if (document.readyState !== 'loading') wire();
+  function wire() {
+    var run = $('mt-run'); if (!run || run.dataset.w) return;
+    run.dataset.w = '1';
+    run.addEventListener('click', function () {
+      var old = $('mt-err'); if (old) old.remove();
+      window.meetAnalyse($('mt-text').value, $('mt-date').value);
+    });
+    $('mt-clear').addEventListener('click', function () {
+      $('mt-text').value = ''; $('mt-body').style.display = 'none';
+      var old = $('mt-err'); if (old) old.remove();
+      $('mt-meta').textContent = 'Paste a meeting transcript to see which directives left a trace in the trackers';
+      try { idbSet('pbes_meet_txt', { t: Date.now(), text: '', date: '' }); } catch (e) {}
+    });
+    $('mt-file').addEventListener('change', function (ev) {
+      var f = ev.target.files && ev.target.files[0]; if (!f) return;
+      var r = new FileReader();
+      r.onload = function () { $('mt-text').value = String(r.result || ''); $('mt-run').click(); };
+      r.readAsText(f);
+    });
+    var drop = $('mt-drop');
+    ['dragenter','dragover'].forEach(function (e) {
+      drop.addEventListener(e, function (ev) { ev.preventDefault(); drop.classList.add('on'); });
+    });
+    ['dragleave','drop'].forEach(function (e) {
+      drop.addEventListener(e, function (ev) { ev.preventDefault(); drop.classList.remove('on'); });
+    });
+    drop.addEventListener('drop', function (ev) {
+      var f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0]; if (!f) return;
+      var r = new FileReader();
+      r.onload = function () { $('mt-text').value = String(r.result || ''); $('mt-run').click(); };
+      r.readAsText(f);
+    });
+    $('mt-filter').addEventListener('change', function (e) { V.filter = e.target.value; renderList(); });
+    var t; $('mt-q').addEventListener('input', function (e) {
+      clearTimeout(t); t = setTimeout(function () { V.q = e.target.value; renderList(); }, 200);
+    });
+    $('mt-mod-x').addEventListener('click', closeModal);
+    $('mt-modal').addEventListener('click', function (e) { if (e.target === $('mt-modal')) closeModal(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
+
+    /* default the meeting date to today, and restore the last transcript */
+    var d = new Date();
+    $('mt-date').value = d.getFullYear() + '-' +
+      String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    try {
+      idbGet('pbes_meet_txt').then(function (c) {
+        if (c && c.text) {
+          $('mt-text').value = c.text;
+          if (c.date) $('mt-date').value = c.date;
+          setTimeout(function () { window.meetAnalyse(c.text, c.date); }, 400);
+        }
+      }).catch(function () {});
+    } catch (e) {}
+  }
+})();
+
 </script>
 </body>
 </html>
