@@ -8681,7 +8681,9 @@ async function loadPT1Review(force){
     var res=await fetch(DATA_API+'?section=pt1'+(force?'&nocache=1':'')+'&_t='+Date.now(),
                         { headers:{ 'Authorization':'Bearer '+session.access_token } });
     if(res.status===401){ await sb.auth.signOut(); window.location.href='login.html'; return; }
-    if(!res.ok) throw new Error('HTTP '+res.status);
+    if(!res.ok) throw new Error('HTTP '+res.status+' from /api/data. A 404 means the Apps Script '+
+      'deployment URL is stale \u2014 in Apps Script use Deploy \u2192 Manage deployments \u2192 edit the '+
+      'EXISTING deployment \u2192 New version, so the /exec URL stays the same.');
     var d=await res.json();
     if(d && d.error) throw new Error(d.message||'Upstream error');
 
@@ -8848,7 +8850,36 @@ window.AUDIT = (function () {
     var rows = allRows.filter(function (r) {
       return audited[str(r[iB]) + '\u241f' + str(r[iM])];
     });
-    if (!rows.length) throw new Error('No branch-month in the audit sheet carries enough entries to score.');
+    /* Do not dead-end. Two very different causes produce the same empty result —
+       a genuinely thin month, or stage columns whose cells hold something other
+       than Yes/No/IP — and a bare message tells the reader neither. Score
+       whatever has ANY entry and flag it; if there is nothing scoreable at all,
+       report exactly what the sheet contains so the cause is visible. */
+    var lowEvidence = false;
+    if (!rows.length) {
+      Object.keys(probe).forEach(function (k) { if (scored(probe[k]) > 0) audited[k] = 1; });
+      rows = allRows.filter(function (r) { return audited[str(r[iB]) + '\u241f' + str(r[iM])]; });
+      stray = [];
+      lowEvidence = rows.length > 0;
+    }
+    if (!rows.length) {
+      var seenVals = {};
+      allRows.forEach(function (r) {
+        cols.forEach(function (ci) {
+          if (ci < 0) return;
+          var v = str(r[ci]); var k = v === '' ? '(blank)' : v;
+          seenVals[k] = (seenVals[k] || 0) + 1;
+        });
+      });
+      var vals = Object.keys(seenVals).sort(function (a, b) { return seenVals[b] - seenVals[a]; })
+        .slice(0, 8).map(function (k) { return k + ' \u00d7' + seenVals[k]; });
+      throw new Error(
+        'The sheet has ' + allRows.length + ' rows, but none of the five stage columns hold a Yes, No or IP.'
+        + '\n\nStage columns matched:\n  ' +
+        GRADES.map(function (g, i) { return g + ' \u2192 ' + (cols[i] >= 0 ? '"' + H[cols[i]] + '"' : 'NOT FOUND'); }).join('\n  ')
+        + '\n\nWhat those columns actually contain:\n  ' + (vals.length ? vals.join(', ') : 'nothing')
+        + '\n\nSheet headers:\n  ' + H.filter(Boolean).join(' | '));
+    }
 
     var branches = [], months = [], cats = [];
     var seenB = {}, seenM = {}, seenC = {};
@@ -8985,7 +9016,7 @@ window.AUDIT = (function () {
       byBM: byBM, byBMC: byBMC, byBMG: byBMG, byM: byM, byMC: byMC, byMG: byMG,
       byBMP: byBMP, params: params,
       remarks: remarks, gov: gov, chronic: chronic, movers: movers,
-      audited: audited, stray: stray, minAudit: MIN_AUDIT,
+      audited: audited, stray: stray, minAudit: MIN_AUDIT, lowEvidence: lowEvidence,
       worstParams: worstParams,
       latest: latest, prev: prev,
       rowCount: rows.length,
@@ -10033,6 +10064,18 @@ window.AUDIT = (function () {
     var meta = D.rowCount.toLocaleString('en-IN') + ' audit lines · ' +
       D.branches.length + ' branches · ' + D.months.length + ' audited month' + (D.months.length === 1 ? '' : 's');
     var el = $('au-meta'); if (el) el.textContent = meta;
+    if (D.lowEvidence) {
+      var host = $('au-body');
+      if (host && !$('au-lowev')) {
+        var w2 = document.createElement('div');
+        w2.id = 'au-lowev'; w2.className = 'au-flag bad';
+        w2.innerHTML = '<b>Every branch-month here is scored on very few checks.</b> A month normally needs ' +
+          'at least ' + D.minAudit + ' scored cells to count and none reached it, so the bar has been dropped ' +
+          'to show what exists rather than nothing at all. Treat these percentages as provisional until the ' +
+          'audit sheet is filled in further.';
+        host.insertBefore(w2, host.firstChild);
+      }
+    } else { var oldw = $('au-lowev'); if (oldw) oldw.remove(); }
     renderAll();
 
     /* the global filter bar calls this whenever branch or month changes */
@@ -10096,7 +10139,7 @@ function _auPaint(){
     _auShow(false);
     var l=document.getElementById('au-loader');
     if(l) l.innerHTML='<div style="color:var(--r);font-weight:700">Could not build the audit view</div>'+
-      '<div style="font-size:11px;color:var(--txm);max-width:460px">'+String(err&&err.message||err)+'</div>';
+      '<div style="font-size:11.5px;color:var(--txm);max-width:660px;white-space:pre-wrap;text-align:left;line-height:1.55;margin-top:10px">'+String(err&&err.message||err)+'</div>';
   }
 }
 
@@ -10120,7 +10163,9 @@ async function loadAudit(force){
     var res=await fetch(DATA_API+'?section=audit'+(force?'&nocache=1':'')+'&_t='+Date.now(),
                         { headers:{ 'Authorization':'Bearer '+session.access_token } });
     if(res.status===401){ await sb.auth.signOut(); window.location.href='login.html'; return; }
-    if(!res.ok) throw new Error('HTTP '+res.status);
+    if(!res.ok) throw new Error('HTTP '+res.status+' from /api/data. A 404 means the Apps Script '+
+      'deployment URL is stale \u2014 in Apps Script use Deploy \u2192 Manage deployments \u2192 edit the '+
+      'EXISTING deployment \u2192 New version, so the /exec URL stays the same.');
     var d=await res.json();
     if(d && d.error) throw new Error(d.message||'Upstream error');
 
@@ -11450,7 +11495,9 @@ async function loadPTM(force){
     var res=await fetch(DATA_API+'?section=ptm'+(force?'&nocache=1':'')+'&_t='+Date.now(),
                         { headers:{ 'Authorization':'Bearer '+session.access_token } });
     if(res.status===401){ await sb.auth.signOut(); window.location.href='login.html'; return; }
-    if(!res.ok) throw new Error('HTTP '+res.status);
+    if(!res.ok) throw new Error('HTTP '+res.status+' from /api/data. A 404 means the Apps Script '+
+      'deployment URL is stale \u2014 in Apps Script use Deploy \u2192 Manage deployments \u2192 edit the '+
+      'EXISTING deployment \u2192 New version, so the /exec URL stays the same.');
     var d=await res.json();
     if(d && d.error) throw new Error(d.message||'Upstream error');
 
@@ -12446,7 +12493,9 @@ async function loadCivil(force){
     var res=await fetch(DATA_API+'?section=civil'+(force?'&nocache=1':'')+'&_t='+Date.now(),
                         { headers:{ 'Authorization':'Bearer '+session.access_token } });
     if(res.status===401){ await sb.auth.signOut(); window.location.href='login.html'; return; }
-    if(!res.ok) throw new Error('HTTP '+res.status);
+    if(!res.ok) throw new Error('HTTP '+res.status+' from /api/data. A 404 means the Apps Script '+
+      'deployment URL is stale \u2014 in Apps Script use Deploy \u2192 Manage deployments \u2192 edit the '+
+      'EXISTING deployment \u2192 New version, so the /exec URL stays the same.');
     var d=await res.json();
     if(d && d.error) throw new Error(d.message||'Upstream error');
 
@@ -13389,7 +13438,9 @@ async function loadSyl(force){
     var res=await fetch(DATA_API+'?section=syl'+(force?'&nocache=1':'')+'&_t='+Date.now(),
                         { headers:{ 'Authorization':'Bearer '+session.access_token } });
     if(res.status===401){ await sb.auth.signOut(); window.location.href='login.html'; return; }
-    if(!res.ok) throw new Error('HTTP '+res.status);
+    if(!res.ok) throw new Error('HTTP '+res.status+' from /api/data. A 404 means the Apps Script '+
+      'deployment URL is stale \u2014 in Apps Script use Deploy \u2192 Manage deployments \u2192 edit the '+
+      'EXISTING deployment \u2192 New version, so the /exec URL stays the same.');
     var d=await res.json();
     if(d && d.error) throw new Error(d.message||'Upstream error');
 
