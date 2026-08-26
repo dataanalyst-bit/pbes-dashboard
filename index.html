@@ -6929,9 +6929,63 @@ function renderCare(){
 const TR_BRANCHES=['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam'];
 function _trData(){ return (window._TRANSPORT&&typeof window._TRANSPORT==='object')?window._TRANSPORT:{vehicles:[],routes:[],students:[],mileage:[],repair:[]}; }
 function _trFilt(arr){ return (arr||[]).filter(r=>fBranch==='ALL'||r.Branch===fBranch); }
-function _trExpiring(v){ // expiring within 30 days, already expired, or Compliance flagged
-  const d=v.DaysToExpiry; if(typeof d==='number'&&d<=30) return true;
-  return /expir/i.test(String(v.Compliance||''));
+/* ══════════════════════════════════════════════════════════════════════════
+   DOCUMENT EXPIRY — computed here, not read from the sheet
+
+   The Vehicle_Master sheet carries its own "Days To Expiry" and "Compliance"
+   columns, and both are wrong. The sheet mixes four date formats in the same
+   columns — ISO 2027-06-17, day-first 24-05-2027, slashes 14/05/2027, and raw
+   Excel serials like 46572.47917 — and its formula reads them inconsistently.
+   The result: every Pocharam vehicle reported -267 days, Bachupally reported
+   148.4375 days, and one row produced an "expiry" of 1900-11-08.
+
+   Those two columns are therefore ignored. Expiry is recomputed from the seven
+   document date fields, each already normalised to ISO on the way in, and the
+   vehicle's status is the SOONEST of them. That also means the drill-down can
+   say WHICH document is the problem, which the single sheet column never could.
+   ══════════════════════════════════════════════════════════════════════════ */
+var _TR_DOCS=[
+  {k:'InsuranceExp',   n:'InsuranceNo',   label:'Insurance'},
+  {k:'PermitExp',      n:'PermitNo',      label:'Permit'},
+  {k:'FitnessExp',     n:'FitnessNo',     label:'Fitness (FC)'},
+  {k:'PucExp',         n:'PucNo',         label:'PUC'},
+  {k:'RoadTaxExp',     n:'RoadTaxNo',     label:'Road Tax'},
+  {k:'LabourCertExp',  n:'LabourCertNo',  label:'Labour Certificate'},
+  {k:'HeavyLicenceExp',n:null,            label:'Driver heavy licence'}
+];
+function _trParse(s){
+  if(!s||s==='–') return null;
+  var m=String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(!m) return null;
+  var y=+m[1], mo=+m[2], d=+m[3];
+  /* the sheet contains month 00 and years in the 1900s — neither is a real
+     expiry date, and treating them as one is how a bus shows 400 years overdue */
+  if(mo<1||mo>12||d<1||d>31||y<2000||y>2100) return null;
+  return new Date(y,mo-1,d);
+}
+function _trToday(){ var t=new Date(); return new Date(t.getFullYear(),t.getMonth(),t.getDate()); }
+function _trDocList(v){
+  var today=_trToday();
+  return _TR_DOCS.map(function(D){
+    var raw=v[D.k], dt=_trParse(raw);
+    var days=dt?Math.round((dt-today)/86400000):null;
+    return {
+      label:D.label,
+      no:(D.n&&v[D.n]&&v[D.n]!=='–')?v[D.n]:'',
+      raw:(raw&&raw!=='–')?raw:'',
+      date:dt, days:days,
+      state: dt===null ? 'missing' : days<0 ? 'expired' : days<=30 ? 'soon' : 'ok'
+    };
+  });
+}
+function _trWorst(v){
+  var live=_trDocList(v).filter(function(d){ return d.days!==null; });
+  if(!live.length) return null;
+  return live.reduce(function(a,b){ return b.days<a.days?b:a; });
+}
+function _trExpiring(v){
+  var w=_trWorst(v);
+  return !!(w && w.days<=30);
 }
 function renderTransport(){
   const T=_trData();
@@ -7152,19 +7206,24 @@ function viewTransport(kind,branch){
   }
   if(kind==='expiring'||kind==='expired'){
     // Per-vehicle expand dropdown showing ALL Vehicle_Master details
-    const rows=(T.vehicles||[]).filter(bf).filter(kind==='expired'?(v=>/expir/i.test(String(v.Compliance||''))):_trExpiring)
-      .sort((a,b)=>(a.DaysToExpiry==null?1e9:a.DaysToExpiry)-(b.DaysToExpiry==null?1e9:b.DaysToExpiry));
+    const rows=(T.vehicles||[]).filter(bf)
+      .filter(kind==='expired'?(v=>{var w=_trWorst(v);return w&&w.days<0;}):_trExpiring)
+      .sort((a,b)=>{var x=_trWorst(a),y=_trWorst(b);
+        return (x?x.days:1e9)-(y?y.days:1e9);});
     let h='<div style="font-size:12px;color:#334155;margin-bottom:10px;"><strong>'+rows.length+'</strong> vehicle(s) with documents expiring/expired. Click a vehicle to see every Vehicle_Master detail.</div>';
     rows.forEach((v,i)=>{
       const id='veh_'+i+'_'+Math.random().toString(36).slice(2,7);
-      const dcol=(v.DaysToExpiry==null)?'#94A3B8':(v.DaysToExpiry<0?'#DC2626':v.DaysToExpiry<=15?'#DC2626':v.DaysToExpiry<=30?'#D97706':'#059669');
-      const dtxt=(v.DaysToExpiry==null)?'–':(v.DaysToExpiry<0?Math.abs(v.DaysToExpiry)+'d overdue':v.DaysToExpiry+'d left');
+      const W=_trWorst(v);
+      const dcol=!W?'#94A3B8':(W.days<0?'#DC2626':W.days<=30?'#D97706':'#059669');
+      const dtxt=!W?'no dated document':(W.days<0?W.label+' expired '+Math.abs(W.days)+'d ago'
+                                                 :W.label+' due in '+W.days+'d');
       h+=`<div style="border:1px solid #FECACA;border-radius:9px;margin-bottom:8px;overflow:hidden;">
         <div onclick="toggleAcc('${id}',this)" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#FEF2F2;">
           <div style="font-weight:800;font-size:13px;color:#0F172A;"><span class="acc-caret" style="color:#DC2626;margin-right:6px;">▸</span><span class="bd b${v.Branch}"></span> ${v.VehicleNo} <small style="color:#64748B;font-weight:600;">· ${v.Branch} · ${v.Category}</small></div>
-          <div style="font-weight:800;font-size:12.5px;color:${dcol};">${dtxt} <small style="color:#94A3B8;">${v.Compliance||''}</small></div>
+          <div style="font-weight:800;font-size:12.5px;color:${dcol};text-align:right;">${dtxt}
+            <small style="color:#94A3B8;display:block;font-weight:600;">${W&&W.date?W.date.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):''}</small></div>
         </div>
-        <div id="${id}" style="display:none;padding:12px 14px;background:#fff;">${_vehicleDetailHTML(v)}</div>
+        <div id="${id}" style="display:none;padding:12px 14px;background:#fff;">${_trDocTable(v)}${_vehicleDetailHTML(v)}</div>
       </div>`;
     });
     openHTMLModal('⚠️ Documents Expiring / Expired', (branch||(fBranch==='ALL'?'All Branches':fBranch)), h);
@@ -7185,6 +7244,35 @@ function viewTransport(kind,branch){
   openModal('🚌 Fleet — Vehicles',`${rows.length} vehicle(s)`,rows,_TR_VCOLS());
 }
 // Full detail grid for one vehicle (all Vehicle_Master fields).
+/* Every document on one vehicle, so the reader can see exactly which one is
+   the problem rather than a single aggregate number. */
+function _trDocTable(v){
+  var docs=_trDocList(v);
+  var C={expired:'#DC2626',soon:'#D97706',ok:'#059669',missing:'#94A3B8'};
+  var L={expired:'EXPIRED',soon:'DUE SOON',ok:'OK',missing:'NO DATE ON RECORD'};
+  return '<div style="font-size:11px;font-weight:800;color:#0F172A;text-transform:uppercase;'+
+    'letter-spacing:.05em;margin-bottom:7px;">Document status</div>'+
+    '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;">'+
+    '<thead><tr>'+['Document','Number','Expires','','Status'].map(function(x,i){
+      return '<th style="text-align:'+(i>=2&&i<4?'right':'left')+';padding:6px 8px;background:#F1F7F3;'+
+        'color:#07361F;font-size:9.5px;font-weight:800;text-transform:uppercase;border-bottom:1px solid #B7CFC0;">'+x+'</th>';
+    }).join('')+'</tr></thead><tbody>'+
+    docs.map(function(d){
+      var col=C[d.state];
+      var when=d.date?d.date.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):(d.raw||'—');
+      var rel=d.days===null?'':(d.days<0?Math.abs(d.days)+'d ago':'in '+d.days+'d');
+      return '<tr><td style="padding:6px 8px;border-bottom:1px solid #EEF2F7;font-weight:600;">'+d.label+'</td>'+
+        '<td style="padding:6px 8px;border-bottom:1px solid #EEF2F7;color:#64748B;font-size:11px;">'+(d.no||'—')+'</td>'+
+        '<td style="padding:6px 8px;border-bottom:1px solid #EEF2F7;text-align:right;white-space:nowrap;">'+when+'</td>'+
+        '<td style="padding:6px 8px;border-bottom:1px solid #EEF2F7;text-align:right;color:'+col+';font-size:11px;">'+rel+'</td>'+
+        '<td style="padding:6px 8px;border-bottom:1px solid #EEF2F7;"><span style="background:'+col+
+        ';color:#fff;font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:99px;">'+L[d.state]+'</span></td></tr>';
+    }).join('')+'</tbody></table>'+
+    '<p style="font-size:10.5px;color:#94A3B8;line-height:1.5;margin:0 0 12px;">Computed from the document dates '+
+    'themselves. The sheet\u2019s own <i>Days To Expiry</i> and <i>Compliance</i> columns are not used \u2014 they '+
+    'misread the mixed date formats in the export.</p>';
+}
+
 function _vehicleDetailHTML(v){
   const F=(l,val)=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px dashed #EEF2F7;"><span style="color:#64748B;font-size:11px;">${l}</span><span style="color:#0F172A;font-size:11.5px;font-weight:600;text-align:right;">${(val===undefined||val===null||val===''||val==='–')?'–':val}</span></div>`;
   const D=x=>(x&&x!=='–'&&typeof fmtDispDate==='function')?fmtDispDate(x):(x||'–');
