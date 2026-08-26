@@ -4081,10 +4081,7 @@ function renderGrievance(){
   setTxt('gr-sat-s', satYes+' of '+satRated.length+' rated');
 
   // ── Chart 1: Cases by Branch & Status (stacked) ──
-  // Resolved is left out on purpose. It dwarfs every other status, so the bars
-  // for the work that still needs doing were squeezed into a sliver. This chart
-  // is now about open work; the resolved count is on the KPI tile above.
-  const statusCats=['In Progress','Escalated','Open','Pending Parent Response'];
+  const statusCats=['Resolved','In Progress','Escalated','Open','Pending Parent Response'];
   const statusColors={'Resolved':'#059669','In Progress':'#3B82F6','Escalated':'#DC2626','Open':'#D97706','Pending Parent Response':'#7C3AED'};
   const brData=statusCats.map(st=>ALLB.map(b=>rows.filter(r=>r.Branch===b&&(r.Status||'')===st).length));
   mkChart('gr-branch',{type:'bar',
@@ -4097,13 +4094,45 @@ function renderGrievance(){
         datalabels:{display:true,color:'#fff',font:{size:10,weight:'bold'},formatter:v=>v>0?v:''}},
       scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,title:{display:true,text:'Cases'}}}}});
 
-  // ── Chart 2: Severity Distribution (doughnut) ──
-  const sevCats=['Critical','High','Medium','Low'];
-  const sevColors={'Critical':'#991B1B','High':'#DC2626','Medium':'#D97706','Low':'#059669'};
-  // The Severity Distribution and Parent Satisfaction charts were removed from
-  // this tab. The line that used to follow them belonged to renderPurchase and
-  // was left behind by an earlier bad edit — it referenced _pRows, a variable
-  // that only exists inside that other function, so every Grievance render threw.
+  // Severity Distribution chart removed: severity is set by whoever logs the case,
+  // so it measured the logger more than the school.
+
+  // ── Chart 3: Category Breakdown (horizontal bar) ──
+  const catCounts={};
+  rows.forEach(r=>{ let c=(r.Category||'Others').trim(); if(/^nan$/i.test(c)||!c)c='Others'; if(c==='Academic')c='Academics'; catCounts[c]=(catCounts[c]||0)+1; });
+  const catSorted=Object.keys(catCounts).sort((a,b)=>catCounts[b]-catCounts[a]);
+  mkChart('gr-category',{type:'bar',
+    data:{labels:catSorted,datasets:[{label:'Cases',data:catSorted.map(c=>catCounts[c]),backgroundColor:'#7C3AED',borderRadius:4}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:true,
+      onClick:(evt,els)=>{ if(!els||!els.length)return; viewGrievByCategory(catSorted[els[0].index]); },
+      plugins:{legend:{display:false},
+        datalabels:{display:true,anchor:'end',align:'right',color:'#1E293B',font:{size:10,weight:'bold'}}},
+      scales:{x:{beginAtZero:true,title:{display:true,text:'Cases'}}}}});
+
+  // Parent Satisfaction by Branch chart removed: the column is filled on only a
+  // fraction of cases.
+
+  // ── Performance Scorecard ──
+  renderGrievRanking(rows, ALLB);
+
+  // ── All records table ──
+  const SEV_PILL={'Critical':'pr','High':'po','Medium':'pa','Low':'pg'};
+  const STAT_PILL={'Resolved':'pg','In Progress':'pa','Escalated':'pr','Open':'po','Pending Parent Response':'pb'};
+  const SAT_PILL={'Satisfied':'pg','Partially Satisfied':'pa','Not Satisfied':'pr'};
+  const tbody=document.getElementById('gr-tbody');
+  const display=rows.slice(0,200);
+  tbody.innerHTML = display.length?display.map(r=>{
+    const sev=/^nan$/i.test(r.Severity)?'–':r.Severity;
+    const sat=/^nan$/i.test(r.ParentSatisfaction)?'–':r.ParentSatisfaction;
+    return `<tr style="cursor:pointer" onclick='openGrievDetail(${JSON.stringify(r).replace(/'/g,"&#39;")})'>
+      <td><span class="bd b${r.Branch}"></span> ${r.Branch}</td><td>${fmtDispDate(r.Date)}</td>
+      <td>${r.Student}</td><td>${/^nan$/i.test(r.Category)?'Others':r.Category}</td>
+      <td><span class="pill ${SEV_PILL[sev]||'pa'}">${sev}</span></td>
+      <td>${/^nan$/i.test(r.AssignedTo)?'–':r.AssignedTo}</td>
+      <td><span class="pill ${STAT_PILL[r.Status]||'pa'}">${r.Status}</span></td>
+      <td>${sat==='–'?'–':`<span class="pill ${SAT_PILL[sat]||'pa'}">${sat}</span>`}</td></tr>`;
+  }).join(''):'<tr><td colspan="8" class="no-data">No grievance records for this branch</td></tr>';
+  document.getElementById('gr-all-fn').textContent = rows.length+' records'+(rows.length>200?' (showing first 200 — use View All)':'');
 }
 
 // Purchase Manager Performance per branch
@@ -6231,8 +6260,37 @@ function renderCareSummary(){
   window._CARE_SENT=_sent;
   // Sentiment is now read per row by the negation-aware scorer, and an
   // unanswered call is its own class rather than being filed as Neutral.
-  const sentFilteredRows=(_sent==='ALL')?filteredRows
-    :filteredRows.filter(r=>CARE_NLP.classify(r).klass===_sent);
+  /* ── Concern scope: All / Academic / Non-Academic, and Pending-only ──
+     Applied BEFORE sentiment so every panel below, and every drill-down that
+     calls _careActiveFilter, works from the same set. Academic follows the same
+     rule the compliance report uses, so the two cannot disagree. */
+  const _CARE_ACADEMIC=/^(academics?|studies|study|teaching|learning|exam|homework)/i;
+  const _CARE_NOT_CONCERN=/^(no concern|not answering|no response)/i;
+  const _scope=window._CARE_SCOPE||'ALL';
+  const _pendOnly=!!window._CARE_PENDING;
+
+  window._careIsConcern=function(r){ return !_CARE_NOT_CONCERN.test(String(r.Grievance||'')); };
+  window._careIsOpenConcern=function(r){
+    return window._careIsConcern(r) && !/resolved/i.test(String(r.Status||''));
+  };
+  window._careActiveFilter=function(list){
+    return list.filter(function(r){
+      const cat=String(r.Grievance||'');
+      if(_scope==='Academic'     && !_CARE_ACADEMIC.test(cat)) return false;
+      if(_scope==='Non-Academic' && ( _CARE_ACADEMIC.test(cat) || !window._careIsConcern(r))) return false;
+      if(_pendOnly && !window._careIsOpenConcern(r)) return false;
+      if(_sent!=='ALL' && CARE_NLP.classify(r).klass!==_sent) return false;
+      return true;
+    });
+  };
+  window._careSentLabel=function(){
+    return (_scope==='ALL'?'all concerns':_scope.toLowerCase())
+      + (_pendOnly?' · pending only':'')
+      + (_sent==='ALL'?'':' · '+_sent.toLowerCase());
+  };
+
+  const _pendCount=filteredRows.filter(window._careIsOpenConcern).length;
+  const sentFilteredRows=window._careActiveFilter(filteredRows);
   if(!sentFilteredRows.length){ el.innerHTML='<div class="no-data">No care-call data for this filter combination.</div>'; return; }
 
   const CATS=['No Concern','Not Answering','Academics','Behaviour / Wellbeing','Administration','Transport','Co Curricular','New Admission','No Response','Other'];
@@ -6389,6 +6447,21 @@ function renderCareSummary(){
     +'<select id="care-sec-sel" onchange="renderCareSummary()" style="padding:5px 10px;border:1.5px solid #E0E8FF;border-radius:8px;font-size:11.5px;font-family:Inter,sans-serif;cursor:pointer;">'
     +'<option value="ALL">All Sections</option>'+allSections.map(s=>'<option value="'+s+'"'+(_sec===s?' selected':'')+'>'+s+'</option>').join('')+'</select>'
     +'<div style="display:flex;border:1.5px solid #E0E8FF;border-radius:8px;overflow:hidden;font-size:11px;font-family:Inter,sans-serif;">'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-right:10px;">'
+      +[['ALL','All concerns',''],['Academic','Academic','📘 '],['Non-Academic','Non-Academic','🏫 ']].map(([v,lbl,ic])=>{
+        const on=_scope===v;
+        return '<button onclick="window._CARE_SCOPE=\''+v+'\';renderCareSummary()" '
+          +'style="padding:5px 12px;border:1px solid '+(on?'#1E4FD8':'#E0E8FF')+';border-radius:8px;'
+          +'background:'+(on?'#1E4FD8':'#fff')+';color:'+(on?'#fff':'#334155')+';font-weight:'+(on?'700':'500')
+          +';cursor:pointer;font-family:Inter,sans-serif;font-size:11px;white-space:nowrap;">'+ic+lbl+'</button>';
+      }).join('')
+      +'<button onclick="window._CARE_PENDING=!window._CARE_PENDING;renderCareSummary()" '
+        +'title="Show only concerns that are still open" '
+        +'style="padding:5px 12px;border:1px solid '+(_pendOnly?'#DC2626':'#FDE68A')+';border-radius:8px;'
+        +'background:'+(_pendOnly?'#DC2626':'#FFFBEB')+';color:'+(_pendOnly?'#fff':'#B45309')
+        +';font-weight:700;cursor:pointer;font-family:Inter,sans-serif;font-size:11px;white-space:nowrap;">'
+        +'⏳ Pending to be Addressed '+fi(_pendCount)+(_pendOnly?' ✕':'')+'</button>'
+      +'</div>'
       +['ALL','Positive','Neutral','Negative','No Answer'].map(s=>{
         const active=_sent===s;
         const C={'Positive':'#059669','Negative':'#DC2626','Neutral':'#64748B','No Answer':'#C2410C','ALL':'#1E4FD8'};
@@ -6507,8 +6580,8 @@ function viewSubTopic(catName, topicName, keywords){
   const CATS=['No Concern','Not Answering','Academics','Behaviour / Wellbeing','Administration','Transport','Co Curricular','New Admission','No Response'];
   let catRows=CARE.filter(r=>scope.includes(r.Branch)&&(fMonth==='ALL'||r.Month===fMonth))
     .filter(r=>{ const c=CATS.includes(r.Grievance)?r.Grievance:'Other'; return c===catName; });
-  // Apply active sentiment filter
-  catRows=_careFilterBySentiment(catRows);
+  catRows = (typeof _careActiveFilter==='function') ? _careActiveFilter(catRows)
+                                                    : _careFilterBySentiment(catRows);
   let rows;
   if(keywords&&keywords.length>0){
     rows=catRows.filter(r=>{
@@ -6531,8 +6604,11 @@ function viewCareGrievance(cat){
   const BR=['Boduppal','Keesara','Pocharam','Bachupally','Gowdavalli'];
   const scope=(fBranch==='ALL')?BR:[fBranch];
   let rows=CARE.filter(r=>scope.includes(r.Branch)&&(fMonth==='ALL'||r.Month===fMonth)&&(r.Grievance===cat||(cat==='Other'&&!['No Concern','Not Answering','Academics','Behaviour / Wellbeing','Administration','Transport','Co Curricular','New Admission','No Response'].includes(r.Grievance))));
-  // Apply active sentiment filter
-  rows=_careFilterBySentiment(rows);
+  /* One shared filter: scope (Academic / Non-Academic), Pending-only and the
+     sentiment chip together. Applying only the sentiment here is what let a
+     drill-down open resolved rows while the chip said "pending only". */
+  rows = (typeof _careActiveFilter==='function') ? _careActiveFilter(rows)
+                                                 : _careFilterBySentiment(rows);
   rows=rows.map(r=>({Branch:r.Branch,Month:r.Month,Student:r.Student,Class:r.Class,Date:r.Date,
       Grievance:r.GrievanceRaw||r.Grievance, Sentiment:_careRowSentiment(r),
       Remarks:r.Remarks,Followup:r.Followup,Status:r.StatusRaw||r.Status}));
@@ -6653,7 +6729,12 @@ function renderCare(){
   }).join('');
 
   // Grievance — compute dynamically from CARE_DATA filtered by branch AND month
-  document.getElementById('griev-fn').textContent=fBranch==='ALL'?'All Branches':fBranch;
+  /* #griev-fn does not exist in the markup and never has. The per-step try/catch
+     upstream swallowed the resulting null reference, so renderCare aborted here
+     every single time and everything below it silently failed to draw. Guarded,
+     so the rest of the tab renders. */
+  { const _gf=document.getElementById('griev-fn');
+    if(_gf) _gf.textContent=fBranch==='ALL'?'All Branches':fBranch; }
   const _gRows = (typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))
     ? CARE_DATA.filter(r=>(fBranch==='ALL'||r.Branch===fBranch)&&(fMonth==='ALL'||r.Month===fMonth))
     : [];
