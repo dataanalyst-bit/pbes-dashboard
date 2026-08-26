@@ -445,6 +445,25 @@ table.auhm td.itm{font-size:11px;font-weight:700;padding:4px 9px}
 table.auhm tr.au-itemrow td{border-color:#E8EEF2}
 
 
+/* ═══ TOP PROBLEMS ═══ */
+.cp-row{display:grid;grid-template-columns:210px 1fr 120px;gap:10px;align-items:center;
+  padding:7px 0;border-bottom:1px solid var(--bor)}
+.cp-row:last-child{border-bottom:none}
+.cp-name{font-size:12.5px;font-weight:700;color:var(--tx);display:flex;align-items:center;gap:7px}
+.cp-name i{font-style:normal;font-size:14px;width:19px;text-align:center}
+.cp-bars{display:flex;flex-direction:column;gap:3px}
+.cp-bar{display:flex;align-items:center;gap:7px;font-size:10.5px;color:var(--txm)}
+.cp-bar .t{width:52px;flex:0 0 52px;text-align:right;font-variant-numeric:tabular-nums}
+.cp-bar .track{flex:1;height:11px;background:#EEF2FF;border-radius:99px;overflow:hidden;cursor:pointer}
+.cp-bar .track:hover{outline:2px solid var(--p)}
+.cp-bar .track i{display:block;height:100%;border-radius:99px}
+.cp-bar .v{width:38px;flex:0 0 38px;font-weight:700;color:var(--tx);font-variant-numeric:tabular-nums}
+.cp-delta{text-align:right;font-size:12.5px;font-weight:800;font-variant-numeric:tabular-nums}
+.cp-delta small{display:block;font-size:9.5px;font-weight:500;color:#94A3B8}
+.cp-hd{display:grid;grid-template-columns:210px 1fr 120px;gap:10px;font-size:9.5px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--txm);padding-bottom:7px;border-bottom:2px solid var(--bor)}
+.cp-hd span:last-child{text-align:right}
+
 /* ═══ MEETING ACTIONS ═══ */
 .mt-drop{border:2px dashed var(--bor);border-radius:14px;padding:26px 22px;text-align:center;background:var(--sur)}
 .mt-drop.on{border-color:var(--p);background:var(--pl)}
@@ -1080,6 +1099,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="card" style="margin-bottom:16px;">
     <div class="ch"><h3>🧭 Care Call Summary — Insights &amp; Data-Driven Decisions</h3><span class="fnote" id="care-summary-fn">Parents-satisfied % + grievance-category insights</span></div>
     <div class="cb" id="care-summary-report" style="padding:14px 18px;"></div>
+  </div>
+
+  <!-- Top 10 consolidated problems, this month against last -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="ch"><h3>🔟 Top 10 problems — this month against last</h3>
+      <span class="fnote" id="cp-fn">Read from what parents actually said, not from the category tag</span>
+      <div class="vt-toggle" id="cp-toggle">
+        <button data-v="chart" class="on">📊 Chart</button><button data-v="table">📋 Table</button>
+      </div>
+    </div>
+    <div class="cb" style="padding:14px 18px;"><div id="cp-body"></div></div>
   </div>
 
   <!-- Stage-group infographic replaces the monthly volume chart: the volume
@@ -14366,6 +14396,324 @@ window.MEET = (function () {
   }
 })();
 
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   TOP 10 CONSOLIDATED PROBLEMS — month against month
+
+   The category tag on a call says which box someone filed it in. It does not
+   say what the parent was actually unhappy about, and two calls in the same box
+   are routinely about different things. This panel therefore reads the REMARK,
+   not the tag.
+
+   How a problem is identified:
+     1. keep only calls that are a concern AND read negatively through the
+        negation-aware scorer — a call tagged "Academics" whose remark says
+        "very happy with the new teacher" is not a problem
+     2. match the remark against a lexicon of school-specific problem patterns,
+        each a set of phrases rather than single words, so "not corrected",
+        "notebook not checked" and "corrections pending" land on one theme
+     3. a remark can carry more than one problem, and does — "bus is late and
+        the driver was rude" is two, and counting it once would hide one of them
+     4. rank by this month's count, then compare with last month
+
+   WHY THE COMPARISON MATTERS MORE THAN THE RANKING
+   A big number is usually just a big category. What is worth a meeting is what
+   MOVED. Each row therefore carries the change against last month, and the
+   share of that month's negative calls — so a theme that grew only because the
+   month was busier is visible as flat share rather than as growth.
+   ══════════════════════════════════════════════════════════════════════════ */
+window.CARE_PROBLEMS = (function () {
+  'use strict';
+
+  /* Each theme is a set of phrases. Phrases beat single words: "correction"
+     alone catches "corrections are good", the phrase does not. */
+  var THEMES = [
+    { k:'notebook',  label:'Notebook correction',       icon:'🖊️', c:'#7C3AED',
+      p:['notebook not correct','note book not correct','not corrected','correction pending','corrections pending',
+         'notebook not check','note book not check','uncorrected','not checked notebook','correction not done'] },
+    { k:'teaching',  label:'Teaching quality',          icon:'📚', c:'#1E4FD8',
+      p:['teaching not good','teaching quality','not teaching','not explain','unable to understand','cannot understand',
+         'not understanding','teacher not teaching','poor teaching','not clear in class','revision not done'] },
+    { k:'homework',  label:'Homework load',             icon:'📝', c:'#6366F1',
+      p:['too much homework','more homework','homework load','heavy homework','excess homework','no homework',
+         'homework not given','homework not check'] },
+    { k:'marks',     label:'Marks & results',           icon:'📉', c:'#DC2626',
+      p:['marks are low','low marks','less marks','marks not improve','failed in','poor result','result not good',
+         'not scoring','marks reduce'] },
+    { k:'transport', label:'Bus delay & routing',       icon:'🚌', c:'#0D9488',
+      p:['bus is late','bus late','bus delay','late pickup','late drop','route problem','bus not come',
+         'bus did not come','waiting for bus','bus timing','pick up late','drop late'] },
+    { k:'busSafety', label:'Bus safety & conduct',      icon:'⚠️', c:'#B91C1C',
+      p:['driver rash','rash driving','driver rude','over speed','overspeed','no attender','attender not',
+         'bus crowded','standing in bus','door open','driver behaviour'] },
+    { k:'behaviour', label:'Teacher behaviour',         icon:'🗣️', c:'#EA580C',
+      p:['teacher scold','teacher shouted','teacher rude','harsh with','scolding','shouted at','beaten by teacher',
+         'punished','teacher behaviour','misbehave with child','partial treatment'] },
+    { k:'bullying',  label:'Bullying & fights',         icon:'🥊', c:'#991B1B',
+      p:['bullying','bullied','fight in class','hit by','beaten by','teasing','teased','ragging','pushed by',
+         'other students hit'] },
+    { k:'comms',     label:'Communication gap',         icon:'📵', c:'#D97706',
+      p:['no information','not informed','no intimation','not communicated','no response from school','no reply',
+         'message not received','circular not received','no update','not aware'] },
+    { k:'fees',      label:'Fees & accounts',           icon:'💰', c:'#F59E0B',
+      p:['fee issue','fees issue','fee not updated','excess fee','fee receipt','refund','fee structure',
+         'payment not reflect','double payment','late fee'] },
+    { k:'hygiene',   label:'Cleanliness & washrooms',   icon:'🧼', c:'#0891B2',
+      p:['washroom not clean','toilet not clean','unhygienic','dirty classroom','no water in washroom',
+         'smell','not cleaned','hygiene'] },
+    { k:'food',      label:'Food & water',              icon:'🍱', c:'#16A34A',
+      p:['food not good','food quality','lunch','drinking water','water not available','snacks','food cold',
+         'not eating food'] },
+    { k:'health',    label:'Health & first aid',        icon:'🩺', c:'#059669',
+      p:['fever','vomit','injury','injured','first aid','not well in school','health issue','medical',
+         'fell down','wound'] },
+    { k:'admin',     label:'Admission, TC & records',   icon:'🗂️', c:'#8B5CF6',
+      p:['tc not','transfer certificate','admission process','id card not','bonafide','certificate not',
+         'documents not','record not updated','almanac not'] },
+    { k:'timing',    label:'Timings & schedule',        icon:'🕐', c:'#64748B',
+      p:['timing problem','school timing','late to school','early dispersal','holiday not informed',
+         'schedule change','exam date','timetable'] },
+    { k:'uniform',   label:'Uniform & books supply',    icon:'👕', c:'#0EA5E9',
+      p:['uniform not','books not received','book not given','not received books','stationery','shoes not',
+         'belt not','not received uniform'] },
+    { k:'infra',     label:'Classroom & facilities',    icon:'🏫', c:'#475569',
+      p:['fan not working','light not working','ac not working','bench broken','desk broken','projector not',
+         'classroom hot','no ventilation','seating'] },
+    { k:'activity',  label:'Activities & sports',       icon:'🎯', c:'#EC4899',
+      p:['no sports','sports not','activity not','not allowed to participate','no games','pt not',
+         'competition not informed'] },
+    { k:'attention', label:'Individual attention',      icon:'👤', c:'#A855F7',
+      p:['no individual attention','not focusing on my child','ignoring my child','child not attended',
+         'no personal attention','child is weak','needs extra care','slow learner'] },
+    { k:'discipline',label:'Discipline & conduct',      icon:'📋', c:'#78716C',
+      p:['indiscipline','not disciplined','class control','noisy class','no discipline','behaviour problem'] }
+  ];
+
+  function norm(s){
+    return ' ' + String(s == null ? '' : s).toLowerCase()
+      .replace(/[\u2018\u2019]/g,"'").replace(/[^a-z0-9\s']/g,' ')
+      .replace(/\s+/g,' ').trim() + ' ';
+  }
+
+  /* which problems does this remark carry? */
+  function themesOf(row){
+    var t = norm(((row.Remarks && row.Remarks !== '\u2013') ? row.Remarks : '') + ' ' +
+                 ((row.Followup && row.Followup !== '\u2013') ? row.Followup : ''));
+    if (!t.trim()) return [];
+    var out = [];
+    THEMES.forEach(function (th) {
+      for (var i = 0; i < th.p.length; i++) {
+        if (t.indexOf(' ' + th.p[i]) !== -1 || t.indexOf(th.p[i] + ' ') !== -1) { out.push(th); return; }
+      }
+    });
+    return out;
+  }
+
+  /* What counts as a problem.
+
+     The first version required a concern category AND a Negative reading, and
+     that lost real complaints. "Notebook not corrected, corrections pending"
+     carries no word the sentiment lexicon scores strongly, so it came back
+     Neutral and twenty calls about the single largest issue of the month
+     vanished from the chart entirely.
+
+     The rule is therefore an OR, matching how the request was actually put —
+     negative remarks AND concerns, not their intersection:
+        · the call was answered, and
+        · it sits in a concern category, OR its remark reads negatively, OR the
+          remark matches a known problem pattern
+     That last clause is what catches a call filed as "No Concern" whose remark
+     says the washroom is dirty. The tag says nothing was wrong; the words say
+     otherwise, and the words are the evidence. */
+  function isProblem(row){
+    if (!window.CARE_NLP) return false;
+    var c = CARE_NLP.classify(row);
+    if (!c.reachable) return false;                       // nobody answered
+    var cat = String(row.Grievance || '');
+    var isConcernCat = !/^(no concern|not answering|no response)/i.test(cat);
+    if (isConcernCat) return true;
+    return c.klass === 'Negative' || c.flagged === true || themesOf(row).length > 0;
+  }
+
+  function tally(rows){
+    var by = {}, n = 0;
+    rows.forEach(function (r) {
+      if (!isProblem(r)) return;
+      n++;
+      themesOf(r).forEach(function (th) {
+        (by[th.k] || (by[th.k] = { th: th, rows: [] })).rows.push(r);
+      });
+    });
+    return { by: by, negatives: n };
+  }
+
+  return { THEMES: THEMES, themesOf: themesOf, isProblem: isProblem, tally: tally };
+})();
+
+/* ══════════════════ renderer ══════════════════ */
+(function () {
+  'use strict';
+  var ORDER = ['March','April','May','June','July','August','September','October',
+               'November','December','January','February'];
+
+  function scopeRows(){
+    var C = (typeof CARE_DATA !== 'undefined' && Array.isArray(CARE_DATA)) ? CARE_DATA : [];
+    var ALL = ['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam'];
+    var scope = (fBranch === 'ALL') ? ALL : [fBranch];
+    return C.filter(function (r) { return scope.indexOf(r.Branch) >= 0; });
+  }
+  /* the two months to compare: whichever is selected (or the latest with data),
+     and the one before it in the academic year */
+  function pickMonths(rows){
+    var have = {};
+    rows.forEach(function (r) { if (r.Month) have[r.Month] = (have[r.Month] || 0) + 1; });
+    var present = ORDER.filter(function (m) { return have[m]; });
+    if (!present.length) return null;
+    var cur = (typeof fMonth !== 'undefined' && fMonth !== 'ALL' && have[fMonth])
+      ? fMonth : present[present.length - 1];
+    var i = ORDER.indexOf(cur), prev = null;
+    for (var k = i - 1; k >= 0; k--) { if (have[ORDER[k]]) { prev = ORDER[k]; break; } }
+    return { cur: cur, prev: prev };
+  }
+
+  function build(){
+    var el = document.getElementById('cp-body'); if (!el) return;
+    var rows = scopeRows();
+    if (!rows.length) { el.innerHTML = '<div class="no-data">No care-call data for this branch.</div>'; return; }
+    var M = pickMonths(rows);
+    if (!M) { el.innerHTML = '<div class="no-data">No month is recorded against these calls.</div>'; return; }
+
+    var curRows = rows.filter(function (r) { return r.Month === M.cur; });
+    var prevRows = M.prev ? rows.filter(function (r) { return r.Month === M.prev; }) : [];
+    var A = CARE_PROBLEMS.tally(curRows), B = CARE_PROBLEMS.tally(prevRows);
+
+    var keys = {};
+    Object.keys(A.by).forEach(function (k) { keys[k] = 1; });
+    Object.keys(B.by).forEach(function (k) { keys[k] = 1; });
+    var list = Object.keys(keys).map(function (k) {
+      var a = A.by[k], b = B.by[k];
+      var cn = a ? a.rows.length : 0, pn = b ? b.rows.length : 0;
+      return {
+        th: (a || b).th, cur: cn, prev: pn, delta: cn - pn,
+        curShare: A.negatives ? cn / A.negatives * 100 : 0,
+        prevShare: B.negatives ? pn / B.negatives * 100 : 0,
+        curRows: a ? a.rows : [], prevRows: b ? b.rows : []
+      };
+    }).sort(function (x, y) { return y.cur - x.cur || y.delta - x.delta; }).slice(0, 10);
+
+    window._CP = { list: list, M: M, A: A, B: B };
+    if (!list.length) {
+      el.innerHTML = '<div class="no-data">No negative remark in ' + M.cur +
+        ' matched a known problem pattern. That usually means remarks are being left blank or written as one word.</div>';
+      return;
+    }
+
+    var view = window._CP_VIEW || 'chart';
+    var tog = document.getElementById('cp-toggle');
+    if (tog) tog.querySelectorAll('button').forEach(function (b) { b.classList.toggle('on', b.dataset.v === view); });
+
+    var max = Math.max.apply(null, list.map(function (r) { return Math.max(r.cur, r.prev); }).concat([1]));
+    var head = '<div style="font-size:12px;color:var(--txm);margin-bottom:12px;line-height:1.6">' +
+      '<b>' + M.cur + '</b>: ' + A.negatives.toLocaleString('en-IN') + ' calls read as a problem' +
+      (M.prev ? ' · <b>' + M.prev + '</b>: ' + B.negatives.toLocaleString('en-IN') : ' · no earlier month to compare') +
+      '. A call can carry more than one problem, so the rows below add to more than the totals.</div>';
+
+    if (view === 'table') {
+      el.innerHTML = head +
+        '<table class="hrs" style="min-width:640px"><thead><tr><th class="nm">Problem</th>' +
+        '<th>' + esc(M.cur) + '</th><th>share</th>' +
+        '<th>' + esc(M.prev || '—') + '</th><th>share</th><th>change</th></tr></thead><tbody>' +
+        list.map(function (r, i) {
+          var dc = r.delta > 0 ? '#DC2626' : r.delta < 0 ? '#059669' : '#94A3B8';
+          return '<tr class="cp-tr" data-i="' + i + '" style="cursor:pointer">' +
+            '<td class="nm">' + r.th.icon + ' ' + esc(r.th.label) + '</td>' +
+            '<td style="font-weight:800">' + r.cur + '</td>' +
+            '<td style="color:#64748B">' + r.curShare.toFixed(0) + '%</td>' +
+            '<td>' + (M.prev ? r.prev : '—') + '</td>' +
+            '<td style="color:#64748B">' + (M.prev ? r.prevShare.toFixed(0) + '%' : '—') + '</td>' +
+            '<td style="font-weight:800;color:' + dc + '">' +
+              (M.prev ? (r.delta > 0 ? '+' : '') + r.delta : '—') + '</td></tr>';
+        }).join('') + '</tbody></table>';
+    } else {
+      el.innerHTML = head +
+        '<div class="cp-hd"><span>Problem</span><span>' + esc(M.cur) + ' vs ' + esc(M.prev || 'no prior month') +
+        '</span><span>Change</span></div>' +
+        list.map(function (r, i) {
+          var dc = r.delta > 0 ? '#DC2626' : r.delta < 0 ? '#059669' : '#94A3B8';
+          var arrow = r.delta > 0 ? '\u25b2' : r.delta < 0 ? '\u25bc' : '\u2013';
+          return '<div class="cp-row">' +
+            '<div class="cp-name"><i>' + r.th.icon + '</i>' + esc(r.th.label) + '</div>' +
+            '<div class="cp-bars">' +
+              '<div class="cp-bar"><span class="t">' + esc(M.cur.slice(0,3)) + '</span>' +
+                '<span class="track" data-i="' + i + '" data-w="cur" title="Click to view these calls">' +
+                '<i style="width:' + (r.cur / max * 100) + '%;background:' + r.th.c + '"></i></span>' +
+                '<span class="v">' + r.cur + '</span></div>' +
+              (M.prev ? '<div class="cp-bar"><span class="t">' + esc(M.prev.slice(0,3)) + '</span>' +
+                '<span class="track" data-i="' + i + '" data-w="prev" title="Click to view these calls">' +
+                '<i style="width:' + (r.prev / max * 100) + '%;background:' + r.th.c + '66"></i></span>' +
+                '<span class="v" style="color:#94A3B8">' + r.prev + '</span></div>' : '') +
+            '</div>' +
+            '<div class="cp-delta" style="color:' + dc + '">' + arrow + ' ' +
+              (M.prev ? (r.delta > 0 ? '+' : '') + r.delta : '—') +
+              '<small>' + r.curShare.toFixed(0) + '% of this month</small></div>' +
+            '</div>';
+        }).join('') +
+        '<p class="au-note">Bars are counts; the percentage under each change is that problem\u2019s <b>share of the ' +
+        'month\u2019s negative calls</b>. Read the two together — a theme can grow in count while its share falls, ' +
+        'which means the month got busier rather than that problem getting worse. Click any bar for the calls behind it.</p>';
+    }
+
+    var fn = document.getElementById('cp-fn');
+    if (fn) fn.textContent = (fBranch === 'ALL' ? 'All branches' : fBranch) + ' \u00b7 ' + M.cur +
+      (M.prev ? ' vs ' + M.prev : '');
+
+    el.querySelectorAll('.cp-bar .track').forEach(function (t) {
+      t.addEventListener('click', function () { openCP(+t.dataset.i, t.dataset.w); });
+    });
+    el.querySelectorAll('tr.cp-tr').forEach(function (tr) {
+      tr.addEventListener('click', function () { openCP(+tr.dataset.i, 'cur'); });
+    });
+  }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]; }); }
+
+  function openCP(i, which){
+    var C = window._CP; if (!C) return;
+    var r = C.list[i]; if (!r) return;
+    var rows = which === 'prev' ? r.prevRows : r.curRows;
+    var mon = which === 'prev' ? C.M.prev : C.M.cur;
+    if (typeof openModal !== 'function') return;
+    openModal(r.th.icon + '  ' + r.th.label + ' \u2014 ' + mon,
+      rows.length.toLocaleString('en-IN') + ' call(s) whose remark carries this problem',
+      rows, [{key:'Branch',label:'Branch'},{key:'Month',label:'Month'},{key:'Class',label:'Class'},
+        {key:'Student',label:'Student',maxW:'160px'},{key:'Date',label:'Date',date:true},
+        {key:'Grievance',label:'Filed as',pill:true},{key:'Remarks',label:'What the parent said',maxW:'320px'},
+        {key:'Followup',label:'Follow-up',maxW:'220px'},{key:'Status',label:'Status',pill:true}]);
+  }
+
+  function safe(){ try { build(); } catch (e) {
+    var el = document.getElementById('cp-body');
+    if (el) el.innerHTML = '<div class="no-data" style="color:var(--r)">Could not build the problem comparison: ' +
+      String(e && e.message || e) + '</div>';
+  } }
+  window.__renderCareProblems = safe;
+
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest('#cp-toggle button'); if (!b) return;
+    window._CP_VIEW = b.dataset.v; safe();
+  });
+  var _o = window.renderCareSummary;
+  if (typeof _o === 'function') window.renderCareSummary = function () {
+    var r = _o.apply(this, arguments); try { safe(); } catch (e) {} return r;
+  };
+  var _af = window.applyFilters;
+  if (typeof _af === 'function') window.applyFilters = function () {
+    var r = _af.apply(this, arguments); try { safe(); } catch (e) {} return r;
+  };
+  setTimeout(safe, 1500); setTimeout(safe, 4000);
+})();
 </script>
 </body>
 </html>
