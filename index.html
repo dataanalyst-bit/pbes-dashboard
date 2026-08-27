@@ -13487,13 +13487,11 @@ window.__SYL_PAGE__ = "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charse
    exact headers to add.
    ══════════════════════════════════════════════════════════════════════════ */
 var SYL_FIELDS = {
-  module:      ['module','type','checktype','monitortype','category','moduletype'],
-  branch:      ['branch','campus','school','branchname'],
-  stream:      ['stream','curriculum','board','str'],
-  /* 'grade' must beat 'classLabel': the sheet's classLabel is "Grade 6-D",
-     which already carries the section and would double it up */
+  module:      ['module','metricname','type','checktype','monitortype','category'],
+  branch:      ['branch','branchname','campus','school'],
+  stream:      ['stream','curriculum','board'],
   grade:       ['grade','gradename','classlabel','class'],
-  gradeOrder:  ['gradeorder','gradeord','order','classorder','go'],
+  gradeOrder:  ['gradeorder','gradeord','order','classorder'],
   stage:       ['stage','stagegroup','level'],
   floor:       ['floor'],
   section:     ['section','sec'],
@@ -13501,11 +13499,19 @@ var SYL_FIELDS = {
   group:       ['subjectgroup','subjgroup','group'],
   month:       ['month'],
   date:        ['checkdate','date','dateofcheck'],
-  status:      ['status'],
+  status:      ['statusgroup','status','workflowstatus'],
   pct:         ['completionpct','completionpercent','completion','pct','percent'],
-  numerator:   ['numerator','covered','completed','done','num'],
-  denominator: ['denominator','total','strength','den','books'],
-  incharge:    ['incharge','floorincharge','teacher','checkedby','owner','fi'],
+  /* Students are the unit that matters for notebook correction: one student,
+     one notebook. numerator/denominator are NOT that — on an almanac row they
+     count the six ticked items per student, so a class of 26 shows 156. Reading
+     those as notebooks would multiply every almanac class by six. studentsDone
+     and studentsTotal are the same thing on both modules and are used first. */
+  numerator:   ['studentsdone','numerator','covered','completed','done','num'],
+  denominator: ['studentstotal','denominator','total','strength','den','books'],
+  itemsDone:   ['numerator'],
+  itemsTotal:  ['denominator'],
+  incharge:    ['floorincharge','incharge','checkedby','owner','fi'],
+  teacher:     ['teacher','teachername'],
   remarks:     ['remarks','remark','notes','comment']
 };
 
@@ -13525,14 +13531,14 @@ function _sylIndex(hdr){
   return { map:map, missing:missing };
 }
 
-/* the letter the page uses for each module */
+/* The sheet writes the module in full — "Almanac Check", "Notebook Check",
+   "Syllabus Check". The embedded page keys everything on a single letter. */
 function _sylModule(v, subject){
   var s = String(v==null?'':v).toLowerCase();
   if(/almanac/.test(s)) return 'A';
   if(/note\s*book|notebook/.test(s)) return 'N';
   if(/syllab/.test(s)) return 'S';
   if(s==='a'||s==='n'||s==='s') return s.toUpperCase();
-  /* the ledger marks almanac rows with "All subjects" and no subject of their own */
   if(/all\s*subjects/i.test(String(subject||''))) return 'A';
   return 'S';
 }
@@ -13601,8 +13607,12 @@ function sylRowsFromSheet(tab){
       date,
       String(g(r,'status')||'').trim(),
       pct, num, den,
-      String(g(r,'incharge')||'').trim(),
-      String(g(r,'remarks')||'').trim()
+      String(g(r,'incharge')||'').trim() || String(g(r,'teacher')||'').trim(),
+      String(g(r,'remarks')||'').trim(),
+      /* 19th element: the page derives this as students×6 for almanac when it is
+         missing. The sheet already carries the real figure, so it is passed
+         through rather than re-guessed. */
+      (M.itemsTotal>=0 ? _sylNum(g(r,'itemsTotal')) : 0) || den
     ];
   }).filter(function(t){ return t[1]; });        // a row with no branch is unusable
 }
