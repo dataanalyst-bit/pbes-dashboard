@@ -496,16 +496,39 @@ table.auhm tr.au-itemrow td{border-color:#E8EEF2}
   border:1px solid var(--bor);border-radius:7px;font:inherit;font-size:11px;font-weight:700;
   padding:3px 9px;cursor:pointer;white-space:nowrap}
 .ph-btn:hover{background:var(--p);color:#fff;border-color:var(--p)}
-.ph-wrap{position:fixed;inset:0;background:rgba(8,20,14,.92);z-index:120;display:none;
-  align-items:center;justify-content:center;flex-direction:column;gap:14px;padding:24px}
+.ph-wrap{position:fixed;inset:0;background:rgba(6,16,11,.94);z-index:100000;display:none;
+  align-items:center;justify-content:center;padding:64px 76px 132px}
 .ph-wrap.on{display:flex}
-.ph-img{max-width:92vw;max-height:74vh;border-radius:10px;background:#fff;object-fit:contain;
-  box-shadow:0 18px 60px rgba(0,0,0,.5)}
-.ph-bar{display:flex;align-items:center;gap:14px;color:#fff;font-size:13px;font-weight:600}
-.ph-bar button{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);color:#fff;
-  font:inherit;font-size:13px;font-weight:700;padding:7px 15px;border-radius:9px;cursor:pointer}
-.ph-bar button:hover{background:#F2C230;color:#07361F;border-color:#F2C230}
-.ph-cap{color:#BBF7D0;font-size:11.5px;max-width:70vw;text-align:center;line-height:1.5}
+/* z-index must clear the sticky header (200) and the record modal (400). At 120
+   the control bar sat behind the header and there was no visible way to reach
+   the next photo. */
+.ph-top{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;
+  justify-content:space-between;gap:14px;padding:14px 20px;
+  background:linear-gradient(180deg,rgba(0,0,0,.72),rgba(0,0,0,0))}
+.ph-count{color:#fff;font-size:14px;font-weight:800;letter-spacing:.02em}
+.ph-acts{display:flex;gap:9px}
+.ph-wrap button{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;
+  font:inherit;font-size:13px;font-weight:700;padding:8px 15px;border-radius:9px;cursor:pointer}
+.ph-wrap button:hover{background:#F2C230;color:#07361F;border-color:#F2C230}
+.ph-nav{position:absolute;top:50%;transform:translateY(-50%);width:52px;height:52px;padding:0!important;
+  font-size:30px!important;line-height:1;display:flex;align-items:center;justify-content:center;
+  border-radius:50%!important}
+.ph-nav.prev{left:16px} .ph-nav.next{right:16px}
+.ph-stage{display:flex;align-items:center;justify-content:center;max-width:100%;max-height:100%;position:relative}
+.ph-img{max-width:100%;max-height:calc(100vh - 200px);border-radius:10px;background:#fff;
+  object-fit:contain;box-shadow:0 18px 60px rgba(0,0,0,.55);display:block}
+.ph-load{position:absolute;color:#BBF7D0;font-size:13px;font-weight:600}
+.ph-foot{position:absolute;left:0;right:0;bottom:0;padding:12px 20px 16px;
+  background:linear-gradient(0deg,rgba(0,0,0,.78),rgba(0,0,0,0));
+  display:flex;flex-direction:column;align-items:center;gap:10px}
+.ph-cap{color:#DCFCE7;font-size:12px;line-height:1.5;text-align:center;max-width:min(900px,86vw)}
+.ph-strip{display:flex;gap:7px;overflow-x:auto;max-width:min(900px,90vw);padding:2px}
+.ph-strip img{width:54px;height:54px;object-fit:cover;border-radius:7px;cursor:pointer;
+  border:2px solid transparent;opacity:.55;flex:0 0 auto;background:#1F2937}
+.ph-strip img:hover{opacity:.85}
+.ph-strip img.on{border-color:#F2C230;opacity:1}
+@media(max-width:700px){.ph-wrap{padding:56px 12px 128px}.ph-nav{width:42px;height:42px;font-size:24px!important}
+  .ph-nav.prev{left:6px}.ph-nav.next{right:6px}}
 
 /* ═══ MEETING ACTIONS ═══ */
 .mt-drop{border:2px dashed var(--bor);border-radius:14px;padding:26px 22px;text-align:center;background:var(--sur)}
@@ -2251,16 +2274,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   </div>
 </div>
 
-<div class="ph-wrap" id="ph-wrap">
-  <div class="ph-bar">
-    <button id="ph-prev">‹ Previous</button>
-    <span id="ph-count">1 of 1</span>
-    <button id="ph-next">Next ›</button>
-    <button id="ph-open">Open original ↗</button>
-    <button id="ph-close">✕ Close</button>
+<div class="ph-wrap" id="ph-wrap" role="dialog" aria-label="Inspection photos">
+  <div class="ph-top">
+    <span class="ph-count" id="ph-count">1 of 1</span>
+    <div class="ph-acts">
+      <button id="ph-open" title="Open the original file in Drive">Open original ↗</button>
+      <button id="ph-close" title="Close (Esc)">✕ Close</button>
+    </div>
   </div>
-  <img class="ph-img" id="ph-img" alt="Inspection photo">
-  <div class="ph-cap" id="ph-cap"></div>
+  <button class="ph-nav prev" id="ph-prev" title="Previous (←)">‹</button>
+  <div class="ph-stage" id="ph-stage">
+    <img class="ph-img" id="ph-img" alt="Inspection photo">
+    <div class="ph-load" id="ph-load">Loading…</div>
+  </div>
+  <button class="ph-nav next" id="ph-next" title="Next (→)">›</button>
+  <div class="ph-foot">
+    <div class="ph-cap" id="ph-cap"></div>
+    <div class="ph-strip" id="ph-strip"></div>
+  </div>
 </div>
 
 <!-- ═══ SCHOOL AUDIT ═══ -->
@@ -15063,39 +15094,85 @@ window.VCHK = (function () {
 (function(){
   var L = { list: [], i: 0, cap: '' };
   function $(id){ return document.getElementById(id); }
+
   window.openPhotos = function(urls, caption, startAt){
-    L.list = (urls||[]).filter(Boolean); L.cap = caption||'';
-    L.i = Math.max(0, Math.min(L.list.length-1, startAt||0));
+    L.list = (urls||[]).filter(Boolean);
+    L.cap  = caption || '';
+    L.i    = Math.max(0, Math.min(L.list.length - 1, startAt || 0));
     if(!L.list.length) return;
-    paint(); $('ph-wrap').classList.add('on'); document.body.style.overflow='hidden';
+    buildStrip();
+    paint();
+    $('ph-wrap').classList.add('on');
+    document.body.style.overflow = 'hidden';
   };
+
+  /* A strip of every photo, so the reader can see at a glance that there ARE
+     others and jump straight to one. With a single photo it is hidden — a strip
+     of one is noise. */
+  function buildStrip(){
+    var s = $('ph-strip');
+    if(L.list.length < 2){ s.innerHTML = ''; s.style.display = 'none'; return; }
+    s.style.display = 'flex';
+    s.innerHTML = L.list.map(function(u, i){
+      return '<img src="' + VCHK.viewable(u, 160) + '" data-i="' + i + '" alt="photo ' + (i+1) + '"' +
+             ' onerror="this.style.opacity=.25">';
+    }).join('');
+  }
+
   function paint(){
     var raw = L.list[L.i];
-    $('ph-img').src = VCHK.viewable(raw);
-    $('ph-count').textContent = (L.i+1) + ' of ' + L.list.length;
-    $('ph-cap').textContent = L.cap;
-    $('ph-prev').style.visibility = L.list.length>1 ? 'visible' : 'hidden';
-    $('ph-next').style.visibility = L.list.length>1 ? 'visible' : 'hidden';
-    $('ph-open').onclick = function(){ window.open(raw,'_blank','noopener'); };
+    var img = $('ph-img');
+    img.style.visibility = 'hidden';
+    $('ph-load').style.display = 'block';
+    $('ph-load').textContent = 'Loading…';
+    img.onload  = function(){ img.style.visibility = 'visible'; $('ph-load').style.display = 'none'; };
+    img.onerror = function(){
+      $('ph-load').style.display = 'block';
+      $('ph-load').innerHTML = 'This photo will not display here.<br>' +
+        'The Drive file is probably restricted \u2014 use <b>Open original</b>.';
+    };
+    img.src = VCHK.viewable(raw, 1600);
+
+    $('ph-count').textContent = (L.i + 1) + ' of ' + L.list.length;
+    $('ph-cap').textContent   = L.cap;
+    var many = L.list.length > 1;
+    $('ph-prev').style.display = many ? 'flex' : 'none';
+    $('ph-next').style.display = many ? 'flex' : 'none';
+    $('ph-open').onclick = function(e){ e.stopPropagation(); window.open(raw, '_blank', 'noopener'); };
+    Array.prototype.forEach.call($('ph-strip').children, function(t, i){
+      t.classList.toggle('on', i === L.i);
+    });
+    var act = $('ph-strip').children[L.i];
+    if(act && act.scrollIntoView) act.scrollIntoView({ block:'nearest', inline:'center' });
   }
-  function close(){ $('ph-wrap').classList.remove('on'); document.body.style.overflow=''; $('ph-img').src=''; }
+
+  function step(d){ if(L.list.length<2) return; L.i = (L.i + d + L.list.length) % L.list.length; paint(); }
+  function close(){
+    $('ph-wrap').classList.remove('on');
+    document.body.style.overflow = '';
+    $('ph-img').src = '';
+  }
+
   document.addEventListener('click', function(e){
-    if(e.target.id==='ph-close' || e.target.id==='ph-wrap') return close();
-    if(e.target.id==='ph-prev'){ L.i=(L.i-1+L.list.length)%L.list.length; paint(); }
-    if(e.target.id==='ph-next'){ L.i=(L.i+1)%L.list.length; paint(); }
-  });
+    var wrap = $('ph-wrap');
+    if(!wrap || !wrap.classList.contains('on')) return;
+    if(e.target.closest('#ph-close')){ e.stopPropagation(); return close(); }
+    if(e.target.closest('#ph-prev')){ e.stopPropagation(); return step(-1); }
+    if(e.target.closest('#ph-next')){ e.stopPropagation(); return step(1); }
+    var t = e.target.closest('#ph-strip img');
+    if(t){ e.stopPropagation(); L.i = +t.dataset.i; return paint(); }
+    /* clicking the backdrop closes; clicking the photo itself advances, which is
+       what people try first on a gallery */
+    if(e.target.id === 'ph-img'){ e.stopPropagation(); return step(1); }
+    if(e.target === wrap || e.target.id === 'ph-stage'){ e.stopPropagation(); return close(); }
+  }, true);
+
   document.addEventListener('keydown', function(e){
-    if(!$('ph-wrap') || !$('ph-wrap').classList.contains('on')) return;
-    if(e.key==='Escape') close();
-    if(e.key==='ArrowLeft'){ L.i=(L.i-1+L.list.length)%L.list.length; paint(); }
-    if(e.key==='ArrowRight'){ L.i=(L.i+1)%L.list.length; paint(); }
-  });
-  /* the image element itself is the fallback when a Drive thumbnail is blocked */
-  document.addEventListener('error', function(e){
-    if(e.target && e.target.id==='ph-img'){
-      $('ph-cap').textContent = 'This photo could not be shown inline — Drive may require sign-in. '+
-        'Use "Open original" to view it.' + (L.cap ? ' · ' + L.cap : '');
-    }
+    var wrap = $('ph-wrap');
+    if(!wrap || !wrap.classList.contains('on')) return;
+    if(e.key === 'Escape'){ e.stopPropagation(); close(); }
+    if(e.key === 'ArrowLeft'){ e.stopPropagation(); step(-1); }
+    if(e.key === 'ArrowRight'){ e.stopPropagation(); step(1); }
   }, true);
 })();
 </script>
