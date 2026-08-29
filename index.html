@@ -484,6 +484,14 @@ table.auhm tr.au-itemrow td{border-color:#E8EEF2}
 .vck-two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 @media(max-width:900px){.vck-two{grid-template-columns:1fr}}
 .vck-pill{display:inline-block;font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:99px}
+.ph-cell{display:flex;gap:4px;margin-bottom:5px;flex-wrap:wrap}
+.ph-th{width:44px;height:44px;object-fit:cover;border-radius:6px;border:1px solid var(--bor);
+  cursor:pointer;background:#F1F5F9;transition:transform .12s}
+.ph-th:hover{transform:scale(1.08);border-color:var(--p)}
+.ph-more{width:44px;height:44px;border-radius:6px;border:1px dashed var(--bor);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;
+  color:var(--txm);background:var(--pl)}
+.ph-more:hover{border-color:var(--p);color:var(--p)}
 .ph-btn{display:inline-flex;align-items:center;gap:5px;background:var(--pl);color:var(--p);
   border:1px solid var(--bor);border-radius:7px;font:inherit;font-size:11px;font-weight:700;
   padding:3px 9px;cursor:pointer;white-space:nowrap}
@@ -7645,7 +7653,11 @@ function renderModalTable() {
   const cols = window._modalColumns || [];
   let filtered = modalAllRows.filter(r => {
     if (!modalSearchVal) return true;
-    return cols.some(c => String(r[c.key] || '').toLowerCase().includes(modalSearchVal));
+    return cols.some(c => {
+      const v = r[c.key];
+      const s = Array.isArray(v) ? v.join(' ') : String(v || '');
+      return s.toLowerCase().includes(modalSearchVal);
+    });
   });
   
   const total = filtered.length;
@@ -7657,6 +7669,7 @@ function renderModalTable() {
   document.getElementById('modal-count').textContent = `Showing ${Math.min(start+1, total)}–${Math.min(start+modalPageSize, total)} of ${total.toLocaleString('en-IN')} records`;
   
   const tbody = document.getElementById('modal-tbody');
+  setTimeout(function(){ if (typeof window.__wireVckPhotos === 'function') window.__wireVckPhotos(); }, 0);
   if (slice.length === 0) {
     tbody.innerHTML = '<tr><td colspan="' + cols.length + '" style="text-align:center;padding:40px;color:#94A3B8;font-style:italic;">No records found</td></tr>';
   } else {
@@ -7664,6 +7677,14 @@ function renderModalTable() {
       const bg = i % 2 === 0 ? '' : 'background:#F8FAFF;';
       return '<tr style="' + bg + '">' + cols.map(c => {
         let val = r[c.key] !== undefined ? r[c.key] : '–';
+        /* A column may supply its own renderer. Without this a cell holding an
+           array of Drive links printed the links themselves — six wrapped URLs
+           in a cell, which is unreadable and is not what anyone wants to see
+           when they ask for a photograph. */
+        if (typeof c.render === 'function') {
+          val = c.render(r[c.key], r);
+          return `<td style="padding:9px 13px;font-size:12px;border-bottom:1px solid #E0E8FF;vertical-align:top;max-width:${c.maxW||'260px'};word-wrap:break-word;">${val}</td>`;
+        }
         if (c.pill) val = makePill(String(val), c.pill);
         else if (c.score) val = makeScoreBadge(parseFloat(val));
         else if (c.date) val = fmtDispDate(val);
@@ -14999,9 +15020,13 @@ window.VCHK = (function () {
   }
   /* Drive links must be turned into something an <img> can actually load —
      the share URL renders a viewer page, not an image. */
-  function viewable(u){
+  function viewable(u, px){
     var m = String(u).match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?[^]*id=)([-\w]{10,})/);
-    if(m) return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w1600';
+    /* Drive share URLs render a viewer page, not an image, so they are rewritten
+       to the thumbnail endpoint. The size is asked for explicitly: a 44px cell
+       does not need a 1600px file, and a table of twenty rows would otherwise
+       pull twenty full-size photographs on open. */
+    if(m) return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w' + (px || 1600);
     return u;
   }
   function toRows(tab){
@@ -15038,8 +15063,9 @@ window.VCHK = (function () {
 (function(){
   var L = { list: [], i: 0, cap: '' };
   function $(id){ return document.getElementById(id); }
-  window.openPhotos = function(urls, caption){
-    L.list = (urls||[]).filter(Boolean); L.i = 0; L.cap = caption||'';
+  window.openPhotos = function(urls, caption, startAt){
+    L.list = (urls||[]).filter(Boolean); L.cap = caption||'';
+    L.i = Math.max(0, Math.min(L.list.length-1, startAt||0));
     if(!L.list.length) return;
     paint(); $('ph-wrap').classList.add('on'); document.body.style.overflow='hidden';
   };
@@ -15110,22 +15136,34 @@ window.VCHK = (function () {
     });
     if(typeof openModal!=='function') return;
     openModal(title, sub + ' · ' + list.filter(function(r){return r.photos.length;}).length + ' with photos',
-      withBtn, COLS.concat([{key:'__photos',label:'Photos',render:function(v,row){
+      withBtn, COLS.concat([{key:'__photos',label:'Photos',maxW:'190px',render:function(v,row){
         var n = (v||[]).length;
         if(!n) return '<span style="color:#CBD5E1">—</span>';
-        var cap = [row.branch,row.location,row.wrong].filter(Boolean).join(' · ');
-        return '<button class="ph-btn" data-ph="'+esc(JSON.stringify(v))+'" data-cap="'+esc(cap)+'">'+
-               '📷 '+n+(n>1?' photos':' photo')+'</button>';
+        var cap = [row.branch,row.location,row.wrong].filter(Boolean).join(' \u00b7 ');
+        var payload = esc(JSON.stringify(v));
+        /* Show the photograph, not a link to it. Up to three thumbnails inline,
+           each opening the full-size gallery at that image. A thumbnail that
+           will not load is hidden rather than left as a broken icon, and the
+           button below still opens the original. */
+        var thumbs = v.slice(0,3).map(function(u,i){
+          return '<img class="ph-th" src="'+esc(VCHK.viewable(u))+'" data-ph="'+payload+'" '+
+                 'data-i="'+i+'" data-cap="'+esc(cap)+'" alt="inspection photo" loading="lazy" '+
+                 'onerror="this.style.display=\'none\'">';
+        }).join('');
+        return '<div class="ph-cell">'+thumbs+
+          (n>3?'<span class="ph-more" data-ph="'+payload+'" data-cap="'+esc(cap)+'">+'+(n-3)+'</span>':'')+
+          '</div><button class="ph-btn" data-ph="'+payload+'" data-cap="'+esc(cap)+'">'+
+          '\ud83d\udcf7 View '+n+(n>1?' photos':' photo')+'</button>';
       }}]));
     setTimeout(wirePhotoButtons, 30);
   }
   function wirePhotoButtons(){
-    document.querySelectorAll('.ph-btn[data-ph]').forEach(function(b){
+    document.querySelectorAll('.ph-btn[data-ph],.ph-th[data-ph],.ph-more[data-ph]').forEach(function(b){
       if(b.dataset.w) return; b.dataset.w='1';
       b.addEventListener('click', function(ev){
         ev.stopPropagation();
         var urls=[]; try{ urls=JSON.parse(b.dataset.ph); }catch(e){}
-        openPhotos(urls, b.dataset.cap||'');
+        openPhotos(urls, b.dataset.cap||'', +(b.dataset.i||0));
       });
     });
   }
