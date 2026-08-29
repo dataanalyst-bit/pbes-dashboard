@@ -6625,6 +6625,31 @@ function renderCareSummary(){
     ]
   };
 
+  /* The Category Mix sub-topics and the Top-10 problems panel used to run two
+     different lexicons over the same remark, so "Teaching Quality" read 51 in
+     one and 4 in the other. Both now read from TOPIC_RULES, published here, and
+     the two panels cannot disagree by construction. */
+  window._CARE_TOPIC_RULES = TOPIC_RULES;
+  window._careCatOf = function(r){ return CATS.includes(r.Grievance) ? r.Grievance : 'Other'; };
+  window._careTopicsOf = function(r){
+    var cat = window._careCatOf(r), rules = TOPIC_RULES[cat];
+    if(!rules) return [];
+    var t = (((r.Remarks&&r.Remarks!=='–')?r.Remarks:'')+' '+
+             ((r.Followup&&r.Followup!=='–')?r.Followup:'')).toLowerCase();
+    var hits = [], matched = false;
+    rules.forEach(function(b){
+      if(!b.kw.length) return;
+      if(b.kw.some(function(k){ return t.indexOf(k)!==-1; })){ hits.push({cat:cat, topic:b.topic}); matched=true; }
+    });
+    if(!matched){ var misc = rules.find(function(b){ return !b.kw.length; });
+      if(misc) hits.push({cat:cat, topic:misc.topic}); }
+    return hits;
+  };
+  /* the slice the panels below must obey — scope, pending-only and sentiment */
+  window._careSlice = function(list){
+    return (typeof _careActiveFilter==='function') ? _careActiveFilter(list) : list;
+  };
+
   function extractTopics(catName, catRows){
     const rules=TOPIC_RULES[catName];
     if(!rules||!catRows.length) return [];
@@ -6822,8 +6847,15 @@ function viewSubTopic(catName, topicName, keywords){
     .filter(r=>{ const c=CATS.includes(r.Grievance)?r.Grievance:'Other'; return c===catName; });
   catRows = (typeof _careActiveFilter==='function') ? _careActiveFilter(catRows)
                                                     : _careFilterBySentiment(catRows);
+  /* Select the rows the SAME way the sub-topic count is produced: through the
+     shared TOPIC_RULES engine. Matching on the keyword list alone over-counted,
+     because a remark hitting two buckets belongs to both, and a bucket with no
+     keywords (the catch-all) previously returned the entire category — which is
+     why "Teaching Quality 22" opened 116 records. */
   let rows;
-  if(keywords&&keywords.length>0){
+  if(typeof _careTopicsOf==='function'){
+    rows=catRows.filter(r=>_careTopicsOf(r).some(t=>t.topic===topicName));
+  } else if(keywords&&keywords.length>0){
     rows=catRows.filter(r=>{
       const t=((r.Remarks&&r.Remarks!=='–')?r.Remarks:'')+' '+((r.Followup&&r.Followup!=='–')?r.Followup:'');
       return keywords.some(k=>t.toLowerCase().indexOf(k)!==-1);
@@ -14555,129 +14587,53 @@ window.MEET = (function () {
 window.CARE_PROBLEMS = (function () {
   'use strict';
 
-  /* Each theme is a set of phrases. Phrases beat single words: "correction"
-     alone catches "corrections are good", the phrase does not. */
-  var THEMES = [
-    { k:'notebook',  label:'Notebook correction',       icon:'🖊️', c:'#7C3AED',
-      p:['notebook not correct','note book not correct','not corrected','correction pending','corrections pending',
-         'notebook not check','note book not check','uncorrected','not checked notebook','correction not done'] },
-    { k:'teaching',  label:'Teaching quality',          icon:'📚', c:'#1E4FD8',
-      p:['teaching not good','teaching quality','not teaching','not explain','unable to understand','cannot understand',
-         'not understanding','teacher not teaching','poor teaching','not clear in class','revision not done'] },
-    { k:'homework',  label:'Homework load',             icon:'📝', c:'#6366F1',
-      p:['too much homework','more homework','homework load','heavy homework','excess homework','no homework',
-         'homework not given','homework not check'] },
-    { k:'marks',     label:'Marks & results',           icon:'📉', c:'#DC2626',
-      p:['marks are low','low marks','less marks','marks not improve','failed in','poor result','result not good',
-         'not scoring','marks reduce'] },
-    { k:'transport', label:'Bus delay & routing',       icon:'🚌', c:'#0D9488',
-      p:['bus is late','bus late','bus delay','late pickup','late drop','route problem','bus not come',
-         'bus did not come','waiting for bus','bus timing','pick up late','drop late'] },
-    { k:'busSafety', label:'Bus safety & conduct',      icon:'⚠️', c:'#B91C1C',
-      p:['driver rash','rash driving','driver rude','over speed','overspeed','no attender','attender not',
-         'bus crowded','standing in bus','door open','driver behaviour'] },
-    { k:'behaviour', label:'Teacher behaviour',         icon:'🗣️', c:'#EA580C',
-      p:['teacher scold','teacher shouted','teacher rude','harsh with','scolding','shouted at','beaten by teacher',
-         'punished','teacher behaviour','misbehave with child','partial treatment'] },
-    { k:'bullying',  label:'Bullying & fights',         icon:'🥊', c:'#991B1B',
-      p:['bullying','bullied','fight in class','hit by','beaten by','teasing','teased','ragging','pushed by',
-         'other students hit'] },
-    { k:'comms',     label:'Communication gap',         icon:'📵', c:'#D97706',
-      p:['no information','not informed','no intimation','not communicated','no response from school','no reply',
-         'message not received','circular not received','no update','not aware'] },
-    { k:'fees',      label:'Fees & accounts',           icon:'💰', c:'#F59E0B',
-      p:['fee issue','fees issue','fee not updated','excess fee','fee receipt','refund','fee structure',
-         'payment not reflect','double payment','late fee'] },
-    { k:'hygiene',   label:'Cleanliness & washrooms',   icon:'🧼', c:'#0891B2',
-      p:['washroom not clean','toilet not clean','unhygienic','dirty classroom','no water in washroom',
-         'smell','not cleaned','hygiene'] },
-    { k:'food',      label:'Food & water',              icon:'🍱', c:'#16A34A',
-      p:['food not good','food quality','lunch','drinking water','water not available','snacks','food cold',
-         'not eating food'] },
-    { k:'health',    label:'Health & first aid',        icon:'🩺', c:'#059669',
-      p:['fever','vomit','injury','injured','first aid','not well in school','health issue','medical',
-         'fell down','wound'] },
-    { k:'admin',     label:'Admission, TC & records',   icon:'🗂️', c:'#8B5CF6',
-      p:['tc not','transfer certificate','admission process','id card not','bonafide','certificate not',
-         'documents not','record not updated','almanac not'] },
-    { k:'timing',    label:'Timings & schedule',        icon:'🕐', c:'#64748B',
-      p:['timing problem','school timing','late to school','early dispersal','holiday not informed',
-         'schedule change','exam date','timetable'] },
-    { k:'uniform',   label:'Uniform & books supply',    icon:'👕', c:'#0EA5E9',
-      p:['uniform not','books not received','book not given','not received books','stationery','shoes not',
-         'belt not','not received uniform'] },
-    { k:'infra',     label:'Classroom & facilities',    icon:'🏫', c:'#475569',
-      p:['fan not working','light not working','ac not working','bench broken','desk broken','projector not',
-         'classroom hot','no ventilation','seating'] },
-    { k:'activity',  label:'Activities & sports',       icon:'🎯', c:'#EC4899',
-      p:['no sports','sports not','activity not','not allowed to participate','no games','pt not',
-         'competition not informed'] },
-    { k:'attention', label:'Individual attention',      icon:'👤', c:'#A855F7',
-      p:['no individual attention','not focusing on my child','ignoring my child','child not attended',
-         'no personal attention','child is weak','needs extra care','slow learner'] },
-    { k:'discipline',label:'Discipline & conduct',      icon:'📋', c:'#78716C',
-      p:['indiscipline','not disciplined','class control','noisy class','no discipline','behaviour problem'] }
-  ];
+  /* Icons only — the counting itself comes from TOPIC_RULES, the same rules the
+     Category Mix sub-topics use. */
+  var ICON = {
+    'Teaching Quality':['📚','#1E4FD8'], 'General Academic':['📖','#3B82F6'],
+    'Communication':['📵','#D97706'], 'Reading / Writing':['✍️','#6366F1'],
+    'Math / Science':['🔢','#0891B2'], 'Marks / Results':['📉','#DC2626'],
+    'Homework / Assignments':['📝','#7C3AED'], 'Attendance / Regularity':['📅','#64748B'],
+    'Route / Timing':['🚌','#0D9488'], 'Vehicle Condition':['⚠️','#B91C1C'],
+    'Driver / Attender':['🧑‍✈️','#EA580C'], 'General Transport':['🚏','#0F766E'],
+    'Discipline':['📋','#78716C'], 'Bullying / Fights':['🥊','#991B1B'],
+    'Emotional / Mental':['💚','#059669'], 'Health / Medical':['🩺','#16A34A'],
+    'Other Wellbeing':['🧩','#8B5CF6'], 'Admission Process':['🎟️','#1E4FD8'],
+    'Fees / Admin':['💰','#F59E0B'], 'TC / Transfer':['🗂️','#8B5CF6'],
+    'Schedule / Timing':['🕐','#64748B'], 'Other Admin':['🏫','#475569'],
+    'Sports':['🏅','#EC4899'], 'Arts / Dance / Music':['🎨','#DB2777'],
+    'Clubs / Activities':['🎯','#A855F7'], 'Food / Canteen':['🍱','#16A34A'],
+    'Uniform / Stationery':['👕','#0EA5E9'], 'Safety / Infrastructure':['🏗️','#B91C1C'],
+    'Fees / Payment':['💳','#F59E0B'], 'Miscellaneous':['📌','#94A3B8']
+  };
+  function iconFor(t){ return (ICON[t]||['🔎','#1E4FD8'])[0]; }
+  function colorFor(t){ return (ICON[t]||['🔎','#1E4FD8'])[1]; }
 
-  function norm(s){
-    return ' ' + String(s == null ? '' : s).toLowerCase()
-      .replace(/[\u2018\u2019]/g,"'").replace(/[^a-z0-9\s']/g,' ')
-      .replace(/\s+/g,' ').trim() + ' ';
-  }
-
-  /* which problems does this remark carry? */
-  function themesOf(row){
-    var t = norm(((row.Remarks && row.Remarks !== '\u2013') ? row.Remarks : '') + ' ' +
-                 ((row.Followup && row.Followup !== '\u2013') ? row.Followup : ''));
-    if (!t.trim()) return [];
-    var out = [];
-    THEMES.forEach(function (th) {
-      for (var i = 0; i < th.p.length; i++) {
-        if (t.indexOf(' ' + th.p[i]) !== -1 || t.indexOf(th.p[i] + ' ') !== -1) { out.push(th); return; }
-      }
-    });
-    return out;
-  }
-
-  /* What counts as a problem.
-
-     The first version required a concern category AND a Negative reading, and
-     that lost real complaints. "Notebook not corrected, corrections pending"
-     carries no word the sentiment lexicon scores strongly, so it came back
-     Neutral and twenty calls about the single largest issue of the month
-     vanished from the chart entirely.
-
-     The rule is therefore an OR, matching how the request was actually put —
-     negative remarks AND concerns, not their intersection:
-        · the call was answered, and
-        · it sits in a concern category, OR its remark reads negatively, OR the
-          remark matches a known problem pattern
-     That last clause is what catches a call filed as "No Concern" whose remark
-     says the washroom is dirty. The tag says nothing was wrong; the words say
-     otherwise, and the words are the evidence. */
+  /* A problem is a sub-topic under a concern category. "No Concern" carries
+     sub-topics too (Parent Satisfied, General Check-in) but those are not
+     problems, so that category is excluded here — everything else counts. */
   function isProblem(row){
-    if (!window.CARE_NLP) return false;
-    var c = CARE_NLP.classify(row);
-    if (!c.reachable) return false;                       // nobody answered
-    var cat = String(row.Grievance || '');
-    var isConcernCat = !/^(no concern|not answering|no response)/i.test(cat);
-    if (isConcernCat) return true;
-    return c.klass === 'Negative' || c.flagged === true || themesOf(row).length > 0;
+    var cat = window._careCatOf ? window._careCatOf(row) : String(row.Grievance||'');
+    return !/^(no concern|not answering|no response)/i.test(cat);
   }
-
+  function themesOf(row){
+    if(!window._careTopicsOf) return [];
+    return window._careTopicsOf(row).map(function(x){
+      return { k:x.cat+' › '+x.topic, label:x.topic, cat:x.cat,
+               icon:iconFor(x.topic), c:colorFor(x.topic) };
+    });
+  }
   function tally(rows){
     var by = {}, n = 0;
-    rows.forEach(function (r) {
-      if (!isProblem(r)) return;
+    rows.forEach(function(r){
+      if(!isProblem(r)) return;
       n++;
-      themesOf(r).forEach(function (th) {
-        (by[th.k] || (by[th.k] = { th: th, rows: [] })).rows.push(r);
-      });
+      themesOf(r).forEach(function(th){ (by[th.k]||(by[th.k]={th:th,rows:[]})).rows.push(r); });
     });
     return { by: by, negatives: n };
   }
 
-  return { THEMES: THEMES, themesOf: themesOf, isProblem: isProblem, tally: tally };
+  return { themesOf: themesOf, isProblem: isProblem, tally: tally, iconFor: iconFor };
 })();
 
 /* ══════════════════ renderer ══════════════════ */
@@ -14713,8 +14669,11 @@ window.CARE_PROBLEMS = (function () {
     var M = pickMonths(rows);
     if (!M) { el.innerHTML = '<div class="no-data">No month is recorded against these calls.</div>'; return; }
 
-    var curRows = rows.filter(function (r) { return r.Month === M.cur; });
-    var prevRows = M.prev ? rows.filter(function (r) { return r.Month === M.prev; }) : [];
+    /* Scope, Pending-only and the sentiment chip all apply here, so this panel
+       always describes the same slice the Category Mix above it describes. */
+    var slice = window._careSlice || function(x){ return x; };
+    var curRows  = slice(rows.filter(function (r) { return r.Month === M.cur; }));
+    var prevRows = M.prev ? slice(rows.filter(function (r) { return r.Month === M.prev; })) : [];
     var A = CARE_PROBLEMS.tally(curRows), B = CARE_PROBLEMS.tally(prevRows);
 
     var keys = {};
@@ -14744,7 +14703,7 @@ window.CARE_PROBLEMS = (function () {
 
     var max = Math.max.apply(null, list.map(function (r) { return Math.max(r.cur, r.prev); }).concat([1]));
     var head = '<div style="font-size:12px;color:var(--txm);margin-bottom:12px;line-height:1.6">' +
-      '<b>' + M.cur + '</b>: ' + A.negatives.toLocaleString('en-IN') + ' calls read as a problem' +
+      '<b>' + M.cur + '</b>: ' + A.negatives.toLocaleString('en-IN') + ' calls carrying a concern' +
       (M.prev ? ' · <b>' + M.prev + '</b>: ' + B.negatives.toLocaleString('en-IN') : ' · no earlier month to compare') +
       '. A call can carry more than one problem, so the rows below add to more than the totals.</div>';
 
@@ -15364,16 +15323,17 @@ window.VCHK = (function () {
       var bo=br.filter(VCHK.isOpen);
       return { b:b,
         today: br.filter(function(r){ return inRange(dOf(r),today,today); }),
+        yday:  br.filter(function(r){ return inRange(dOf(r),ago(1),ago(1)); }),
         month: br.filter(function(r){ return inRange(dOf(r),monthStart,today); }),
         open:  bo, unassd: bo.filter(VCHK.unassigned),
         over:  br.filter(overdue), red: br.filter(VCHK.isRed), all: br };
     }).sort(function(a,b){ return b.open.length-a.open.length; });
     html+='<div class="vck-h" style="margin-top:20px">🏫 By branch</div>'+
       '<div style="overflow-x:auto"><table class="hrs vckt"><thead><tr><th class="nm">Branch</th>'+
-      '<th>Today</th><th>Month</th><th>Open</th><th>Unassd</th><th>Overdue</th><th>Red</th></tr></thead><tbody>'+
+      '<th>Today</th><th>Yesterday</th><th>Month</th><th>Open</th><th>Unassd</th><th>Overdue</th><th>Red</th></tr></thead><tbody>'+
       window._VCK_BR.map(function(x,i){
         function c(list,f){ return '<td class="vck-c'+(list.length?'':' z')+'" data-br="'+i+'" data-f="'+f+'">'+list.length+'</td>'; }
-        return '<tr><td class="nm">'+esc(x.b)+'</td>'+c(x.today,'today')+c(x.month,'month')+
+        return '<tr><td class="nm">'+esc(x.b)+'</td>'+c(x.today,'today')+c(x.yday,'yday')+c(x.month,'month')+
           c(x.open,'open')+c(x.unassd,'unassd')+c(x.over,'over')+c(x.red,'red')+'</tr>';
       }).join('')+'</tbody></table></div>';
 
@@ -15453,7 +15413,7 @@ window.VCHK = (function () {
 
     /* every number opens the issues behind it */
     var FL={raised:'raised',closed:'closed in this period',still:'raised and still open',
-            over:'overdue',red:'red flagged',today:'raised today',month:'raised this month',
+            over:'overdue',red:'red flagged',today:'raised today',yday:'raised yesterday',month:'raised this month',
             open:'still open',unassd:'open with no owner'};
     el.querySelectorAll('.vck-k').forEach(function(n){
       n.addEventListener('click',function(){ var k=K[+n.dataset.k];
@@ -15466,7 +15426,7 @@ window.VCHK = (function () {
     });
     el.querySelectorAll('[data-br]').forEach(function(n){
       n.addEventListener('click',function(){ var x=window._VCK_BR[+n.dataset.br], f=n.dataset.f;
-        var map={today:x.today,month:x.month,open:x.open,unassd:x.unassd,over:x.over,red:x.red};
+        var map={today:x.today,yday:x.yday,month:x.month,open:x.open,unassd:x.unassd,over:x.over,red:x.red};
         openIssues('🏫 '+x.b+' \u2014 '+FL[f], map[f].length+' issue(s)', map[f]); });
     });
     el.querySelectorAll('[data-area]').forEach(function(n){
