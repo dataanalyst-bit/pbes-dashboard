@@ -6466,8 +6466,11 @@ function renderCareSummary(){
   });
   // Use filteredRows for all computations below
   // Apply sentiment filter (All / Positive / Negative / Neutral)
+  /* The sentiment control is a row of chips, not a <select>. Reading a stale
+     #care-sent-sel first meant that if such an element ever existed with an
+     empty value, every slice silently fell back to ALL. */
   const _sentSel=document.getElementById('care-sent-sel');
-  const _sent=(_sentSel?_sentSel.value:window._CARE_SENT)||'ALL';
+  const _sent=(window._CARE_SENT||(_sentSel?_sentSel.value:'')||'ALL');
   window._CARE_SENT=_sent;
   // Sentiment is now read per row by the negation-aware scorer, and an
   // unanswered call is its own class rather than being filed as Neutral.
@@ -6490,7 +6493,7 @@ function renderCareSummary(){
       if(_scope==='Academic'     && !_CARE_ACADEMIC.test(cat)) return false;
       if(_scope==='Non-Academic' && ( _CARE_ACADEMIC.test(cat) || !window._careIsConcern(r))) return false;
       if(_pendOnly && !window._careIsOpenConcern(r)) return false;
-      if(_sent!=='ALL' && CARE_NLP.classify(r).klass!==_sent) return false;
+      if(_sent!=='ALL' && _careRowSentiment(r)!==_sent) return false;
       return true;
     });
   };
@@ -6778,8 +6781,19 @@ function viewCareWithSentiment(status){
 // Drill-down: care calls in a grievance category (respects current branch+month filter)
 // Sub-topic drill-down: filters care calls by category + keyword match
 // Helper: compute sentiment for a care row and check if it matches the active filter
+/* ONE sentiment reading, used by the chips, the filters, the counts and the
+   Sentiment column alike.
+
+   This function previously called the old bag-of-words _sentiment(), while the
+   Negative chip filtered with CARE_NLP.classify(). Two different readings of the
+   same remark: the chip kept a row the column then labelled "Positive", so a
+   Negative drill-down openly displayed positive records. Whenever a number and
+   its label come from different code, they will disagree eventually — so they
+   now come from the same place. */
 function _careRowSentiment(r){
-  return _sentiment(((r.Remarks&&r.Remarks!=='–')?r.Remarks:'')+' '+((r.Followup&&r.Followup!=='–')?r.Followup:'')).label;
+  if(window.CARE_NLP && CARE_NLP.classify) return CARE_NLP.classify(r).klass;
+  return _sentiment(((r.Remarks&&r.Remarks!=='–')?r.Remarks:'')+' '+
+                    ((r.Followup&&r.Followup!=='–')?r.Followup:'')).label;
 }
 function _careFilterBySentiment(rows){
   const sf=window._CARE_SENT||'ALL';
