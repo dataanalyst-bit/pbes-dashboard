@@ -4400,12 +4400,12 @@ const HR_COLORS = {
   'Kavitha':'#059669','Priya':'#1E4FD8','Navya':'#D97706',
   'Swathi Priya':'#7C3AED','Preethi':'#DC2626','Stella':'#0D9488'
 };
-const HR_NAMES = ['Kavitha','Priya','Navya','Swathi Priya','Preethi','Stella'];
+const HR_NAMES = ['Kavitha','Priya','Navya', 'Savina', 'Swathi Priya','Preethi','Stella'];
 // Recruiters who have LEFT the organization: hidden from performance ranking & scorecard,
 // but the positions they posted (open or closed) still count in the KPI totals.
 // To bring someone back or add a new leaver, just edit this list.
 const HR_RESIGNED_LIST = ['Priya'];
-const HR_BRANCH_MAP = {Pocharam:'Kavitha',Boduppal:[],Keesara:'Navya',Gowdavalli:'Swathi Priya',Bachupally:['Preethi','Stella']};
+const HR_BRANCH_MAP = {Pocharam:'Kavitha',Boduppal:[],Keesara:[],Gowdavalli:'Swathi Priya',Bachupally:['Preethi','Stella']};
 
 function renderHR(){
   const bl=fBranch==='ALL'?'All Recruiters':fBranch;
@@ -4416,7 +4416,7 @@ function renderHR(){
   const allRecHR=(typeof HR_RECORDS!=='undefined'&&Array.isArray(HR_RECORDS))?HR_RECORDS:[];
   // Recruiters who have resigned/left: excluded from PERFORMANCE ranking & scorecard,
   // but their posted positions STILL count in the position totals (they remain open/closed work).
-  const HR_RESIGNED=(typeof HR_RESIGNED_LIST!=='undefined')?HR_RESIGNED_LIST:['Priya'];
+  const HR_RESIGNED=(typeof HR_RESIGNED_LIST!=='undefined')?HR_RESIGNED_LIST:['Priya', 'Navya'];
   const isResigned=h=>HR_RESIGNED.some(x=>String(x).trim().toLowerCase()===String(h).trim().toLowerCase());
   // Discover recruiters live from the data (fallback to known names); drop resigned from the performer list
   let recruiterNames=[...new Set(allRecHR.map(r=>r.HR).filter(h=>h&&h!=='–'))].filter(h=>!isResigned(h));
