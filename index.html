@@ -464,6 +464,41 @@ table.auhm tr.au-itemrow td{border-color:#E8EEF2}
   text-transform:uppercase;letter-spacing:.05em;color:var(--txm);padding-bottom:7px;border-bottom:2px solid var(--bor)}
 .cp-hd span:last-child{text-align:right}
 
+/* ═══ VIGILANCE CHECKLIST ═══ */
+.vck-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-bottom:16px}
+.vck-k{border:1px solid var(--bor);border-top:3px solid var(--p);border-radius:11px;padding:12px 14px;background:var(--sur);cursor:pointer}
+.vck-k:hover{box-shadow:0 4px 14px rgba(0,0,0,.07)}
+.vck-k .l{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--txm)}
+.vck-k .v{font-size:26px;font-weight:800;line-height:1.1;margin:3px 0 1px}
+.vck-k .d{font-size:10.5px;color:var(--txm);line-height:1.45}
+.vck-row{display:grid;grid-template-columns:26px 1fr 96px;gap:10px;align-items:center;
+  padding:7px 4px;border-bottom:1px solid var(--bor);cursor:pointer}
+.vck-row:hover{background:var(--pl)}
+.vck-row:last-child{border-bottom:none}
+.vck-nm{font-size:12.5px;font-weight:600;color:var(--tx)}
+.vck-sub{font-size:9.5px;color:#94A3B8;margin-top:2px}
+.vck-bar{height:7px;background:#EEF2FF;border-radius:99px;overflow:hidden;margin-top:3px}
+.vck-bar i{display:block;height:100%;border-radius:99px}
+.vck-n{text-align:right;font-size:12.5px;font-weight:800;font-variant-numeric:tabular-nums}
+.vck-h{font-size:11.5px;font-weight:800;color:var(--tx);margin:0 0 8px}
+.vck-two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:900px){.vck-two{grid-template-columns:1fr}}
+.vck-pill{display:inline-block;font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:99px}
+.ph-btn{display:inline-flex;align-items:center;gap:5px;background:var(--pl);color:var(--p);
+  border:1px solid var(--bor);border-radius:7px;font:inherit;font-size:11px;font-weight:700;
+  padding:3px 9px;cursor:pointer;white-space:nowrap}
+.ph-btn:hover{background:var(--p);color:#fff;border-color:var(--p)}
+.ph-wrap{position:fixed;inset:0;background:rgba(8,20,14,.92);z-index:120;display:none;
+  align-items:center;justify-content:center;flex-direction:column;gap:14px;padding:24px}
+.ph-wrap.on{display:flex}
+.ph-img{max-width:92vw;max-height:74vh;border-radius:10px;background:#fff;object-fit:contain;
+  box-shadow:0 18px 60px rgba(0,0,0,.5)}
+.ph-bar{display:flex;align-items:center;gap:14px;color:#fff;font-size:13px;font-weight:600}
+.ph-bar button{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);color:#fff;
+  font:inherit;font-size:13px;font-weight:700;padding:7px 15px;border-radius:9px;cursor:pointer}
+.ph-bar button:hover{background:#F2C230;color:#07361F;border-color:#F2C230}
+.ph-cap{color:#BBF7D0;font-size:11.5px;max-width:70vw;text-align:center;line-height:1.5}
+
 /* ═══ MEETING ACTIONS ═══ */
 .mt-drop{border:2px dashed var(--bor);border-radius:14px;padding:26px 22px;text-align:center;background:var(--sur)}
 .mt-drop.on{border-color:var(--p);background:var(--pl)}
@@ -1612,12 +1647,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="kc amber" onclick="viewVigilanceRecords('AwaitingAdmin')" style="cursor:pointer;" title="Vigilance closed but Admin Status not yet updated"><div class="kc-ico">🧑‍💼</div><div class="kc-lbl">Awaiting Admin Update</div><div class="kc-val" id="vig-awaiting">–</div><div class="kc-sub" id="vig-awaiting-s">Admin Status pending — click to view</div></div>
   </div>
   <div class="row r2">
-    <div class="card"><div class="ch"><h3>🧑‍💼 Admin Follow-up Status by Branch</h3><span class="fnote">Admin Status column · filled by Admins only · click to view</span></div><div class="cb"><div class="cw tall"><canvas id="vig-admin-br"></canvas></div></div></div>
+    <div class="card"><div class="ch"><h3>🏫 Issue Status by Branch</h3><span class="fnote">Click a segment to view those issues</span></div><div class="cb"><div class="cw tall"><canvas id="vig-br"></canvas></div></div></div>
     <div class="card"><div class="ch"><h3>🏆 Branch Safety Performance Score</h3><span class="fnote">Workload 35% + Closure 25% + Speed 20% + Overdue Control 20% · click a branch for records</span></div><div class="cb-0" id="vig-safety-perf"></div></div>
   </div>
-  <div class="row r2">
-    <div class="card"><div class="ch"><h3>🏫 Issue Status by Branch</h3></div><div class="cb"><div class="cw tall"><canvas id="vig-br"></canvas></div></div></div>
-    <div class="card"><div class="ch"><h3>⚠️ Risk Level by Branch</h3></div><div class="cb"><div class="cw tall"><canvas id="vig-risk"></canvas></div></div></div>
+  <!-- ═══ DAILY INSPECTION CHECKLIST ═══ -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="ch"><h3>🔎 Daily inspection checklist — what the rounds are finding</h3>
+      <span class="fnote" id="vck-fn">Loading…</span>
+      <button class="exm-refresh" onclick="loadVchk(true)" title="Re-read the Vigilance Checklist sheet">↻ Refresh</button>
+      <span class="exm-status" id="vck-status"></span></div>
+    <div class="cb" style="padding:14px 18px"><div id="vck-body">
+      <div class="no-data">Reading the inspection checklist…</div></div></div>
   </div>
   <div class="card"><div class="ch"><h3>🚨 Open & Critical Issues — Board Attention Required</h3><span class="fnote" id="vig-table-fn">All Branches · All Months</span></div>
     <div class="cb-0" style="overflow-x:auto"><table class="dt">
@@ -2201,6 +2241,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     </div>
     <div class="au-mod-bd" id="mt-mod-body"></div>
   </div>
+</div>
+
+<div class="ph-wrap" id="ph-wrap">
+  <div class="ph-bar">
+    <button id="ph-prev">‹ Previous</button>
+    <span id="ph-count">1 of 1</span>
+    <button id="ph-next">Next ›</button>
+    <button id="ph-open">Open original ↗</button>
+    <button id="ph-close">✕ Close</button>
+  </div>
+  <img class="ph-img" id="ph-img" alt="Inspection photo">
+  <div class="ph-cap" id="ph-cap"></div>
 </div>
 
 <!-- ═══ SCHOOL AUDIT ═══ -->
@@ -4024,30 +4076,8 @@ function renderVigilance(){
     const aOpen  =vb.map(b=>rowsOf(b).filter(r=>_admFilled(r)&&!_isAdmDone(r)).length);
     const aBlank =vb.map(b=>rowsOf(b).filter(r=>!_admFilled(r)).length);
     window._VIG_ADM_BR=vb;
-    mkChart('vig-admin-br',{type:'bar',data:{
-      labels:vb.map((b,i)=>`${b}\n(${aClosed[i]+aOpen[i]+aBlank[i]})`),
-      datasets:[
-        {label:'Admin Closed',      data:aClosed,backgroundColor:'#059669',borderRadius:4,stack:'s'},
-        {label:'Admin Open',        data:aOpen,  backgroundColor:'#DC2626',borderRadius:4,stack:'s'},
-        {label:'Not Updated by Admin',data:aBlank,backgroundColor:'#94A3B8',borderRadius:4,stack:'s'},
-      ]
-    },options:{responsive:true,maintainAspectRatio:true,
-      onClick:(evt,elements)=>{
-        if(!elements||!elements.length)return;
-        const b=window._VIG_ADM_BR[elements[0].index];
-        const band=['AdminClosed','AdminOpen','AdminBlank'][elements[0].datasetIndex];
-        let rws=ALLVIG.filter(r=>r.Branch===b&&(fMonth==='ALL'||r.Month===fMonth));
-        if(band==='AdminClosed') rws=rws.filter(_isAdmDone);
-        else if(band==='AdminOpen') rws=rws.filter(r=>_admFilled(r)&&!_isAdmDone(r));
-        else rws=rws.filter(r=>!_admFilled(r));
-        openModal(`🧑‍💼 ${b} — ${band==='AdminClosed'?'Admin Closed':band==='AdminOpen'?'Admin Open':'Not Updated by Admin'}`,`${rws.length} issues`,rws,_VIG_COLS);
-      },
-      plugins:{legend:{display:true},tooltip:{mode:'index',intersect:false},
-        datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]>0,anchor:'center',align:'center',
-          font:{weight:'800',size:12},color:'#fff',formatter:v=>v>0?v:''}
-      },
-      scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,grid:{color:'#E0E8FF'},ticks:{maxTicksLimit:5}}}
-    }});
+    // chart removed from the Vigilance tab
+
   }
 
   // ── Branch Safety Performance Score (unified: WH 35% + CE 25% + CS 20% + OC 20%) ──
@@ -4122,27 +4152,8 @@ function renderVigilance(){
   // ── Risk Level by Branch (stacked) ──
   const RISKS=['Critical','High','Medium','Low'];
   const RISK_COLORS={'Critical':'#DC2626','High':'#EA580C','Medium':'#D97706','Low':'#059669'};
-  mkChart('vig-risk',{type:'bar',data:{
-    labels:vigBranches,
-    datasets:RISKS.map(rk=>({
-      label:rk,
-      data:vigBranches.map(b=>ALLVIG.filter(r=>r.Branch===b&&r.RiskLevel===rk&&(fMonth==='ALL'||r.Month===fMonth)).length),
-      backgroundColor:RISK_COLORS[rk],borderRadius:4,stack:'s',
-    }))
-  },options:{responsive:true,maintainAspectRatio:true,
-    onClick:(evt,elements)=>{
-      if(!elements||!elements.length)return;
-      const branch=vigBranches[elements[0].index];
-      const risk=RISKS[elements[0].datasetIndex];
-      const rows=ALLVIG.filter(r=>r.Branch===branch&&r.RiskLevel===risk&&(fMonth==='ALL'||r.Month===fMonth));
-      openModal(`🛡️ ${branch} — ${risk} Risk`,`${rows.length} issues`,rows,_VIG_COLS);
-    },
-    plugins:{legend:{display:true},tooltip:{mode:'index',intersect:false},
-      datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]>0,anchor:'center',align:'center',
-        font:{weight:'800',size:12},color:'#fff',formatter:v=>v>0?v:''}
-    },
-    scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,grid:{color:'#E0E8FF'},ticks:{maxTicksLimit:5}}}
-  }});
+  // chart removed from the Vigilance tab
+
 
   // ── Open & Critical Issues table ──
   const RISK_PILL={'Critical':'pr','High':'po','Medium':'pa','Low':'pg'};
@@ -4400,12 +4411,12 @@ const HR_COLORS = {
   'Kavitha':'#059669','Priya':'#1E4FD8','Navya':'#D97706',
   'Swathi Priya':'#7C3AED','Preethi':'#DC2626','Stella':'#0D9488'
 };
-const HR_NAMES = ['Kavitha','Priya','Navya', 'Savina', 'Swathi Priya','Preethi','Stella'];
+const HR_NAMES = ['Kavitha','Priya','Navya','Swathi Priya','Preethi','Stella'];
 // Recruiters who have LEFT the organization: hidden from performance ranking & scorecard,
 // but the positions they posted (open or closed) still count in the KPI totals.
 // To bring someone back or add a new leaver, just edit this list.
 const HR_RESIGNED_LIST = ['Priya'];
-const HR_BRANCH_MAP = {Pocharam:'Kavitha',Boduppal:[],Keesara:[],Gowdavalli:'Swathi Priya',Bachupally:['Preethi','Stella']};
+const HR_BRANCH_MAP = {Pocharam:'Kavitha',Boduppal:[],Keesara:'Navya',Gowdavalli:'Swathi Priya',Bachupally:['Preethi','Stella']};
 
 function renderHR(){
   const bl=fBranch==='ALL'?'All Recruiters':fBranch;
@@ -4416,7 +4427,7 @@ function renderHR(){
   const allRecHR=(typeof HR_RECORDS!=='undefined'&&Array.isArray(HR_RECORDS))?HR_RECORDS:[];
   // Recruiters who have resigned/left: excluded from PERFORMANCE ranking & scorecard,
   // but their posted positions STILL count in the position totals (they remain open/closed work).
-  const HR_RESIGNED=(typeof HR_RESIGNED_LIST!=='undefined')?HR_RESIGNED_LIST:['Priya', 'Navya'];
+  const HR_RESIGNED=(typeof HR_RESIGNED_LIST!=='undefined')?HR_RESIGNED_LIST:['Priya'];
   const isResigned=h=>HR_RESIGNED.some(x=>String(x).trim().toLowerCase()===String(h).trim().toLowerCase());
   // Discover recruiters live from the data (fallback to known names); drop resigned from the performer list
   let recruiterNames=[...new Set(allRecHR.map(r=>r.HR).filter(h=>h&&h!=='–'))].filter(h=>!isResigned(h));
@@ -14914,6 +14925,426 @@ window.CARE_PROBLEMS = (function () {
     var r = _o.apply(this, arguments); try { safe(); } catch (e) {} return r;
   };
   setTimeout(safe, 1500); setTimeout(safe, 4000);
+})();
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   DAILY INSPECTION CHECKLIST — insights
+
+   One row per issue raised against a checklist point during a round. The
+   officer records what failed and attaches photographs; the Senior Admin then
+   assigns it and moves it through the status list.
+
+   What this reports, and why each cut earns its place:
+
+     · CHECKLIST POINTS that fail most often. A point failing across several
+       branches is a standard nobody can meet or nobody understands — that is a
+       policy problem, and chasing branches about it will not fix it.
+     · AREAS carrying the most open work, ranked by open issues × how long they
+       have waited, so a small pile of very old issues outranks a large pile of
+       fresh ones.
+     · WHO the work sits with, including the issues assigned to nobody, which
+       are the ones that quietly never move.
+     · ROUND COVERAGE — which branches were actually visited, and when last.
+       An empty branch here means no inspection happened, not that nothing is
+       wrong, and those two look identical in every other panel.
+
+   Columns are matched by name with aliases, so a renamed column degrades to a
+   missing panel rather than a wrong number.
+   ══════════════════════════════════════════════════════════════════════════ */
+window.VCHK = (function () {
+  'use strict';
+  var F = {
+    id:['issueid','id','issueno'], flag:['flag'], why:['whyflagged','reason'],
+    branch:['branch','campus'], areaCode:['areacode','code'], area:['area','category'],
+    location:['location','place','room'], wrong:['whatiswrong','issue','problem','checkpoint','point'],
+    detail:['detail','details','description','remarks','remark'],
+    severity:['severity','risk','risklevel'], standard:['standardfailed','standard'],
+    status:['status'], raised:['raiseddate','date','raisedon'], raisedAt:['raisedat','time'],
+    raisedBy:['raisedby','officer','inspector'], source:['source'],
+    assigned:['assignedto','assignee','owner','incharge'],
+    assignedRole:['assignedrole','role'], assignedDate:['assigneddate'],
+    approval:['approval'], note:['updatenote','note'], closed:['closeddate','closedon'],
+    target:['targetdate','duedate'], days:['daysopen','days']
+  };
+  function norm(s){ return String(s==null?'':s).toLowerCase().replace(/[^a-z0-9]/g,''); }
+  function indexOf(hdr){
+    var low = hdr.map(norm), map = {};
+    Object.keys(F).forEach(function(k){
+      var hit = -1;
+      F[k].forEach(function(a){ if(hit<0) hit = low.indexOf(a); });
+      if(hit<0) F[k].forEach(function(a){
+        if(hit<0) for(var i=0;i<low.length;i++) if(low[i].indexOf(a)===0){ hit=i; break; }
+      });
+      map[k]=hit;
+    });
+    /* photo columns: however many the app writes, whatever they are called */
+    map._photos = [];
+    hdr.forEach(function(hh,i){
+      if(/photo|image|picture|attachment|proof|evidence/.test(norm(hh))) map._photos.push(i);
+    });
+    return map;
+  }
+  /* one cell may hold several links; the app also writes Photo 1..n */
+  function photosOf(row, M){
+    var out = [];
+    M._photos.forEach(function(i){
+      String(row[i]==null?'':row[i]).split(/[\s,;|]+/).forEach(function(u){
+        u = u.trim();
+        if(/^https?:\/\//i.test(u) && out.indexOf(u) < 0) out.push(u);
+      });
+    });
+    return out;
+  }
+  /* Drive links must be turned into something an <img> can actually load —
+     the share URL renders a viewer page, not an image. */
+  function viewable(u){
+    var m = String(u).match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?[^]*id=)([-\w]{10,})/);
+    if(m) return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w1600';
+    return u;
+  }
+  function toRows(tab){
+    var hdr = tab.hdr.map(function(x){ return String(x==null?'':x).trim(); });
+    var M = indexOf(hdr);
+    if(M.branch < 0 || M.status < 0)
+      throw new Error('The checklist sheet needs at least a Branch and a Status column. '+
+        'It has: ' + hdr.filter(Boolean).join(' | '));
+    var g = function(r,k){ return M[k]>=0 ? String(r[M[k]]==null?'':r[M[k]]).trim() : ''; };
+    return tab.rows.map(function(r){
+      return {
+        id:g(r,'id'), flag:g(r,'flag'), why:g(r,'why'), branch:g(r,'branch'),
+        areaCode:g(r,'areaCode'), area:g(r,'area'), location:g(r,'location'),
+        wrong:g(r,'wrong'), detail:g(r,'detail'), severity:g(r,'severity'),
+        standard:g(r,'standard'), status:g(r,'status'), raised:g(r,'raised'),
+        raisedBy:g(r,'raisedBy'), source:g(r,'source'), assigned:g(r,'assigned'),
+        assignedRole:g(r,'assignedRole'), approval:g(r,'approval'), note:g(r,'note'),
+        closed:g(r,'closed'), target:g(r,'target'),
+        photos: photosOf(r, M)
+      };
+    }).filter(function(x){ return x.branch; });
+  }
+  function isOpen(r){ return !/closed|work done|verified|resolved|rejected|not valid/i.test(r.status); }
+  function isCritical(r){ return /critical|red/i.test(r.severity) || /red/i.test(r.flag); }
+  function dt(v){ if(!v) return null; var d=new Date(v); return isNaN(d.getTime())?null:d; }
+  function daysOpen(r, today){
+    var d = dt(r.raised); return d ? Math.max(0, Math.round((today-d)/86400000)) : null;
+  }
+  return { toRows: toRows, isOpen: isOpen, isCritical: isCritical, photosOf: photosOf,
+           viewable: viewable, dt: dt, daysOpen: daysOpen };
+})();
+
+/* ══════════════════ photo gallery ══════════════════ */
+(function(){
+  var L = { list: [], i: 0, cap: '' };
+  function $(id){ return document.getElementById(id); }
+  window.openPhotos = function(urls, caption){
+    L.list = (urls||[]).filter(Boolean); L.i = 0; L.cap = caption||'';
+    if(!L.list.length) return;
+    paint(); $('ph-wrap').classList.add('on'); document.body.style.overflow='hidden';
+  };
+  function paint(){
+    var raw = L.list[L.i];
+    $('ph-img').src = VCHK.viewable(raw);
+    $('ph-count').textContent = (L.i+1) + ' of ' + L.list.length;
+    $('ph-cap').textContent = L.cap;
+    $('ph-prev').style.visibility = L.list.length>1 ? 'visible' : 'hidden';
+    $('ph-next').style.visibility = L.list.length>1 ? 'visible' : 'hidden';
+    $('ph-open').onclick = function(){ window.open(raw,'_blank','noopener'); };
+  }
+  function close(){ $('ph-wrap').classList.remove('on'); document.body.style.overflow=''; $('ph-img').src=''; }
+  document.addEventListener('click', function(e){
+    if(e.target.id==='ph-close' || e.target.id==='ph-wrap') return close();
+    if(e.target.id==='ph-prev'){ L.i=(L.i-1+L.list.length)%L.list.length; paint(); }
+    if(e.target.id==='ph-next'){ L.i=(L.i+1)%L.list.length; paint(); }
+  });
+  document.addEventListener('keydown', function(e){
+    if(!$('ph-wrap') || !$('ph-wrap').classList.contains('on')) return;
+    if(e.key==='Escape') close();
+    if(e.key==='ArrowLeft'){ L.i=(L.i-1+L.list.length)%L.list.length; paint(); }
+    if(e.key==='ArrowRight'){ L.i=(L.i+1)%L.list.length; paint(); }
+  });
+  /* the image element itself is the fallback when a Drive thumbnail is blocked */
+  document.addEventListener('error', function(e){
+    if(e.target && e.target.id==='ph-img'){
+      $('ph-cap').textContent = 'This photo could not be shown inline — Drive may require sign-in. '+
+        'Use "Open original" to view it.' + (L.cap ? ' · ' + L.cap : '');
+    }
+  }, true);
+})();
+</script>
+
+<script>
+/* ══════════════════ checklist renderer + loader ══════════════════ */
+(function(){
+  var RAW = null, ROWS = [];
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  var ALLB = ['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam'];
+
+  function scoped(){
+    var b = (typeof fBranch!=='undefined') ? fBranch : 'ALL';
+    return ROWS.filter(function(r){ return b==='ALL' || r.branch===b; });
+  }
+  function median(a){ if(!a.length) return 0; var s=a.slice().sort(function(x,y){return x-y;}),m=s.length>>1;
+    return s.length%2 ? s[m] : (s[m-1]+s[m])/2; }
+
+  var COLS = [{key:'id',label:'Issue'},{key:'branch',label:'Branch'},{key:'raised',label:'Raised',date:true},
+    {key:'area',label:'Area'},{key:'location',label:'Location',maxW:'170px'},
+    {key:'wrong',label:'Checklist point',maxW:'220px'},{key:'detail',label:'Detail',maxW:'260px'},
+    {key:'severity',label:'Severity',pill:true},{key:'assigned',label:'Assigned to'},
+    {key:'status',label:'Status',pill:true}];
+
+  /* every drill-down carries the photo button, because a photograph is the
+     only part of this record that shows what the officer actually saw */
+  function openIssues(title, sub, list){
+    if(!list.length){
+      if(typeof openModal==='function') openModal(title, sub, [], COLS);
+      return;
+    }
+    var withBtn = list.map(function(r){
+      var o = Object.assign({}, r);
+      o.__photos = r.photos;
+      return o;
+    });
+    if(typeof openModal!=='function') return;
+    openModal(title, sub + ' · ' + list.filter(function(r){return r.photos.length;}).length + ' with photos',
+      withBtn, COLS.concat([{key:'__photos',label:'Photos',render:function(v,row){
+        var n = (v||[]).length;
+        if(!n) return '<span style="color:#CBD5E1">—</span>';
+        var cap = [row.branch,row.location,row.wrong].filter(Boolean).join(' · ');
+        return '<button class="ph-btn" data-ph="'+esc(JSON.stringify(v))+'" data-cap="'+esc(cap)+'">'+
+               '📷 '+n+(n>1?' photos':' photo')+'</button>';
+      }}]));
+    setTimeout(wirePhotoButtons, 30);
+  }
+  function wirePhotoButtons(){
+    document.querySelectorAll('.ph-btn[data-ph]').forEach(function(b){
+      if(b.dataset.w) return; b.dataset.w='1';
+      b.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        var urls=[]; try{ urls=JSON.parse(b.dataset.ph); }catch(e){}
+        openPhotos(urls, b.dataset.cap||'');
+      });
+    });
+  }
+  window.__wireVckPhotos = wirePhotoButtons;
+
+  function bar(v,max,c){ return '<div class="vck-bar"><i style="width:'+(max?v/max*100:0)+'%;background:'+c+'"></i></div>'; }
+
+  function build(){
+    var el = $('vck-body'); if(!el) return;
+    if(!RAW){ el.innerHTML='<div class="no-data">Reading the inspection checklist…</div>'; return; }
+    var rows = scoped();
+    if(!rows.length){
+      el.innerHTML='<div class="no-data">No inspection issues recorded for this branch.</div>'; return;
+    }
+    var today=new Date(); today=new Date(today.getFullYear(),today.getMonth(),today.getDate());
+    var open = rows.filter(VCHK.isOpen);
+    var crit = rows.filter(function(r){ return VCHK.isCritical(r) && VCHK.isOpen(r); });
+    var unass = open.filter(function(r){ return !r.assigned || /unassigned|^-$/i.test(r.assigned); });
+    var withPh = rows.filter(function(r){ return r.photos.length; });
+    var ages = open.map(function(r){ return VCHK.daysOpen(r,today); }).filter(function(x){ return x!==null; });
+
+    var K = [
+      {l:'Issues raised', v:rows.length, c:'#0F172A', d:'across '+new Set(rows.map(function(r){return r.branch;})).size+' branches', list:rows, t:'Every issue raised'},
+      {l:'Still open', v:open.length, c:open.length?'#D97706':'#059669',
+       d:(rows.length?Math.round(open.length/rows.length*100):0)+'% of all · median '+Math.round(median(ages))+'d waiting', list:open, t:'Issues still open'},
+      {l:'Critical and open', v:crit.length, c:crit.length?'#DC2626':'#059669',
+       d:'flagged RED or CRITICAL and not yet closed', list:crit, t:'Critical issues still open'},
+      {l:'Assigned to nobody', v:unass.length, c:unass.length?'#B91C1C':'#059669',
+       d:'open with no owner — these are the ones that never move', list:unass, t:'Open issues with no owner'},
+      {l:'With photographs', v:withPh.length, c:'#1E4FD8',
+       d:(rows.length?Math.round(withPh.length/rows.length*100):0)+'% carry visual evidence', list:withPh, t:'Issues with photographs'}
+    ];
+    var html = '<div class="vck-grid">'+K.map(function(k,i){
+      return '<div class="vck-k" data-k="'+i+'" style="border-top-color:'+k.c+'" title="Click to view these issues">'+
+        '<div class="l">'+esc(k.l)+'</div><div class="v" style="color:'+k.c+'">'+k.v+'</div>'+
+        '<div class="d">'+esc(k.d)+'</div></div>';
+    }).join('')+'</div>';
+
+    /* checklist points that fail most, and whether it is one branch or all */
+    var byPoint = {};
+    rows.forEach(function(r){
+      var k = r.wrong || '(no checklist point recorded)';
+      var o = byPoint[k] || (byPoint[k] = {k:k, rows:[], br:{}});
+      o.rows.push(r); o.br[r.branch]=1;
+    });
+    var points = Object.keys(byPoint).map(function(k){ return byPoint[k]; })
+      .map(function(o){ o.n=o.rows.length; o.nbr=Object.keys(o.br).length;
+        o.open=o.rows.filter(VCHK.isOpen).length; return o; })
+      .sort(function(a,b){ return b.n-a.n; }).slice(0,10);
+    var maxP = Math.max.apply(null, points.map(function(p){return p.n;}).concat([1]));
+
+    /* areas ranked by pressure, not volume */
+    var byArea = {};
+    rows.forEach(function(r){
+      var k = r.area || '(no area)';
+      (byArea[k] || (byArea[k]={k:k,rows:[]})).rows.push(r);
+    });
+    var areas = Object.keys(byArea).map(function(k){
+      var o=byArea[k], op=o.rows.filter(VCHK.isOpen);
+      var ag=op.map(function(r){return VCHK.daysOpen(r,today);}).filter(function(x){return x!==null;});
+      var med=median(ag);
+      return {k:k, rows:o.rows, n:o.rows.length, open:op.length, med:med,
+              pressure: op.length*Math.log(1+med)};
+    }).sort(function(a,b){ return b.pressure-a.pressure || b.open-a.open; }).slice(0,10);
+    var maxA = Math.max.apply(null, areas.map(function(a){return a.n;}).concat([1]));
+
+    html += '<div class="vck-two">'+
+      '<div><div class="vck-h">Checklist points failing most often</div>'+
+      points.map(function(p,i){
+        var col = p.nbr>=3 ? '#DC2626' : p.nbr===2 ? '#D97706' : '#1E4FD8';
+        return '<div class="vck-row" data-p="'+i+'" title="Click to view these issues">'+
+          '<div style="font-size:13px;text-align:center">'+(p.nbr>=3?'🌐':'📍')+'</div>'+
+          '<div><div class="vck-nm">'+esc(p.k)+'</div>'+bar(p.n,maxP,col)+
+          '<div class="vck-sub">'+p.open+' still open · '+p.nbr+' branch'+(p.nbr===1?'':'es')+
+          (p.nbr>=3?' — this is a standard nobody is meeting, not a branch problem':'')+'</div></div>'+
+          '<div class="vck-n" style="color:'+col+'">'+p.n+'</div></div>';
+      }).join('')+'</div>'+
+      '<div><div class="vck-h">Areas carrying the most open work</div>'+
+      areas.map(function(a,i){
+        var col = a.med>30 ? '#DC2626' : a.med>14 ? '#D97706' : '#059669';
+        return '<div class="vck-row" data-a="'+i+'" title="Click to view these issues">'+
+          '<div style="font-size:13px;text-align:center">🏗️</div>'+
+          '<div><div class="vck-nm">'+esc(a.k)+'</div>'+bar(a.n,maxA,col)+
+          '<div class="vck-sub">'+a.open+' open of '+a.n+' · median '+Math.round(a.med)+' days waiting</div></div>'+
+          '<div class="vck-n" style="color:'+col+'">'+a.open+'</div></div>';
+      }).join('')+'</div></div>';
+
+    /* who it sits with, and which branches were actually inspected */
+    var byOwner = {};
+    open.forEach(function(r){
+      var k = (r.assigned && !/unassigned|^-$/i.test(r.assigned)) ? r.assigned : '(nobody assigned)';
+      (byOwner[k] || (byOwner[k]={k:k,rows:[]})).rows.push(r);
+    });
+    var owners = Object.keys(byOwner).map(function(k){
+      var o=byOwner[k];
+      var ag=o.rows.map(function(r){return VCHK.daysOpen(r,today);}).filter(function(x){return x!==null;});
+      return {k:k, rows:o.rows, n:o.rows.length, med:median(ag)};
+    }).sort(function(a,b){ return b.n-a.n; }).slice(0,10);
+    var maxO = Math.max.apply(null, owners.map(function(o){return o.n;}).concat([1]));
+
+    var byBr = {};
+    ALLB.forEach(function(b){ byBr[b] = {b:b, rows:[], last:null}; });
+    rows.forEach(function(r){
+      var o = byBr[r.branch] || (byBr[r.branch]={b:r.branch,rows:[],last:null});
+      o.rows.push(r);
+      var d = VCHK.dt(r.raised);
+      if(d && (!o.last || d>o.last)) o.last = d;
+    });
+    var brs = Object.keys(byBr).map(function(k){ return byBr[k]; })
+      .sort(function(a,b){ return (b.last?b.last.getTime():0)-(a.last?a.last.getTime():0); });
+
+    html += '<div class="vck-two" style="margin-top:18px">'+
+      '<div><div class="vck-h">Where the open work sits</div>'+
+      owners.map(function(o,i){
+        var none = /nobody/.test(o.k);
+        var col = none ? '#B91C1C' : o.med>21 ? '#D97706' : '#1E4FD8';
+        return '<div class="vck-row" data-o="'+i+'" title="Click to view these issues">'+
+          '<div style="font-size:13px;text-align:center">'+(none?'❗':'👤')+'</div>'+
+          '<div><div class="vck-nm">'+esc(o.k)+'</div>'+bar(o.n,maxO,col)+
+          '<div class="vck-sub">median '+Math.round(o.med)+' days waiting</div></div>'+
+          '<div class="vck-n" style="color:'+col+'">'+o.n+'</div></div>';
+      }).join('')+'</div>'+
+      '<div><div class="vck-h">Round coverage — when each branch was last inspected</div>'+
+      brs.map(function(o,i){
+        var days = o.last ? Math.round((today-o.last)/86400000) : null;
+        var col = days===null ? '#94A3B8' : days<=2 ? '#059669' : days<=7 ? '#D97706' : '#DC2626';
+        return '<div class="vck-row" data-b="'+esc(o.b)+'" title="Click to view this branch\u2019s issues">'+
+          '<div style="font-size:13px;text-align:center">🏫</div>'+
+          '<div><div class="vck-nm">'+esc(o.b)+'</div>'+
+          '<div class="vck-sub">'+(o.last
+            ? 'last issue raised '+(days===0?'today':days+' day'+(days===1?'':'s')+' ago')+' · '+o.rows.length+' issues'
+            : 'no inspection issue has ever been recorded here')+'</div></div>'+
+          '<div class="vck-n" style="color:'+col+'">'+(days===null?'—':days+'d')+'</div></div>';
+      }).join('')+
+      '<p class="au-note">A branch with nothing here has not been inspected, which is not the same as ' +
+      'having nothing wrong \u2014 and in every other panel on this page the two look identical.</p>'+
+      '</div></div>';
+
+    el.innerHTML = html;
+    var fn = $('vck-fn');
+    if(fn) fn.textContent = ((typeof fBranch!=='undefined'&&fBranch!=='ALL')?fBranch:'All branches')+
+      ' · '+rows.length+' issues · '+open.length+' open';
+
+    el.querySelectorAll('.vck-k').forEach(function(n){
+      n.addEventListener('click',function(){ var k=K[+n.dataset.k]; openIssues('🔎 '+k.t, k.d, k.list); });
+    });
+    el.querySelectorAll('[data-p]').forEach(function(n){
+      n.addEventListener('click',function(){ var p=points[+n.dataset.p];
+        openIssues('🔎 '+p.k, p.n+' issue(s) · '+p.open+' still open · '+p.nbr+' branch(es)', p.rows); });
+    });
+    el.querySelectorAll('[data-a]').forEach(function(n){
+      n.addEventListener('click',function(){ var a=areas[+n.dataset.a];
+        openIssues('🏗️ '+a.k, a.open+' open of '+a.n+' · median '+Math.round(a.med)+' days', a.rows); });
+    });
+    el.querySelectorAll('[data-o]').forEach(function(n){
+      n.addEventListener('click',function(){ var o=owners[+n.dataset.o];
+        openIssues('👤 '+o.k, o.n+' open issue(s) · median '+Math.round(o.med)+' days waiting', o.rows); });
+    });
+    el.querySelectorAll('[data-b]').forEach(function(n){
+      n.addEventListener('click',function(){ var b=n.dataset.b;
+        var list=rows.filter(function(r){ return r.branch===b; });
+        openIssues('🏫 '+b, list.length+' issue(s) · '+list.filter(VCHK.isOpen).length+' open', list); });
+    });
+  }
+
+  function safe(){ try{ build(); }catch(e){
+    var el=$('vck-body');
+    if(el) el.innerHTML='<div class="no-data" style="color:var(--r)">Could not build the checklist insights: '+
+      esc(String(e&&e.message||e))+'</div>';
+  } }
+  window.__renderVchk = safe;
+
+  var loading=false, loaded=false;
+  window.loadVchk = async function(force){
+    if(loading) return;
+    if(loaded && !force){ safe(); return; }
+    loading=true;
+    var st=$('vck-status'); if(st){ st.textContent=force?'Refreshing…':'Loading…'; st.className='exm-status'; }
+    try{
+      if(!force){
+        try{ var c=await idbGet('pbes_vchk');
+          if(c&&c.data&&c.data.vchk&&(Date.now()-c.t)<24*3600*1000){
+            RAW=c.data; ROWS=VCHK.toRows(RAW.vchk); loaded=true; safe();
+            if(st) st.textContent='Cached · refreshing in background';
+          }
+        }catch(e){}
+      }
+      var session=null;
+      try{ var s2=await sb.auth.getSession(); session=s2&&s2.data&&s2.data.session; }catch(e){}
+      if(!session){ window.location.href='login.html'; return; }
+      var res=await _lazyFetch('vchk', force, session, 55000);
+      if(res.status===401){ await sb.auth.signOut(); window.location.href='login.html'; return; }
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      var d=await res.json();
+      if(d&&d.error) throw new Error(d.message||'Upstream error');
+      var raw=(d&&d.VCHK_RAW)?d.VCHK_RAW:null;
+      if(!raw||!raw.vchk||!raw.vchk.rows||!raw.vchk.rows.length)
+        throw new Error('No rows returned. Check the "Vigilance Checklist" tab exists and that '+
+                        '/api/data forwards ?section=vchk');
+      RAW=raw; ROWS=VCHK.toRows(raw.vchk); loaded=true;
+      try{ idbSet('pbes_vchk',{t:Date.now(),data:raw}); }catch(e){}
+      safe();
+      if(st) st.textContent = raw.generatedAt ? ('Updated '+String(raw.generatedAt).replace('T',' ').slice(0,16)) : '';
+    }catch(err){
+      if(!loaded){ var el=$('vck-body');
+        if(el) el.innerHTML='<div class="no-data" style="color:var(--r)">'+esc(String(err&&err.message||err))+'</div>'; }
+      if(st){ st.textContent=String(err&&err.message||err); st.className='exm-status err'; }
+    }finally{ loading=false; }
+  };
+
+  var _st=window.showTab;
+  if(typeof _st==='function') window.showTab=function(id,btn){
+    var r=_st(id,btn); if(id==='vigilance') loadVchk(false); return r;
+  };
+  var _af=window.applyFilters;
+  if(typeof _af==='function') window.applyFilters=function(){
+    var r=_af.apply(this,arguments); try{ safe(); }catch(e){} return r;
+  };
+  setTimeout(function(){ loadVchk(false); }, 2500);
 })();
 </script>
 </body>
