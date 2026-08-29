@@ -779,6 +779,10 @@ const ROLE_TABS = {
   hr:                ['hr','observations'],
   admin:             ['admin','vigilance','civil'],
   grievance_officer: ['care','grievance','ptm'],
+  /* Same as grievance_officer, plus Admissions. Kept as its own role rather
+     than widening grievance_officer, because that would silently hand
+     Admissions to every other grievance officer at the same time. */
+  grievance_admissions: ['care','grievance','ptm','admissions'],
   hr_grievance:      ['hr','observations','care','grievance','ptm'],
   /* Academic coordinators — the five academic-quality views, own branch only.
      Deliberately NOT given Admin, Vigilance, Purchase, HR or Transport: those
