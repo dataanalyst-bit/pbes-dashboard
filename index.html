@@ -480,7 +480,15 @@ table.auhm tr.au-itemrow td{border-color:#E8EEF2}
 .vck-bar{height:7px;background:#EEF2FF;border-radius:99px;overflow:hidden;margin-top:3px}
 .vck-bar i{display:block;height:100%;border-radius:99px}
 .vck-n{text-align:right;font-size:12.5px;font-weight:800;font-variant-numeric:tabular-nums}
-.vck-h{font-size:11.5px;font-weight:800;color:var(--tx);margin:0 0 8px}
+.vck-h{font-size:11.5px;font-weight:800;color:var(--tx);margin:0 0 8px;text-transform:uppercase;letter-spacing:.05em}
+table.vckt{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;min-width:420px}
+table.vckt th{text-align:center}
+table.vckt th.nm,table.vckt td.nm{text-align:left}
+table.vckt td{text-align:center;padding:8px 10px}
+table.vckt td.vck-c,table.vckt tr.vck-c{cursor:pointer;font-weight:800;color:#1E4FD8;transition:background .12s}
+table.vckt td.vck-c:hover,table.vckt tr.vck-c:hover td{background:var(--pl)}
+table.vckt td.vck-c.z{color:#CBD5E1;font-weight:500}
+table.vckt tr.vck-c td.nm{font-weight:600;color:var(--tx)}
 .vck-two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 @media(max-width:900px){.vck-two{grid-template-columns:1fr}}
 .vck-pill{display:inline-block;font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:99px}
@@ -15094,14 +15102,20 @@ window.VCHK = (function () {
       };
     }).filter(function(x){ return x.branch; });
   }
-  function isOpen(r){ return !/closed|work done|verified|resolved|rejected|not valid/i.test(r.status); }
+  function isOpen(r){ return !/^(closed|verified|resolved|rejected|not valid)/i.test(String(r.status).trim())
+      && !/verified/i.test(r.status); }
+  function toVerify(r){ return /work done.*verification pending|verification pending/i.test(r.status); }
+  function awaitingSanction(r){ return /awaiting approval|awaiting sanction|approval pending/i.test(r.status+' '+r.approval); }
+  function isRed(r){ return /^red$/i.test(String(r.flag).trim()); }
+  function unassigned(r){ return !r.assigned || /unassigned|^-+$|^not yet assigned$/i.test(r.assigned.trim()); }
   function isCritical(r){ return /critical|red/i.test(r.severity) || /red/i.test(r.flag); }
   function dt(v){ if(!v) return null; var d=new Date(v); return isNaN(d.getTime())?null:d; }
   function daysOpen(r, today){
     var d = dt(r.raised); return d ? Math.max(0, Math.round((today-d)/86400000)) : null;
   }
   return { toRows: toRows, isOpen: isOpen, isCritical: isCritical, photosOf: photosOf,
-           viewable: viewable, dt: dt, daysOpen: daysOpen };
+           viewable: viewable, dt: dt, daysOpen: daysOpen, toVerify: toVerify,
+           awaitingSanction: awaitingSanction, isRed: isRed, unassigned: unassigned };
 })();
 
 /* ══════════════════ photo gallery ══════════════════ */
@@ -15266,157 +15280,211 @@ window.VCHK = (function () {
     var el = $('vck-body'); if(!el) return;
     if(!RAW){ el.innerHTML='<div class="no-data">Reading the inspection checklist…</div>'; return; }
     var rows = scoped();
-    if(!rows.length){
-      el.innerHTML='<div class="no-data">No inspection issues recorded for this branch.</div>'; return;
-    }
-    var today=new Date(); today=new Date(today.getFullYear(),today.getMonth(),today.getDate());
-    var open = rows.filter(VCHK.isOpen);
-    var crit = rows.filter(function(r){ return VCHK.isCritical(r) && VCHK.isOpen(r); });
-    var unass = open.filter(function(r){ return !r.assigned || /unassigned|^-$/i.test(r.assigned); });
-    var withPh = rows.filter(function(r){ return r.photos.length; });
-    var ages = open.map(function(r){ return VCHK.daysOpen(r,today); }).filter(function(x){ return x!==null; });
+    if(!rows.length){ el.innerHTML='<div class="no-data">No inspection issues recorded for this branch.</div>'; return; }
 
-    var K = [
-      {l:'Issues raised', v:rows.length, c:'#0F172A', d:'across '+new Set(rows.map(function(r){return r.branch;})).size+' branches', list:rows, t:'Every issue raised'},
-      {l:'Still open', v:open.length, c:open.length?'#D97706':'#059669',
-       d:(rows.length?Math.round(open.length/rows.length*100):0)+'% of all · median '+Math.round(median(ages))+'d waiting', list:open, t:'Issues still open'},
-      {l:'Critical and open', v:crit.length, c:crit.length?'#DC2626':'#059669',
-       d:'flagged RED or CRITICAL and not yet closed', list:crit, t:'Critical issues still open'},
-      {l:'Assigned to nobody', v:unass.length, c:unass.length?'#B91C1C':'#059669',
-       d:'open with no owner — these are the ones that never move', list:unass, t:'Open issues with no owner'},
-      {l:'With photographs', v:withPh.length, c:'#1E4FD8',
-       d:(rows.length?Math.round(withPh.length/rows.length*100):0)+'% carry visual evidence', list:withPh, t:'Issues with photographs'}
+    var now=new Date(), today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+    var D=86400000;
+    function dOf(r){ return VCHK.dt(r.raised); }
+    function closedOf(r){ return VCHK.dt(r.closed); }
+    function ago(n){ return new Date(today.getTime()-n*D); }
+    /* the week runs Monday to today, which is how a round is actually planned */
+    var dow=(today.getDay()+6)%7;
+    var weekStart=ago(dow), lastWeekStart=ago(dow+7), lastWeekEnd=ago(dow+1);
+    var monthStart=new Date(today.getFullYear(),today.getMonth(),1);
+    var lastMonthStart=new Date(today.getFullYear(),today.getMonth()-1,1);
+    var lastMonthEnd=new Date(today.getFullYear(),today.getMonth(),0);
+    function inRange(d,a,b){ return d && d>=a && d<=b; }
+
+    var open=rows.filter(VCHK.isOpen);
+    var fmtD=function(d){ if(!d) return '—';
+      var M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return String(d.getDate()).padStart(2,'0')+'-'+M[d.getMonth()]+'-'+String(d.getFullYear()).slice(2); };
+    function overdue(r){
+      if(!VCHK.isOpen(r)) return false;
+      var t=VCHK.dt(r.target);
+      if(t) return t<today;
+      var d=dOf(r); return !!(d && (today-d)/D > 7);   // no target set: a week is the working limit
+    }
+
+    /* ═════ RIGHT NOW ═════ */
+    var K=[
+      {l:'Open',              v:open.length,                              c:'#0F172A', list:open, ic:'📂'},
+      {l:'Unassigned',        v:open.filter(VCHK.unassigned).length,      c:'#B91C1C', list:open.filter(VCHK.unassigned), ic:'🙋'},
+      {l:'Red flagged',       v:rows.filter(VCHK.isRed).length,           c:'#DC2626', list:rows.filter(VCHK.isRed), ic:'🚩'},
+      {l:'Overdue',           v:rows.filter(overdue).length,              c:'#DC2626', list:rows.filter(overdue), ic:'⏰'},
+      {l:'Open critical',     v:open.filter(VCHK.isCritical).length,      c:'#DC2626', list:open.filter(VCHK.isCritical), ic:'🔥'},
+      {l:'Over 30 days',      v:open.filter(function(r){var d=dOf(r);return d&&(today-d)/D>30;}).length,
+                              c:'#B91C1C', list:open.filter(function(r){var d=dOf(r);return d&&(today-d)/D>30;}), ic:'📅'},
+      {l:'To verify',         v:rows.filter(VCHK.toVerify).length,        c:'#0891B2', list:rows.filter(VCHK.toVerify), ic:'🔍'},
+      {l:'Awaiting sanction', v:rows.filter(VCHK.awaitingSanction).length,c:'#D97706', list:rows.filter(VCHK.awaitingSanction), ic:'💰'}
     ];
-    var html = '<div class="vck-grid">'+K.map(function(k,i){
+    var html='<div class="vck-h">📍 Right now</div><div class="vck-grid">'+K.map(function(k,i){
       return '<div class="vck-k" data-k="'+i+'" style="border-top-color:'+k.c+'" title="Click to view these issues">'+
-        '<div class="l">'+esc(k.l)+'</div><div class="v" style="color:'+k.c+'">'+k.v+'</div>'+
-        '<div class="d">'+esc(k.d)+'</div></div>';
+        '<div class="l">'+k.ic+' '+esc(k.l)+'</div>'+
+        '<div class="v" style="color:'+(k.v?k.c:'#94A3B8')+'">'+k.v+'</div></div>';
     }).join('')+'</div>';
 
-    /* checklist points that fail most, and whether it is one branch or all */
-    var byPoint = {};
-    rows.forEach(function(r){
-      var k = r.wrong || '(no checklist point recorded)';
-      var o = byPoint[k] || (byPoint[k] = {k:k, rows:[], br:{}});
-      o.rows.push(r); o.br[r.branch]=1;
+    /* ═════ ISSUES RAISED AND CLOSED ═════ */
+    var PER=[
+      {k:'Today',      sub:fmtD(today), a:today, b:today},
+      {k:'Yesterday',  sub:fmtD(ago(1)), a:ago(1), b:ago(1)},
+      {k:'This week',  sub:fmtD(weekStart)+' – '+fmtD(today), a:weekStart, b:today},
+      {k:'Last week',  sub:fmtD(lastWeekStart)+' – '+fmtD(lastWeekEnd), a:lastWeekStart, b:lastWeekEnd},
+      {k:'This month', sub:fmtD(monthStart)+' – '+fmtD(today), a:monthStart, b:today},
+      {k:'Last month', sub:fmtD(lastMonthStart)+' – '+fmtD(lastMonthEnd), a:lastMonthStart, b:lastMonthEnd}
+    ];
+    window._VCK_PER=PER.map(function(P){
+      var raised=rows.filter(function(r){ return inRange(dOf(r),P.a,P.b); });
+      return { P:P, raised:raised,
+        closed: rows.filter(function(r){ return inRange(closedOf(r),P.a,P.b); }),
+        still:  raised.filter(VCHK.isOpen),
+        over:   raised.filter(overdue),
+        red:    raised.filter(VCHK.isRed) };
     });
-    var points = Object.keys(byPoint).map(function(k){ return byPoint[k]; })
-      .map(function(o){ o.n=o.rows.length; o.nbr=Object.keys(o.br).length;
-        o.open=o.rows.filter(VCHK.isOpen).length; return o; })
-      .sort(function(a,b){ return b.n-a.n; }).slice(0,10);
-    var maxP = Math.max.apply(null, points.map(function(p){return p.n;}).concat([1]));
+    html+='<div class="vck-h" style="margin-top:20px">📈 Issues raised and closed'+
+      '<span style="font-weight:500;color:var(--txm);margin-left:8px;font-size:10.5px">tap any number to see the issues behind it</span></div>'+
+      '<div style="overflow-x:auto"><table class="hrs vckt"><thead><tr><th class="nm">Period</th>'+
+      '<th>Raised</th><th>Closed</th><th>Still open</th><th>Overdue</th><th>Red</th></tr></thead><tbody>'+
+      window._VCK_PER.map(function(x,i){
+        function c(list,col){ return '<td class="vck-c'+(list.length?'':' z')+'" data-per="'+i+'" data-f="'+col+'">'+list.length+'</td>'; }
+        return '<tr><td class="nm"><b>'+esc(x.P.k)+'</b><div class="vck-sub">'+esc(x.P.sub)+'</div></td>'+
+          c(x.raised,'raised')+c(x.closed,'closed')+c(x.still,'still')+
+          c(x.over,'over')+c(x.red,'red')+'</tr>';
+      }).join('')+'</tbody></table></div>';
 
-    /* areas ranked by pressure, not volume */
-    var byArea = {};
-    rows.forEach(function(r){
-      var k = r.area || '(no area)';
-      (byArea[k] || (byArea[k]={k:k,rows:[]})).rows.push(r);
-    });
-    var areas = Object.keys(byArea).map(function(k){
-      var o=byArea[k], op=o.rows.filter(VCHK.isOpen);
-      var ag=op.map(function(r){return VCHK.daysOpen(r,today);}).filter(function(x){return x!==null;});
-      var med=median(ag);
-      return {k:k, rows:o.rows, n:o.rows.length, open:op.length, med:med,
-              pressure: op.length*Math.log(1+med)};
-    }).sort(function(a,b){ return b.pressure-a.pressure || b.open-a.open; }).slice(0,10);
-    var maxA = Math.max.apply(null, areas.map(function(a){return a.n;}).concat([1]));
+    /* ═════ BY BRANCH ═════ */
+    var BRS=[];
+    (function(){
+      var seen={};
+      rows.forEach(function(r){ if(!seen[r.branch]){ seen[r.branch]=1; BRS.push(r.branch); } });
+      ALLB.forEach(function(b){ if(!seen[b]){ seen[b]=1; BRS.push(b); } });
+    })();
+    window._VCK_BR=BRS.map(function(b){
+      var br=rows.filter(function(r){ return r.branch===b; });
+      var bo=br.filter(VCHK.isOpen);
+      return { b:b,
+        today: br.filter(function(r){ return inRange(dOf(r),today,today); }),
+        month: br.filter(function(r){ return inRange(dOf(r),monthStart,today); }),
+        open:  bo, unassd: bo.filter(VCHK.unassigned),
+        over:  br.filter(overdue), red: br.filter(VCHK.isRed), all: br };
+    }).sort(function(a,b){ return b.open.length-a.open.length; });
+    html+='<div class="vck-h" style="margin-top:20px">🏫 By branch</div>'+
+      '<div style="overflow-x:auto"><table class="hrs vckt"><thead><tr><th class="nm">Branch</th>'+
+      '<th>Today</th><th>Month</th><th>Open</th><th>Unassd</th><th>Overdue</th><th>Red</th></tr></thead><tbody>'+
+      window._VCK_BR.map(function(x,i){
+        function c(list,f){ return '<td class="vck-c'+(list.length?'':' z')+'" data-br="'+i+'" data-f="'+f+'">'+list.length+'</td>'; }
+        return '<tr><td class="nm">'+esc(x.b)+'</td>'+c(x.today,'today')+c(x.month,'month')+
+          c(x.open,'open')+c(x.unassd,'unassd')+c(x.over,'over')+c(x.red,'red')+'</tr>';
+      }).join('')+'</tbody></table></div>';
 
-    html += '<div class="vck-two">'+
-      '<div><div class="vck-h">Checklist points failing most often</div>'+
-      points.map(function(p,i){
-        var col = p.nbr>=3 ? '#DC2626' : p.nbr===2 ? '#D97706' : '#1E4FD8';
-        return '<div class="vck-row" data-p="'+i+'" title="Click to view these issues">'+
+    /* ═════ WHERE THE OPEN WORK SITS · WHO IS HOLDING IT ═════ */
+    function group(list, keyFn, blank){
+      var by={};
+      list.forEach(function(r){ var k=keyFn(r)||blank; (by[k]||(by[k]={k:k,rows:[]})).rows.push(r); });
+      return Object.keys(by).map(function(k){ return by[k]; })
+        .sort(function(a,b){ return b.rows.length-a.rows.length; });
+    }
+    window._VCK_AREA = group(open, function(r){ return r.area; }, '(no area recorded)');
+    window._VCK_OWN  = group(open, function(r){ return VCHK.unassigned(r) ? '' : r.assigned; }, '— not yet assigned —');
+    function simpleTable(title, icon, list, store, label){
+      var max=Math.max.apply(null,list.map(function(x){return x.rows.length;}).concat([1]));
+      return '<div><div class="vck-h">'+icon+' '+title+'</div>'+
+        '<table class="hrs vckt"><thead><tr><th class="nm">'+label+'</th><th>Open</th></tr></thead><tbody>'+
+        list.map(function(x,i){
+          var none=/not yet assigned|no area/.test(x.k);
+          return '<tr class="vck-c" data-'+store+'="'+i+'"><td class="nm">'+
+            (none?'<span style="color:#B91C1C">'+esc(x.k)+'</span>':esc(x.k))+
+            '<div class="vck-bar"><i style="width:'+(x.rows.length/max*100)+'%;background:'+(none?'#B91C1C':'#1E4FD8')+'"></i></div></td>'+
+            '<td style="font-weight:800">'+x.rows.length+'</td></tr>';
+        }).join('')+'</tbody></table></div>';
+    }
+    html+='<div class="vck-two" style="margin-top:20px">'+
+      simpleTable('Where the open work sits','📖',window._VCK_AREA,'area','Area')+
+      simpleTable('Who is holding it','👥',window._VCK_OWN,'own','Assigned to')+'</div>';
+
+    /* ═════ CAMPUS COVERAGE ═════ */
+    window._VCK_COV=BRS.map(function(b){
+      var br=rows.filter(function(r){ return r.branch===b; });
+      var last=null, days={};
+      br.forEach(function(r){
+        var d=dOf(r); if(!d) return;
+        if(!last||d>last) last=d;
+        if((today-d)/D<=30) days[d.toISOString().slice(0,10)]=1;
+      });
+      return { b:b, rows:br, last:last, days: last?Math.round((today-last)/D):null,
+               rounds:Object.keys(days).length };
+    }).sort(function(a,b){ return (a.days===null?1e9:a.days)-(b.days===null?1e9:b.days); });
+    html+='<div class="vck-h" style="margin-top:20px">🧭 Campus coverage</div>'+
+      '<div style="overflow-x:auto"><table class="hrs vckt"><thead><tr><th class="nm">Branch</th>'+
+      '<th>Last inspected</th><th>Days</th><th>Rounds 30d</th></tr></thead><tbody>'+
+      window._VCK_COV.map(function(x,i){
+        var col=x.days===null?'#B91C1C':x.days<=2?'#059669':x.days<=7?'#D97706':'#DC2626';
+        return '<tr class="vck-c" data-cov="'+i+'"><td class="nm">'+esc(x.b)+'</td>'+
+          '<td>'+(x.last?fmtD(x.last):'<span style="color:#B91C1C">never</span>')+'</td>'+
+          '<td style="color:'+col+';font-weight:800">'+(x.days===null?'never':x.days)+'</td>'+
+          '<td>'+x.rounds+'</td></tr>';
+      }).join('')+'</tbody></table></div>'+
+      '<p class="au-note">A branch showing <b>never</b> has not been inspected at all \u2014 which is not the ' +
+      'same as having nothing wrong, and in every other panel here the two look identical. <b>Rounds 30d</b> ' +
+      'counts distinct days on which an issue was raised there, so it measures visits rather than volume.</p>';
+
+    /* ═════ CHECKLIST POINTS ═════ */
+    var pts=group(rows,function(r){ return r.wrong; },'(no checklist point recorded)')
+      .map(function(x){ var brs={}; x.rows.forEach(function(r){ brs[r.branch]=1; });
+        x.nbr=Object.keys(brs).length; x.open=x.rows.filter(VCHK.isOpen).length; return x; }).slice(0,10);
+    window._VCK_PT=pts;
+    var maxP=Math.max.apply(null,pts.map(function(p){return p.rows.length;}).concat([1]));
+    html+='<div class="vck-h" style="margin-top:20px">🔎 Checklist points failing most often</div>'+
+      pts.map(function(p,i){
+        var col=p.nbr>=3?'#DC2626':p.nbr===2?'#D97706':'#1E4FD8';
+        return '<div class="vck-row vck-c" data-pt="'+i+'">'+
           '<div style="font-size:13px;text-align:center">'+(p.nbr>=3?'🌐':'📍')+'</div>'+
-          '<div><div class="vck-nm">'+esc(p.k)+'</div>'+bar(p.n,maxP,col)+
-          '<div class="vck-sub">'+p.open+' still open · '+p.nbr+' branch'+(p.nbr===1?'':'es')+
-          (p.nbr>=3?' — this is a standard nobody is meeting, not a branch problem':'')+'</div></div>'+
-          '<div class="vck-n" style="color:'+col+'">'+p.n+'</div></div>';
-      }).join('')+'</div>'+
-      '<div><div class="vck-h">Areas carrying the most open work</div>'+
-      areas.map(function(a,i){
-        var col = a.med>30 ? '#DC2626' : a.med>14 ? '#D97706' : '#059669';
-        return '<div class="vck-row" data-a="'+i+'" title="Click to view these issues">'+
-          '<div style="font-size:13px;text-align:center">🏗️</div>'+
-          '<div><div class="vck-nm">'+esc(a.k)+'</div>'+bar(a.n,maxA,col)+
-          '<div class="vck-sub">'+a.open+' open of '+a.n+' · median '+Math.round(a.med)+' days waiting</div></div>'+
-          '<div class="vck-n" style="color:'+col+'">'+a.open+'</div></div>';
-      }).join('')+'</div></div>';
+          '<div><div class="vck-nm">'+esc(p.k)+'</div>'+
+          '<div class="vck-bar"><i style="width:'+(p.rows.length/maxP*100)+'%;background:'+col+'"></i></div>'+
+          '<div class="vck-sub">'+p.open+' still open \u00b7 '+p.nbr+' branch'+(p.nbr===1?'':'es')+
+          (p.nbr>=3?' \u2014 a standard nobody is meeting, not a branch problem':'')+'</div></div>'+
+          '<div class="vck-n" style="color:'+col+'">'+p.rows.length+'</div></div>';
+      }).join('');
 
-    /* who it sits with, and which branches were actually inspected */
-    var byOwner = {};
-    open.forEach(function(r){
-      var k = (r.assigned && !/unassigned|^-$/i.test(r.assigned)) ? r.assigned : '(nobody assigned)';
-      (byOwner[k] || (byOwner[k]={k:k,rows:[]})).rows.push(r);
-    });
-    var owners = Object.keys(byOwner).map(function(k){
-      var o=byOwner[k];
-      var ag=o.rows.map(function(r){return VCHK.daysOpen(r,today);}).filter(function(x){return x!==null;});
-      return {k:k, rows:o.rows, n:o.rows.length, med:median(ag)};
-    }).sort(function(a,b){ return b.n-a.n; }).slice(0,10);
-    var maxO = Math.max.apply(null, owners.map(function(o){return o.n;}).concat([1]));
+    el.innerHTML=html;
+    var fn=$('vck-fn');
+    if(fn) fn.textContent=((typeof fBranch!=='undefined'&&fBranch!=='ALL')?fBranch:'All branches')+
+      ' \u00b7 '+rows.length+' issues \u00b7 '+open.length+' open';
 
-    var byBr = {};
-    ALLB.forEach(function(b){ byBr[b] = {b:b, rows:[], last:null}; });
-    rows.forEach(function(r){
-      var o = byBr[r.branch] || (byBr[r.branch]={b:r.branch,rows:[],last:null});
-      o.rows.push(r);
-      var d = VCHK.dt(r.raised);
-      if(d && (!o.last || d>o.last)) o.last = d;
-    });
-    var brs = Object.keys(byBr).map(function(k){ return byBr[k]; })
-      .sort(function(a,b){ return (b.last?b.last.getTime():0)-(a.last?a.last.getTime():0); });
-
-    html += '<div class="vck-two" style="margin-top:18px">'+
-      '<div><div class="vck-h">Where the open work sits</div>'+
-      owners.map(function(o,i){
-        var none = /nobody/.test(o.k);
-        var col = none ? '#B91C1C' : o.med>21 ? '#D97706' : '#1E4FD8';
-        return '<div class="vck-row" data-o="'+i+'" title="Click to view these issues">'+
-          '<div style="font-size:13px;text-align:center">'+(none?'❗':'👤')+'</div>'+
-          '<div><div class="vck-nm">'+esc(o.k)+'</div>'+bar(o.n,maxO,col)+
-          '<div class="vck-sub">median '+Math.round(o.med)+' days waiting</div></div>'+
-          '<div class="vck-n" style="color:'+col+'">'+o.n+'</div></div>';
-      }).join('')+'</div>'+
-      '<div><div class="vck-h">Round coverage — when each branch was last inspected</div>'+
-      brs.map(function(o,i){
-        var days = o.last ? Math.round((today-o.last)/86400000) : null;
-        var col = days===null ? '#94A3B8' : days<=2 ? '#059669' : days<=7 ? '#D97706' : '#DC2626';
-        return '<div class="vck-row" data-b="'+esc(o.b)+'" title="Click to view this branch\u2019s issues">'+
-          '<div style="font-size:13px;text-align:center">🏫</div>'+
-          '<div><div class="vck-nm">'+esc(o.b)+'</div>'+
-          '<div class="vck-sub">'+(o.last
-            ? 'last issue raised '+(days===0?'today':days+' day'+(days===1?'':'s')+' ago')+' · '+o.rows.length+' issues'
-            : 'no inspection issue has ever been recorded here')+'</div></div>'+
-          '<div class="vck-n" style="color:'+col+'">'+(days===null?'—':days+'d')+'</div></div>';
-      }).join('')+
-      '<p class="au-note">A branch with nothing here has not been inspected, which is not the same as ' +
-      'having nothing wrong \u2014 and in every other panel on this page the two look identical.</p>'+
-      '</div></div>';
-
-    el.innerHTML = html;
-    var fn = $('vck-fn');
-    if(fn) fn.textContent = ((typeof fBranch!=='undefined'&&fBranch!=='ALL')?fBranch:'All branches')+
-      ' · '+rows.length+' issues · '+open.length+' open';
-
+    /* every number opens the issues behind it */
+    var FL={raised:'raised',closed:'closed in this period',still:'raised and still open',
+            over:'overdue',red:'red flagged',today:'raised today',month:'raised this month',
+            open:'still open',unassd:'open with no owner'};
     el.querySelectorAll('.vck-k').forEach(function(n){
-      n.addEventListener('click',function(){ var k=K[+n.dataset.k]; openIssues('🔎 '+k.t, k.d, k.list); });
+      n.addEventListener('click',function(){ var k=K[+n.dataset.k];
+        openIssues('🔎 '+k.l, k.v+' issue(s)', k.list); });
     });
-    el.querySelectorAll('[data-p]').forEach(function(n){
-      n.addEventListener('click',function(){ var p=points[+n.dataset.p];
-        openIssues('🔎 '+p.k, p.n+' issue(s) · '+p.open+' still open · '+p.nbr+' branch(es)', p.rows); });
+    el.querySelectorAll('[data-per]').forEach(function(n){
+      n.addEventListener('click',function(){ var x=window._VCK_PER[+n.dataset.per], f=n.dataset.f;
+        var map={raised:x.raised,closed:x.closed,still:x.still,over:x.over,red:x.red};
+        openIssues('📈 '+x.P.k+' \u2014 '+FL[f], x.P.sub, map[f]); });
     });
-    el.querySelectorAll('[data-a]').forEach(function(n){
-      n.addEventListener('click',function(){ var a=areas[+n.dataset.a];
-        openIssues('🏗️ '+a.k, a.open+' open of '+a.n+' · median '+Math.round(a.med)+' days', a.rows); });
+    el.querySelectorAll('[data-br]').forEach(function(n){
+      n.addEventListener('click',function(){ var x=window._VCK_BR[+n.dataset.br], f=n.dataset.f;
+        var map={today:x.today,month:x.month,open:x.open,unassd:x.unassd,over:x.over,red:x.red};
+        openIssues('🏫 '+x.b+' \u2014 '+FL[f], map[f].length+' issue(s)', map[f]); });
     });
-    el.querySelectorAll('[data-o]').forEach(function(n){
-      n.addEventListener('click',function(){ var o=owners[+n.dataset.o];
-        openIssues('👤 '+o.k, o.n+' open issue(s) · median '+Math.round(o.med)+' days waiting', o.rows); });
+    el.querySelectorAll('[data-area]').forEach(function(n){
+      n.addEventListener('click',function(){ var x=window._VCK_AREA[+n.dataset.area];
+        openIssues('📖 '+x.k, x.rows.length+' open issue(s)', x.rows); });
     });
-    el.querySelectorAll('[data-b]').forEach(function(n){
-      n.addEventListener('click',function(){ var b=n.dataset.b;
-        var list=rows.filter(function(r){ return r.branch===b; });
-        openIssues('🏫 '+b, list.length+' issue(s) · '+list.filter(VCHK.isOpen).length+' open', list); });
+    el.querySelectorAll('[data-own]').forEach(function(n){
+      n.addEventListener('click',function(){ var x=window._VCK_OWN[+n.dataset.own];
+        openIssues('👥 '+x.k, x.rows.length+' open issue(s)', x.rows); });
+    });
+    el.querySelectorAll('[data-cov]').forEach(function(n){
+      n.addEventListener('click',function(){ var x=window._VCK_COV[+n.dataset.cov];
+        openIssues('🧭 '+x.b, x.last?('last inspected '+fmtD(x.last)+' \u00b7 '+x.rounds+' rounds in 30 days')
+                                    :'never inspected', x.rows); });
+    });
+    el.querySelectorAll('[data-pt]').forEach(function(n){
+      n.addEventListener('click',function(){ var x=window._VCK_PT[+n.dataset.pt];
+        openIssues('🔎 '+x.k, x.rows.length+' issue(s) \u00b7 '+x.open+' still open \u00b7 '+x.nbr+' branch(es)', x.rows); });
     });
   }
 
