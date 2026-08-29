@@ -6551,76 +6551,87 @@ function renderCareSummary(){
   const pending=sentFilteredRows.filter(r=>r.Status==='Pending').length;
 
   // ── Topic rules for ALL categories ──
+  /* ══════════════════════════════════════════════════════════════════════
+     WHAT A CALL WAS ABOUT
+
+     The previous version matched raw substrings, so "informed" in a follow-up
+     pulled a homework call into Communication, and every bucket a remark
+     brushed against claimed it equally. Two changes fix that:
+
+       · terms are matched on WORD BOUNDARIES, and phrases score higher than
+         single words — "not writing homework" is stronger evidence than a
+         stray "work"
+       · a remark goes to the bucket that scores highest, not to everything it
+         touches. A second bucket is kept only when it scores close to the
+         winner, which is what a genuinely two-topic remark looks like
+
+     Subjects are their own topics now. "Weak in Telugu" and "maths is hard"
+     were both landing in one lumped bucket, which told nobody which teacher to
+     talk to.
+     ══════════════════════════════════════════════════════════════════════ */
   const TOPIC_RULES={
     'No Concern':[
-      {topic:'Teacher Call — Positive',kw:['teacher','informed','discussed','what i had informed','class teacher']},
-      {topic:'Parent Satisfied',kw:['happy','satisfied','good','great','no concern','no issue','well','fine','thank','appreciate']},
-      {topic:'Event / Activity',kw:['event','bonalu','field trip','sports','annual','cultural','function','competition']},
-      {topic:'Progress Update',kw:['progress','improvement','change','better','improving','marks','result']},
+      {topic:'Parent Satisfied',ph:['no concern','no issue','very happy','quite happy','fully satisfied','doing well','doing good','all good','nothing to report'],kw:['happy','satisfied','appreciate','thankful','pleased','excellent']},
+      {topic:'Teacher Call — Positive',ph:['class teacher called','teacher informed','discussed with teacher','teacher spoke'],kw:['informed','discussed','conveyed']},
+      {topic:'Progress Update',ph:['showing improvement','has improved','doing better','progress is good'],kw:['progress','improvement','improving','better']},
+      {topic:'Event / Activity',ph:['field trip','annual day','sports day','cultural programme'],kw:['event','bonalu','function','competition','celebration']},
       {topic:'General Check-in',kw:[]}
     ],
     'Academics':[
-      {topic:'Homework / Assignments',kw:['homework','assignment','home work','hw','project','submission']},
-      {topic:'Marks / Results',kw:['marks','result','score','grade','pt-1','pt1','ia-1','pt-2','exam','test','rank','percentage','fail','review']},
-      {topic:'Teaching Quality',kw:['teaching','teacher','explain','understand','doubt','syllabus','portion','pedagogy']},
-      {topic:'Attendance / Regularity',kw:['absent','attendance','irregular','leave','bunk','late','punctual']},
-      {topic:'Reading / Writing',kw:['reading','writing','handwriting','spelling','vocabulary','english','hindi','telugu']},
-      {topic:'Math / Science',kw:['math','maths','science','formula','calculation','physics','chemistry','biology']},
-      {topic:'Communication',kw:['inform','communication','message','whatsapp','almanac','diary','notice','dc','digital campus']},
-      {topic:'General Academic',kw:['concern','improvement','performance','weak','slow','attention','focus','concentration']},
-      {topic:'Other Academic',kw:[]}
-    ],
-    'Other':[
-      {topic:'Fees / Payment',kw:['fee','fees','payment','amount','receipt','due','balance','concession']},
-      {topic:'Uniform / Stationery',kw:['uniform','dress','shoes','books','textbook','notebook','stationery','id card']},
-      {topic:'Safety / Infrastructure',kw:['safety','broken','damage','repair','clean','hygiene','washroom','water','cctv']},
-      {topic:'Food / Canteen',kw:['food','lunch','canteen','tiffin','snack','meal']},
-      {topic:'Positive / Appreciation',kw:['good','great','happy','satisfied','thank','appreciate','excellent']},
-      {topic:'Miscellaneous',kw:[]}
+      /* ── subjects, so a weakness points at a teacher and not at a category ── */
+      {topic:'English',subj:true,ph:['in english','english subject','english marks','english teacher'],kw:['english','grammar','comprehension']},
+      {topic:'Hindi',subj:true,ph:['in hindi','hindi subject','hindi teacher','third language'],kw:['hindi']},
+      {topic:'Telugu',subj:true,ph:['in telugu','telugu subject','telugu teacher','second language'],kw:['telugu']},
+      {topic:'Mathematics',subj:true,ph:['in maths','in math','maths subject','math subject','maths teacher'],kw:['math','maths','mathematics','calculation','multiplication','tables','arithmetic','geometry','algebra']},
+      {topic:'Science',subj:true,ph:['in science','science subject','science teacher'],kw:['science','physics','chemistry','biology','evs','experiment']},
+      {topic:'Social Studies',subj:true,ph:['social studies','social science'],kw:['social','history','geography','civics']},
+      {topic:'Computer / ICT',subj:true,ph:['computer class','computer lab'],kw:['computer','ict','coding','typing']},
+      /* ── what is going wrong, whatever the subject ── */
+      {topic:'Homework / Assignments',ph:['not writing homework','not doing homework','homework not done','incomplete homework','homework not given','too much homework','home work'],kw:['homework','assignment','worksheet','project','submission']},
+      {topic:'Marks / Results',ph:['low marks','less marks','poor result','failed in','marks are low','not scoring'],kw:['marks','result','score','grade','exam','test','rank','percentage','fail']},
+      {topic:'Teaching Quality',ph:['teaching is not good','not teaching properly','not able to understand','unable to understand','not explaining','doubts not cleared','syllabus not completed','portion not completed'],kw:['teaching','explain','pedagogy','revision']},
+      {topic:'Reading / Writing',ph:['reading and writing','not able to read','not able to write','poor handwriting','spelling mistakes','slow in writing'],kw:['reading','writing','handwriting','spelling','dictation','vocabulary']},
+      {topic:'Attendance / Regularity',ph:['coming late','not attending','irregular to school'],kw:['absent','attendance','irregular','punctual']},
+      {topic:'Communication',ph:['not informed','no information','not communicated','message not received','circular not received','no update from school','almanac not signed','diary not checked'],kw:['whatsapp','circular','intimation']},
+      {topic:'Attention / Focus',ph:['not focusing','lack of concentration','not paying attention','needs individual attention','no individual attention'],kw:['concentration','attention','focus','distracted']},
+      {topic:'General Academic',kw:[]}
     ],
     'Behaviour / Wellbeing':[
-      {topic:'Bullying / Fights',kw:['bully','fight','hit','beat','push','tease','quarrel','abuse']},
-      {topic:'Emotional / Mental',kw:['stress','anxiety','cry','sad','fear','pressure','depress','counsel','emotional']},
-      {topic:'Discipline',kw:['discipline','misbehav','rude','disturbance','punish','complain','disobey']},
-      {topic:'Health / Medical',kw:['health','sick','fever','injury','allergy','medicine','doctor','medical']},
+      {topic:'Bullying / Fights',ph:['being bullied','beaten by','hit by','fighting with','teasing him','teasing her'],kw:['bully','bullying','fight','ragging','teased']},
+      {topic:'Discipline',ph:['not listening','misbehaving in class','indiscipline'],kw:['discipline','misbehave','naughty','mischief']},
+      {topic:'Emotional / Mental',ph:['crying at home','not confident','feeling low','afraid to go','not mixing with'],kw:['crying','anxious','fear','confidence','shy','stress'] },
+      {topic:'Health / Medical',ph:['not well','fell down','first aid','health issue'],kw:['fever','vomit','injury','injured','medical','illness','allergy']},
       {topic:'Other Wellbeing',kw:[]}
     ],
-    'Not Answering':[
-      {topic:'Phone Switched Off',kw:['switched off','switch off','not reachable','unreachable','out of service']},
-      {topic:'Busy / Engaged',kw:['busy','engaged','call back','call later','not available']},
-      {topic:'No Pick Up',kw:['not answering','not picking','no answer','no response','ring','didn\'t pick']},
-      {topic:'Wrong Number',kw:['wrong number','invalid','disconnected','not in use']},
-      {topic:'General',kw:[]}
-    ],
     'Administration':[
-      {topic:'TC / Transfer',kw:['tc','transfer','leaving','withdraw','migration']},
-      {topic:'Admission Process',kw:['admission','enroll','registration','form','document']},
-      {topic:'Schedule / Timing',kw:['timing','schedule','holiday','vacation','time table','calendar']},
-      {topic:'Fees / Admin',kw:['fee','receipt','payment','bill','challan']},
+      {topic:'TC / Transfer',ph:['transfer certificate','tc not issued','leaving the school'],kw:['transfer','withdraw','migration']},
+      {topic:'Admission Process',ph:['admission process','admission form','documents pending'],kw:['admission','enrollment','registration']},
+      {topic:'Schedule / Timing',ph:['school timing','time table','holiday list','exam schedule'],kw:['timing','schedule','holiday','vacation','calendar']},
+      {topic:'Fees / Admin',ph:['fee receipt','fee payment','fee structure','not updated in portal'],kw:['fee','fees','receipt','payment','refund','challan']},
       {topic:'Other Admin',kw:[]}
     ],
     'Transport':[
-      {topic:'Route / Timing',kw:['route','timing','late','delay','early','pickup','drop','time','stop']},
-      {topic:'Driver / Attender',kw:['driver','attender','staff','behaviour','rude','speed','rash']},
-      {topic:'Safety',kw:['safety','accident','seat','overcrowd','cctv','gps']},
-      {topic:'Vehicle Condition',kw:['ac','condition','clean','maintenance','repair','breakdown']},
+      {topic:'Route / Timing',ph:['bus is late','bus late','pick up late','drop late','route change','bus not come','waiting for bus'],kw:['route','pickup','drop','delay','stop']},
+      {topic:'Driver / Attender',ph:['driver is rude','rash driving','over speed','no attender','attender not present'],kw:['driver','attender','rash','speeding']},
+      {topic:'Safety',ph:['no seat belt','bus overcrowded','standing in bus','door open'],kw:['accident','overcrowded','gps','safety']},
+      {topic:'Vehicle Condition',ph:['ac not working','bus not clean','bus breakdown','poor condition'],kw:['breakdown','maintenance','unclean']},
       {topic:'General Transport',kw:[]}
     ],
     'Co Curricular':[
-      {topic:'Sports',kw:['sports','game','physical','swimming','skating','cricket','football']},
-      {topic:'Arts / Dance / Music',kw:['art','dance','music','craft','drawing','painting','singing']},
-      {topic:'Clubs / Activities',kw:['club','activity','robotics','coding','debate','quiz']},
+      {topic:'Sports',ph:['sports period','games period','not allowed to play'],kw:['sports','game','swimming','skating','cricket','football','athletics']},
+      {topic:'Arts / Dance / Music',ph:['art and craft','dance class','music class'],kw:['art','dance','music','craft','drawing','painting','singing']},
+      {topic:'Clubs / Activities',ph:['activity class','club activity'],kw:['club','robotics','debate','quiz','olympiad']},
       {topic:'General Co-Curricular',kw:[]}
     ],
     'New Admission':[
-      {topic:'Enquiry',kw:['enquiry','inquiry','information','details','seat','availability']},
-      {topic:'Process',kw:['process','document','form','submit','fee','payment']},
-      {topic:'Visit / Tour',kw:['visit','tour','campus','school','see']},
+      {topic:'Enquiry',ph:['seat availability','fee details','admission enquiry'],kw:['enquiry','inquiry','availability']},
+      {topic:'Process',ph:['admission form','document submission'],kw:['process','document','submit']},
+      {topic:'Visit / Tour',ph:['campus visit','school tour'],kw:['visit','tour']},
       {topic:'General',kw:[]}
     ],
     'No Response':[
-      {topic:'Unreachable',kw:['not reachable','switched off','out of service']},
-      {topic:'No Pick Up',kw:['not answering','not picking','no response','ring']},
+      {topic:'Unreachable',ph:['not reachable','switched off','out of service','out of coverage'],kw:['unreachable']},
+      {topic:'No Pick Up',ph:['not answering','not picking','no response','call not answered','busy'],kw:['ringing']},
       {topic:'General',kw:[]}
     ]
   };
@@ -6634,34 +6645,67 @@ function renderCareSummary(){
   window._careTopicsOf = function(r){
     var cat = window._careCatOf(r), rules = TOPIC_RULES[cat];
     if(!rules) return [];
-    var t = (((r.Remarks&&r.Remarks!=='–')?r.Remarks:'')+' '+
-             ((r.Followup&&r.Followup!=='–')?r.Followup:'')).toLowerCase();
-    var hits = [], matched = false;
-    rules.forEach(function(b){
-      if(!b.kw.length) return;
-      if(b.kw.some(function(k){ return t.indexOf(k)!==-1; })){ hits.push({cat:cat, topic:b.topic}); matched=true; }
+    var raw = (((r.Remarks&&r.Remarks!=='–')?r.Remarks:'')+' '+
+               ((r.Followup&&r.Followup!=='–')?r.Followup:''));
+    /* pad so \b-style edge matching works on the first and last word too */
+    var t = ' ' + String(raw).toLowerCase().replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim() + ' ';
+    if(t.trim()==='') { var e = rules.find(function(b){ return !(b.kw&&b.kw.length)&&!(b.ph&&b.ph.length); });
+      return e ? [{cat:cat, topic:e.topic}] : []; }
+
+    function hasWord(w){ return t.indexOf(' '+w+' ') !== -1; }
+    function hasPhrase(ph){
+      return t.indexOf(' '+String(ph).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()+' ') !== -1;
+    }
+    var scored = rules.map(function(b){
+      var s = 0;
+      /* a phrase is far stronger evidence than any single word it contains:
+         "not writing homework" says what happened, "work" says nothing */
+      (b.ph||[]).forEach(function(x){ if(hasPhrase(x)) s += 3 + String(x).split(/\s+/).length * 0.5; });
+      (b.kw||[]).forEach(function(x){
+        if(String(x).indexOf(' ')>=0){ if(hasPhrase(x)) s += 2.5; }
+        else if(hasWord(x)) s += 1;
+      });
+      return { b:b, s:s };
     });
-    if(!matched){ var misc = rules.find(function(b){ return !b.kw.length; });
-      if(misc) hits.push({cat:cat, topic:misc.topic}); }
-    return hits;
+    var max = Math.max.apply(null, scored.map(function(x){ return x.s; }).concat([0]));
+    if(max <= 0){
+      var fb = rules.find(function(b){ return !(b.kw&&b.kw.length)&&!(b.ph&&b.ph.length); });
+      return fb ? [{cat:cat, topic:fb.topic}] : [];
+    }
+    /* "Which subject" and "what is wrong" are different questions, so they do
+       not compete. A named subject is always recorded when it appears —
+       otherwise "maths is difficult, not able to understand" counted only as
+       Teaching Quality and the maths teacher never appeared in the numbers.
+       Among the problem types, the winner takes it, plus anything close. */
+    var subjHits = scored.filter(function(x){ return x.b.subj && x.s > 0; });
+    var probMax  = Math.max.apply(null, scored.filter(function(x){ return !x.b.subj; })
+                                              .map(function(x){ return x.s; }).concat([0]));
+    var probHits = probMax > 0
+      ? scored.filter(function(x){ return !x.b.subj && x.s >= probMax*0.6 && x.s > 0; })
+      : [];
+    var out = probHits.concat(subjHits).sort(function(a2,b2){ return b2.s-a2.s; });
+    if(!out.length){
+      var fb2 = rules.find(function(b){ return !(b.kw&&b.kw.length)&&!(b.ph&&b.ph.length); });
+      return fb2 ? [{cat:cat, topic:fb2.topic}] : [];
+    }
+    return out.slice(0,4).map(function(x){ return {cat:cat, topic:x.b.topic}; });
   };
   /* the slice the panels below must obey — scope, pending-only and sentiment */
   window._careSlice = function(list){
     return (typeof _careActiveFilter==='function') ? _careActiveFilter(list) : list;
   };
 
+  /* Counts come from the same scorer the drill-downs and the Top-10 use, so a
+     number here always opens exactly that many records. */
   function extractTopics(catName, catRows){
     const rules=TOPIC_RULES[catName];
     if(!rules||!catRows.length) return [];
-    const buckets=rules.map(r=>({topic:r.topic,kw:r.kw,count:0}));
+    const count={};
     catRows.forEach(r=>{
-      const text=((r.Remarks&&r.Remarks!=='–')?r.Remarks:'')+' '+((r.Followup&&r.Followup!=='–')?r.Followup:'');
-      const t=text.toLowerCase();
-      let matched=false;
-      buckets.forEach(b=>{ if(b.kw.length===0)return; if(b.kw.some(k=>t.indexOf(k)!==-1)){b.count++;matched=true;} });
-      if(!matched){ const misc=buckets.find(b=>b.kw.length===0); if(misc)misc.count++; }
+      window._careTopicsOf(r).forEach(x=>{ if(x.cat===catName) count[x.topic]=(count[x.topic]||0)+1; });
     });
-    return buckets.filter(b=>b.count>0).sort((a,b)=>b.count-a.count);
+    return rules.map(b=>({topic:b.topic,kw:(b.kw||[]),count:count[b.topic]||0}))
+                .filter(b=>b.count>0).sort((a,b)=>b.count-a.count);
   }
 
   // ── KPI strip: Parents Satisfied + Resolved + In Progress + Pending ──
@@ -14590,6 +14634,11 @@ window.CARE_PROBLEMS = (function () {
   /* Icons only — the counting itself comes from TOPIC_RULES, the same rules the
      Category Mix sub-topics use. */
   var ICON = {
+    /* subjects get their own marks so a subject row is recognisable at a glance */
+    'English':['🔤','#1E4FD8'], 'Hindi':['🕉️','#EA580C'], 'Telugu':['🪔','#C2410C'],
+    'Mathematics':['🔢','#0891B2'], 'Science':['🔬','#059669'],
+    'Social Studies':['🌍','#0D9488'], 'Computer / ICT':['💻','#6366F1'],
+    'Attention / Focus':['🎯','#A855F7'], 'Safety':['🦺','#B91C1C'],
     'Teaching Quality':['📚','#1E4FD8'], 'General Academic':['📖','#3B82F6'],
     'Communication':['📵','#D97706'], 'Reading / Writing':['✍️','#6366F1'],
     'Math / Science':['🔢','#0891B2'], 'Marks / Results':['📉','#DC2626'],
