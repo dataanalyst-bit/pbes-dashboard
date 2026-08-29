@@ -26,7 +26,7 @@ const CACHE_TTL_SECONDS = 300; // edge freshness window (Apps Script keep-warm k
 
 // Sections the browser is allowed to request. Anything else is ignored, so a bad
 // or hand-typed ?section= can never be used to probe the upstream script.
-const ALLOWED_SECTIONS = { pt1: 1, audit: 1, ptm: 1, civil: 1, syl: 1 };
+const ALLOWED_SECTIONS = { pt1: 1, audit: 1, ptm: 1, civil: 1, syl: 1, vchk: 1 };
 
 // Heavier than the main payload and it changes only when marks are entered, so it
 // can sit in the edge cache far longer.
@@ -167,6 +167,7 @@ export async function onRequestGet({ request, env }) {
   if (section === "ptm")   return json(filterTablesByBranch(data, userBranch, "PTM_RAW"));
   if (section === "civil") return json(filterTablesByBranch(data, userBranch, "CIVIL_RAW"));
   if (section === "syl")   return json(filterTablesByBranch(data, userBranch, "SYL_RAW"));
+  if (section === "vchk")  return json(filterTablesByBranch(data, userBranch, "VCHK_RAW"));
 
   //   Cross-branch aggregates needed by the Head-to-Head scorecard stay full.
   return json(filterByBranch(data, userBranch));
