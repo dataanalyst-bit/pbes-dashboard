@@ -10407,8 +10407,7 @@ async function loadAudit(force){
     try{ var s=await sb.auth.getSession(); session=s && s.data && s.data.session; }catch(e){}
     if(!session){ window.location.href='login.html'; return; }
 
-    var res=await fetch(DATA_API+'?section=audit'+(force?'&nocache=1':'')+'&_t='+Date.now(),
-                        { headers:{ 'Authorization':'Bearer '+session.access_token } });
+    var res = await _lazyFetch('audit', force, session, 55000);
     if(res.status===401){ await sb.auth.signOut(); window.location.href='login.html'; return; }
     if(!res.ok) throw new Error('HTTP '+res.status+' from /api/data. A 404 means the Apps Script '+
       'deployment URL is stale \u2014 in Apps Script use Deploy \u2192 Manage deployments \u2192 edit the '+
@@ -13674,6 +13673,29 @@ window.addEventListener('message',function(ev){
   /* height messages are ignored on purpose — see the note on the iframe */
 });
 
+
+/* A lazy section fetch that gives up cleanly instead of hanging. "Failed to
+   fetch" with no further detail is what the browser reports when the request is
+   cut off, and it tells the reader nothing about which end was slow — so the
+   timeout is explicit here and the message says what to do about it. */
+async function _lazyFetch(section, force, session, ms){
+  var ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+  var timer = setTimeout(function(){ if(ctl) ctl.abort(); }, ms || 55000);
+  try{
+    var res = await fetch(DATA_API+'?section='+section+(force?'&nocache=1':'')+'&_t='+Date.now(),
+      { headers:{ 'Authorization':'Bearer '+session.access_token }, signal: ctl?ctl.signal:undefined });
+    return res;
+  }catch(err){
+    if(err && (err.name==='AbortError')) throw new Error(
+      'The '+section+' feed did not answer within '+Math.round((ms||55000)/1000)+' seconds. '+
+      'This is almost always the first load after a Code.gs deploy, when the cache is cold and Apps '+
+      'Script has to read the whole sheet. Press Refresh once more \u2014 the second load is served '+
+      'from cache. If it keeps failing, run refreshSylCache() or refreshAuditCache() in the Apps '+
+      'Script editor to warm it there instead.');
+    throw new Error('Could not reach the data service: '+String(err && err.message || err));
+  }finally{ clearTimeout(timer); }
+}
+
 async function loadSyl(force){
   _sylMount();
   if(_sylLoading) return;
@@ -13692,8 +13714,7 @@ async function loadSyl(force){
     try{ var s=await sb.auth.getSession(); session=s && s.data && s.data.session; }catch(e){}
     if(!session){ window.location.href='login.html'; return; }
 
-    var res=await fetch(DATA_API+'?section=syl'+(force?'&nocache=1':'')+'&_t='+Date.now(),
-                        { headers:{ 'Authorization':'Bearer '+session.access_token } });
+    var res=await _lazyFetch('syl', force, session, 55000);
     if(res.status===401){ await sb.auth.signOut(); window.location.href='login.html'; return; }
     if(!res.ok) throw new Error('HTTP '+res.status+' from /api/data. A 404 means the Apps Script '+
       'deployment URL is stale \u2014 in Apps Script use Deploy \u2192 Manage deployments \u2192 edit the '+
