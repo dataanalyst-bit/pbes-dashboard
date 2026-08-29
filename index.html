@@ -780,6 +780,11 @@ const ROLE_TABS = {
   admin:             ['admin','vigilance','civil'],
   grievance_officer: ['care','grievance','ptm'],
   hr_grievance:      ['hr','observations','care','grievance','ptm'],
+  /* Academic coordinators — the five academic-quality views, own branch only.
+     Deliberately NOT given Admin, Vigilance, Purchase, HR or Transport: those
+     carry staff salaries, disciplinary matters and vendor pricing that a
+     coordinator has no reason to see. */
+  coordinator:       ['care','pt1','ptm','grievance','syl'],
   principal:         ['overview','care','observations','admissions','grievance','transport','it','pt1','audit','ptm','civil','syl','meet']
 };
 // Roles that span every campus. Everyone else with a branch on their account is
