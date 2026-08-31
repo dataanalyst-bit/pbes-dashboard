@@ -6506,7 +6506,9 @@ function renderCareSummary(){
 
   window._careIsConcern=function(r){ return !_CARE_NOT_CONCERN.test(String(r.Grievance||'')); };
   window._careIsOpenConcern=function(r){
-    return window._careIsConcern(r) && !/resolved/i.test(String(r.Status||''));
+    /* matches the Remaining tile and the compliance report: a concern that is
+       not marked Resolved is still to be addressed, whatever else it says */
+    return window._careIsConcern(r) && !/^resolved$/i.test(String(r.Status||'').trim());
   };
   window._careActiveFilter=function(list){
     return list.filter(function(r){
@@ -6568,15 +6570,24 @@ function renderCareSummary(){
      calls are taken out: calls with a blank or unrecognised status. It is shown
      because the four tiles used not to add up to the total, and a reader has no
      way to tell whether the difference is a data gap or an arithmetic error. */
-  const _answered=sentFilteredRows.filter(r=>!(window._careUnanswered
-    ? window._careUnanswered(r)
-    : /not\s*answer|no\s*response|switched\s*off|not\s*reachable/i.test(
-        String(r.Grievance||'')+' '+String(r.Status||'')+' '+String(r.Remarks||''))));
-  const _unans=sentFilteredRows.length-_answered.length;
-  const resolved=_answered.filter(r=>r.Status==='Resolved').length;
-  const inProg=_answered.filter(r=>r.Status==='In Progress').length;
-  const pending=_answered.filter(r=>r.Status==='Pending').length;
-  const remaining=Math.max(0, _answered.length-resolved-inProg-pending);
+  /* ── ONE definition, shared with the compliance report ──
+     A call is excluded when nobody answered it, judged on the Grievance
+     category the school itself assigns — "Not Answering", "No Response" —
+     with the wording only as a backstop.
+
+     From the Status column the only settled state is Resolved. Everything else
+     — In Progress, Pending, blank, or any spelling nobody anticipated — is
+     still to be addressed and is counted as one figure. Three separate tiles
+     implied a distinction the data does not carry, and left a fourth tile for
+     whatever fell through. */
+  window._careAnswerable = function(r){
+    if(/^(not\s*answering|no\s*response)/i.test(String(r.Grievance||''))) return false;
+    if(typeof window._careUnanswered === 'function') return !window._careUnanswered(r);
+    return !/not\s*answer|switched\s*off|not\s*reachable/i.test(String(r.Status||''));
+  };
+  const _answered=sentFilteredRows.filter(window._careAnswerable);
+  const resolved=_answered.filter(r=>/^resolved$/i.test(String(r.Status||'').trim())).length;
+  const remaining=_answered.length-resolved;
 
   // ── Topic rules for ALL categories ──
   /* ══════════════════════════════════════════════════════════════════════
@@ -6913,19 +6924,11 @@ function renderCareSummary(){
         <div style="font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;">✅ Resolved</div>
         <div style="font-size:30px;font-weight:800;color:#059669;line-height:1.1;margin-top:2px;">${fi(resolved)}</div>
         <div style="font-size:11px;color:#64748B;">${_answered.length?Math.round(resolved/_answered.length*100):0}% of answered · click to view</div></div>`
-    +`<div style="flex:1;min-width:150px;background:#F5F3FF;border:1px solid #DDD6FE;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="viewCareWithSentiment('In Progress')" title="Click to view">
-        <div style="font-size:11px;font-weight:700;color:#7C3AED;text-transform:uppercase;">🔄 In Progress</div>
-        <div style="font-size:30px;font-weight:800;color:#7C3AED;line-height:1.1;margin-top:2px;">${fi(inProg)}</div>
-        <div style="font-size:11px;color:#64748B;">${_answered.length?Math.round(inProg/_answered.length*100):0}% of answered · click to view</div></div>`
-    +`<div style="flex:1;min-width:150px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="viewCareWithSentiment('Pending')" title="Click to view">
-        <div style="font-size:11px;font-weight:700;color:#D97706;text-transform:uppercase;">⏳ Pending</div>
-        <div style="font-size:30px;font-weight:800;color:#D97706;line-height:1.1;margin-top:2px;">${fi(pending)}</div>
-        <div style="font-size:11px;color:#64748B;">${_answered.length?Math.round(pending/_answered.length*100):0}% of answered · click to view</div></div>`
-      +`<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:10px 12px;${remaining?'cursor:pointer;':''}"
-          ${remaining?'onclick="viewCareWithSentiment(\'__remaining\')" title="Calls whose status is blank or unrecognised"':''}>
-        <div style="font-size:11px;font-weight:700;color:#64748B;">\u2753 REMAINING</div>
-        <div style="font-size:26px;font-weight:800;color:${remaining?'#64748B':'#CBD5E1'};line-height:1.1;">${fi(remaining)}</div>
-        <div style="font-size:11px;color:#64748B;">${remaining?'status blank or unrecognised':'every answered call has a status'}</div></div>`
+    +`<div style="flex:1;min-width:190px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="viewCareWithSentiment('__remaining')" title="Every answered call not marked Resolved">
+        <div style="font-size:11px;font-weight:700;color:#B45309;text-transform:uppercase;">\u2753 Remaining \u2014 to be addressed</div>
+        <div style="font-size:30px;font-weight:800;color:${remaining?'#D97706':'#059669'};line-height:1.1;margin-top:2px;">${fi(remaining)}</div>
+        <div style="font-size:11px;color:#64748B;">${_answered.length?Math.round(remaining/_answered.length*100):0}% of answered \u00b7 click to view</div>
+        <div style="font-size:10px;color:#94A3B8;margin-top:1px;">anything not Resolved \u2014 in progress, pending or blank</div></div>`
     +'</div>';
 
   // ── Class / Section dropdown filter for the Summary ──
@@ -7050,13 +7053,13 @@ function viewCareWithSentiment(status){
   /* Matches the tiles exactly: unanswered calls are excluded from every status
      view, and __remaining opens the answered calls whose status is blank or is
      none of the three named ones. */
-  const _isUnans=r=>(typeof _careUnanswered==='function') ? _careUnanswered(r)
-    : /not\s*answer|no\s*response|switched\s*off|not\s*reachable/i.test(
-        String(r.Grievance||'')+' '+String(r.Status||'')+' '+String(r.Remarks||''));
+  const _isUnans=r=>(typeof window._careAnswerable==='function') ? !window._careAnswerable(r)
+    : /^(not\s*answering|no\s*response)/i.test(String(r.Grievance||''));
   let filtered=CARE.filter(r=>scope.includes(r.Branch)&&(fMonth==='ALL'||r.Month===fMonth)&&!_isUnans(r));
+  /* Resolved is the only settled state; __remaining is everything else. */
   filtered=(status==='__remaining')
-    ? filtered.filter(r=>['Resolved','In Progress','Pending'].indexOf(r.Status)<0)
-    : filtered.filter(r=>r.Status===status);
+    ? filtered.filter(r=>!/^resolved$/i.test(String(r.Status||'').trim()))
+    : filtered.filter(r=>/^resolved$/i.test(String(r.Status||'').trim()));
   filtered=(typeof _careActiveFilter==='function')?_careActiveFilter(filtered):_careFilterBySentiment(filtered);
   const rows=filtered.map(r=>({Branch:r.Branch,Month:r.Month,Student:r.Student,Class:r.Class,Date:r.Date,
       Grievance:r.GrievanceRaw||r.Grievance, Sentiment:_careRowSentiment(r),
@@ -7065,7 +7068,7 @@ function viewCareWithSentiment(status){
     {key:'Date',label:'Date',date:true},{key:'Grievance',label:'Grievance'},{key:'Sentiment',label:'Sentiment',pill:true},
     {key:'Remarks',label:'Remarks',maxW:'280px'},{key:'Followup',label:'Follow-up',maxW:'200px'},{key:'Status',label:'Status'}];
   const bl=fBranch==='ALL'?'All Branches':fBranch;
-  const _title=(status==='__remaining')?'\u2753 Remaining \u2014 status blank or unrecognised':'\ud83d\udcde '+status+' Calls';
+  const _title=(status==='__remaining')?'\u2753 Remaining \u2014 still to be addressed':'\u2705 Resolved Calls';
   openModal(_title,`${rows.length} call(s) · ${bl} · answered calls only · ${_careSentLabel()}`,rows,cols);
 }
 
@@ -13348,7 +13351,14 @@ async function loadCivil(force){
   /* The language engine lives in another script block. If anything ever stops
      it loading, this table must still work, so the not-answered test falls back
      to reading the row directly rather than the whole card disappearing. */
+  /* One test, shared with the Care Call Summary. These two panels sit on the
+     same screen and used to disagree — the summary said 1,727 concerns still to
+     address and this table said 1,698, because each decided separately which
+     calls counted as unanswered. The summary's rule wins: the Grievance
+     category the school assigns, with the wording only as a backstop. */
   function unanswered(r){
+    if(typeof window._careAnswerable === 'function') return !window._careAnswerable(r);
+    if(/^(not\s*answering|no\s*response)/i.test(String(r.Grievance||''))) return true;
     try{ if(window.CARE_NLP && CARE_NLP.isNoAnswer) return CARE_NLP.isNoAnswer(r); }catch(e){}
     return NO_ANS.test(String(r.Grievance||'')+' '+String(r.Status||'')+' '+String(r.Remarks||''));
   }
@@ -13391,7 +13401,9 @@ async function loadCivil(force){
       var concerns=answered.filter(function(r){ return !NOT_A_CONCERN.test(String(r.Grievance||'')); });
       var aca=concerns.filter(function(r){ return ACADEMIC.test(String(r.Grievance||'')); });
       var non=concerns.filter(function(r){ return !ACADEMIC.test(String(r.Grievance||'')); });
-      var done=function(list){ return list.filter(function(r){ return /resolved/i.test(String(r.Status||'')); }).length; };
+      /* Addressed means the status says Resolved and nothing else — the same
+         rule the Remaining tile uses. */
+      var done=function(list){ return list.filter(function(r){ return /^resolved$/i.test(String(r.Status||'').trim()); }).length; };
 
       var acaN=aca.length, nonN=non.length, acaD=done(aca), nonD=done(non);
       return {
