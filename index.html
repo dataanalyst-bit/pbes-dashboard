@@ -1197,7 +1197,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="row r2" style="margin-bottom:16px;">
   <div class="card">
     <div class="ch"><h3>🔟 Top 10 problems — this month against last</h3>
-      <span class="fnote" id="cp-fn">Read from what parents actually said, not from the category tag</span>
+      <span class="fnote" id="cp-fn">What CHANGED — this month against last</span>
       <div class="vt-toggle" id="cp-toggle">
         <button data-v="chart" class="on">📊 Chart</button><button data-v="table">📋 Table</button>
       </div>
@@ -1206,7 +1206,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   </div>
   <div class="card">
     <div class="ch"><h3>📅 Top 10 problems — March to date</h3>
-      <span class="fnote" id="cpy-fn">Every call this academic year, so a steady problem is not hidden by one quiet month</span>
+      <span class="fnote" id="cpy-fn">What is BIGGEST — the whole year so far</span>
     </div>
     <div class="cb" style="padding:14px 18px;"><div id="cpy-body"></div></div>
   </div>
@@ -6543,10 +6543,15 @@ function renderCareSummary(){
   const _scope=window._CARE_SCOPE||'ALL';
   const _pendOnly=!!window._CARE_PENDING;
 
-  window._careIsConcern=function(r){ return !_CARE_NOT_CONCERN.test(String(r.Grievance||'')); };
+  /* One definition of a concern, used by the chip, the Remaining tile and the
+     compliance report alike. It must also drop calls nobody answered — the chip
+     read 1,727 against the tile's 1,711 purely because it kept sixteen
+     unanswered calls the others had excluded. */
+  window._careIsConcern=function(r){
+    if(window._careAnswerable && !window._careAnswerable(r)) return false;
+    return !_CARE_NOT_CONCERN.test(String(r.Grievance||'').trim());
+  };
   window._careIsOpenConcern=function(r){
-    /* matches the Remaining tile and the compliance report: a concern that is
-       not marked Resolved is still to be addressed, whatever else it says */
     return window._careIsConcern(r) && !/^resolved$/i.test(String(r.Status||'').trim());
   };
   window._careActiveFilter=function(list){
@@ -6622,7 +6627,15 @@ function renderCareSummary(){
      whatever fell through. */
   const _answered=sentFilteredRows.filter(window._careAnswerable);
   const resolved=_answered.filter(r=>/^resolved$/i.test(String(r.Status||'').trim())).length;
-  const remaining=_answered.length-resolved;
+  /* "To be addressed" counts CONCERNS that are not yet Resolved. It used to
+     count every answered call that was not Resolved, which swept in 212 calls
+     filed as No Concern — nothing to address there — and made this tile
+     disagree with both the Pending chip and the compliance report. All three
+     now mean the same thing. */
+  const _NOT_A_CONCERN=/^(no concern|not answering|no response)/i;
+  const _concerns=_answered.filter(r=>!_NOT_A_CONCERN.test(String(r.Grievance||'').trim()));
+  const remaining=_concerns.filter(r=>!/^resolved$/i.test(String(r.Status||'').trim())).length;
+  const _noConcernOpen=_answered.length-resolved-remaining;
 
   // ── Topic rules for ALL categories ──
   /* ══════════════════════════════════════════════════════════════════════
@@ -6829,7 +6842,16 @@ function renderCareSummary(){
     var _subj={}; CARE_TOPICS.forEach(function(b){ if(b.subj) _subj[b.topic]=1; });
     CARE_PROBLEMS.setMeta(_meta,_catch,_subj);
   }
-  window._careCatOf = function(r){ return CATS.includes(r.Grievance) ? r.Grievance : 'Other'; };
+  /* The export writes "Not Answering Call"; the category list holds "Not
+     Answering". The two never matched, so all 918 of those calls fell to
+     "Other" and were counted as Other-category concerns in the Category Mix and
+     in the Top 10. That is why unanswered calls kept appearing under Others,
+     Academics and the rest. */
+  window._careCatOf = function(r){
+    var g = String(r.Grievance || '').trim();
+    if(window._careAnswerable && !window._careAnswerable(r)) return 'Not Answering';
+    return CATS.includes(g) ? g : 'Other';
+  };
   /* ── MEMOISATION ──
      A row's topics depend only on its text and its category, neither of which
      changes once loaded. Without a cache this ran 21,332 rows through 50 rule
@@ -6889,6 +6911,9 @@ function renderCareSummary(){
   window._carePrimary = function(t){ return PRIMARY[t] || t; };
 
   window._careTopicsOf = function(r){
+    /* A call nobody picked up has no subject matter. Giving it a topic put it
+       into the sub-topic lists and the problem rankings, where it is noise. */
+    if(window._careAnswerable && !window._careAnswerable(r)) return [];
     /* Keyed on the TEXT, not on the row. The export is full of identical
        boilerplate — the standard "Teacher : Discussed regarding..." remark
        repeats across hundreds of calls — so keying on the row object cached
@@ -7147,8 +7172,11 @@ function viewCareWithSentiment(status){
     : /^(not\s*answering|no\s*response)/i.test(String(r.Grievance||''));
   let filtered=CARE.filter(r=>scope.includes(r.Branch)&&(fMonth==='ALL'||r.Month===fMonth)&&!_isUnans(r));
   /* Resolved is the only settled state; __remaining is everything else. */
+  /* Resolved opens every answered call marked Resolved; __remaining opens the
+     CONCERNS that are not, which is what the tile counts. */
   filtered=(status==='__remaining')
-    ? filtered.filter(r=>!/^resolved$/i.test(String(r.Status||'').trim()))
+    ? filtered.filter(r=>!/^(no concern|not answering|no response)/i.test(String(r.Grievance||'').trim())
+                       && !/^resolved$/i.test(String(r.Status||'').trim()))
     : filtered.filter(r=>/^resolved$/i.test(String(r.Status||'').trim()));
   filtered=(typeof _careActiveFilter==='function')?_careActiveFilter(filtered):_careFilterBySentiment(filtered);
   const rows=filtered.map(r=>({Branch:r.Branch,Month:r.Month,Student:r.Student,Class:r.Class,Date:r.Date,
@@ -15210,7 +15238,12 @@ window.CARE_PROBLEMS = (function () {
        month, this panel compares two. That is the difference the reader was
        seeing, so it is stated here rather than left to be discovered. */
     var _allMonths = (typeof fMonth !== 'undefined' && fMonth === 'ALL');
-    var head = (_allMonths
+    var purpose = '<div style="background:#EEF2FF;border-left:3px solid #1E4FD8;padding:7px 11px;'
+      + 'font-size:11.5px;color:#1E3A8A;line-height:1.5;margin-bottom:10px;border-radius:0 7px 7px 0">'
+      + '<b>Use this to spot what moved.</b> Two months side by side, so a problem that jumped or '
+      + 'fell stands out. The panel on the right ranks the whole year instead \u2014 a steady problem '
+      + 'shows no jump here and can only be seen there.</div>';
+    var head = purpose + (_allMonths
       ? '<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:9px;padding:9px 12px;' +
         'font-size:11.5px;color:#92400E;line-height:1.55;margin-bottom:11px">' +
         '<b>Month filter is set to All Months.</b> This panel is a month-on-month comparison, so it is ' +
@@ -16107,7 +16140,12 @@ window.VCHK = (function () {
     if(!list.length){ el.innerHTML='<div class="no-data">No topic matched this year\u2019s remarks.</div>'; return; }
     var max=Math.max.apply(null,list.map(function(x){return x.n;}).concat([1]));
 
-    el.innerHTML='<div style="font-size:12px;color:var(--txm);margin-bottom:12px;line-height:1.6">'+
+    el.innerHTML='<div style="background:#F0FDF4;border-left:3px solid #059669;padding:7px 11px;'+
+      'font-size:11.5px;color:#065F46;line-height:1.5;margin-bottom:10px;border-radius:0 7px 7px 0">'+
+      '<b>Use this to decide what to fix.</b> The whole year ranked by volume, so a problem reported '+
+      'steadily every month is visible even though it never spikes. The panel on the left shows '+
+      'movement instead.</div>'+
+      '<div style="font-size:12px;color:var(--txm);margin-bottom:12px;line-height:1.6">'+
       '<b>'+esc(span[0])+' \u2013 '+esc(span[span.length-1])+'</b> \u00b7 '+
       rows.length.toLocaleString('en-IN')+' calls'+
       ((typeof fBranch!=='undefined'&&fBranch!=='ALL')?' \u00b7 '+esc(fBranch):' \u00b7 all branches')+
