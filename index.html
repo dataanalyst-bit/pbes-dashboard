@@ -1193,8 +1193,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="cb" id="care-summary-report" style="padding:14px 18px;"></div>
   </div>
 
-  <!-- Top 10 consolidated problems, this month against last -->
-  <div class="card" style="margin-bottom:16px;">
+  <!-- Top 10: month-on-month on the left, year to date on the right -->
+  <div class="row r2" style="margin-bottom:16px;">
+  <div class="card">
     <div class="ch"><h3>🔟 Top 10 problems — this month against last</h3>
       <span class="fnote" id="cp-fn">Read from what parents actually said, not from the category tag</span>
       <div class="vt-toggle" id="cp-toggle">
@@ -1202,6 +1203,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
     </div>
     <div class="cb" style="padding:14px 18px;"><div id="cp-body"></div></div>
+  </div>
+  <div class="card">
+    <div class="ch"><h3>📅 Top 10 problems — March to date</h3>
+      <span class="fnote" id="cpy-fn">Every call this academic year, so a steady problem is not hidden by one quiet month</span>
+    </div>
+    <div class="cb" style="padding:14px 18px;"><div id="cpy-body"></div></div>
+  </div>
+  </div>
+  <div style="display:none">
   </div>
 
   <!-- Stage-group infographic replaces the monthly volume chart: the volume
@@ -6467,6 +6477,35 @@ function _sentiment(text){
   return {label: score>0?'Positive':score<0?'Negative':'Neutral', score};
 }
 
+  /* ── WHO ACTUALLY DID NOT ANSWER ──
+   Measured against the export rather than guessed at. Reading the remark text
+   for "not responding", "busy", "no response" gets it wrong in both
+   directions on this data:
+
+     · 151 false positives — "Parent was busy in the temple", "called the
+       uniforms section 10 times and there is no response", "the child may not
+       respond positively when prompted". Every one of those is a real concern
+       that happens to contain the words.
+     · 625 false negatives — calls the school itself filed as "Not Answering
+       Call" whose remark never uses any of those phrases at all.
+
+   So the Grievance category decides, because that is the field the caller
+   fills in deliberately. Text is consulted only when the category is blank
+   (213 rows), and then only for a short remark that is ABOUT the call — "no
+   response", "Not reachable" — never a phrase buried inside a longer
+   complaint, which is what produced the false positives. */
+const _NOANS_CAT=/^\s*(not\s*answer(ing)?( call)?|no\s*response|no\s*answer|switch(ed)?\s*off|not\s*reachable|unreachable)\s*$/i;
+const _NOANS_TXT=/(^|[.;•\-\s])(not\s*answer(ed|ing)?|no\s*response|noresponse|not\s*reachable|switch(ed)?\s*off|not\s*picking|not\s*lifting)([.;\s]|$)/i;
+window._careAnswerable = function(r){
+  var cat = String(r.Grievance || '').trim();
+  if(_NOANS_CAT.test(cat)) return false;
+  if(cat) return true;                       // a stated category is never overridden by wording
+  var txt = ((r.Remarks && r.Remarks !== '\u2013' ? r.Remarks : '') + ' ' +
+             (r.Followup && r.Followup !== '\u2013' ? r.Followup : '')).trim();
+  if(txt.length > 70) return true;           // a long remark is a concern, not a failed call
+  return !_NOANS_TXT.test(txt);
+};
+
 function renderCareSummary(){
   const el=document.getElementById('care-summary-report'); if(!el)return;
   const CARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
@@ -6549,9 +6588,10 @@ function renderCareSummary(){
      figure collapsed to 0% and read as a catastrophe rather than as an artefact
      of the filter. The three status tiles do follow the slice, which is what
      their "click to view with sentiment" labels promise. */
+  /* the same rule the tiles and the compliance report use */
   const _nlpAll=filteredRows.map(r=>CARE_NLP.classify(r));
-  const reachable=_nlpAll.filter(c=>c.reachable).length;
-  const noAnswer=_nlpAll.length-reachable;
+  const reachable=filteredRows.filter(window._careAnswerable).length;
+  const noAnswer=filteredRows.length-reachable;
   const satisfiedN=_nlpAll.filter(c=>c.satisfied).length;
   const flaggedN=_nlpAll.filter(c=>c.flagged).length;
   const satisfiedPct=reachable?Math.round(satisfiedN/reachable*100):0;
@@ -6580,11 +6620,6 @@ function renderCareSummary(){
      still to be addressed and is counted as one figure. Three separate tiles
      implied a distinction the data does not carry, and left a fourth tile for
      whatever fell through. */
-  window._careAnswerable = function(r){
-    if(/^(not\s*answering|no\s*response)/i.test(String(r.Grievance||''))) return false;
-    if(typeof window._careUnanswered === 'function') return !window._careUnanswered(r);
-    return !/not\s*answer|switched\s*off|not\s*reachable/i.test(String(r.Status||''));
-  };
   const _answered=sentFilteredRows.filter(window._careAnswerable);
   const resolved=_answered.filter(r=>/^resolved$/i.test(String(r.Status||'').trim())).length;
   const remaining=_answered.length-resolved;
@@ -6804,6 +6839,55 @@ function renderCareSummary(){
      change. The cache is keyed on the row object itself, so it costs nothing
      when the data is replaced. */
   var _topicCache = new Map();
+  /* ── PRIMARY SUB-TOPICS ──
+     Forty-nine topics was too fine to act on: eleven subjects and four
+     near-identical facility buckets each showed 2-3% and nothing looked big
+     enough to matter. Related topics are folded into one primary heading
+     here, AFTER matching, so the keyword precision is unchanged and only
+     the reporting granularity is coarser. The subject roll-up already works
+     this way and is left as it is. */
+  const PRIMARY = {
+    'Notes & Notebook Work': 'Homework & Notebook Work',
+    'Homework & Assignments': 'Homework & Notebook Work',
+    'Reading Skills': 'Reading & Writing',
+    'Writing & Handwriting': 'Reading & Writing',
+    'Early Literacy': 'Reading & Writing',
+    'Speech & Language Support': 'Reading & Writing',
+    'DC App & Profile Page': 'DC App, Almanac & Records',
+    'Almanac & Diary': 'DC App, Almanac & Records',
+    'Digital Learning Platforms': 'Learning Platforms & Coaching',
+    'IIT / Coaching Classes': 'Learning Platforms & Coaching',
+    'Books & Stationery': 'Books, Uniform & Supplies',
+    'Uniform & Belongings': 'Books, Uniform & Supplies',
+    'Attendance & Punctuality': 'Attendance & Regularity',
+    'Regularity to School': 'Attendance & Regularity',
+    'Confidence & Participation': 'Confidence, Focus & Motivation',
+    'Interest & Motivation': 'Confidence, Focus & Motivation',
+    'Restless / Hyperactive': 'Discipline & Behaviour',
+    'Discipline & Behaviour': 'Discipline & Behaviour',
+    'Health & Wellbeing': 'Health & Wellbeing',
+    'Sleep & Routine': 'Health & Wellbeing',
+    'Screen Time & Devices': 'Health & Wellbeing',
+    'Lunch & Water Intake': 'Lunch & Water Intake',
+    'Washroom Cleanliness': 'Washrooms, Water & Cleanliness',
+    'Drinking Water Supply': 'Washrooms, Water & Cleanliness',
+    'Cleanliness & Housekeeping': 'Washrooms, Water & Cleanliness',
+    'Classroom Seating': 'Washrooms, Water & Cleanliness',
+    'Fees & Accounts': 'Fees, Admission & Records',
+    'Admission / TC': 'Fees, Admission & Records',
+    'Section / Class Change': 'Fees, Admission & Records',
+    'Special Support Needs': 'Special Support & Counselling',
+    'Counselling Request': 'Special Support & Counselling',
+    'Events & Activities': 'Events & Co-curricular',
+    'Co-curricular & Sports': 'Events & Co-curricular',
+    'Exam & Marks': 'Exam & Marks',
+    'Teaching Quality': 'Teaching Quality',
+    'Overall Improvement': 'Overall Improvement',
+    'Transport': 'Transport',
+    'Communication Gap': 'Communication Gap'
+  };
+  window._carePrimary = function(t){ return PRIMARY[t] || t; };
+
   window._careTopicsOf = function(r){
     /* Keyed on the TEXT, not on the row. The export is full of identical
        boilerplate — the standard "Teacher : Discussed regarding..." remark
@@ -6887,7 +6971,13 @@ function renderCareSummary(){
       var fb2 = rules.find(function(b){ return !(b.kw&&b.kw.length)&&!(b.ph&&b.ph.length); });
       return fb2 ? [{cat:cat, topic:fb2.topic}] : [];
     }
-    return out.slice(0,4).map(function(x){ return {cat:cat, topic:x.b.topic}; });
+    var mapped = out.slice(0,4).map(function(x){
+      return { cat:cat, topic: window._carePrimary(x.b.topic), raw:x.b.topic };
+    });
+    /* folding can produce the same primary twice from one remark */
+    var seen = {}, uniq = [];
+    mapped.forEach(function(x){ if(!seen[x.topic]){ seen[x.topic]=1; uniq.push(x); } });
+    return uniq;
   }
   /* the slice the panels below must obey — scope, pending-only and sentiment */
   window._careSlice = function(list){
@@ -15968,6 +16058,109 @@ window.VCHK = (function () {
     var r=_af.apply(this,arguments); try{ safe(); }catch(e){} return r;
   };
   setTimeout(function(){ loadVchk(false); }, 2500);
+})();
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   TOP 10 PROBLEMS — MARCH TO DATE
+
+   The month-on-month panel answers "what changed". This one answers "what has
+   been wrong all year", which is a different question and often a different
+   list: a problem reported steadily every month never shows a big delta and can
+   sit unnoticed beside one that spiked once.
+
+   Same engine, same topics, same filters — only the window differs. The
+   academic year starts in March, so it runs from the March of whichever year
+   the most recent call belongs to.
+   ══════════════════════════════════════════════════════════════════════════ */
+(function(){
+  var ORDER=['March','April','May','June','July','August','September','October',
+             'November','December','January','February'];
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+  function build(){
+    var el=$('cpy-body'); if(!el) return;
+    var C=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
+    var ALLB=['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam'];
+    var scope=(typeof fBranch!=='undefined'&&fBranch!=='ALL')?[fBranch]:ALLB;
+    /* the branch filter applies; the MONTH filter deliberately does not — this
+       panel is the year, and honouring it would make it a copy of the panel
+       beside it */
+    var rows=C.filter(function(r){ return scope.indexOf(r.Branch)>=0 && ORDER.indexOf(r.Month)>=0; });
+    var slice=window._careSlice||function(x){return x;};
+    rows=slice(rows);
+    if(!rows.length){ el.innerHTML='<div class="no-data">No calls recorded this academic year.</div>'; return; }
+    if(!window.CARE_PROBLEMS){ el.innerHTML='<div class="no-data">Waiting for the topic engine…</div>'; return; }
+
+    var months={}; rows.forEach(function(r){ months[r.Month]=1; });
+    var span=ORDER.filter(function(m){ return months[m]; });
+    var T=CARE_PROBLEMS.tally(rows);
+    var list=Object.keys(T.by).map(function(k){
+      var e=T.by[k];
+      return { th:e.th, n:e.rows.length, concern:(e.concernRows||[]).length,
+               rows:e.rows, share:rows.length?e.rows.length/rows.length*100:0 };
+    }).filter(function(x){ return !x.th.isSubjectRoll || true; })
+      .sort(function(a,b){ return b.n-a.n; }).slice(0,10);
+    if(!list.length){ el.innerHTML='<div class="no-data">No topic matched this year\u2019s remarks.</div>'; return; }
+    var max=Math.max.apply(null,list.map(function(x){return x.n;}).concat([1]));
+
+    el.innerHTML='<div style="font-size:12px;color:var(--txm);margin-bottom:12px;line-height:1.6">'+
+      '<b>'+esc(span[0])+' \u2013 '+esc(span[span.length-1])+'</b> \u00b7 '+
+      rows.length.toLocaleString('en-IN')+' calls'+
+      ((typeof fBranch!=='undefined'&&fBranch!=='ALL')?' \u00b7 '+esc(fBranch):' \u00b7 all branches')+
+      '. Ranked by how often each topic came up across the whole year, so a steady problem is not '+
+      'hidden by one quiet month. Same topics and filters as the panel on the left.</div>'+
+      list.map(function(r,i){
+        return '<div class="cp-row cpy-row" data-i="'+i+'" title="Click to view these calls">'+
+          '<div class="cp-name"><i>'+r.th.icon+'</i>'+esc(r.th.label)+'</div>'+
+          '<div class="cp-bars"><div class="cp-bar">'+
+            '<span class="t">year</span>'+
+            '<span class="track"><i style="width:'+(r.n/max*100)+'%;background:'+(r.th.c||'#1E4FD8')+'"></i></span>'+
+            '<span class="v">'+r.n+'</span></div></div>'+
+          '<div class="cp-delta" style="color:var(--txm)">'+r.share.toFixed(0)+'%'+
+            '<small>'+(r.concern<r.n ? r.concern+' are concerns' : 'all are concerns')+'</small></div>'+
+          '</div>';
+      }).join('');
+
+    var fn=$('cpy-fn');
+    if(fn) fn.textContent=span[0]+' \u2013 '+span[span.length-1]+' \u00b7 '+
+      ((typeof fBranch!=='undefined'&&fBranch!=='ALL')?fBranch:'all branches');
+
+    el.querySelectorAll('.cpy-row').forEach(function(n){
+      n.addEventListener('click',function(){
+        var r=list[+n.dataset.i];
+        if(typeof openModal!=='function') return;
+        openModal('\ud83d\udcc5 '+r.th.label+' \u2014 '+span[0]+' to '+span[span.length-1],
+          r.rows.length.toLocaleString('en-IN')+' call(s) \u00b7 '+r.concern+' carrying a concern', r.rows,
+          [{key:'Branch',label:'Branch'},{key:'Month',label:'Month'},{key:'Class',label:'Class'},
+           {key:'Student',label:'Student',maxW:'160px'},{key:'Date',label:'Date',date:true},
+           {key:'Grievance',label:'Filed as',pill:true},{key:'Remarks',label:'What the parent said',maxW:'320px'},
+           {key:'Followup',label:'Follow-up',maxW:'220px'},{key:'Status',label:'Status',pill:true}]);
+      });
+    });
+  }
+  function safe(){ try{ build(); }catch(e){
+    var el=$('cpy-body');
+    if(el) el.innerHTML='<div class="no-data" style="color:var(--r)">Could not build: '+esc(String(e&&e.message||e))+'</div>';
+  } }
+  window.__renderCareYear=safe;
+  /* The month-on-month panel is redrawn by renderCareSummary, which is itself
+     wrapped further up. Hooking only that wrapper missed the case where the
+     Care tab is opened later — the panel drew nothing. Both entry points are
+     hooked, and a redraw is scheduled after any filter change. */
+  function hook(name){
+    var prev=window[name];
+    if(typeof prev==='function') window[name]=function(){ var r=prev.apply(this,arguments); safe(); return r; };
+  }
+  hook('__renderCareProblems'); hook('renderCareSummary'); hook('renderCare');
+  var _st=window.showTab;
+  if(typeof _st==='function') window.showTab=function(id,btn){
+    var r=_st(id,btn); if(id==='care') setTimeout(safe,0); return r;
+  };
+  setTimeout(safe,2000);
 })();
 </script>
 </body>
