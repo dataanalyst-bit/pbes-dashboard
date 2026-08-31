@@ -460,6 +460,15 @@ table.auhm tr.au-itemrow td{border-color:#E8EEF2}
 .cp-bar .v{width:38px;flex:0 0 38px;font-weight:700;color:var(--tx);font-variant-numeric:tabular-nums}
 .cp-delta{text-align:right;font-size:12.5px;font-weight:800;font-variant-numeric:tabular-nums}
 .cp-delta small{display:block;font-size:9.5px;font-weight:500;color:#94A3B8}
+.cp-roll{cursor:pointer}
+.cp-roll:hover{background:var(--pl)}
+.cp-car{color:var(--p);font-size:10px;margin-right:5px}
+.cp-sub{display:grid;grid-template-columns:1fr 46px 44px;gap:8px;align-items:center;
+  padding:5px 0 5px 38px;font-size:11.5px;color:#475569;cursor:pointer;
+  border-bottom:1px dashed var(--bor)}
+.cp-sub:hover{background:var(--pl);color:var(--p)}
+.cp-sub .n{text-align:right;font-weight:800;font-variant-numeric:tabular-nums;color:var(--tx)}
+.cp-sub .d{text-align:right;font-weight:700;font-variant-numeric:tabular-nums;font-size:10.5px}
 .cp-hd{display:grid;grid-template-columns:210px 1fr 120px;gap:10px;font-size:9.5px;font-weight:800;
   text-transform:uppercase;letter-spacing:.05em;color:var(--txm);padding-bottom:7px;border-bottom:2px solid var(--bor)}
 .cp-hd span:last-child{text-align:right}
@@ -6601,7 +6610,7 @@ function renderCareSummary(){
     {topic:'Subject Focus — Computer',subj:true,ph:['computer science','ict','computing','computer class'],kw:['computer']},
     {topic:'Subject Focus — Language',subj:true,ph:['second language','2nd language','third language','3rd language','french','sanskrit'],kw:[]},
     {topic:'Exam & Marks',ph:['pt 1','pt1','ia 1','unit test','exam','marks','result','performance in the'],kw:['marks','exam','result','score']},
-    {topic:'Overall Improvement',ph:['need improvement','needs improvement','improvement in','to improve','improve in','more focus','focus on','extra care','special focus','individual attention'],kw:['improvement','improve']},
+    {topic:'Overall Improvement',generic:true,ph:['need improvement','needs improvement','improvement in','to improve','improve in','more focus','focus on','extra care','special focus','individual attention'],kw:['improvement','improve']},
     {topic:'DC App & Profile Page',ph:['dc app','the dc','profile page','digital campus','app is not','through dc','update the profile'],kw:['dcapp']},
     {topic:'Almanac & Diary',ph:['almanac','diary','sign the almanac','almanac not'],kw:['almanac','diary']},
     {topic:'Books & Stationery',ph:['purchase of books','books and','books are not','buy the books','text books','work books','stationery','not purchased'],kw:['books']},
@@ -6733,7 +6742,8 @@ function renderCareSummary(){
     Object.keys(TOPIC_RULES).forEach(function(c){
       TOPIC_RULES[c].forEach(function(b){ if(!_real[b.topic]) _catch[b.topic]=1; });
     });
-    CARE_PROBLEMS.setMeta(_meta,_catch);
+    var _subj={}; CARE_TOPICS.forEach(function(b){ if(b.subj) _subj[b.topic]=1; });
+    CARE_PROBLEMS.setMeta(_meta,_catch,_subj);
   }
   window._careCatOf = function(r){ return CATS.includes(r.Grievance) ? r.Grievance : 'Other'; };
   window._careTopicsOf = function(r){
@@ -6771,6 +6781,14 @@ function renderCareSummary(){
        otherwise "maths is difficult, not able to understand" counted only as
        Teaching Quality and the maths teacher never appeared in the numbers.
        Among the problem types, the winner takes it, plus anything close. */
+    /* "Needs to improve" is what a parent says when they have not named
+       anything specific. "Child need to improve in Hindi" HAS named something,
+       so counting it as both a Hindi concern and a generic one inflates the
+       total and puts the same call in two places. Generic buckets are therefore
+       a fallback: they apply only when nothing specific was found. */
+    var specific = scored.filter(function(x){ return !x.b.generic && x.s > 0; });
+    if(specific.length) scored = specific;
+
     var axisHits = scored.filter(function(x){ return (x.b.subj||x.b.fac) && x.s > 0; });
     var probMax  = Math.max.apply(null, scored.filter(function(x){ return !(x.b.subj||x.b.fac); })
                                               .map(function(x){ return x.s; }).concat([0]));
@@ -14788,7 +14806,7 @@ window.CARE_PROBLEMS = (function () {
     var cat = window._careCatOf ? window._careCatOf(row) : String(row.Grievance||'');
     return !/^(no concern|not answering|no response)/i.test(cat);
   }
-  var META = {}, CATCHALL = {};
+  var META = {}, CATCHALL = {}, SUBJ = {};
   function themesOf(row){
     if(!window._careTopicsOf) return [];
     /* Excluded from a list titled "problems":
@@ -14804,7 +14822,7 @@ window.CARE_PROBLEMS = (function () {
          the same problem whether the call was filed under Administration or
          Other, and splitting it three ways made each fragment look too small to
          act on while the same label appeared three times in one list. */
-      return { k:x.topic, label:x.topic, cat:x.cat,
+      return { k:x.topic, label:x.topic, cat:x.cat, subj:!!SUBJ[x.topic],
                icon:iconFor(x.topic), c:colorFor(x.topic) };
     });
   }
@@ -14819,7 +14837,7 @@ window.CARE_PROBLEMS = (function () {
   }
 
   return { themesOf: themesOf, isProblem: isProblem, tally: tally, iconFor: iconFor,
-           setMeta: function(m,c){ META = m || {}; CATCHALL = c || {}; } };
+           setMeta: function(m,c,s){ META = m || {}; CATCHALL = c || {}; SUBJ = s || {}; } };
 })();
 
 /* ══════════════════ renderer ══════════════════ */
@@ -14862,6 +14880,28 @@ window.CARE_PROBLEMS = (function () {
     var prevRows = M.prev ? slice(rows.filter(function (r) { return r.Month === M.prev; })) : [];
     var A = CARE_PROBLEMS.tally(curRows), B = CARE_PROBLEMS.tally(prevRows);
 
+    /* Every subject rolls into ONE row. Eleven subjects each at 3% pushed the
+       genuinely different problems off a list of ten, when the useful reading
+       is "subject-specific concerns are the biggest thing, and here is the
+       split". The parts survive underneath, one tap away. */
+    function rollSubjects(t){
+      var out = {}, sub = { rows: [], parts: {} };
+      Object.keys(t.by).forEach(function (k) {
+        var e = t.by[k];
+        if (e.th && e.th.subj) {
+          sub.rows = sub.rows.concat(e.rows);
+          sub.parts[e.th.label.replace(/^Subject Focus\s*[—-]\s*/, '')] = e.rows.slice();
+        } else out[k] = e;
+      });
+      if (sub.rows.length) {
+        out['__subjects'] = { th:{ k:'__subjects', label:'Subject-specific concerns',
+                                   icon:'\ud83d\udcda', c:'#1E4FD8', isSubjectRoll:true },
+                              rows: sub.rows, parts: sub.parts };
+      }
+      return { by: out, negatives: t.negatives };
+    }
+    A = rollSubjects(A); B = rollSubjects(B);
+
     var keys = {};
     Object.keys(A.by).forEach(function (k) { keys[k] = 1; });
     Object.keys(B.by).forEach(function (k) { keys[k] = 1; });
@@ -14872,7 +14912,9 @@ window.CARE_PROBLEMS = (function () {
         th: (a || b).th, cur: cn, prev: pn, delta: cn - pn,
         curShare: A.negatives ? cn / A.negatives * 100 : 0,
         prevShare: B.negatives ? pn / B.negatives * 100 : 0,
-        curRows: a ? a.rows : [], prevRows: b ? b.rows : []
+        curRows: a ? a.rows : [], prevRows: b ? b.rows : [],
+        parts: (a && a.parts) || (b && b.parts) || null,
+        prevParts: (b && b.parts) || null
       };
     }).sort(function (x, y) { return y.cur - x.cur || y.delta - x.delta; }).slice(0, 10);
 
@@ -14916,8 +14958,12 @@ window.CARE_PROBLEMS = (function () {
         list.map(function (r, i) {
           var dc = r.delta > 0 ? '#DC2626' : r.delta < 0 ? '#059669' : '#94A3B8';
           var arrow = r.delta > 0 ? '\u25b2' : r.delta < 0 ? '\u25bc' : '\u2013';
-          return '<div class="cp-row">' +
-            '<div class="cp-name"><i>' + r.th.icon + '</i>' + esc(r.th.label) + '</div>' +
+          var isRoll = r.th.isSubjectRoll && r.parts;
+          var open = isRoll && window._CP_OPEN;
+          return '<div class="cp-row' + (isRoll ? ' cp-roll' : '') + '"' +
+              (isRoll ? ' data-roll="1" title="Tap to see the split by subject"' : '') + '>' +
+            '<div class="cp-name">' + (isRoll ? '<b class="cp-car">' + (open ? '\u25be' : '\u25b8') + '</b>' : '') +
+              '<i>' + r.th.icon + '</i>' + esc(r.th.label) + '</div>' +
             '<div class="cp-bars">' +
               '<div class="cp-bar"><span class="t">' + esc(M.cur.slice(0,3)) + '</span>' +
                 '<span class="track" data-i="' + i + '" data-w="cur" title="Click to view these calls">' +
@@ -14931,7 +14977,18 @@ window.CARE_PROBLEMS = (function () {
             '<div class="cp-delta" style="color:' + dc + '">' + arrow + ' ' +
               (M.prev ? (r.delta > 0 ? '+' : '') + r.delta : '—') +
               '<small>' + r.curShare.toFixed(0) + '% of this month</small></div>' +
-            '</div>';
+            '</div>' +
+            (isRoll && open ? Object.keys(r.parts)
+                .map(function(s){ return {s:s, n:r.parts[s].length,
+                       p:(r.prevParts && r.prevParts[s]) ? r.prevParts[s].length : 0}; })
+                .sort(function(x,y){ return y.n-x.n; })
+                .map(function(x){
+                  var d = x.n - x.p, dc = d>0?'#DC2626':d<0?'#059669':'#94A3B8';
+                  return '<div class="cp-sub" data-subj="' + esc(x.s) + '">' +
+                    '<span>' + esc(x.s) + '</span>' +
+                    '<span class="n">' + x.n + '</span>' +
+                    '<span class="d" style="color:' + dc + '">' + (d>0?'+':'') + (M.prev?d:'') + '</span></div>';
+                }).join('') : '');
         }).join('') +
         '<p class="au-note">Bars are counts; the percentage under each change is that problem\u2019s <b>share of the ' +
         'month\u2019s negative calls</b>. Read the two together — a theme can grow in count while its share falls, ' +
@@ -14943,7 +15000,28 @@ window.CARE_PROBLEMS = (function () {
       (M.prev ? ' vs ' + M.prev : '');
 
     el.querySelectorAll('.cp-bar .track').forEach(function (t) {
-      t.addEventListener('click', function () { openCP(+t.dataset.i, t.dataset.w); });
+      t.addEventListener('click', function (e) { e.stopPropagation(); openCP(+t.dataset.i, t.dataset.w); });
+    });
+    el.querySelectorAll('.cp-row[data-roll]').forEach(function (row) {
+      row.addEventListener('click', function (e) {
+        if (e.target.closest('.cp-sub') || e.target.closest('.track')) return;
+        window._CP_OPEN = !window._CP_OPEN; build();
+      });
+    });
+    el.querySelectorAll('.cp-sub').forEach(function (n) {
+      n.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var C = window._CP; if (!C) return;
+        var roll = C.list.filter(function (x) { return x.th.isSubjectRoll; })[0];
+        if (!roll || !roll.parts) return;
+        var s = n.dataset.subj, rows = roll.parts[s] || [];
+        openModal('\ud83d\udcda ' + s + ' \u2014 ' + C.M.cur,
+          rows.length.toLocaleString('en-IN') + ' call(s) naming this subject', rows,
+          [{key:'Branch',label:'Branch'},{key:'Month',label:'Month'},{key:'Class',label:'Class'},
+           {key:'Student',label:'Student',maxW:'160px'},{key:'Date',label:'Date',date:true},
+           {key:'Grievance',label:'Filed as',pill:true},{key:'Remarks',label:'What the parent said',maxW:'320px'},
+           {key:'Followup',label:'Follow-up',maxW:'220px'},{key:'Status',label:'Status',pill:true}]);
+      });
     });
     el.querySelectorAll('tr.cp-tr').forEach(function (tr) {
       tr.addEventListener('click', function () { openCP(+tr.dataset.i, 'cur'); });
