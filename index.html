@@ -6624,10 +6624,29 @@ function renderCareSummary(){
     {topic:'Communication Gap',ph:['not informed','no information','communication gap','not communicated','no response from school','not aware'],kw:['communication']},
     {topic:'Not Reachable',meta:true,ph:['not answering','no response','switched off','not reachable','call back','busy','out of station','not picking','not lifting the call','message sent to parent','sent message to the parent','to call again','not responding','did not answer','no answer','called twice'],kw:['unreachable']},
     {topic:'Co-curricular & Sports',ph:['sports','games','dance','music','art','craft','activity','competition','badminton','swimming'],kw:['sports']},
-    {topic:'Facilities & Cleanliness',fac:true,ph:['washroom','toilet','drinking water','cleanliness','not clean','canteen','food','classroom fan','furniture'],kw:['washroom','toilet','canteen']},
+    /* Washroom and water, from the wording actually used in the export.
+
+       Three different things hide behind the same words, so they are three
+       topics. "Washrooms are not clean" is a building problem; "no water in the
+       washrooms" is a supply problem, and the two are frequently reported in
+       the SAME sentence; "remind the child to drink water" is a habit and not a
+       complaint about the school at all.
+
+       Note what is NOT here: the bare word "hygiene". It appears 117 times, and
+       every one of them is inside the standard teacher-conversation template
+       ("...5. Check well being / behaviour / hygiene..."). Matching it alone
+       would have manufactured a 117-call problem out of a checklist heading, so
+       it only counts when paired with a washroom or a water word. */
+    {topic:'Washroom Cleanliness',fac:true,ph:['washroom','washrooms','wash room','wash rooms','toilet','toilets','bathroom','rest room','restroom','washroom cleanliness','washrooms are not clean','washroom are not clean','washrooms are not hygiene','washrooms are not hygenie','not hygienic','bathroom neatness','neatness of washrooms','unpleasant smell','washrooms need','indian toilet','ayamma is not','ayas are not responding','not allowing to go to washroom','not sending to wash room','hesitant to use the washroom','send her to washroom','sent to washroom'],kw:[]},
+    /* "drinking water" on its own is ambiguous: the school's supply, or the
+       child's habit. Only supply-specific wording counts here — availability,
+       quality, location — and the habit phrasings live with Lunch & Water
+       Intake, which is where a reminder to drink more belongs. */
+    {topic:'Drinking Water Supply',fac:true,ph:['no water in','water is salty','water was salty','water issue','water isssue','water problem','hot water','water not available','water is not available','availability of drinking water','drinking water is not','drinking water was','drinking water and washroom','water is not well maintained','ro plant','purified water','water cooler','drinking water is not available','no drinking water'],kw:[]},
+    {topic:'Cleanliness & Housekeeping',fac:true,ph:['not clean','cleanliness of','cleanliness and maintenance','cleanliness and hygiene','hygiene and cleanliness','housekeeping','not cleaned','dust in the','unclean','neatness of'],kw:['cleanliness']},
     {topic:'Confidence & Participation',ph:['not confident','confident in speaking','participate in all','make her participate','make him participate','overcome her fear','overcome his fear','introvert','shy','socialize','socialise','mix with','hesitat','stage fear','speaking skills','communication skills'],kw:['confidence','participation']},
     {topic:'Events & Activities',ph:['phonics expo','independence day','library week','annual day','sports day','field trip','upcoming event','celebration','slc','competition','exhibition'],kw:['event']},
-    {topic:'Lunch & Water Intake',fac:true,ph:['lunch box','not completing her lunch','not completing his lunch','drink water','drink more water','lunch timings','eating habits','not eating','snack'],kw:['lunch']},
+    {topic:'Lunch & Water Intake',fac:true,ph:['lunch box','not completing her lunch','not completing his lunch','drink water','drink more water','drinks enough water','drinking enough water','not drinking water','wont show interset in drinking','water bottle','finishing water bottle','dehydration','well hydrated','stay hydrated','lunch timings','eating habits','not eating','not finishing','snack'],kw:['lunch']},
     {topic:'Classroom Seating',fac:true,ph:['seating place','change of seating','seating arrangement','sit in front','back bench'],kw:['seating']},
     {topic:'Restless / Hyperactive',ph:['very hyper','hyper in the class','not sitting','moving around','restless','disturbing others','continuously mov'],kw:['hyperactive']},
     {topic:'Call Retry / Follow-up',meta:true,ph:['will call again','try again tomorrow','message sent through','whatsapp','call back later','will try again','introduction call','follow up call'],kw:[]},
@@ -14773,7 +14792,9 @@ window.CARE_PROBLEMS = (function () {
     'Communication Gap':['📵','#1E4FD8'],
     'Not Reachable':['📴','#1E4FD8'],
     'Co-curricular & Sports':['🏅','#1E4FD8'],
-    'Facilities & Cleanliness':['🧼','#1E4FD8'],
+    'Washroom Cleanliness':['🚻','#1E4FD8'],
+    'Drinking Water Supply':['🚰','#1E4FD8'],
+    'Cleanliness & Housekeeping':['🧼','#1E4FD8'],
     'Confidence & Participation':['🌟','#1E4FD8'],
     'Events & Activities':['🎪','#1E4FD8'],
     'Lunch & Water Intake':['🍱','#1E4FD8'],
