@@ -5604,7 +5604,11 @@ function showTab(id,btn){
   document.querySelectorAll('.tb').forEach(b=>b.classList.remove('active'));
   document.getElementById('pane-'+id).classList.add('active');
   if(btn)btn.classList.add('active');
-  renderAll();
+  /* Switching a tab used to call renderAll(), which redrew all fourteen panels
+     — so opening Care Calls cost five seconds, and opening it again cost five
+     more. Only the panel being opened is drawn, and only if a filter change has
+     left it stale. */
+  if(typeof renderTabIfStale==='function') renderTabIfStale(id); else renderAll();
 }
 // Helper for KPI-card clicks: jump to a tab by id, find its button automatically
 function switchTab(id){
@@ -5618,7 +5622,7 @@ function switchTab(id){
     if(b.getAttribute('onclick')&&b.getAttribute('onclick').indexOf("'"+id+"'")!==-1) b.classList.add('active');
   });
   window.scrollTo(0,0);
-  renderAll();
+  if(typeof renderTabIfStale==='function') renderTabIfStale(id); else renderAll();
 }
 // ═══════════════════════════════════════════════════════
 // 🎯 KEY MANAGEMENT INSIGHTS — computed live from every department
@@ -6765,7 +6769,35 @@ function renderCareSummary(){
     CARE_PROBLEMS.setMeta(_meta,_catch,_subj);
   }
   window._careCatOf = function(r){ return CATS.includes(r.Grievance) ? r.Grievance : 'Other'; };
+  /* ── MEMOISATION ──
+     A row's topics depend only on its text and its category, neither of which
+     changes once loaded. Without a cache this ran 21,332 rows through 50 rule
+     sets several times per render — the category counts, each category's
+     sub-topics, the Top-10 panel and every drill-down each re-derived the same
+     answer. That was 3.5 seconds of the ~6 second freeze on every filter
+     change. The cache is keyed on the row object itself, so it costs nothing
+     when the data is replaced. */
+  var _topicCache = new Map();
   window._careTopicsOf = function(r){
+    /* Keyed on the TEXT, not on the row. The export is full of identical
+       boilerplate — the standard "Teacher : Discussed regarding..." remark
+       repeats across hundreds of calls — so keying on the row object cached
+       each duplicate separately and still paid full price for every one. On
+       this data that is the difference between 3.7 seconds and a fraction of
+       it. */
+    var cat = window._careCatOf(r);
+    var key = cat + '\u241f' + ((r.Remarks||'') + '\u241f' + (r.Followup||''));
+    var hit = _topicCache.get(key);
+    if(hit) return hit;
+    var out = _careTopicsUncached(r);
+    /* a runaway cache on a huge import would cost more memory than it saves */
+    if(_topicCache.size > 60000) _topicCache.clear();
+    _topicCache.set(key, out);
+    return out;
+  };
+  function _normTerm(x){ return String(x).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim(); }
+  function _reEsc(x){ return x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
+  function _careTopicsUncached(r){
     var cat = window._careCatOf(r), rules = TOPIC_RULES[cat];
     if(!rules) return [];
     var raw = (((r.Remarks&&r.Remarks!=='–')?r.Remarks:'')+' '+
@@ -6776,10 +6808,20 @@ function renderCareSummary(){
       return e ? [{cat:cat, topic:e.topic}] : []; }
 
     function hasWord(w){ return t.indexOf(' '+w+' ') !== -1; }
-    function hasPhrase(ph){
-      return t.indexOf(' '+String(ph).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()+' ') !== -1;
-    }
+    function hasPhrase(ph){ return t.indexOf(' '+_normTerm(ph)+' ') !== -1; }
+
+    /* Each bucket is scanned only when a cheap combined test says one of its
+       terms is present. Scoring every bucket term-by-term meant roughly six
+       hundred string searches per remark; the gate rejects most buckets in one.
+       The gate is compiled once and cached on the rule object itself. */
     var scored = rules.map(function(b){
+      if(!b.__gate){
+        var terms = (b.ph||[]).concat(b.kw||[]).map(_normTerm).filter(Boolean);
+        b.__gate = terms.length
+          ? new RegExp('(?:^| )(?:' + terms.map(_reEsc).join('|') + ')(?: |$)')
+          : null;
+      }
+      if(b.__gate && !b.__gate.test(t)) return { b:b, s:0 };
       var s = 0;
       /* a phrase is far stronger evidence than any single word it contains:
          "not writing homework" says what happened, "work" says nothing */
@@ -6820,7 +6862,7 @@ function renderCareSummary(){
       return fb2 ? [{cat:cat, topic:fb2.topic}] : [];
     }
     return out.slice(0,4).map(function(x){ return {cat:cat, topic:x.b.topic}; });
-  };
+  }
   /* the slice the panels below must obey — scope, pending-only and sentiment */
   window._careSlice = function(list){
     return (typeof _careActiveFilter==='function') ? _careActiveFilter(list) : list;
@@ -6998,7 +7040,17 @@ function viewCareWithSentiment(status){
    Negative drill-down openly displayed positive records. Whenever a number and
    its label come from different code, they will disagree eventually — so they
    now come from the same place. */
+var _sentCache = new Map();
 function _careRowSentiment(r){
+  var key = ((r&&r.Grievance)||'') + '\u241f' + ((r&&r.Remarks)||'') + '\u241f' + ((r&&r.Followup)||'');
+  var c = _sentCache.get(key);
+  if(c !== undefined) return c;
+  var v = _careRowSentimentUncached(r);
+  if(_sentCache.size > 60000) _sentCache.clear();
+  _sentCache.set(key, v);
+  return v;
+}
+function _careRowSentimentUncached(r){
   if(window.CARE_NLP && CARE_NLP.classify) return CARE_NLP.classify(r).klass;
   return _sentiment(((r.Remarks&&r.Remarks!=='–')?r.Remarks:'')+' '+
                     ((r.Followup&&r.Followup!=='–')?r.Followup:'')).label;
@@ -7746,20 +7798,58 @@ function viewIT(kind,branch,system){
 }
 
 
-function _origRenderAll(){
-  // Each render is isolated: if one throws on unexpected live data, the rest still render.
-  const steps=[
-    ['Overview',renderOverview],['GrievanceOfficer',renderGrievanceOfficer],['HR',renderHR],['Rankings',renderRankings],['Insights',renderInsights],
-    ['Care',renderCare],['Observations',renderObservations],['Admin',renderAdmin],
-    ['Vigilance',renderVigilance],['Purchase',renderPurchase],
-    ['Admissions',renderAdmissions],['Grievance',renderGrievance],
-    ['Transport',renderTransport],['IT',renderIT]
-  ];
-  steps.forEach(function(s){
-    try{ s[1](); }
-    catch(err){ console.error('render '+s[0]+' failed:',err && err.message, err && err.stack); }
-  });
+/* ══════════════════════════════════════════════════════════════════════════
+   RENDER ONLY WHAT IS ON SCREEN
+
+   Every filter change used to redraw all fourteen panels, including the
+   thirteen the reader cannot see. Care Calls alone takes five seconds on a full
+   year of data, so changing the branch dropdown froze the page for six seconds
+   whichever tab you were on — and switching tabs did the same again.
+
+   Now a filter change marks every panel stale and redraws only the visible one.
+   The rest redraw the moment they are opened, and only if their data actually
+   changed since they were last drawn. The work is the same; it is just no
+   longer done for things nobody is looking at.
+   ══════════════════════════════════════════════════════════════════════════ */
+var _RENDERERS = {
+  overview:      ['Overview', function(){ renderOverview(); renderRankings(); renderInsights(); }],
+  care:          ['Care', function(){ renderCare(); }],
+  observations:  ['Observations', function(){ renderObservations(); }],
+  admin:         ['Admin', function(){ renderAdmin(); }],
+  vigilance:     ['Vigilance', function(){ renderVigilance(); }],
+  purchase:      ['Purchase', function(){ renderPurchase(); }],
+  admissions:    ['Admissions', function(){ renderAdmissions(); }],
+  grievance:     ['Grievance', function(){ renderGrievance(); renderGrievanceOfficer(); }],
+  transport:     ['Transport', function(){ renderTransport(); }],
+  it:            ['IT', function(){ renderIT(); }],
+  hr:            ['HR', function(){ renderHR(); }]
+};
+var _stale = {};
+function _currentTab(){
+  var el = document.querySelector('.pane.active');
+  if (el && el.id && el.id.indexOf('pane-') === 0) return el.id.slice(5);
+  return 'overview';
 }
+function _renderTab(id, force){
+  var r = _RENDERERS[id];
+  if (!r) return;
+  if (!force && _stale[id] === false) return;
+  try { r[1](); _stale[id] = false; }
+  catch (err) { console.error('render ' + r[0] + ' failed:', err && err.message, err && err.stack); }
+}
+window.renderTabIfStale = function(id){ _renderTab(id, false); };
+
+function _origRenderAll(){
+  /* everything is now out of date; the visible panel is brought up to date at
+     once and the others when they are opened */
+  Object.keys(_RENDERERS).forEach(function(k){ _stale[k] = true; });
+  _renderTab(_currentTab(), true);
+}
+/* Renderers that other code calls directly must still mark their panel fresh,
+   or opening that tab would redraw it a second time for nothing. */
+window.renderAllPanels = function(){
+  Object.keys(_RENDERERS).forEach(function(k){ _renderTab(k, true); });
+};
 document.addEventListener('DOMContentLoaded',()=>{ if(_liveDataLoaded) renderAll(); /* else: live loader will call renderAll() once data arrives */ });
 </script>
 <script>
@@ -14054,7 +14144,12 @@ function _sylPushBranch(){
 
 (function(){
   var _s=window.showTab, _w=window.switchTab;
-  window.showTab=function(id,btn){ _s(id,btn); if(id==='syl'){ loadSyl(false); setTimeout(_sylPushBranch,300); } };
+  window.showTab=function(id,btn){
+    _s(id,btn);
+    /* draw the panel the reader just opened, if a filter change left it stale */
+    if(typeof renderTabIfStale==='function') renderTabIfStale(id);
+    if(id==='syl'){ loadSyl(false); setTimeout(_sylPushBranch,300); }
+  };
   window.switchTab=function(id){ _w(id); if(id==='syl'){ loadSyl(false); setTimeout(_sylPushBranch,300); } };
   var _af=window.applyFilters;
   if(typeof _af==='function') window.applyFilters=function(){
