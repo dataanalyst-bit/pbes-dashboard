@@ -6569,6 +6569,43 @@ function renderCareSummary(){
      were both landing in one lumped bucket, which told nobody which teacher to
      talk to.
      ══════════════════════════════════════════════════════════════════════ */
+  /* ── SUBJECTS ──
+     Named the way the school names them. "Telugu (III Lang)", "French (II
+     Lang)", "Computing", "ICT / IT" and "Computer Science" are four labels for
+     two things, so the aliases collapse onto one topic each — otherwise the
+     same complaint splits four ways and none of them looks big enough to act
+     on. Where a parent says only "second language" without naming it, that is
+     recorded as such rather than guessed at. */
+  const SUBJECT_RULES=[
+    {topic:'English',        subj:true, ph:['in english','english subject','english marks','english teacher','cll english','english reading','english writing'], kw:['english','grammar','comprehension','phonics']},
+    {topic:'Hindi',          subj:true, ph:['in hindi','hindi subject','hindi teacher','2nd language hindi','second language hindi','third language hindi'], kw:['hindi']},
+    {topic:'Telugu',         subj:true, ph:['in telugu','telugu subject','telugu teacher','telugu iii lang','telugu 3rd lang','third language telugu'], kw:['telugu']},
+    {topic:'French',         subj:true, ph:['french ii lang','french 2nd lang','in french','french subject','french teacher'], kw:['french']},
+    {topic:'Sanskrit',       subj:true, ph:['in sanskrit','sanskrit subject'], kw:['sanskrit']},
+    {topic:'Mathematics',    subj:true, ph:['in maths','in math','maths subject','math subject','maths teacher','math lab'], kw:['math','maths','mathematics','calculation','multiplication','tables','arithmetic','geometry','algebra','numeracy']},
+    {topic:'Science',        subj:true, ph:['in science','science subject','science teacher','science lab','environmental science'], kw:['science','physics','chemistry','biology','evs']},
+    {topic:'Social / Humanities', subj:true, ph:['social studies','social science','in social','humanities subject'], kw:['social','humanities','history','geography','civics','sst']},
+    {topic:'Computer / ICT', subj:true, ph:['computer science','computer class','computer lab','ict it','in computing','computing subject','digital literacy'], kw:['computer','computing','ict','coding','typing']},
+    {topic:'Second / Third Language', subj:true, ph:['second language','2nd language','third language','3rd language','ii language','iii language','language subject'], kw:[]},
+    {topic:'Let\'s Explore / UWS', subj:true, ph:['lets explore','let s explore','understanding the world','uws'], kw:[]}
+  ];
+
+  /* ── FACILITIES ──
+     Washrooms, drinking water, cleanliness and the rest were invisible: nothing
+     matched them, so those calls fell into whatever catch-all their category
+     had. They are a separate axis for the same reason subjects are — "the
+     toilet is dirty" is a fact about the building, not about a category. */
+  const FACILITY_RULES=[
+    {topic:'Washrooms / Toilets', fac:true, ph:['wash room','washroom','rest room','restroom','toilet not','toilet is','no water in toilet','toilets are'], kw:['washroom','washrooms','toilet','toilets','urinal','lavatory']},
+    {topic:'Drinking Water / RO', fac:true, ph:['drinking water','water not available','no water','ro plant','water bottle','water cooler','water problem','water supply'], kw:['ro']},
+    {topic:'Cleanliness / Hygiene', fac:true, ph:['not clean','not cleaned','dirty classroom','unhygienic','bad smell','dust in','garbage','housekeeping'], kw:['cleanliness','hygiene','dirty','unclean','sweeping','mopping']},
+    {topic:'Food / Canteen', fac:true, ph:['lunch box','food is not','food quality','canteen food','snacks are','food not good','mid day meal'], kw:['canteen','food','meal','snack']},
+    {topic:'Classroom / Furniture', fac:true, ph:['fan not working','light not working','ac not working','bench is broken','desk broken','no ventilation','classroom is hot','door stopper','projector not'], kw:['furniture','bench','desk','fan','ventilation']},
+    {topic:'Building / Safety', fac:true, ph:['wall is','boundary wall','stagnant water','water leakage','seepage','broken tile','wire hanging','open wire','stray dog','no railing'], kw:['leakage','seepage','hazard','unsafe']},
+    {topic:'Uniform / Books Supply', fac:true, ph:['uniform not','books not received','book not given','not received books','id card not','belt not','shoes not'], kw:['uniform','stationery']},
+    {topic:'Playground / Sports Facility', fac:true, ph:['playground is','play area','sports equipment','ground is not','swimming pool'], kw:['playground']}
+  ];
+
   const TOPIC_RULES={
     'No Concern':[
       {topic:'Parent Satisfied',ph:['no concern','no issue','very happy','quite happy','fully satisfied','doing well','doing good','all good','nothing to report'],kw:['happy','satisfied','appreciate','thankful','pleased','excellent']},
@@ -6579,13 +6616,6 @@ function renderCareSummary(){
     ],
     'Academics':[
       /* ── subjects, so a weakness points at a teacher and not at a category ── */
-      {topic:'English',subj:true,ph:['in english','english subject','english marks','english teacher'],kw:['english','grammar','comprehension']},
-      {topic:'Hindi',subj:true,ph:['in hindi','hindi subject','hindi teacher','third language'],kw:['hindi']},
-      {topic:'Telugu',subj:true,ph:['in telugu','telugu subject','telugu teacher','second language'],kw:['telugu']},
-      {topic:'Mathematics',subj:true,ph:['in maths','in math','maths subject','math subject','maths teacher'],kw:['math','maths','mathematics','calculation','multiplication','tables','arithmetic','geometry','algebra']},
-      {topic:'Science',subj:true,ph:['in science','science subject','science teacher'],kw:['science','physics','chemistry','biology','evs','experiment']},
-      {topic:'Social Studies',subj:true,ph:['social studies','social science'],kw:['social','history','geography','civics']},
-      {topic:'Computer / ICT',subj:true,ph:['computer class','computer lab'],kw:['computer','ict','coding','typing']},
       /* ── what is going wrong, whatever the subject ── */
       {topic:'Homework / Assignments',ph:['not writing homework','not doing homework','homework not done','incomplete homework','homework not given','too much homework','home work'],kw:['homework','assignment','worksheet','project','submission']},
       {topic:'Marks / Results',ph:['low marks','less marks','poor result','failed in','marks are low','not scoring'],kw:['marks','result','score','grade','exam','test','rank','percentage','fail']},
@@ -6633,8 +6663,28 @@ function renderCareSummary(){
       {topic:'Unreachable',ph:['not reachable','switched off','out of service','out of coverage'],kw:['unreachable']},
       {topic:'No Pick Up',ph:['not answering','not picking','no response','call not answered','busy'],kw:['ringing']},
       {topic:'General',kw:[]}
+    ],
+    /* Anything whose category is not one of the eight above lands here. Without
+       this entry those calls produced no topics at all — which is exactly where
+       the washroom, water and cleanliness complaints were disappearing to, and
+       why they never showed up in any panel. */
+    'Other':[
+      {topic:'Fees / Payment',ph:['fee receipt','fee payment','fee structure','not updated in portal','refund'],kw:['fee','fees','payment','challan']},
+      {topic:'Safety / Infrastructure',ph:['not safe','safety concern','wire hanging','open wire','no railing'],kw:['unsafe','hazard']},
+      {topic:'Staff Behaviour',ph:['staff is rude','behaviour of staff','spoke rudely','misbehaved with'],kw:['rude','misbehave']},
+      {topic:'Miscellaneous',kw:[]}
     ]
   };
+
+  /* Subjects and facilities can be mentioned in a call filed under ANY category,
+     so both axes are available everywhere. They are inserted before each
+     category's catch-all, which must stay last. */
+  Object.keys(TOPIC_RULES).forEach(function(c){
+    var list = TOPIC_RULES[c];
+    var tail = list.filter(function(b){ return !(b.kw&&b.kw.length) && !(b.ph&&b.ph.length); });
+    var head = list.filter(function(b){ return (b.kw&&b.kw.length) || (b.ph&&b.ph.length); });
+    TOPIC_RULES[c] = head.concat(SUBJECT_RULES, FACILITY_RULES, tail);
+  });
 
   /* The Category Mix sub-topics and the Top-10 problems panel used to run two
      different lexicons over the same remark, so "Teaching Quality" read 51 in
@@ -6677,13 +6727,13 @@ function renderCareSummary(){
        otherwise "maths is difficult, not able to understand" counted only as
        Teaching Quality and the maths teacher never appeared in the numbers.
        Among the problem types, the winner takes it, plus anything close. */
-    var subjHits = scored.filter(function(x){ return x.b.subj && x.s > 0; });
-    var probMax  = Math.max.apply(null, scored.filter(function(x){ return !x.b.subj; })
+    var axisHits = scored.filter(function(x){ return (x.b.subj||x.b.fac) && x.s > 0; });
+    var probMax  = Math.max.apply(null, scored.filter(function(x){ return !(x.b.subj||x.b.fac); })
                                               .map(function(x){ return x.s; }).concat([0]));
     var probHits = probMax > 0
-      ? scored.filter(function(x){ return !x.b.subj && x.s >= probMax*0.6 && x.s > 0; })
+      ? scored.filter(function(x){ return !(x.b.subj||x.b.fac) && x.s >= probMax*0.6 && x.s > 0; })
       : [];
-    var out = probHits.concat(subjHits).sort(function(a2,b2){ return b2.s-a2.s; });
+    var out = probHits.concat(axisHits).sort(function(a2,b2){ return b2.s-a2.s; });
     if(!out.length){
       var fb2 = rules.find(function(b){ return !(b.kw&&b.kw.length)&&!(b.ph&&b.ph.length); });
       return fb2 ? [{cat:cat, topic:fb2.topic}] : [];
@@ -14638,6 +14688,15 @@ window.CARE_PROBLEMS = (function () {
     'English':['🔤','#1E4FD8'], 'Hindi':['🕉️','#EA580C'], 'Telugu':['🪔','#C2410C'],
     'Mathematics':['🔢','#0891B2'], 'Science':['🔬','#059669'],
     'Social Studies':['🌍','#0D9488'], 'Computer / ICT':['💻','#6366F1'],
+    'French':['🇫🇷','#4338CA'], 'Sanskrit':['🕉️','#B45309'],
+    'Social / Humanities':['🌍','#0D9488'], 'Second / Third Language':['🗣️','#7C3AED'],
+    "Let's Explore / UWS":['🧭','#0891B2'],
+    'Washrooms / Toilets':['🚻','#0891B2'], 'Drinking Water / RO':['🚰','#0EA5E9'],
+    'Cleanliness / Hygiene':['🧼','#14B8A6'], 'Classroom / Furniture':['🪑','#78716C'],
+    'Building / Safety':['🏗️','#B91C1C'], 'Uniform / Books Supply':['👕','#0EA5E9'],
+    'Playground / Sports Facility':['🛝','#EC4899'],
+    'Fees / Payment':['💳','#F59E0B'], 'Safety / Infrastructure':['🏗️','#B91C1C'],
+    'Staff Behaviour':['🗣️','#EA580C'], 'Miscellaneous':['📌','#94A3B8'],
     'Attention / Focus':['🎯','#A855F7'], 'Safety':['🦺','#B91C1C'],
     'Teaching Quality':['📚','#1E4FD8'], 'General Academic':['📖','#3B82F6'],
     'Communication':['📵','#D97706'], 'Reading / Writing':['✍️','#6366F1'],
@@ -14668,7 +14727,11 @@ window.CARE_PROBLEMS = (function () {
   function themesOf(row){
     if(!window._careTopicsOf) return [];
     return window._careTopicsOf(row).map(function(x){
-      return { k:x.cat+' › '+x.topic, label:x.topic, cat:x.cat,
+      /* Keyed by the topic alone, not by category › topic. A dirty washroom is
+         the same problem whether the call was filed under Administration or
+         Other, and splitting it three ways made each fragment look too small to
+         act on while the same label appeared three times in one list. */
+      return { k:x.topic, label:x.topic, cat:x.cat,
                icon:iconFor(x.topic), c:colorFor(x.topic) };
     });
   }
