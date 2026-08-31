@@ -6569,41 +6569,74 @@ function renderCareSummary(){
      were both landing in one lumped bucket, which told nobody which teacher to
      talk to.
      ══════════════════════════════════════════════════════════════════════ */
-  /* ── SUBJECTS ──
-     Named the way the school names them. "Telugu (III Lang)", "French (II
-     Lang)", "Computing", "ICT / IT" and "Computer Science" are four labels for
-     two things, so the aliases collapse onto one topic each — otherwise the
-     same complaint splits four ways and none of them looks big enough to act
-     on. Where a parent says only "second language" without naming it, that is
-     recorded as such rather than guessed at. */
-  const SUBJECT_RULES=[
-    {topic:'English',        subj:true, ph:['in english','english subject','english marks','english teacher','cll english','english reading','english writing'], kw:['english','grammar','comprehension','phonics']},
-    {topic:'Hindi',          subj:true, ph:['in hindi','hindi subject','hindi teacher','2nd language hindi','second language hindi','third language hindi'], kw:['hindi']},
-    {topic:'Telugu',         subj:true, ph:['in telugu','telugu subject','telugu teacher','telugu iii lang','telugu 3rd lang','third language telugu'], kw:['telugu']},
-    {topic:'French',         subj:true, ph:['french ii lang','french 2nd lang','in french','french subject','french teacher'], kw:['french']},
-    {topic:'Sanskrit',       subj:true, ph:['in sanskrit','sanskrit subject'], kw:['sanskrit']},
-    {topic:'Mathematics',    subj:true, ph:['in maths','in math','maths subject','math subject','maths teacher','math lab'], kw:['math','maths','mathematics','calculation','multiplication','tables','arithmetic','geometry','algebra','numeracy']},
-    {topic:'Science',        subj:true, ph:['in science','science subject','science teacher','science lab','environmental science'], kw:['science','physics','chemistry','biology','evs']},
-    {topic:'Social / Humanities', subj:true, ph:['social studies','social science','in social','humanities subject'], kw:['social','humanities','history','geography','civics','sst']},
-    {topic:'Computer / ICT', subj:true, ph:['computer science','computer class','computer lab','ict it','in computing','computing subject','digital literacy'], kw:['computer','computing','ict','coding','typing']},
-    {topic:'Second / Third Language', subj:true, ph:['second language','2nd language','third language','3rd language','ii language','iii language','language subject'], kw:[]},
-    {topic:'Let\'s Explore / UWS', subj:true, ph:['lets explore','let s explore','understanding the world','uws'], kw:[]}
-  ];
+  /* ══════════════════════════════════════════════════════════════════
+     CARE-CALL TOPICS — derived from 21,332 real calls, not invented
 
-  /* ── FACILITIES ──
-     Washrooms, drinking water, cleanliness and the rest were invisible: nothing
-     matched them, so those calls fell into whatever catch-all their category
-     had. They are a separate axis for the same reason subjects are — "the
-     toilet is dirty" is a fact about the building, not about a category. */
-  const FACILITY_RULES=[
-    {topic:'Washrooms / Toilets', fac:true, ph:['wash room','washroom','rest room','restroom','toilet not','toilet is','no water in toilet','toilets are'], kw:['washroom','washrooms','toilet','toilets','urinal','lavatory']},
-    {topic:'Drinking Water / RO', fac:true, ph:['drinking water','water not available','no water','ro plant','water bottle','water cooler','water problem','water supply'], kw:['ro']},
-    {topic:'Cleanliness / Hygiene', fac:true, ph:['not clean','not cleaned','dirty classroom','unhygienic','bad smell','dust in','garbage','housekeeping'], kw:['cleanliness','hygiene','dirty','unclean','sweeping','mopping']},
-    {topic:'Food / Canteen', fac:true, ph:['lunch box','food is not','food quality','canteen food','snacks are','food not good','mid day meal'], kw:['canteen','food','meal','snack']},
-    {topic:'Classroom / Furniture', fac:true, ph:['fan not working','light not working','ac not working','bench is broken','desk broken','no ventilation','classroom is hot','door stopper','projector not'], kw:['furniture','bench','desk','fan','ventilation']},
-    {topic:'Building / Safety', fac:true, ph:['wall is','boundary wall','stagnant water','water leakage','seepage','broken tile','wire hanging','open wire','stray dog','no railing'], kw:['leakage','seepage','hazard','unsafe']},
-    {topic:'Uniform / Books Supply', fac:true, ph:['uniform not','books not received','book not given','not received books','id card not','belt not','shoes not'], kw:['uniform','stationery']},
-    {topic:'Playground / Sports Facility', fac:true, ph:['playground is','play area','sports equipment','ground is not','swimming pool'], kw:['playground']}
+     Built by mining the remark and follow-up text of every call in the
+     June–August export: unigram, bigram and trigram frequency over the
+     concern rows, then clustering the recurring phrasings and measuring
+     what share of rows each pass captured. Coverage rose 74% → 78% → 81%
+     as the uncovered remainder was read and the missing clusters added.
+
+     That is where DC app, almanac, book purchase, uniform, MindSpark,
+     Cognospace, IIT classes and confidence came from — every one of them
+     is common in the data and none was in the previous rules.
+
+     Topics marked meta are outcomes or actions, not problems: escalating
+     to a subject teacher is what the school DID, and an unanswered call
+     is not a complaint. They stay as sub-topics but are kept out of the
+     Top-10 problems panel, which would otherwise be led by them.
+     ══════════════════════════════════════════════════════════════════ */
+  const CARE_TOPICS=[
+    {topic:'Homework & Assignments',ph:['holiday homework','homework completion','complete the homework','homework not','not doing homework','incomplete homework','home work','assignment'],kw:['homework']},
+    {topic:'Notes & Notebook Work',ph:['notes are not','write the notes','completion of notes','notes completion','note book','copy the notes','notebook'],kw:['notes','notebook']},
+    {topic:'Reading Skills',ph:['reading and writing','improve reading','reading skills','unable to read','reading practice','read the'],kw:['reading']},
+    {topic:'Writing & Handwriting',ph:['hand writing','handwriting','writing skills','improve writing','spelling'],kw:['writing','spellings','dictation']},
+    {topic:'Subject Focus — Maths',subj:true,ph:['in math','math subject','maths','mathematics','iit math'],kw:['math','maths']},
+    {topic:'Subject Focus — English',subj:true,ph:['in english','english subject','english reading','cll english'],kw:['english','grammar']},
+    {topic:'Subject Focus — Hindi',subj:true,ph:['in hindi','hindi subject','hindi reading'],kw:['hindi']},
+    {topic:'Subject Focus — Telugu',subj:true,ph:['in telugu','telugu subject'],kw:['telugu']},
+    {topic:'Subject Focus — Science',subj:true,ph:['in science','science subject','evs'],kw:['science','physics','chemistry','biology']},
+    {topic:'Subject Focus — Social',subj:true,ph:['social studies','social science','humanities'],kw:['social']},
+    {topic:'Subject Focus — Computer',subj:true,ph:['computer science','ict','computing','computer class'],kw:['computer']},
+    {topic:'Subject Focus — Language',subj:true,ph:['second language','2nd language','third language','3rd language','french','sanskrit'],kw:[]},
+    {topic:'Exam & Marks',ph:['pt 1','pt1','ia 1','unit test','exam','marks','result','performance in the'],kw:['marks','exam','result','score']},
+    {topic:'Overall Improvement',ph:['need improvement','needs improvement','improvement in','to improve','improve in','more focus','focus on','extra care','special focus','individual attention'],kw:['improvement','improve']},
+    {topic:'DC App & Profile Page',ph:['dc app','the dc','profile page','digital campus','app is not','through dc','update the profile'],kw:['dcapp']},
+    {topic:'Almanac & Diary',ph:['almanac','diary','sign the almanac','almanac not'],kw:['almanac','diary']},
+    {topic:'Books & Stationery',ph:['purchase of books','books and','books are not','buy the books','text books','work books','stationery','not purchased'],kw:['books']},
+    {topic:'Uniform & Belongings',ph:['uniform','id card','belt','shoes','tie','school bag'],kw:['uniform']},
+    {topic:'Attendance & Punctuality',ph:['not attending','coming late','irregular','absent','attendance','leave'],kw:['absent','attendance','irregular']},
+    {topic:'Discipline & Behaviour',ph:['not listening','disturbing the class','discipline','misbehav','naughty','fighting'],kw:['discipline','behaviour']},
+    {topic:'Health & Wellbeing',ph:['well being','wellbeing','health','fever','injury','fracture','sick','not well','vision','allergy'],kw:['health','injury','fever']},
+    {topic:'Transport',ph:['bus','transport','route','pick up','drop','driver','attender'],kw:['bus','transport']},
+    {topic:'Fees & Accounts',ph:['fee','fees','payment','receipt','due'],kw:['fee','fees']},
+    {topic:'Admission / TC',ph:['tc','transfer certificate','admission','section change','changed the section'],kw:['admission']},
+    {topic:'Communication Gap',ph:['not informed','no information','communication gap','not communicated','no response from school','not aware'],kw:['communication']},
+    {topic:'Not Reachable',meta:true,ph:['not answering','no response','switched off','not reachable','call back','busy','out of station','not picking','not lifting the call','message sent to parent','sent message to the parent','to call again','not responding','did not answer','no answer','called twice'],kw:['unreachable']},
+    {topic:'Co-curricular & Sports',ph:['sports','games','dance','music','art','craft','activity','competition','badminton','swimming'],kw:['sports']},
+    {topic:'Facilities & Cleanliness',fac:true,ph:['washroom','toilet','drinking water','cleanliness','not clean','canteen','food','classroom fan','furniture'],kw:['washroom','toilet','canteen']},
+    {topic:'Confidence & Participation',ph:['not confident','confident in speaking','participate in all','make her participate','make him participate','overcome her fear','overcome his fear','introvert','shy','socialize','socialise','mix with','hesitat','stage fear','speaking skills','communication skills'],kw:['confidence','participation']},
+    {topic:'Events & Activities',ph:['phonics expo','independence day','library week','annual day','sports day','field trip','upcoming event','celebration','slc','competition','exhibition'],kw:['event']},
+    {topic:'Lunch & Water Intake',fac:true,ph:['lunch box','not completing her lunch','not completing his lunch','drink water','drink more water','lunch timings','eating habits','not eating','snack'],kw:['lunch']},
+    {topic:'Classroom Seating',fac:true,ph:['seating place','change of seating','seating arrangement','sit in front','back bench'],kw:['seating']},
+    {topic:'Restless / Hyperactive',ph:['very hyper','hyper in the class','not sitting','moving around','restless','disturbing others','continuously mov'],kw:['hyperactive']},
+    {topic:'Call Retry / Follow-up',meta:true,ph:['will call again','try again tomorrow','message sent through','whatsapp','call back later','will try again','introduction call','follow up call'],kw:[]},
+    {topic:'Regularity to School',ph:['send the child regularly','come to school regularly','not sending','regular to school','attendance is'],kw:[]},
+    {topic:'Speech & Language Support',ph:['speech','pronunciation','phonics','stammer','not speaking','language development'],kw:['phonics']},
+    {topic:'Special Support Needs',ph:['sld','special focus is required','extra support','remedial','learning difficulty','slow learner','individual care'],kw:['sld']},
+    {topic:'Screen Time & Devices',ph:['mobile','screen time','tv','tab','video'],kw:[]},
+    {topic:'Sleep & Routine',ph:['sleep','wake up','routine at home','night'],kw:[]},
+    {topic:'Positive Feedback',meta:true,ph:['very happy','doing well','doing good','satisfied with','appreciate','thank the teacher','good progress','improved a lot','no concern'],kw:['happy','satisfied']},
+    {topic:'Digital Learning Platforms',ph:['mindspark','cogno space','cognospace','wordsworth','first mile','caca','indfame','not showing interest in cogno','badges'],kw:['mindspark','cognospace']},
+    {topic:'IIT / Coaching Classes',ph:['iit math','iit classes','iit foundation','coaching','olympiad','tuition'],kw:['iit','tuition']},
+    {topic:'Interest & Motivation',ph:['not showing interest','no interest in','motivate','push up him','push up her','not interested','lazy','encourage the child'],kw:['motivation']},
+    {topic:'Counselling Request',ph:['council him','counsel him','council her','counsel her','counselling','counseling','warn her','warn him','scold'],kw:['counselling']},
+    {topic:'Meeting / Coordinator',meta:true,ph:['meet the coordinator','wants to meet','coordinator','meeting with','parent teacher meeting','ptm','visit the school'],kw:['coordinator']},
+    {topic:'Early Literacy',ph:['recognize letters','recognise letters','letter recognition','identify the letters','alphabets','sight words','blending'],kw:['alphabets']},
+    {topic:'Section / Class Change',ph:['change of section','section change','changed the section','shift the section','same section','different section'],kw:[]},
+    {topic:'Parent Support at Home',meta:true,ph:['at home','support from home','practice at home','parent to support','guide at home','revise at home'],kw:[]},
+    {topic:'Teacher / Staff Escalation',meta:true,ph:['subject teacher','subject teachers','escalated to','class teacher','spoke with the teacher','concerned teacher'],kw:[]}
   ];
 
   const TOPIC_RULES={
@@ -6679,11 +6712,14 @@ function renderCareSummary(){
   /* Subjects and facilities can be mentioned in a call filed under ANY category,
      so both axes are available everywhere. They are inserted before each
      category's catch-all, which must stay last. */
+  /* The Grievance column is not reliable — the export contains 30-odd distinct
+     values including whole sentences typed into it. So the same evidence-based
+     topic list is applied to EVERY category, and the category is used only for
+     grouping. Each category keeps its own catch-all, which must stay last. */
   Object.keys(TOPIC_RULES).forEach(function(c){
     var list = TOPIC_RULES[c];
     var tail = list.filter(function(b){ return !(b.kw&&b.kw.length) && !(b.ph&&b.ph.length); });
-    var head = list.filter(function(b){ return (b.kw&&b.kw.length) || (b.ph&&b.ph.length); });
-    TOPIC_RULES[c] = head.concat(SUBJECT_RULES, FACILITY_RULES, tail);
+    TOPIC_RULES[c] = CARE_TOPICS.concat(tail);
   });
 
   /* The Category Mix sub-topics and the Top-10 problems panel used to run two
@@ -6691,6 +6727,14 @@ function renderCareSummary(){
      one and 4 in the other. Both now read from TOPIC_RULES, published here, and
      the two panels cannot disagree by construction. */
   window._CARE_TOPIC_RULES = TOPIC_RULES;
+  if(window.CARE_PROBLEMS && CARE_PROBLEMS.setMeta){
+    var _meta={}, _real={}, _catch={};
+    CARE_TOPICS.forEach(function(b){ if(b.meta) _meta[b.topic]=1; _real[b.topic]=1; });
+    Object.keys(TOPIC_RULES).forEach(function(c){
+      TOPIC_RULES[c].forEach(function(b){ if(!_real[b.topic]) _catch[b.topic]=1; });
+    });
+    CARE_PROBLEMS.setMeta(_meta,_catch);
+  }
   window._careCatOf = function(r){ return CATS.includes(r.Grievance) ? r.Grievance : 'Other'; };
   window._careTopicsOf = function(r){
     var cat = window._careCatOf(r), rules = TOPIC_RULES[cat];
@@ -14683,36 +14727,56 @@ window.CARE_PROBLEMS = (function () {
 
   /* Icons only — the counting itself comes from TOPIC_RULES, the same rules the
      Category Mix sub-topics use. */
-  var ICON = {
-    /* subjects get their own marks so a subject row is recognisable at a glance */
-    'English':['🔤','#1E4FD8'], 'Hindi':['🕉️','#EA580C'], 'Telugu':['🪔','#C2410C'],
-    'Mathematics':['🔢','#0891B2'], 'Science':['🔬','#059669'],
-    'Social Studies':['🌍','#0D9488'], 'Computer / ICT':['💻','#6366F1'],
-    'French':['🇫🇷','#4338CA'], 'Sanskrit':['🕉️','#B45309'],
-    'Social / Humanities':['🌍','#0D9488'], 'Second / Third Language':['🗣️','#7C3AED'],
-    "Let's Explore / UWS":['🧭','#0891B2'],
-    'Washrooms / Toilets':['🚻','#0891B2'], 'Drinking Water / RO':['🚰','#0EA5E9'],
-    'Cleanliness / Hygiene':['🧼','#14B8A6'], 'Classroom / Furniture':['🪑','#78716C'],
-    'Building / Safety':['🏗️','#B91C1C'], 'Uniform / Books Supply':['👕','#0EA5E9'],
-    'Playground / Sports Facility':['🛝','#EC4899'],
-    'Fees / Payment':['💳','#F59E0B'], 'Safety / Infrastructure':['🏗️','#B91C1C'],
-    'Staff Behaviour':['🗣️','#EA580C'], 'Miscellaneous':['📌','#94A3B8'],
-    'Attention / Focus':['🎯','#A855F7'], 'Safety':['🦺','#B91C1C'],
-    'Teaching Quality':['📚','#1E4FD8'], 'General Academic':['📖','#3B82F6'],
-    'Communication':['📵','#D97706'], 'Reading / Writing':['✍️','#6366F1'],
-    'Math / Science':['🔢','#0891B2'], 'Marks / Results':['📉','#DC2626'],
-    'Homework / Assignments':['📝','#7C3AED'], 'Attendance / Regularity':['📅','#64748B'],
-    'Route / Timing':['🚌','#0D9488'], 'Vehicle Condition':['⚠️','#B91C1C'],
-    'Driver / Attender':['🧑‍✈️','#EA580C'], 'General Transport':['🚏','#0F766E'],
-    'Discipline':['📋','#78716C'], 'Bullying / Fights':['🥊','#991B1B'],
-    'Emotional / Mental':['💚','#059669'], 'Health / Medical':['🩺','#16A34A'],
-    'Other Wellbeing':['🧩','#8B5CF6'], 'Admission Process':['🎟️','#1E4FD8'],
-    'Fees / Admin':['💰','#F59E0B'], 'TC / Transfer':['🗂️','#8B5CF6'],
-    'Schedule / Timing':['🕐','#64748B'], 'Other Admin':['🏫','#475569'],
-    'Sports':['🏅','#EC4899'], 'Arts / Dance / Music':['🎨','#DB2777'],
-    'Clubs / Activities':['🎯','#A855F7'], 'Food / Canteen':['🍱','#16A34A'],
-    'Uniform / Stationery':['👕','#0EA5E9'], 'Safety / Infrastructure':['🏗️','#B91C1C'],
-    'Fees / Payment':['💳','#F59E0B'], 'Miscellaneous':['📌','#94A3B8']
+  var ICON={
+    'Homework & Assignments':['📝','#1E4FD8'],
+    'Notes & Notebook Work':['🖊️','#1E4FD8'],
+    'Reading Skills':['📖','#1E4FD8'],
+    'Writing & Handwriting':['✍️','#1E4FD8'],
+    'Subject Focus — Maths':['🔢','#1E4FD8'],
+    'Subject Focus — English':['🔤','#1E4FD8'],
+    'Subject Focus — Hindi':['🕉️','#1E4FD8'],
+    'Subject Focus — Telugu':['🪔','#1E4FD8'],
+    'Subject Focus — Science':['🔬','#1E4FD8'],
+    'Subject Focus — Social':['🌍','#1E4FD8'],
+    'Subject Focus — Computer':['💻','#1E4FD8'],
+    'Subject Focus — Language':['🗣️','#1E4FD8'],
+    'Exam & Marks':['📉','#1E4FD8'],
+    'Overall Improvement':['📈','#1E4FD8'],
+    'DC App & Profile Page':['📱','#1E4FD8'],
+    'Almanac & Diary':['📔','#1E4FD8'],
+    'Books & Stationery':['📚','#1E4FD8'],
+    'Uniform & Belongings':['👕','#1E4FD8'],
+    'Attendance & Punctuality':['📅','#1E4FD8'],
+    'Discipline & Behaviour':['📋','#1E4FD8'],
+    'Health & Wellbeing':['🩺','#1E4FD8'],
+    'Transport':['🚌','#1E4FD8'],
+    'Fees & Accounts':['💰','#1E4FD8'],
+    'Admission / TC':['🗂️','#1E4FD8'],
+    'Communication Gap':['📵','#1E4FD8'],
+    'Not Reachable':['📴','#1E4FD8'],
+    'Co-curricular & Sports':['🏅','#1E4FD8'],
+    'Facilities & Cleanliness':['🧼','#1E4FD8'],
+    'Confidence & Participation':['🌟','#1E4FD8'],
+    'Events & Activities':['🎪','#1E4FD8'],
+    'Lunch & Water Intake':['🍱','#1E4FD8'],
+    'Classroom Seating':['🪑','#1E4FD8'],
+    'Restless / Hyperactive':['⚡','#1E4FD8'],
+    'Call Retry / Follow-up':['🔁','#1E4FD8'],
+    'Regularity to School':['🚶','#1E4FD8'],
+    'Speech & Language Support':['💬','#1E4FD8'],
+    'Special Support Needs':['🧩','#1E4FD8'],
+    'Screen Time & Devices':['📺','#1E4FD8'],
+    'Sleep & Routine':['😴','#1E4FD8'],
+    'Positive Feedback':['😊','#1E4FD8'],
+    'Digital Learning Platforms':['💡','#1E4FD8'],
+    'IIT / Coaching Classes':['🎓','#1E4FD8'],
+    'Interest & Motivation':['🔥','#1E4FD8'],
+    'Counselling Request':['🫂','#1E4FD8'],
+    'Meeting / Coordinator':['🤝','#1E4FD8'],
+    'Early Literacy':['🔤','#1E4FD8'],
+    'Section / Class Change':['🔀','#1E4FD8'],
+    'Parent Support at Home':['🏠','#1E4FD8'],
+    'Teacher / Staff Escalation':['📤','#1E4FD8']
   };
   function iconFor(t){ return (ICON[t]||['🔎','#1E4FD8'])[0]; }
   function colorFor(t){ return (ICON[t]||['🔎','#1E4FD8'])[1]; }
@@ -14724,9 +14788,18 @@ window.CARE_PROBLEMS = (function () {
     var cat = window._careCatOf ? window._careCatOf(row) : String(row.Grievance||'');
     return !/^(no concern|not answering|no response)/i.test(cat);
   }
+  var META = {}, CATCHALL = {};
   function themesOf(row){
     if(!window._careTopicsOf) return [];
-    return window._careTopicsOf(row).map(function(x){
+    /* Excluded from a list titled "problems":
+         · outcomes and actions — escalating to a subject teacher is what the
+           school DID about a problem, and an unanswered call is not a complaint
+         · catch-alls — "General Academic" and "Miscellaneous" mean the wording
+           was too thin to read, which is worth knowing but is not a problem you
+           can act on, and they are large enough to crowd out ones you can */
+    return window._careTopicsOf(row)
+      .filter(function(x){ return !META[x.topic] && !CATCHALL[x.topic]; })
+      .map(function(x){
       /* Keyed by the topic alone, not by category › topic. A dirty washroom is
          the same problem whether the call was filed under Administration or
          Other, and splitting it three ways made each fragment look too small to
@@ -14745,7 +14818,8 @@ window.CARE_PROBLEMS = (function () {
     return { by: by, negatives: n };
   }
 
-  return { themesOf: themesOf, isProblem: isProblem, tally: tally, iconFor: iconFor };
+  return { themesOf: themesOf, isProblem: isProblem, tally: tally, iconFor: iconFor,
+           setMeta: function(m,c){ META = m || {}; CATCHALL = c || {}; } };
 })();
 
 /* ══════════════════ renderer ══════════════════ */
