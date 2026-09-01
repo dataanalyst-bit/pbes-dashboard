@@ -473,6 +473,38 @@ table.auhm tr.au-itemrow td{border-color:#E8EEF2}
   text-transform:uppercase;letter-spacing:.05em;color:var(--txm);padding-bottom:7px;border-bottom:2px solid var(--bor)}
 .cp-hd span:last-child{text-align:right}
 
+
+/* ═══ K-INNOVATIVE PTM ═══ */
+.kp-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:16px}
+.kp-k{border:1px solid var(--bor);border-top:3px solid var(--p);border-radius:11px;padding:12px 14px;background:var(--sur);cursor:pointer}
+.kp-k:hover{box-shadow:0 4px 14px rgba(0,0,0,.07)}
+.kp-k .l{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--txm)}
+.kp-k .v{font-size:27px;font-weight:800;line-height:1.1;margin:3px 0 1px}
+.kp-k .d{font-size:10.5px;color:var(--txm);line-height:1.45}
+.kp-two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:980px){.kp-two{grid-template-columns:1fr}}
+.kp-h{font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--tx);margin:0 0 4px}
+.kp-sub{font-size:11px;color:var(--txm);margin:0 0 10px;line-height:1.5}
+.kp-row{display:grid;grid-template-columns:1fr 92px;gap:10px;align-items:center;padding:7px 4px;
+  border-bottom:1px solid var(--bor);cursor:pointer}
+.kp-row:hover{background:var(--pl)}
+.kp-row:last-child{border-bottom:none}
+.kp-nm{font-size:12.5px;font-weight:600;color:var(--tx)}
+.kp-meta{font-size:9.5px;color:#94A3B8;margin-top:2px}
+.kp-bar{height:7px;background:#EEF2FF;border-radius:99px;overflow:hidden;margin-top:3px}
+.kp-bar i{display:block;height:100%;border-radius:99px}
+.kp-n{text-align:right;font-size:12.5px;font-weight:800;font-variant-numeric:tabular-nums}
+table.kpt{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;min-width:560px}
+table.kpt th{background:#F1F7F3;color:#07361F;font-size:9.5px;font-weight:800;text-transform:uppercase;
+  padding:7px 9px;border-bottom:2px solid #B7CFC0;text-align:center}
+table.kpt th.nm,table.kpt td.nm{text-align:left}
+table.kpt td{padding:8px 9px;text-align:center;border-bottom:1px solid #E6EEF7}
+table.kpt td.c{cursor:pointer;font-weight:700;color:#1E4FD8}
+table.kpt td.c:hover{background:var(--pl)}
+table.kpt td.c.z{color:#CBD5E1;font-weight:500}
+.kp-flag{background:#FFFBEB;border-left:3px solid #D97706;padding:9px 12px;border-radius:0 8px 8px 0;
+  font-size:11.5px;color:#92400E;line-height:1.55;margin-bottom:12px}
+
 /* ═══ VIGILANCE CHECKLIST ═══ */
 .vck-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-bottom:16px}
 .vck-k{border:1px solid var(--bor);border-top:3px solid var(--p);border-radius:11px;padding:12px 14px;background:var(--sur);cursor:pointer}
@@ -865,14 +897,14 @@ const ROLE_TABS = {
   /* Same as grievance_officer, plus Admissions. Kept as its own role rather
      than widening grievance_officer, because that would silently hand
      Admissions to every other grievance officer at the same time. */
-  grievance_admissions: ['care','grievance','ptm','admissions'],
+  grievance_admissions: ['care','grievance','ptm','admissions','kptm'],
   hr_grievance:      ['hr','observations','care','grievance','ptm'],
   /* Academic coordinators — the five academic-quality views, own branch only.
      Deliberately NOT given Admin, Vigilance, Purchase, HR or Transport: those
      carry staff salaries, disciplinary matters and vendor pricing that a
      coordinator has no reason to see. */
-  coordinator:       ['care','pt1','ptm','grievance','syl'],
-  principal:         ['overview','care','observations','admissions','grievance','transport','it','pt1','audit','ptm','civil','syl','meet']
+  coordinator:       ['care','pt1','ptm','grievance','syl','kptm'],
+  principal:         ['overview','care','observations','admissions','grievance','transport','it','pt1','audit','ptm','civil','syl','meet','kptm']
 };
 // Roles that span every campus. Everyone else with a branch on their account is
 // pinned to it, and the payload is filtered to that branch server-side.
@@ -1043,6 +1075,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     <button class="tb" onclick="showTab('syl',this)" title="Syllabus &amp; Notebook"><span class="ic">📓</span><span class="lb">Syllabus &amp; Notebook</span></button>
     <div class="sn-grp">Parents & Students</div>
     <button class="tb" onclick="showTab('ptm',this)" title="PTM Feedback"><span class="ic">💬</span><span class="lb">PTM Feedback</span></button>
+    <button class="tb" onclick="showTab('kptm',this)" title="K-Innovative PTM Feedback"><span class="ic">⭐</span><span class="lb">K-Innovative PTM</span></button>
     <button class="tb" onclick="showTab('care',this)" title="Care Calls"><span class="ic">📞</span><span class="lb">Care Calls</span></button>
     <button class="tb" onclick="showTab('grievance',this)" title="Grievance"><span class="ic">📣</span><span class="lb">Grievance</span></button>
     <button class="tb" onclick="showTab('admissions',this)" title="Admissions 2026-27"><span class="ic">🎓</span><span class="lb">Admissions 2026-27</span></button>
@@ -2318,6 +2351,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="ph-foot">
     <div class="ph-cap" id="ph-cap"></div>
     <div class="ph-strip" id="ph-strip"></div>
+  </div>
+</div>
+
+
+<!-- ═══ K-INNOVATIVE PTM FEEDBACK ═══ -->
+<div id="pane-kptm" class="pane">
+  <div class="au-wrap">
+    <div class="au-head">
+      <div><h2 style="margin:0;font-size:20px;font-weight:800">⭐ K-Innovative PTM Feedback</h2>
+        <div style="font-size:12.5px;color:var(--txm);margin-top:3px" id="kp-meta">Loading…</div></div>
+      <div class="au-ctl">
+        <button class="exm-refresh" onclick="loadKptm(true)">↻ Refresh</button>
+        <span class="exm-status" id="kp-status"></span>
+      </div>
+    </div>
+    <div id="kp-body"><div class="no-data">Reading the feedback sheet…</div></div>
   </div>
 </div>
 
@@ -16227,6 +16276,429 @@ window.VCHK = (function () {
     var r=_st(id,btn); if(id==='care') setTimeout(safe,0); return r;
   };
   setTimeout(safe,2000);
+})();
+</script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   K-INNOVATIVE PTM FEEDBACK
+
+   8,231 families called, 19 rated dimensions each, plus concern tags and a
+   written remark. Two things the data itself dictates about how it is read:
+
+   · 93% of answered parents gave the SAME score to every one of the 19
+     questions. Every dimension therefore averages 4.51–4.54, and ranking
+     dimensions by mean says nothing — the ordering is noise. The panel reports
+     the straight-lining rate openly and ranks on the responses that actually
+     varied, which is where the discrimination is.
+
+   · Only 48% of calls were answered. A satisfaction score computed over
+     answered calls alone describes the half of parents who picked up, and the
+     half who did not are the ones more likely to be unhappy. Contact rate is
+     shown beside every score for that reason.
+   ══════════════════════════════════════════════════════════════════════════ */
+window.KPTM = (function () {
+  'use strict';
+  var DIMS = [
+    ['Quality of Teachers','Teaching'], ['Quality of Teaching','Teaching'],
+    ['Quality of evaluation(correction)','Teaching'],
+    ['Feedback and Interaction with parents','Communication'],
+    ['Participation in Co Curricular activities','Activities'],
+    ['Access to Coordinators/Teachers','Access'], ['Access to Principal/VP/HM','Access'],
+    ['Access to Admin Manager/Grievance officer','Access'], ['Resolving issues','Access'],
+    ['School Campus Maintenance','Facilities'], ['Maintenance of Washrooms','Facilities'],
+    ['Maintenance of Classrooms','Facilities'], ['Availability of Drinking Water','Facilities'],
+    ['Infrastructure facilities','Facilities'], ['Computer labs','Facilities'],
+    ['Sports','Activities'], ['Library facilities','Facilities'],
+    ['Satisfaction with overall academic performance','Teaching'],
+    ['School Communication','Communication'],
+    ['School Transport Condition of Buses','Transport'],
+    ['School Transport Behaviour of Drivers','Transport'],
+    ['School Transport Behaviour of Attenders','Transport']
+  ];
+  function norm(s){ return String(s==null?'':s).toLowerCase().replace(/[^a-z0-9]/g,''); }
+  function idx(hdr){
+    var low=hdr.map(norm), m={};
+    function f(){ for(var i=0;i<arguments.length;i++){ var k=low.indexOf(norm(arguments[i])); if(k>=0) return k; } return -1; }
+    m.branch=f('Branch'); m.cls=f('Class'); m.sec=f('Section'); m.board=f('Category / Board');
+    m.type=f('Student Type'); m.date=f('Call Date'); m.agent=f('Agent'); m.status=f('Call Status');
+    m.overall=f('Overall school Rating'); m.nps=f('Recommend us (0-5 scale)');
+    m.feedback=f('FEEDBACK'); m.concerns=f('Concerns'); m.remarks=f('Remarks');
+    m.dc=f('DC ISSUE'); m.student=f('Student Name'); m.sugg=f('Any suggestions');
+    m.dims=DIMS.map(function(d){ return f(d[0]); });
+    return m;
+  }
+  function num(v){ if(v===''||v===null||v===undefined) return null; var n=parseFloat(v); return isFinite(n)?n:null; }
+  /* the branch column carries prefixes — "PIS Keesara", "PMS Boduppal" */
+  function branchOf(v){
+    var s=String(v||'').replace(/^(pis|pms|pgs)\s+/i,'').trim();
+    return s || '(no branch)';
+  }
+  function toRows(tab){
+    var hdr=tab.hdr.map(function(x){ return String(x==null?'':x).trim(); }), M=idx(hdr);
+    if(M.branch<0) throw new Error('The feedback sheet needs a Branch column. It has: '+hdr.filter(Boolean).join(' | '));
+    return tab.rows.map(function(r){
+      var scores=M.dims.map(function(i){ return i>=0?num(r[i]):null; });
+      var given=scores.filter(function(x){ return x!==null; });
+      return {
+        branch:branchOf(r[M.branch]),
+        cls:M.cls>=0?String(r[M.cls]||'').trim():'', sec:M.sec>=0?String(r[M.sec]||'').trim():'',
+        board:M.board>=0?String(r[M.board]||'').trim():'',
+        type:M.type>=0?String(r[M.type]||'').trim().toUpperCase().replace(/_/g,' '):'',
+        date:M.date>=0?String(r[M.date]||'').slice(0,10):'',
+        agent:M.agent>=0?String(r[M.agent]||'').trim():'',
+        status:M.status>=0?String(r[M.status]||'').trim().toUpperCase():'',
+        student:M.student>=0?String(r[M.student]||'').trim():'',
+        overall:M.overall>=0?num(r[M.overall]):null,
+        nps:M.nps>=0?num(r[M.nps]):null,
+        feedback:M.feedback>=0?String(r[M.feedback]||'').trim():'',
+        concerns:M.concerns>=0?String(r[M.concerns]||'').trim():'',
+        remarks:M.remarks>=0?String(r[M.remarks]||'').trim():'',
+        dc:M.dc>=0?String(r[M.dc]||'').trim():'',
+        sugg:M.sugg>=0?String(r[M.sugg]||'').trim():'',
+        scores:scores, given:given.length,
+        straight: given.length>=10 && Math.max.apply(null,given)===Math.min.apply(null,given),
+        low: scores.map(function(x,i){ return (x!==null&&x<=3)?DIMS[i][0]:null; }).filter(Boolean)
+      };
+    }).filter(function(x){ return x.branch!=='(no branch)'; });
+  }
+  var ANSWERED=/^answered$/i;
+  function answered(r){ return ANSWERED.test(r.status); }
+  function noResponse(r){ return /^no response/i.test(r.status); }
+  function followUp(r){ return /^need follow up/i.test(r.status); }
+  function denied(r){ return /denied/i.test(r.status); }
+  /* concern tags arrive combined: "Teaching Quality, Student Support" */
+  var TAG_FIX = {
+    'transporation':'Transportation','transport':'Transportation','transporattion management':'Transportation',
+    'extra curricular activities':'Sports & activities','sports':'Sports & activities',
+    'sportsextra curricular activities':'Sports & activities','uniform':'Books & uniforms',
+    'uniforms':'Books & uniforms','books':'Books & uniforms','fees':'Fees','fee':'Fees',
+    'teachers behaviour':'Teacher behaviour','behavioural issues':'Student discipline',
+    'student discipline':'Student discipline','late communication':'Communication',
+    'staff responsiveness':'Management','iit coaching':'IIT coaching','others':'Other'
+  };
+  function tagsOf(r){
+    var raw=r.concerns||'';
+    if(!raw || /^no concerns?$/i.test(raw.trim())) return [];
+    return raw.split(/[,&\/]| and /i).map(function(t){
+      t=t.replace(/\s+/g,' ').trim(); if(!t) return null;
+      var k=t.toLowerCase();
+      if(/^no concerns?$/.test(k)) return null;
+      return TAG_FIX[k] || t.replace(/\b\w/g,function(c){return c.toUpperCase();});
+    }).filter(Boolean).filter(function(v,i,a){ return a.indexOf(v)===i; });
+  }
+  function hasConcern(r){
+    if(tagsOf(r).length) return true;
+    return !!r.feedback && !/^no concerns?$/i.test(r.feedback.trim());
+  }
+  return { DIMS:DIMS, toRows:toRows, answered:answered, noResponse:noResponse,
+           followUp:followUp, denied:denied, tagsOf:tagsOf, hasConcern:hasConcern };
+})();
+</script>
+<script>
+/* ══════════════════ K-Innovative PTM · renderer ══════════════════ */
+(function(){
+  var RAW=null, ROWS=[];
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function fi(n){ return (n||0).toLocaleString('en-IN'); }
+  function pc(a,b){ return b?Math.round(a/b*100):0; }
+  function mean(a){ return a.length ? a.reduce(function(x,y){return x+y;},0)/a.length : null; }
+
+  var COLS=[{key:'branch',label:'Branch'},{key:'cls',label:'Class'},{key:'sec',label:'Section'},
+    {key:'student',label:'Student',maxW:'150px'},{key:'date',label:'Call date',date:true},
+    {key:'agent',label:'Agent'},{key:'status',label:'Call status',pill:true},
+    {key:'overall',label:'Rating'},{key:'feedback',label:'Feedback',pill:true},
+    {key:'concerns',label:'Concern tags',maxW:'190px'},{key:'remarks',label:'What the parent said',maxW:'380px'}];
+  function open(title,sub,rows){ if(typeof openModal==='function') openModal(title,sub,rows,COLS); }
+
+  function scoped(){
+    var b=(typeof fBranch!=='undefined')?fBranch:'ALL';
+    return ROWS.filter(function(r){ return b==='ALL' || r.branch===b || ('PIS '+r.branch)===b || ('PMS '+r.branch)===b; });
+  }
+
+  function build(){
+    var el=$('kp-body'); if(!el) return;
+    if(!RAW){ el.innerHTML='<div class="no-data">Reading the feedback sheet…</div>'; return; }
+    var rows=scoped();
+    if(!rows.length){ el.innerHTML='<div class="no-data">No feedback rows for this branch.</div>'; return; }
+
+    var ans=rows.filter(KPTM.answered);
+    var noResp=rows.filter(KPTM.noResponse);
+    var follow=rows.filter(KPTM.followUp);
+    var denied=rows.filter(KPTM.denied);
+    var straight=ans.filter(function(r){ return r.straight; });
+    var varied=ans.filter(function(r){ return r.given>=10 && !r.straight; });
+    var concerns=ans.filter(KPTM.hasConcern);
+    var promoters=ans.filter(function(r){ return r.nps!==null && r.nps>=5; });
+    var detract=ans.filter(function(r){ return r.nps!==null && r.nps<=3; });
+    var lowRate=ans.filter(function(r){ return r.overall!==null && r.overall<=3; });
+    var overall=mean(ans.map(function(r){return r.overall;}).filter(function(x){return x!==null;}));
+
+    /* ── KPIs ── */
+    var K=[
+      {l:'Families called', v:fi(rows.length), c:'#0F172A',
+       d:new Set(rows.map(function(r){return r.branch;})).size+' branches', list:rows, t:'Every family called'},
+      {l:'Reached', v:pc(ans.length,rows.length)+'%', c:pc(ans.length,rows.length)>=60?'#059669':'#D97706',
+       d:fi(ans.length)+' answered of '+fi(rows.length), list:ans, t:'Parents who answered'},
+      {l:'No response', v:fi(noResp.length), c:'#DC2626',
+       d:pc(noResp.length,rows.length)+'% never picked up', list:noResp, t:'No response'},
+      {l:'Need follow up', v:fi(follow.length), c:'#D97706',
+       d:'promised a call back', list:follow, t:'Need follow up'},
+      {l:'Overall rating', v:overall===null?'—':overall.toFixed(2), c:'#1E4FD8',
+       d:'of 5, among parents who answered', list:ans, t:'Answered calls'},
+      {l:'Raised a concern', v:fi(concerns.length), c:concerns.length?'#B91C1C':'#059669',
+       d:pc(concerns.length,ans.length)+'% of answered calls', list:concerns, t:'Calls raising a concern'},
+      {l:'Rated 3 or below', v:fi(lowRate.length), c:'#DC2626',
+       d:pc(lowRate.length,ans.length)+'% of answered', list:lowRate, t:'Overall rating 3 or below'},
+      {l:'Would not recommend', v:fi(detract.length), c:'#B91C1C',
+       d:'scored 3 or less out of 5', list:detract, t:'Recommend score 3 or below'}
+    ];
+    var html='<div class="kp-kpis">'+K.map(function(k,i){
+      return '<div class="kp-k" data-k="'+i+'" style="border-top-color:'+k.c+'" title="Click to view these records">'+
+        '<div class="l">'+esc(k.l)+'</div><div class="v" style="color:'+k.c+'">'+k.v+'</div>'+
+        '<div class="d">'+esc(k.d)+'</div></div>';
+    }).join('')+'</div>';
+
+    /* ── the straight-lining warning, because it governs how everything else reads ── */
+    if(ans.length){
+      html+='<div class="kp-flag"><b>'+pc(straight.length,ans.length)+'% of parents who answered gave the '+
+        'identical score to all 19 questions.</b> Every dimension therefore averages within 0.03 of every '+
+        'other, and ranking them by mean score would be reading noise. The dimension table below is built '+
+        'from the <b>'+fi(varied.length)+'</b> responses that actually varied, which is where the signal is. '+
+        'Treat the rating grid as a satisfaction thermometer, not as a diagnostic.</div>';
+    }
+
+    /* ── BRANCH COMPARISON ── */
+    var brs={};
+    rows.forEach(function(r){ (brs[r.branch]||(brs[r.branch]={b:r.branch,all:[],ans:[]})).all.push(r); });
+    rows.filter(KPTM.answered).forEach(function(r){ brs[r.branch].ans.push(r); });
+    var blist=Object.keys(brs).map(function(k){
+      var o=brs[k];
+      var ov=mean(o.ans.map(function(r){return r.overall;}).filter(function(x){return x!==null;}));
+      var conc=o.ans.filter(KPTM.hasConcern).length;
+      return {b:o.b, all:o.all, ans:o.ans, reach:pc(o.ans.length,o.all.length),
+              ov:ov, conc:conc, concPct:pc(conc,o.ans.length),
+              low:o.ans.filter(function(r){return r.overall!==null&&r.overall<=3;}).length};
+    }).sort(function(a,b){ return (b.ov||0)-(a.ov||0); });
+
+    html+='<div class="au-sec"><div class="kp-h">🏫 Branch comparison</div>'+
+      '<div class="kp-sub">Ranked by the rating parents gave. Reach matters as much as the score — a high '+
+      'rating from half the families is a narrower claim than the same rating from most of them.</div>'+
+      '<div style="overflow-x:auto"><table class="kpt"><thead><tr><th class="nm">Branch</th>'+
+      '<th>Called</th><th>Reached</th><th>Reach %</th><th>Rating</th><th>Concerns</th>'+
+      '<th>Concern %</th><th>Rated ≤3</th></tr></thead><tbody>'+
+      blist.map(function(x,i){
+        var rc=x.reach>=60?'#059669':x.reach>=40?'#D97706':'#DC2626';
+        var oc=x.ov===null?'#94A3B8':x.ov>=4.5?'#059669':x.ov>=4?'#D97706':'#DC2626';
+        return '<tr><td class="nm">'+esc(x.b)+'</td>'+
+          '<td class="c" data-br="'+i+'" data-f="all">'+fi(x.all.length)+'</td>'+
+          '<td class="c" data-br="'+i+'" data-f="ans">'+fi(x.ans.length)+'</td>'+
+          '<td style="color:'+rc+';font-weight:800">'+x.reach+'%</td>'+
+          '<td style="color:'+oc+';font-weight:800">'+(x.ov===null?'—':x.ov.toFixed(2))+'</td>'+
+          '<td class="c'+(x.conc?'':' z')+'" data-br="'+i+'" data-f="conc">'+fi(x.conc)+'</td>'+
+          '<td style="color:'+(x.concPct>15?'#DC2626':'#64748B')+'">'+x.concPct+'%</td>'+
+          '<td class="c'+(x.low?'':' z')+'" data-br="'+i+'" data-f="low">'+fi(x.low)+'</td></tr>';
+      }).join('')+'</tbody></table></div></div>';
+    window._KP_BR=blist;
+
+    /* ── TOP 10 PROBLEMS from the concern tags ── */
+    var tagMap={};
+    ans.forEach(function(r){ KPTM.tagsOf(r).forEach(function(t){ (tagMap[t]||(tagMap[t]=[])).push(r); }); });
+    var tags=Object.keys(tagMap).map(function(t){
+      var rs=tagMap[t];
+      var ov=mean(rs.map(function(r){return r.overall;}).filter(function(x){return x!==null;}));
+      var brc={}; rs.forEach(function(r){ brc[r.branch]=(brc[r.branch]||0)+1; });
+      var top=Object.keys(brc).sort(function(a,b){return brc[b]-brc[a];})[0];
+      return {t:t, rows:rs, n:rs.length, ov:ov, top:top, topN:brc[top]};
+    }).sort(function(a,b){ return b.n-a.n; }).slice(0,10);
+    window._KP_TAGS=tags;
+    var maxT=Math.max.apply(null,tags.map(function(x){return x.n;}).concat([1]));
+
+    /* ── dimensions, ranked among the responses that varied ── */
+    var dims=KPTM.DIMS.map(function(d,i){
+      var lowN=varied.filter(function(r){ return r.scores[i]!==null && r.scores[i]<=3; });
+      var vals=varied.map(function(r){return r.scores[i];}).filter(function(x){return x!==null;});
+      return {name:d[0], group:d[1], i:i, low:lowN, n:lowN.length, avg:mean(vals)};
+    }).filter(function(d){ return d.n>0; }).sort(function(a,b){ return b.n-a.n; }).slice(0,10);
+    window._KP_DIMS=dims;
+    var maxD=Math.max.apply(null,dims.map(function(x){return x.n;}).concat([1]));
+
+    html+='<div class="kp-two">'+
+      '<div class="au-sec"><div class="kp-h">🔟 Top 10 problems parents raised</div>'+
+      '<div class="kp-sub">From the concern tags on answered calls. A parent can raise more than one.</div>'+
+      (tags.length?tags.map(function(x,i){
+        var c=x.n>=100?'#DC2626':x.n>=40?'#D97706':'#1E4FD8';
+        return '<div class="kp-row" data-tag="'+i+'" title="Click to view these calls">'+
+          '<div><div class="kp-nm">'+esc(x.t)+'</div>'+
+          '<div class="kp-bar"><i style="width:'+(x.n/maxT*100)+'%;background:'+c+'"></i></div>'+
+          '<div class="kp-meta">avg rating '+(x.ov===null?'—':x.ov.toFixed(2))+
+          ' · most often '+esc(x.top)+' ('+x.topN+')</div></div>'+
+          '<div class="kp-n" style="color:'+c+'">'+fi(x.n)+'</div></div>';
+      }).join(''):'<div class="no-data">No concern tags recorded.</div>')+'</div>'+
+      '<div class="au-sec"><div class="kp-h">📉 Where the low scores fall</div>'+
+      '<div class="kp-sub">Counted only among the '+fi(varied.length)+' parents who scored the questions '+
+      'differently from one another — the rest tell us nothing about which dimension is weak.</div>'+
+      (dims.length?dims.map(function(x,i){
+        var c=x.n>=30?'#DC2626':x.n>=15?'#D97706':'#1E4FD8';
+        return '<div class="kp-row" data-dim="'+i+'" title="Click to view these calls">'+
+          '<div><div class="kp-nm">'+esc(x.name)+'</div>'+
+          '<div class="kp-bar"><i style="width:'+(x.n/maxD*100)+'%;background:'+c+'"></i></div>'+
+          '<div class="kp-meta">'+esc(x.group)+' · avg '+(x.avg===null?'—':x.avg.toFixed(2))+
+          ' among varied responses</div></div>'+
+          '<div class="kp-n" style="color:'+c+'">'+fi(x.n)+'</div></div>';
+      }).join(''):'<div class="no-data">No low scores recorded.</div>')+'</div></div>';
+
+    /* ── agents and reach, because a low reach is an operations problem ── */
+    var ag={};
+    rows.forEach(function(r){ if(r.agent) (ag[r.agent]||(ag[r.agent]={a:r.agent,all:[],ans:[]})).all.push(r); });
+    rows.filter(KPTM.answered).forEach(function(r){ if(r.agent&&ag[r.agent]) ag[r.agent].ans.push(r); });
+    var agents=Object.keys(ag).map(function(k){
+      var o=ag[k]; return {a:o.a, all:o.all, ans:o.ans, reach:pc(o.ans.length,o.all.length)};
+    }).filter(function(x){ return x.all.length>=25; }).sort(function(a,b){ return b.reach-a.reach; });
+    window._KP_AG=agents;
+
+    /* ── class-level view ── */
+    var cl={};
+    ans.forEach(function(r){ var k=r.cls||'(no class)'; (cl[k]||(cl[k]={c:k,rows:[]})).rows.push(r); });
+    var classes=Object.keys(cl).map(function(k){
+      var o=cl[k];
+      var ov=mean(o.rows.map(function(r){return r.overall;}).filter(function(x){return x!==null;}));
+      return {c:o.c, rows:o.rows, n:o.rows.length, ov:ov,
+              conc:o.rows.filter(KPTM.hasConcern).length};
+    }).filter(function(x){ return x.n>=20; }).sort(function(a,b){ return (a.ov||9)-(b.ov||9); }).slice(0,10);
+    window._KP_CL=classes;
+
+    html+='<div class="kp-two">'+
+      '<div class="au-sec"><div class="kp-h">📞 Reach by agent</div>'+
+      '<div class="kp-sub">Share of assigned families who actually answered. Agents with fewer than 25 '+
+      'calls are omitted — a small list produces a percentage that swings on one call.</div>'+
+      '<div style="overflow-x:auto"><table class="kpt"><thead><tr><th class="nm">Agent</th>'+
+      '<th>Assigned</th><th>Reached</th><th>Reach %</th></tr></thead><tbody>'+
+      agents.map(function(x,i){
+        var c=x.reach>=60?'#059669':x.reach>=40?'#D97706':'#DC2626';
+        return '<tr><td class="nm">'+esc(x.a)+'</td>'+
+          '<td class="c" data-ag="'+i+'" data-f="all">'+fi(x.all.length)+'</td>'+
+          '<td class="c" data-ag="'+i+'" data-f="ans">'+fi(x.ans.length)+'</td>'+
+          '<td style="color:'+c+';font-weight:800">'+x.reach+'%</td></tr>';
+      }).join('')+'</tbody></table></div></div>'+
+      '<div class="au-sec"><div class="kp-h">🎓 Weakest classes by rating</div>'+
+      '<div class="kp-sub">Classes with at least 20 answered calls, lowest rating first.</div>'+
+      '<div style="overflow-x:auto"><table class="kpt"><thead><tr><th class="nm">Class</th>'+
+      '<th>Answered</th><th>Rating</th><th>Concerns</th></tr></thead><tbody>'+
+      classes.map(function(x,i){
+        var c=x.ov===null?'#94A3B8':x.ov>=4.5?'#059669':x.ov>=4?'#D97706':'#DC2626';
+        return '<tr><td class="nm">'+esc(x.c)+'</td>'+
+          '<td class="c" data-cl="'+i+'">'+fi(x.n)+'</td>'+
+          '<td style="color:'+c+';font-weight:800">'+(x.ov===null?'—':x.ov.toFixed(2))+'</td>'+
+          '<td>'+fi(x.conc)+'</td></tr>';
+      }).join('')+'</tbody></table></div></div></div>';
+
+    /* ── what management should do about it ── */
+    var acts=[];
+    var worst=blist[blist.length-1];
+    if(worst && worst.reach<50) acts.push('<b>'+esc(worst.b)+'</b> reached only '+worst.reach+
+      '% of families. Any rating from that branch describes a minority of parents, and the ones who did not '+
+      'answer are the ones more likely to be dissatisfied.');
+    if(tags[0]) acts.push('<b>'+esc(tags[0].t)+'</b> is the most raised concern ('+fi(tags[0].n)+
+      ' calls), concentrated at '+esc(tags[0].top)+'.');
+    if(ans.length && pc(straight.length,ans.length)>80) acts.push('The rating grid is not discriminating: '+
+      pc(straight.length,ans.length)+'% of parents gave one score to all 19 questions. Either the questions '+
+      'are being read out as a block, or parents are answering a single overall impression. Asking three '+
+      'questions properly would tell you more than nineteen answered this way.');
+    if(noResp.length>ans.length*0.4) acts.push('<b>'+fi(noResp.length)+'</b> families never picked up — '+
+      pc(noResp.length,rows.length)+'% of the list. Until that falls, satisfaction figures describe the '+
+      'contactable half of your parents.');
+    if(detract.length) acts.push('<b>'+fi(detract.length)+'</b> parents scored 3 or less on recommending '+
+      'the school. That is the smallest, most specific list on this page and the one worth calling back first.');
+    if(acts.length) html+='<div class="au-sec"><div class="kp-h">💡 What this suggests</div>'+
+      '<ul style="margin:6px 0 0;padding-left:18px;font-size:12.5px;line-height:1.75;color:var(--tx)">'+
+      acts.map(function(a){ return '<li>'+a+'</li>'; }).join('')+'</ul></div>';
+
+    el.innerHTML=html;
+    var meta=$('kp-meta');
+    if(meta) meta.textContent=((typeof fBranch!=='undefined'&&fBranch!=='ALL')?fBranch:'All branches')+
+      ' · '+fi(rows.length)+' families · '+fi(ans.length)+' answered · rating '+
+      (overall===null?'—':overall.toFixed(2));
+
+    el.querySelectorAll('.kp-k').forEach(function(n){
+      n.addEventListener('click',function(){ var k=K[+n.dataset.k]; open('⭐ '+k.t,k.d,k.list); });
+    });
+    el.querySelectorAll('[data-br]').forEach(function(n){
+      n.addEventListener('click',function(){
+        var x=window._KP_BR[+n.dataset.br], f=n.dataset.f;
+        var map={all:x.all, ans:x.ans, conc:x.ans.filter(KPTM.hasConcern),
+                 low:x.ans.filter(function(r){return r.overall!==null&&r.overall<=3;})};
+        var lbl={all:'every family called',ans:'answered',conc:'raised a concern',low:'rated 3 or below'};
+        open('🏫 '+x.b+' — '+lbl[f], fi(map[f].length)+' record(s)', map[f]);
+      });
+    });
+    el.querySelectorAll('[data-tag]').forEach(function(n){
+      n.addEventListener('click',function(){ var x=window._KP_TAGS[+n.dataset.tag];
+        open('🔟 '+x.t, fi(x.n)+' call(s) · avg rating '+(x.ov===null?'—':x.ov.toFixed(2)), x.rows); });
+    });
+    el.querySelectorAll('[data-dim]').forEach(function(n){
+      n.addEventListener('click',function(){ var x=window._KP_DIMS[+n.dataset.dim];
+        open('📉 '+x.name+' — scored 3 or below', fi(x.n)+' response(s)', x.low); });
+    });
+    el.querySelectorAll('[data-ag]').forEach(function(n){
+      n.addEventListener('click',function(){ var x=window._KP_AG[+n.dataset.ag], f=n.dataset.f;
+        open('📞 '+x.a+' — '+(f==='ans'?'reached':'assigned'), fi((f==='ans'?x.ans:x.all).length)+' record(s)',
+          f==='ans'?x.ans:x.all); });
+    });
+    el.querySelectorAll('[data-cl]').forEach(function(n){
+      n.addEventListener('click',function(){ var x=window._KP_CL[+n.dataset.cl];
+        open('🎓 Class '+x.c, fi(x.n)+' answered · rating '+(x.ov===null?'—':x.ov.toFixed(2)), x.rows); });
+    });
+  }
+
+  function safe(){ try{ build(); }catch(e){
+    var el=$('kp-body');
+    if(el) el.innerHTML='<div class="no-data" style="color:var(--r)">Could not build: '+esc(String(e&&e.message||e))+'</div>';
+  } }
+  window.__renderKptm=safe;
+
+  var loading=false, loaded=false;
+  window.loadKptm=async function(force){
+    if(loading) return;
+    if(loaded&&!force){ safe(); return; }
+    loading=true;
+    var st=$('kp-status'); if(st){ st.textContent=force?'Refreshing…':'Loading…'; st.className='exm-status'; }
+    try{
+      if(!force){ try{ var c=await idbGet('pbes_kptm');
+        if(c&&c.data&&c.data.kptm&&(Date.now()-c.t)<24*3600*1000){
+          RAW=c.data; ROWS=KPTM.toRows(RAW.kptm); loaded=true; safe();
+          if(st) st.textContent='Cached · refreshing in background'; }
+      }catch(e){} }
+      var session=null;
+      try{ var s2=await sb.auth.getSession(); session=s2&&s2.data&&s2.data.session; }catch(e){}
+      if(!session){ window.location.href='login.html'; return; }
+      var res=await _lazyFetch('kptm', force, session, 55000);
+      if(res.status===401){ await sb.auth.signOut(); window.location.href='login.html'; return; }
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      var d=await res.json();
+      if(d&&d.error) throw new Error(d.message||'Upstream error');
+      var raw=(d&&d.KPTM_RAW)?d.KPTM_RAW:null;
+      if(!raw||!raw.kptm||!raw.kptm.rows||!raw.kptm.rows.length)
+        throw new Error('No rows returned. Check the "K-Innovative PTM Feedback" tab exists and that '+
+                        '/api/data forwards ?section=kptm');
+      RAW=raw; ROWS=KPTM.toRows(raw.kptm); loaded=true;
+      try{ idbSet('pbes_kptm',{t:Date.now(),data:raw}); }catch(e){}
+      safe();
+      if(st) st.textContent=raw.generatedAt?('Updated '+String(raw.generatedAt).replace('T',' ').slice(0,16)):'';
+    }catch(err){
+      if(!loaded){ var el=$('kp-body');
+        if(el) el.innerHTML='<div class="no-data" style="color:var(--r)">'+esc(String(err&&err.message||err))+'</div>'; }
+      if(st){ st.textContent=String(err&&err.message||err); st.className='exm-status err'; }
+    }finally{ loading=false; }
+  };
+
+  var _st=window.showTab;
+  if(typeof _st==='function') window.showTab=function(id,btn){
+    var r=_st(id,btn); if(id==='kptm') loadKptm(false); return r; };
+  var _af=window.applyFilters;
+  if(typeof _af==='function') window.applyFilters=function(){
+    var r=_af.apply(this,arguments); try{ safe(); }catch(e){} return r; };
 })();
 </script>
 </body>
