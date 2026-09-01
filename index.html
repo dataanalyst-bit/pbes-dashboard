@@ -6281,11 +6281,44 @@ window.CARE_NLP = (function () {
     if (isNoAnswer(row)) {
       return { klass: 'No Answer', label: 'No Answer', score: null, satisfied: false, reachable: false };
     }
-    var txt = ((row.Remarks && row.Remarks !== '\u2013') ? row.Remarks : '') + ' ' +
-              ((row.Followup && row.Followup !== '\u2013') ? row.Followup : '');
+    var rem = (row.Remarks && row.Remarks !== '\u2013') ? String(row.Remarks) : '';
+    var fup = (row.Followup && row.Followup !== '\u2013') ? String(row.Followup) : '';
+
+    /* ── 1. HYPOTHETICAL AND FUTURE-FACING TEXT CARRIES NO SENTIMENT ──
+       "ready to take up any issue escalated in future" is an offer, not a
+       complaint, but the single word "issue" scored -1.8 and turned the whole
+       call negative. Clauses framed as conditional or forward-looking are
+       stripped before scoring: "any issue", "if any concern", "in future",
+       "future reference", "should there be". The words are still there — they
+       just describe something that has not happened. */
+    var HYPO = /\b(any|if any|in case of any|should there be any|for any)\s+(issue|issues|concern|concerns|problem|problems|query|queries|complaint|complaints|difficulty|difficulties)\b[^.;]*|\b(in|for)\s+(the\s+)?future\b[^.;]*|\bfuture\s+reference\b[^.;]*|\bescalated\s+in\s+future\b[^.;]*|\bfeel\s+free\s+to\b[^.;]*|\breach\s+out\b[^.;]*/gi;
+    function deHypo(t){ return String(t).replace(HYPO, ' '); }
+
+    /* ── 2. THE FOLLOW-UP IS THE SCHOOL SPEAKING, NOT THE PARENT ──
+       The Followup column carries the staff sign-off — "Teacher conveyed thanks
+       and was ready to take up any issue escalated in future" — which is the
+       same courteous boilerplate on thousands of calls. The parent's own words
+       decide the sentiment; the follow-up is only consulted when the remark is
+       empty, and then still stripped of hypotheticals. */
+    var txt = deHypo(rem).trim() || deHypo(fup).trim();
+
     var cat = String(row.Grievance || row.Category || '');
     var isNoConcernCat = /no\s*concern/i.test(cat);
     var s = score(txt, { dropSelfLabel: isNoConcernCat });
+
+    /* ── 3. AN EXPLICIT "NO CONCERN" IS THE PARENT'S OWN VERDICT ──
+       "No concerns from Parents" states the outcome outright. Nothing in the
+       same remark contradicted it, so it is not negative — whatever incidental
+       words follow. A concrete complaint alongside it still wins, which is what
+       keeps "no concern but the washrooms are dirty" flagged. */
+    var NO_CONCERN_STMT = /\b(no|not any|without any)\s+(concerns?|issues?|problems?|complaints?)\b/i;
+    /* A contrast word is the parent qualifying their own statement — "no
+       concern BUT the washrooms are dirty" is a complaint, and the override
+       must not swallow it. Only a clean, uncontradicted "no concerns" counts. */
+    var CONTRAST = /\b(but|however|though|although|except|apart from|other than|only thing|one concern)\b/i;
+    if (NO_CONCERN_STMT.test(rem) && !CONTRAST.test(rem) && s.score > -0.35) {
+      s = { label: 'Positive', score: Math.max(0.4, s.score), empty: s.empty, hits: s.hits };
+    }
 
     /* A parent counts as satisfied only when the category says there was no
        concern AND the words agree. A row tagged "No Concern" whose remark
