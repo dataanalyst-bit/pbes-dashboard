@@ -16713,12 +16713,108 @@ window.KPTM = (function () {
   function pc(a,b){ return b?Math.round(a/b*100):0; }
   function mean(a){ return a.length ? a.reduce(function(x,y){return x+y;},0)/a.length : null; }
 
+  /* ══════════════════════════════════════════════════════════════════
+     WHAT TO DO ABOUT IT
+
+     Written against the sub-topics that the remarks themselves produced, so
+     the guidance names the specific action rather than restating the problem.
+     Where the answer depends on something this sheet cannot see — whether a
+     period actually ran, whether one teacher recurs — the advice says to check
+     that first rather than pretending the feedback settles it.
+     ══════════════════════════════════════════════════════════════════ */
+  var KADVICE = {
+    'Extra academic support / remedial':{h:'Parents are asking for help the timetable does not currently provide.',a:['Identify the students named in these calls and put them on a written remedial list per class — parents are asking individually for something that needs to be a scheme, not a favour.','Fix a weekly slot for it and tell the parent the day and time. Most of these calls ask for "extra support" without any commitment being given back.','Report back after four weeks with what changed. A remedial promise nobody follows up on generates the same call again next term.']},
+    'Notes & homework not completed':{h:'Notes and homework are being set but not completed or not checked.',a:['Check whether this is the child not writing or the teacher not checking — the remarks contain both, and they need opposite responses.','Where notebooks are not being corrected, this belongs with the Syllabus & Notebook monitoring already running in this dashboard.','Give parents a way to see what was set. Most of these calls are parents who cannot tell whether work was assigned.']},
+    'Bus route & timing':{h:'Route design and timing, not driver conduct.',a:['Pull the specific route numbers named in these calls and check actual journey time against the timetable.','Long routes concentrate on a few stops. Splitting one route usually fixes more calls than adding a bus.','Tell affected parents the revised timing in writing. Transport complaints repeat when the change is made but not communicated.']},
+    'Response from school / follow-up':{h:'The concern was raised before and nothing came back.',a:['This is the most damaging item on the list: the parent already tried. Treat every one of these as an escalation, not a fresh complaint.','Assign each to a named person with a date, and call the parent back even when the answer is no.','If this count is high at one branch, the problem is the front desk process, not the individual concerns behind it.']},
+    'General guidance & motivation':{h:'Parents want direction rather than a specific fix.',a:['These calls carry the lowest average rating on the page. They are vague but they are not trivial — the parent is dissatisfied and cannot name why.','A structured parent-teacher conversation about the child specifically will resolve more of these than any policy change.','Look for clusters by class. Several vague calls from one section usually point at one teacher relationship.']},
+    'Co-curricular & activities':{h:'Activities are timetabled but parents say they are not happening.',a:['Verify against the actual period register whether sports and activity periods ran, or were used for academics.','If they were converted to teaching time, say so openly to parents rather than leaving them to infer it.','Publish the activity calendar. Most of these calls are about visibility as much as delivery.']},
+    'Books, uniform & supplies':{h:'Supply and availability, usually at the start of term.',a:['Check stock against enrolment before term rather than after — these calls cluster in the first weeks.','Where items are unavailable, give parents a date. "Not available" without a date generates a second call.']},
+    'Hindi / second language':{h:'Second-language teaching is the weakest subject thread in the feedback.',a:['Check whether the same teacher or section recurs across these calls before treating it as a subject-wide issue.','Second-language difficulty compounds silently — it is rarely raised until marks drop, so these calls are late signals.']},
+    'Fees & payments':{h:'Billing clarity and receipts rather than the amount.',a:['Most of these are process complaints: a receipt not issued, an amount not explained. They are cheap to fix and they damage trust disproportionately.','Route them to accounts with a name and a deadline; they should not sit with academic staff.']},
+    'English & communication skills':{h:'Spoken English and confidence, not the English syllabus.',a:['Parents are asking for speaking practice, which is a different intervention from grammar remediation.','Small-group speaking slots address this better than extra written work.']},
+    'Weak in a subject':{h:'A named subject where the child is behind.',a:['Match these against the PT-1 marks already in this dashboard — where both agree, the case for intervention is settled.','Tell the parent which teacher will act and by when.']},
+    'Washrooms & hygiene':{h:'Cleanliness and maintenance of washrooms.',a:['Cross-check against the Vigilance checklist tab: washroom issues raised there and here at the same branch is a maintenance failure, not a perception problem.','Increase cleaning frequency at the specific block named and confirm it to the parents who called.','Children avoiding school washrooms is a health matter, not a facilities preference.']},
+    'Teacher quality & teaching method':{h:'How lessons are being taught.',a:['Check whether the calls concentrate on one section before treating this as branch-wide.','Pair with the Teacher Observation records already collected — feedback and observation agreeing is strong evidence.']},
+    'Sports & PE not conducted':{h:'Games periods not running.',a:['Verify against the period register rather than the timetable.','If PE is being used for academics, that is a decision to make openly, not by default.']},
+    'Access to teachers & management':{h:'Parents cannot reach the person they need.',a:['Publish a fixed meeting window per coordinator. Most of these calls are about uncertainty, not refusal.','Check whether the same branch appears in "Response from school" — together they indicate an access problem, not isolated incidents.']},
+    'Exams, results & report cards':{h:'Timeliness and clarity of results.',a:['Confirm the publication dates parents were given and whether they were met.','A report card that arrives without explanation generates more calls than a delayed one that was flagged.']},
+    'Safety, discipline & bullying':{h:'Child safety and conduct between students.',a:['Handle individually and immediately, whatever the count. This category is never a statistic.','Every one of these should have a named owner and a call back to the parent within the day.']},
+    'Communication & information':{h:'Parents not being told things in time.',a:['Audit which channel was used for the items named — most of these are circulars that went to one channel only.','Confirm receipt for anything time-critical rather than assuming delivery.']},
+    'Digital / app issues':{h:'The app or portal is not working for these parents.',a:['Establish whether it is access, training or a genuine fault before escalating to the vendor.','This overlaps with DC App issues in the Care Calls tab — check both before concluding scale.']},
+    'Other / not stated clearly':{h:'A concern was recorded but not what it was.',a:['This is a data quality issue, not a parent issue. The call is logged as a concern with nothing actionable written down.','Brief the calling team: one sentence naming the specific problem makes the difference between a record and a lead.']}
+  };
+  var KDIMNOTE = {
+    'Maintenance of Washrooms':'Cross-check against the Vigilance checklist for the same branch. When both flag washrooms, it is a maintenance failure with physical evidence attached.',
+    'School Transport Condition of Buses':'These parents mostly wrote about routing and timing rather than the vehicles. Check the routes named before commissioning bus repairs.',
+    'School Transport Behaviour of Drivers':'Read the remarks before acting: this dimension scores low alongside routing complaints, which suggests frustration with the service rather than the individual.',
+    'School Transport Behaviour of Attenders':'Same pattern as drivers — the low score travels with route complaints. Confirm from the remarks whether conduct was actually mentioned.',
+    'Quality of evaluation(correction)':'The strongest low-score dimension. Pair with the notebook-correction data already in this dashboard; agreement between the two makes the case actionable.',
+    'Quality of Teachers':'Look for concentration by section before treating it as branch-wide, and pair with Teacher Observation records.',
+    'Quality of Teaching':'Look for concentration by section before treating it as branch-wide, and pair with Teacher Observation records.',
+    'Sports':'Verify from the period register whether games periods ran. Parents rate this low most often where activities were replaced by teaching time.',
+    'Participation in Co Curricular activities':'Publish the activity calendar. A low score here is usually about visibility rather than absence.',
+    'Availability of Drinking Water':'Small count but a basic provision — check the specific blocks named rather than the branch as a whole.',
+    'Resolving issues':'This dimension measures whether the school closes loops. It moves only when follow-up is enforced, not when individual concerns are fixed.',
+    'School Communication':'Audit which channels were used for time-critical items. Low scores here usually mean single-channel delivery.',
+    'Access to Coordinators/Teachers':'Publish fixed meeting windows. Most low scores here are about uncertainty rather than refusal.'
+  };
+
   var COLS=[{key:'branch',label:'Branch'},{key:'cls',label:'Class'},{key:'sec',label:'Section'},
     {key:'student',label:'Student',maxW:'150px'},{key:'date',label:'Call date',date:true},
     {key:'agent',label:'Agent'},{key:'status',label:'Call status',pill:true},{key:'sstatus',label:'Student status',pill:true},
     {key:'overall',label:'Rating'},{key:'feedback',label:'Feedback',pill:true},
     {key:'concerns',label:'Concern tags',maxW:'190px'},{key:'remarks',label:'What the parent said',maxW:'380px'}];
   function open(title,sub,rows){ if(typeof openModal==='function') openModal(title,sub,rows,COLS); }
+
+  /* The modal shows the records; this shows what to do with them. It is built
+     from the rows actually opened — the branch spread, the ratings, the words
+     the parents used — so the numbers in the briefing are the numbers in the
+     table beneath it, not a generic template. */
+  function brief(topic, rows, extra){
+    var by={}, low=0, rated=[];
+    rows.forEach(function(r){
+      by[r.branch]=(by[r.branch]||0)+1;
+      if(r.overall!==null){ rated.push(r.overall); if(r.overall<=3) low++; }
+    });
+    var brs=Object.keys(by).sort(function(a,b){ return by[b]-by[a]; });
+    var avg=rated.length?(rated.reduce(function(a,b){return a+b;},0)/rated.length):null;
+    var A=KADVICE[topic];
+    var quotes=rows.map(function(r){ return String(r.remarks||''); })
+      .filter(function(t){ return t.length>60 && t.length<240; })
+      .sort(function(a,b){ return a.length-b.length; }).slice(0,2);
+    var html='<div style="background:#F0FDF4;border-left:4px solid #059669;border-radius:0 10px 10px 0;'+
+      'padding:12px 15px;margin-bottom:12px;font-size:12.5px;line-height:1.65;color:#065F46">'+
+      '<div style="font-weight:800;margin-bottom:5px">\ud83d\udca1 '+esc(topic)+
+      ' \u2014 '+fi(rows.length)+' call'+(rows.length===1?'':'s')+
+      (avg===null?'':' \u00b7 average rating '+avg.toFixed(2))+
+      (low?' \u00b7 '+low+' rated 3 or below':'')+'</div>'+
+      (A?'<div style="margin-bottom:6px">'+esc(A.h)+'</div>':'')+
+      '<div style="margin-bottom:6px"><b>Where it sits:</b> '+
+      brs.slice(0,3).map(function(b){ return esc(b)+' ('+by[b]+')'; }).join(' \u00b7 ')+
+      (brs.length>3?' and '+(brs.length-3)+' more':'')+'</div>'+
+      (extra?'<div style="margin-bottom:6px">'+extra+'</div>':'')+
+      (A?'<div style="font-weight:700;margin:8px 0 3px">What to do</div><ol style="margin:0;padding-left:18px">'+
+        A.a.map(function(x){ return '<li style="margin-bottom:3px">'+esc(x)+'</li>'; }).join('')+'</ol>':'')+
+      (quotes.length?'<div style="font-weight:700;margin:8px 0 3px">In parents\u2019 own words</div>'+
+        quotes.map(function(q){ return '<div style="font-style:italic;color:#047857;margin-bottom:3px">\u201c'+
+          esc(q.replace(/^Spoke (to|with) the parent[,\s]*(who)?\s*/i,''))+'\u201d</div>'; }).join(''):'')+
+      '</div>';
+    return html;
+  }
+  function openWithBrief(title, sub, rows, topic, extra){
+    open(title, sub, rows);
+    setTimeout(function(){
+      var body=document.getElementById('modal-body')||document.getElementById('drill-modal');
+      if(!body) return;
+      if(body.querySelector('.kp-brief')) return;
+      var d=document.createElement('div');
+      d.className='kp-brief';
+      d.innerHTML=brief(topic, rows, extra);
+      body.insertBefore(d, body.firstChild);
+    }, 40);
+  }
+
 
   function scoped(){
     var b=(typeof fBranch!=='undefined')?fBranch:'ALL';
@@ -16799,13 +16895,17 @@ window.KPTM = (function () {
       blist.map(function(x,i){
         var rc=x.reach>=60?'#059669':x.reach>=40?'#D97706':'#DC2626';
         var oc=x.ov===null?'#94A3B8':x.ov>=4.5?'#059669':x.ov>=4?'#D97706':'#DC2626';
-        return '<tr><td class="nm">'+esc(x.b)+'</td>'+
+        /* Every figure opens the rows behind it, percentages included: a reader
+           who doubts "23%" wants the same records as one who doubts "177", and
+           making only the counts clickable sends them hunting for the cell that
+           happens to work. */
+        return '<tr><td class="nm c" data-br="'+i+'" data-f="all">'+esc(x.b)+'</td>'+
           '<td class="c" data-br="'+i+'" data-f="all">'+fi(x.all.length)+'</td>'+
           '<td class="c" data-br="'+i+'" data-f="ans">'+fi(x.ans.length)+'</td>'+
-          '<td style="color:'+rc+';font-weight:800">'+x.reach+'%</td>'+
-          '<td style="color:'+oc+';font-weight:800">'+(x.ov===null?'—':x.ov.toFixed(2))+'</td>'+
+          '<td class="c" data-br="'+i+'" data-f="ans" style="color:'+rc+'">'+x.reach+'%</td>'+
+          '<td class="c" data-br="'+i+'" data-f="rated" style="color:'+oc+'">'+(x.ov===null?'—':x.ov.toFixed(2))+'</td>'+
           '<td class="c'+(x.conc?'':' z')+'" data-br="'+i+'" data-f="conc">'+fi(x.conc)+'</td>'+
-          '<td style="color:'+(x.concPct>15?'#DC2626':'#64748B')+'">'+x.concPct+'%</td>'+
+          '<td class="c'+(x.conc?'':' z')+'" data-br="'+i+'" data-f="conc" style="color:'+(x.concPct>15?'#DC2626':'#64748B')+'">'+x.concPct+'%</td>'+
           '<td class="c'+(x.low?'':' z')+'" data-br="'+i+'" data-f="low">'+fi(x.low)+'</td></tr>';
       }).join('')+'</tbody></table></div></div>';
     window._KP_BR=blist;
@@ -16974,18 +17074,31 @@ window.KPTM = (function () {
       n.addEventListener('click',function(){
         var x=window._KP_BR[+n.dataset.br], f=n.dataset.f;
         var map={all:x.all, ans:x.ans, conc:x.ans.filter(KPTM.hasConcern),
+                 rated:x.ans.filter(function(r){return r.overall!==null;}),
                  low:x.ans.filter(function(r){return r.overall!==null&&r.overall<=3;})};
-        var lbl={all:'every family called',ans:'answered',conc:'raised a concern',low:'rated 3 or below'};
+        var lbl={all:'every family called',ans:'answered',conc:'raised a concern',
+                 rated:'gave an overall rating',low:'rated 3 or below'};
         open('🏫 '+x.b+' — '+lbl[f], fi(map[f].length)+' record(s)', map[f]);
       });
     });
     el.querySelectorAll('[data-tag]').forEach(function(n){
       n.addEventListener('click',function(){ var x=window._KP_TAGS[+n.dataset.tag];
-        open('🔟 '+x.t, fi(x.n)+' call(s) · avg rating '+(x.ov===null?'—':x.ov.toFixed(2)), x.rows); });
+        openWithBrief('🔟 '+x.t, fi(x.n)+' call(s) · avg rating '+(x.ov===null?'—':x.ov.toFixed(2)),
+          x.rows, x.t, x.tag?('<b>Recorded under:</b> '+esc(x.tag)):''); });
     });
     el.querySelectorAll('[data-dim]').forEach(function(n){
-      n.addEventListener('click',function(){ var x=window._KP_DIMS[+n.dataset.dim];
-        open('📉 '+x.name+' — scored 3 or below', fi(x.n)+' response(s)', x.low); });
+      n.addEventListener('click',function(){
+        var x=window._KP_DIMS[+n.dataset.dim];
+        /* the briefing is keyed on what these parents WROTE, since a low score
+           with no words behind it cannot be acted on */
+        var why={};
+        x.low.forEach(function(r){ KPTM.subTopicsOf(r).forEach(function(b){ why[b.t]=(why[b.t]||0)+1; }); });
+        var top=Object.keys(why).sort(function(a,b){ return why[b]-why[a]; })[0];
+        var note=KDIMNOTE[x.name]?('<b>On this dimension:</b> '+esc(KDIMNOTE[x.name])):'';
+        openWithBrief('📉 '+x.name+' — scored 3 or below',
+          fi(x.n)+' response(s) · avg '+(x.avg===null?'—':x.avg.toFixed(2)),
+          x.low, top||x.name, note);
+      });
     });
     el.querySelectorAll('[data-str]').forEach(function(n){
       n.addEventListener('click',function(){
