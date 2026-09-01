@@ -6158,16 +6158,37 @@ window.CARE_NLP = (function () {
     'not attending': 2, 'not regular': 2, 'not interested': 2, 'not improving': 2.5,
     'no improvement': 2.5, 'not done': 2, 'not completed': 2, 'not received': 2,
     'very poor': 3, 'very bad': 3, 'strongly object': 3,
+    /* A blunt threshold silenced real complaints along with the template noise,
+       so the complaint vocabulary is made explicit instead. These are the
+       phrasings parents actually use in this export when something is wrong,
+       and they score high enough to clear the bar on their own. */
+    'not clean': 2.8, 'not cleaned': 2.8, 'not neat': 2.5, 'not hygienic': 3,
+    'not hygiene': 3, 'not hygenie': 3, unhygienic: 3, dirty: 3,
+    'unpleasant smell': 2.8, 'bad smell': 2.8, 'no water': 2.5,
+    'not in good condition': 2.5, 'not in a proper way': 2.5,
+    refuse: 2.5, refuses: 2.5, refusing: 2.5, 'not helping': 2.5,
+    'not maintained': 2.5, 'not well maintained': 2.8, 'not working': 2.2,
+    'not allowing': 2.5, 'not responding': 2.2, 'not resolved': 3,
+    'no action': 2.8, 'still not': 2.5, 'again and again': 2,
+    'water issue': 2.5, 'water isssue': 2.5, 'water problem': 2.5,
     angry: 3, upset: 2.5, unhappy: 3, dissatisfied: 3, furious: 3.5,
     complaint: 2.5, complain: 2.5, complained: 2.5, grievance: 2,
-    problem: 2, issue: 1.8, issues: 1.8, concern: 1.5, concerned: 1.8,
+    problem: 2, issue: 1.8, issues: 1.8,
+    /* "concern" carries no sentiment in this corpus. Nearly every remark is
+       built on the template "asked for any concern ... parent concern is ...",
+       so the word marks WHERE the parent's point begins, not that something is
+       wrong. It was the single largest cause of No-Concern calls reading
+       Negative (77 of 414). The actual complaint words still score. */
     worried: 2, worry: 2, anxious: 2, stress: 2, stressed: 2, pressure: 1.5,
     poor: 2.5, bad: 2.5, worst: 3, terrible: 3, useless: 3,
     delay: 2, delayed: 2, pending: 1.5, unresolved: 2.5, repeated: 1.5, repeatedly: 2,
     rude: 3, harsh: 2.5, misbehave: 3, misbehaviour: 3, misbehavior: 3,
     fight: 2.5, fighting: 2.5, bully: 3.5, bullying: 3.5, beaten: 3.5, hit: 2.5,
     cry: 2, crying: 2.5, sad: 2, afraid: 2.5, scared: 2.5, fear: 2.5,
-    absent: 1.5, irregular: 2, missed: 1.5, missing: 1.5, lost: 2,
+    /* "absent" likewise: "Absent call" and "absent call : went to village" are a
+       call TYPE, not a complaint. Genuine attendance problems are caught by
+       "not attending", "irregular" and "long absent". */
+    irregular: 2, missed: 1.5, missing: 1.5, lost: 2,
     dirty: 2, unhygienic: 2.5, unsafe: 3, injury: 3, injured: 3, sick: 1.5,
     difficult: 1.5, difficulty: 1.5, struggle: 2, struggling: 2, weak: 1.8,
     disappoint: 2.5, disappointed: 2.5, frustrated: 2.5, frustration: 2.5,
@@ -6232,6 +6253,16 @@ window.CARE_NLP = (function () {
     if (opts && opts.dropSelfLabel) {
       t = t.replace(/ no concern | no issue | no problem | no complaint /g, ' ');
     }
+    /* "the transportation problem is resolved" is good news reported with a
+       negative noun. A negative term followed closely by resolution wording is
+       removed rather than counted against the school. */
+    t = t.replace(/\s(problem|issue|issues|complaint|concern|grievance|difficulty)\s(is|was|has been|have been|are|were)?\s*(resolved|sorted|settled|clarified|closed|addressed|solved|rectified)\s/g, ' ');
+    /* a call ABOUT an absence is not a complaint about the school */
+    t = t.replace(/\s(done\s)?absent\s+call\s/g, ' ');
+    /* homework the CHILD has not finished is a status the teacher is reporting,
+       not the parent complaining about the school — and it appears in hundreds
+       of routine reopening calls */
+    t = t.replace(/\s(holiday\s)?(home\s*work|homework|h\s*w)\s(is\s|are\s)?not\s(done|completed)\s/g, ' ');
     if (!t.trim() || t.trim() === '–') return { label: 'Neutral', score: 0, pos: 0, neg: 0, hits: [], empty: true };
 
     var hits = [];
@@ -6324,6 +6355,17 @@ window.CARE_NLP = (function () {
        concern AND the words agree. A row tagged "No Concern" whose remark
        reads "child is crying every day" is not a satisfied parent, and that
        disagreement is exactly what the old count was hiding. */
+    /* The category is evidence in its own right. When a caller has deliberately
+       tagged a call "No Concern", one mildly negative word should not overturn
+       that — only wording that is clearly a complaint should. So the bar for
+       contradicting the tag is raised, and anything below it reads Neutral
+       rather than Negative. This is what stops routine remarks appearing in a
+       Negative slice during a meeting, without hiding the genuine ones. */
+    var NEG_BAR = -0.22;
+    if (isNoConcernCat && s.label === 'Negative' && s.score > NEG_BAR) {
+      s = { label: 'Neutral', score: s.score, empty: s.empty, hits: s.hits };
+    }
+
     var satisfied = (isNoConcernCat && s.label !== 'Negative') ||
                     (!isNoConcernCat && s.label === 'Positive' && s.score >= 0.35);
     var flagged = isNoConcernCat && s.label === 'Negative';
