@@ -6569,7 +6569,9 @@ function _sentiment(text){
    (213 rows), and then only for a short remark that is ABOUT the call — "no
    response", "Not reachable" — never a phrase buried inside a longer
    complaint, which is what produced the false positives. */
-const _NOANS_CAT=/^\s*(not\s*answer(ing)?( call)?|no\s*response|no\s*answer|switch(ed)?\s*off|not\s*reachable|unreachable)\s*$/i;
+/* the export contains "Not Answering Call", "Not AnsweringCall" (no space),
+   "Not answering call" and "Not Answering call" — the space is optional */
+const _NOANS_CAT=/^\s*(not\s*answer(ing)?\s*call?|no\s*response|no\s*answer|switch(ed)?\s*off|not\s*reachable|unreachable)\s*$/i;
 const _NOANS_TXT=/(^|[.;•\-\s])(not\s*answer(ed|ing)?|no\s*response|noresponse|not\s*reachable|switch(ed)?\s*off|not\s*picking|not\s*lifting)([.;\s]|$)/i;
 window._careAnswerable = function(r){
   var cat = String(r.Grievance || '').trim();
@@ -6710,7 +6712,16 @@ function renderCareSummary(){
   const _NOT_A_CONCERN=/^(no concern|not answering|no response)/i;
   const _concerns=_answered.filter(r=>!_NOT_A_CONCERN.test(String(r.Grievance||'').trim()));
   const remaining=_concerns.filter(r=>!/^resolved$/i.test(String(r.Status||'').trim())).length;
-  const _noConcernOpen=_answered.length-resolved-remaining;
+  /* In Progress and Pending are reported separately again, but only for calls
+     somebody actually answered. A call whose CATEGORY is "Not Answering" is
+     counted once, under Not Answered — even when its status column happens to
+     say In Progress or Pending, because there was no conversation to progress.
+     Every tile below therefore draws from _answered, which already excludes
+     them, so the same call can never appear in two tiles. */
+  const _st=r=>String(r.Status||'').trim();
+  const inProg=_answered.filter(r=>/^in\s*progress$/i.test(_st(r))).length;
+  const pending=_answered.filter(r=>/^pending$/i.test(_st(r))).length;
+  const other=_answered.length-resolved-inProg-pending;
 
   // ── Topic rules for ALL categories ──
   /* ══════════════════════════════════════════════════════════════════════
@@ -7064,11 +7075,23 @@ function renderCareSummary(){
         <div style="font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;">✅ Resolved</div>
         <div style="font-size:30px;font-weight:800;color:#059669;line-height:1.1;margin-top:2px;">${fi(resolved)}</div>
         <div style="font-size:11px;color:#64748B;">${_answered.length?Math.round(resolved/_answered.length*100):0}% of answered · click to view</div></div>`
-    +`<div style="flex:1;min-width:190px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="viewCareWithSentiment('__remaining')" title="Every answered call not marked Resolved">
-        <div style="font-size:11px;font-weight:700;color:#B45309;text-transform:uppercase;">\u2753 Remaining \u2014 to be addressed</div>
-        <div style="font-size:30px;font-weight:800;color:${remaining?'#D97706':'#059669'};line-height:1.1;margin-top:2px;">${fi(remaining)}</div>
-        <div style="font-size:11px;color:#64748B;">${_answered.length?Math.round(remaining/_answered.length*100):0}% of answered \u00b7 click to view</div>
-        <div style="font-size:10px;color:#94A3B8;margin-top:1px;">anything not Resolved \u2014 in progress, pending or blank</div></div>`
+    +`<div style="flex:1;min-width:150px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="viewCareWithSentiment('In Progress')" title="Answered calls being worked on">
+        <div style="font-size:11px;font-weight:700;color:#1D4ED8;text-transform:uppercase;">\ud83d\udd04 In Progress</div>
+        <div style="font-size:30px;font-weight:800;color:#1D4ED8;line-height:1.1;margin-top:2px;">${fi(inProg)}</div>
+        <div style="font-size:11px;color:#64748B;">${_answered.length?Math.round(inProg/_answered.length*100):0}% of answered \u00b7 click to view</div></div>`
+    +`<div style="flex:1;min-width:150px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="viewCareWithSentiment('Pending')" title="Answered calls still pending">
+        <div style="font-size:11px;font-weight:700;color:#B45309;text-transform:uppercase;">\u23f3 Pending</div>
+        <div style="font-size:30px;font-weight:800;color:#D97706;line-height:1.1;margin-top:2px;">${fi(pending)}</div>
+        <div style="font-size:11px;color:#64748B;">${_answered.length?Math.round(pending/_answered.length*100):0}% of answered \u00b7 click to view</div></div>`
+    +(other>0?`<div style="flex:1;min-width:150px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="viewCareWithSentiment('__other')" title="Answered calls whose status is blank or unrecognised">
+        <div style="font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase;">\u2753 Other status</div>
+        <div style="font-size:30px;font-weight:800;color:#64748B;line-height:1.1;margin-top:2px;">${fi(other)}</div>
+        <div style="font-size:11px;color:#64748B;">status blank or unrecognised \u00b7 click to view</div></div>`:'')
+    +`<div style="flex:1;min-width:190px;background:#FEF2F2;border:1px solid #FECACA;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="viewCareWithSentiment('__remaining')" title="Concerns not yet Resolved">
+        <div style="font-size:11px;font-weight:700;color:#B91C1C;text-transform:uppercase;">\u2757 To be addressed</div>
+        <div style="font-size:30px;font-weight:800;color:${remaining?'#DC2626':'#059669'};line-height:1.1;margin-top:2px;">${fi(remaining)}</div>
+        <div style="font-size:11px;color:#64748B;">${_concerns.length?Math.round(remaining/_concerns.length*100):0}% of ${fi(_concerns.length)} concerns \u00b7 click to view</div>
+        <div style="font-size:10px;color:#94A3B8;margin-top:1px;">concerns not Resolved \u00b7 unanswered counted separately</div></div>`
     +'</div>';
 
   // ── Class / Section dropdown filter for the Summary ──
@@ -7135,23 +7158,14 @@ function renderCareSummary(){
       +'<div style="font-size:9px;font-weight:700;color:#94A3B8;margin-bottom:2px;" '
       +'title="Every call in this category mentioning the topic. The Top 10 problems panel counts only calls carrying a concern, so its figures are lower.">'
       +'🔍 SUB-TOPICS <span style="font-weight:400;">· all calls</span></div>'
-      +topics.slice(0, (window._CARE_SUBS_ALL ? topics.length : 8)).map(t=>{
+      +topics.slice(0,5).map(t=>{
         const tp=Math.round(t.count/catRows.length*100);
         return '<div style="display:flex;justify-content:space-between;font-size:10px;color:#334155;padding:1px 0;cursor:pointer;" '
           +'onclick="viewSubTopic(\''+c.replace(/'/g,"\\'")+'\',\''+t.topic.replace(/'/g,"\\'")+'\','+JSON.stringify(t.kw).replace(/"/g,'&quot;')+')" '
           +'title="Click to view with sentiment">'
           +'<span>'+t.topic+'</span>'
           +'<span style="font-weight:700;color:'+tc+';">'+t.count+' <small style="color:#94A3B8;">'+tp+'%</small></span></div>';
-      }).join('')
-      /* Only the top five sub-topics used to be drawn. A topic could therefore
-         be counted in the Top-10 panel and be invisible here, which is exactly
-         what happened to DC App & Profile Page: real in the data, sixth in its
-         category, and silently cut. Eight are shown by default and the rest are
-         one click away — never dropped. */
-      +(topics.length>8 ? '<div style="font-size:9.5px;color:#1E4FD8;font-weight:700;cursor:pointer;'
-        +'padding:3px 0 1px;" onclick="event.stopPropagation();window._CARE_SUBS_ALL=!window._CARE_SUBS_ALL;renderCareSummary();">'
-        +(window._CARE_SUBS_ALL?'\u25b4 show fewer':'\u25be show all '+topics.length+' sub-topics')+'</div>' : '')
-      +'</div>'):'';
+      }).join('')+'</div>'):'';
     return `<div style="margin-bottom:4px;">
       <div onclick="viewCareGrievance('${c.replace(/'/g,"\\'")}')" style="display:flex;gap:6px;align-items:center;padding:5px 8px;border-radius:8px;cursor:pointer;border-left:3px solid ${m.c};background:#F8FAFC;" title="Click to view all ${c} calls">
         <div style="width:24px;height:24px;border-radius:7px;background:${m.c}20;display:flex;align-items:center;justify-content:center;font-size:13px;flex:0 0 auto;">${m.e}</div>
@@ -7199,10 +7213,13 @@ function viewCareWithSentiment(status){
   /* Resolved is the only settled state; __remaining is everything else. */
   /* Resolved opens every answered call marked Resolved; __remaining opens the
      CONCERNS that are not, which is what the tile counts. */
+  const _s=r=>String(r.Status||'').trim();
   filtered=(status==='__remaining')
-    ? filtered.filter(r=>!/^(no concern|not answering|no response)/i.test(String(r.Grievance||'').trim())
-                       && !/^resolved$/i.test(String(r.Status||'').trim()))
-    : filtered.filter(r=>/^resolved$/i.test(String(r.Status||'').trim()));
+      ? filtered.filter(r=>!/^(no concern|not answering|no response)/i.test(String(r.Grievance||'').trim())
+                         && !/^resolved$/i.test(_s(r)))
+    : (status==='__other')
+      ? filtered.filter(r=>!/^(resolved|in\s*progress|pending)$/i.test(_s(r)))
+    : filtered.filter(r=>new RegExp('^'+status.replace(/\s+/g,'\\s*')+'$','i').test(_s(r)));
   filtered=(typeof _careActiveFilter==='function')?_careActiveFilter(filtered):_careFilterBySentiment(filtered);
   const rows=filtered.map(r=>({Branch:r.Branch,Month:r.Month,Student:r.Student,Class:r.Class,Date:r.Date,
       Grievance:r.GrievanceRaw||r.Grievance, Sentiment:_careRowSentiment(r),
@@ -7211,7 +7228,11 @@ function viewCareWithSentiment(status){
     {key:'Date',label:'Date',date:true},{key:'Grievance',label:'Grievance'},{key:'Sentiment',label:'Sentiment',pill:true},
     {key:'Remarks',label:'Remarks',maxW:'280px'},{key:'Followup',label:'Follow-up',maxW:'200px'},{key:'Status',label:'Status'}];
   const bl=fBranch==='ALL'?'All Branches':fBranch;
-  const _title=(status==='__remaining')?'\u2753 Remaining \u2014 still to be addressed':'\u2705 Resolved Calls';
+  const _title=(status==='__remaining')?'\u2757 Concerns still to be addressed'
+              :(status==='__other')?'\u2753 Other status \u2014 blank or unrecognised'
+              :(/^in\s*progress$/i.test(status))?'\ud83d\udd04 In Progress calls'
+              :(/^pending$/i.test(status))?'\u23f3 Pending calls'
+              :'\u2705 Resolved calls';
   openModal(_title,`${rows.length} call(s) · ${bl} · answered calls only · ${_careSentLabel()}`,rows,cols);
 }
 
@@ -15253,20 +15274,7 @@ window.CARE_PROBLEMS = (function () {
        exactly. With "All Months" they cannot: the Category Mix counts every
        month, this panel compares two. That is the difference the reader was
        seeing, so it is stated here rather than left to be discovered. */
-    var _allMonths = (typeof fMonth !== 'undefined' && fMonth === 'ALL');
-    var purpose = '<div style="background:#EEF2FF;border-left:3px solid #1E4FD8;padding:7px 11px;'
-      + 'font-size:11.5px;color:#1E3A8A;line-height:1.5;margin-bottom:10px;border-radius:0 7px 7px 0">'
-      + '<b>Use this to spot what moved.</b> Two months side by side, so a problem that jumped or '
-      + 'fell stands out. The panel on the right ranks the whole year instead \u2014 a steady problem '
-      + 'shows no jump here and can only be seen there.</div>';
-    var head = purpose + (_allMonths
-      ? '<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:9px;padding:9px 12px;' +
-        'font-size:11.5px;color:#92400E;line-height:1.55;margin-bottom:11px">' +
-        '<b>Month filter is set to All Months.</b> This panel is a month-on-month comparison, so it is ' +
-        'showing <b>' + esc(M.cur) + '</b> against <b>' + esc(M.prev || 'no earlier month') + '</b>. ' +
-        'The Category Mix above is counting <b>every month</b>, so its figures are larger. ' +
-        'Pick a month in the filter bar and the two will match exactly.</div>'
-      : '') +
+    var head = 
       '<div style="font-size:12px;color:var(--txm);margin-bottom:12px;line-height:1.6">' +
       '<b>' + M.cur + '</b>: ' + A.negatives.toLocaleString('en-IN') + ' calls carrying a concern' +
       (M.prev ? ' · <b>' + M.prev + '</b>: ' + B.negatives.toLocaleString('en-IN') : ' · no earlier month to compare') +
@@ -15281,10 +15289,10 @@ window.CARE_PROBLEMS = (function () {
           var dc = r.delta > 0 ? '#DC2626' : r.delta < 0 ? '#059669' : '#94A3B8';
           return '<tr class="cp-tr" data-i="' + i + '" style="cursor:pointer">' +
             '<td class="nm">' + r.th.icon + ' ' + esc(r.th.label) + '</td>' +
-            '<td style="font-weight:800">' + r.cur + '</td>' +
+            '<td style="font-weight:800;cursor:pointer;color:#1E4FD8" class="cp-num" data-i="' + i + '" data-w="cur">' + r.cur + '</td>' +
             '<td style="color:#64748B">' + r.curShare.toFixed(0) + '%</td>' +
             '<td style="color:#64748B">' + r.curConcern + '</td>' +
-            '<td>' + (M.prev ? r.prev : '—') + '</td>' +
+            '<td' + (M.prev ? ' style="cursor:pointer;color:#1E4FD8" class="cp-num" data-i="' + i + '" data-w="prev"' : '') + '>' + (M.prev ? r.prev : '—') + '</td>' +
             '<td style="color:#64748B">' + (M.prev ? r.prevShare.toFixed(0) + '%' : '—') + '</td>' +
             '<td style="font-weight:800;color:' + dc + '">' +
               (M.prev ? (r.delta > 0 ? '+' : '') + r.delta : '—') + '</td></tr>';
@@ -15306,11 +15314,13 @@ window.CARE_PROBLEMS = (function () {
               '<div class="cp-bar"><span class="t">' + esc(M.cur.slice(0,3)) + '</span>' +
                 '<span class="track" data-i="' + i + '" data-w="cur" title="Click to view these calls">' +
                 '<i style="width:' + (r.cur / max * 100) + '%;background:' + r.th.c + '"></i></span>' +
-                '<span class="v">' + r.cur + '</span></div>' +
+                '<span class="v cp-num" data-i="' + i + '" data-w="cur" '+
+                'style="cursor:pointer" title="Click to view these calls">' + r.cur + '</span></div>' +
               (M.prev ? '<div class="cp-bar"><span class="t">' + esc(M.prev.slice(0,3)) + '</span>' +
                 '<span class="track" data-i="' + i + '" data-w="prev" title="Click to view these calls">' +
                 '<i style="width:' + (r.prev / max * 100) + '%;background:' + r.th.c + '66"></i></span>' +
-                '<span class="v" style="color:#94A3B8">' + r.prev + '</span></div>' : '') +
+                '<span class="v cp-num" data-i="' + i + '" data-w="prev" '+
+                'style="color:#94A3B8;cursor:pointer" title="Click to view these calls">' + r.prev + '</span></div>' : '') +
             '</div>' +
             '<div class="cp-delta" style="color:' + dc + '">' + arrow + ' ' +
               (M.prev ? (r.delta > 0 ? '+' : '') + r.delta : '—') +
@@ -15340,7 +15350,9 @@ window.CARE_PROBLEMS = (function () {
     if (fn) fn.textContent = (fBranch === 'ALL' ? 'All branches' : fBranch) + ' \u00b7 ' + M.cur +
       (M.prev ? ' vs ' + M.prev : '');
 
-    el.querySelectorAll('.cp-bar .track').forEach(function (t) {
+    /* the bar AND the number beside it open the same records — readers reach for
+       the figure, not the bar */
+    el.querySelectorAll('.cp-bar .track, .cp-num').forEach(function (t) {
       t.addEventListener('click', function (e) { e.stopPropagation(); openCP(+t.dataset.i, t.dataset.w); });
     });
     el.querySelectorAll('.cp-row[data-roll]').forEach(function (row) {
