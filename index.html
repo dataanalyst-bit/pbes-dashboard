@@ -491,6 +491,19 @@ table.auhm tr.au-itemrow td{border-color:#E8EEF2}
 .aw-sub{font-size:9.5px;color:#94A3B8;margin-top:2px}
 .aw-note{font-size:11.5px;color:var(--txm);line-height:1.6;margin:10px 0 0}
 
+
+/* ═══ HORIZONTAL BRANCH SLIDER ═══ */
+.brslide{display:flex;gap:6px;overflow-x:auto;padding:3px 1px 7px;margin-bottom:9px;
+  scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+.brslide::-webkit-scrollbar{height:5px}
+.brslide::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:99px}
+.brslide button{flex:0 0 auto;background:var(--sur);border:1px solid var(--bor);color:var(--txm);
+  font:inherit;font-size:11.5px;font-weight:700;padding:5px 13px;border-radius:99px;cursor:pointer;
+  white-space:nowrap;transition:background .12s,color .12s,border-color .12s}
+.brslide button:hover{border-color:var(--p);color:var(--p)}
+.brslide button.on{background:var(--p);color:#fff;border-color:var(--p)}
+.brslide button .n{opacity:.7;font-weight:600;margin-left:5px;font-size:10.5px}
+
 /* ═══ K-INNOVATIVE PTM ═══ */
 .kp-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:16px}
 .kp-k{border:1px solid var(--bor);border-top:3px solid var(--p);border-radius:11px;padding:12px 14px;background:var(--sur);cursor:pointer}
@@ -6655,7 +6668,12 @@ function _sentiment(text){
    complaint, which is what produced the false positives. */
 /* the export contains "Not Answering Call", "Not AnsweringCall" (no space),
    "Not answering call" and "Not Answering call" — the space is optional */
-const _NOANS_CAT=/^\s*(not\s*answer(ing)?\s*call?|no\s*response|no\s*answer|switch(ed)?\s*off|not\s*reachable|unreachable)\s*$/i;
+/* Anchored at the START, not the whole string. The exact-match version needed
+   the category to be nothing but "Not Answering Call", so a live sheet writing
+   "Not Answering Call - Switched off", "Not Answering (2nd attempt)" or a value
+   with a trailing note fell through and the tile read zero. Anything that
+   BEGINS with a no-answer phrase is a no-answer. */
+const _NOANS_CAT=/^\s*(not\s*answer(ing|ed)?|no\s*response|no\s*answer|switch(ed)?\s*off|not\s*reachable|unreachable|call\s*not\s*answer)/i;
 const _NOANS_TXT=/(^|[.;•\-\s])(not\s*answer(ed|ing)?|no\s*response|noresponse|not\s*reachable|switch(ed)?\s*off|not\s*picking|not\s*lifting)([.;\s]|$)/i;
 window._careAnswerable = function(r){
   var cat = String(r.Grievance || '').trim();
@@ -7009,7 +7027,7 @@ function renderCareSummary(){
   window._careCatOf = function(r){
     var g = String(r.Grievance || '').replace(/\s+/g,' ').trim(), l = g.toLowerCase();
     if(window._careAnswerable && !window._careAnswerable(r)) return 'Not Answering';
-    if(/^not\s*answer(ing)?\s*call$|^switched off$|^no answer$/.test(l)) return 'Not Answering';
+    if(/^(not\s*answer|no\s*response|no\s*answer|switch(ed)?\s*off|not\s*reachable|unreachable)/.test(l)) return 'Not Answering';
     if(/^no concerns?$/.test(l)) return 'No Concern';
     if(/^academics?$/.test(l)) return 'Academics';
     if(/^others?$/.test(l)) return 'Other';
@@ -7153,7 +7171,7 @@ function renderCareSummary(){
     +`<div style="flex:1;min-width:160px;background:linear-gradient(135deg,#FFF7ED,#FFFBEB);border:1px solid #FED7AA;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="window._CARE_SENT='No Answer';renderCareSummary()" title="Click to view unanswered calls">
         <div style="font-size:11px;font-weight:700;color:#C2410C;text-transform:uppercase;">📵 Not Answered</div>
         <div style="font-size:30px;font-weight:800;color:#C2410C;line-height:1.1;margin-top:2px;">${fi(noAnswer)}</div>
-        <div style="font-size:11px;color:#64748B;">${filteredRows.length?Math.round(noAnswer/filteredRows.length*100):0}% of ${fi(filteredRows.length)} calls</div>
+        <div style="font-size:11px;color:#64748B;">${filteredRows.length?Math.round(noAnswer/filteredRows.length*100):0}% of ${fi(filteredRows.length)} calls${noAnswer?'':' · no call in this slice is tagged Not Answering'}</div>
         <div style="font-size:10px;color:#94A3B8;margin-top:1px;">${_sliced?'across all calls — not the filtered slice':'held out of satisfaction &amp; sentiment'}</div></div>`
     +`<div style="flex:1;min-width:150px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="viewCareWithSentiment('Resolved')" title="Click to view">
         <div style="font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;">✅ Resolved</div>
@@ -15493,8 +15511,13 @@ window.CARE_PROBLEMS = (function () {
     /* Scope, Pending-only and the sentiment chip all apply here, so this panel
        always describes the same slice the Category Mix above it describes. */
     var slice = window._careSlice || function(x){ return x; };
-    var curRows  = slice(rows.filter(function (r) { return r.Month === M.cur; }));
-    var prevRows = M.prev ? slice(rows.filter(function (r) { return r.Month === M.prev; })) : [];
+    /* panel-local branch switch — the page filter still governs everything else */
+    var PB = window._CP_PANEL_BR || 'ALL';
+    var pbRows = (PB==='ALL') ? rows : rows.filter(function(r){ return r.Branch===PB; });
+    window._CP_BRC = {};
+    rows.forEach(function(r){ window._CP_BRC[r.Branch]=(window._CP_BRC[r.Branch]||0)+1; });
+    var curRows  = slice(pbRows.filter(function (r) { return r.Month === M.cur; }));
+    var prevRows = M.prev ? slice(pbRows.filter(function (r) { return r.Month === M.prev; })) : [];
     var A = CARE_PROBLEMS.tally(curRows), B = CARE_PROBLEMS.tally(prevRows);
 
     /* Every subject rolls into ONE row. Eleven subjects each at 3% pushed the
@@ -15553,7 +15576,7 @@ window.CARE_PROBLEMS = (function () {
        exactly. With "All Months" they cannot: the Category Mix counts every
        month, this panel compares two. That is the difference the reader was
        seeing, so it is stated here rather than left to be discovered. */
-    var head = 
+    var head = branchSlider({id:'cp-slide', counts:window._CP_BRC, value:PB}) +
       '<div style="font-size:12px;color:var(--txm);margin-bottom:12px;line-height:1.6">' +
       '<b>' + M.cur + '</b>: ' + A.negatives.toLocaleString('en-IN') + ' calls carrying a concern' +
       (M.prev ? ' · <b>' + M.prev + '</b>: ' + B.negatives.toLocaleString('en-IN') : ' · no earlier month to compare') +
@@ -15634,6 +15657,7 @@ window.CARE_PROBLEMS = (function () {
     el.querySelectorAll('.cp-bar .track, .cp-num').forEach(function (t) {
       t.addEventListener('click', function (e) { e.stopPropagation(); openCP(+t.dataset.i, t.dataset.w); });
     });
+    wireBranchSlider('cp-slide', function(b){ window._CP_PANEL_BR=b; build(); });
     el.querySelectorAll('.cp-row[data-roll]').forEach(function (row) {
       row.addEventListener('click', function (e) {
         if (e.target.closest('.cp-sub') || e.target.closest('.track')) return;
@@ -16429,7 +16453,10 @@ window.VCHK = (function () {
     /* the branch filter applies; the MONTH filter deliberately does not — this
        panel is the year, and honouring it would make it a copy of the panel
        beside it */
-    var rows=C.filter(function(r){ return scope.indexOf(r.Branch)>=0 && ORDER.indexOf(r.Month)>=0; });
+    var all=C.filter(function(r){ return scope.indexOf(r.Branch)>=0 && ORDER.indexOf(r.Month)>=0; });
+    var brc={}; all.forEach(function(r){ brc[r.Branch]=(brc[r.Branch]||0)+1; });
+    var PB=window._CPY_PANEL_BR||'ALL';
+    var rows=(PB==='ALL')?all:all.filter(function(r){ return r.Branch===PB; });
     var slice=window._careSlice||function(x){return x;};
     rows=slice(rows);
     if(!rows.length){ el.innerHTML='<div class="no-data">No calls recorded this academic year.</div>'; return; }
@@ -16447,7 +16474,8 @@ window.VCHK = (function () {
     if(!list.length){ el.innerHTML='<div class="no-data">No topic matched this year\u2019s remarks.</div>'; return; }
     var max=Math.max.apply(null,list.map(function(x){return x.n;}).concat([1]));
 
-    el.innerHTML='<div style="background:#F0FDF4;border-left:3px solid #059669;padding:7px 11px;'+
+    el.innerHTML=branchSlider({id:'cpy-slide', counts:brc, value:PB})+
+      '<div style="background:#F0FDF4;border-left:3px solid #059669;padding:7px 11px;'+
       'font-size:11.5px;color:#065F46;line-height:1.5;margin-bottom:10px;border-radius:0 7px 7px 0">'+
       '<b>Use this to decide what to fix.</b> The whole year ranked by volume, so a problem reported '+
       'steadily every month is visible even though it never spikes. The panel on the left shows '+
@@ -16474,6 +16502,7 @@ window.VCHK = (function () {
     if(fn) fn.textContent=span[0]+' \u2013 '+span[span.length-1]+' \u00b7 '+
       ((typeof fBranch!=='undefined'&&fBranch!=='ALL')?fBranch:'all branches');
 
+    wireBranchSlider('cpy-slide', function(b){ window._CPY_PANEL_BR=b; safe(); });
     el.querySelectorAll('.cpy-row').forEach(function(n){
       n.addEventListener('click',function(){
         var r=list[+n.dataset.i];
@@ -16911,12 +16940,19 @@ window.KPTM = (function () {
     window._KP_BR=blist;
 
     /* ── TOP 10 PROBLEMS from the concern tags ── */
+    /* the two panels below can be switched to one branch without disturbing the
+       page filter, so a reader can compare campuses in place */
+    var PB = window._KP_PANEL_BR || 'ALL';
+    var panelRows = (PB==='ALL') ? ans : ans.filter(function(r){ return r.branch===PB; });
+    var brCounts = {};
+    ans.forEach(function(r){ brCounts[r.branch]=(brCounts[r.branch]||0)+1; });
+
     /* Ranked on what parents SAID, not on the seven broad tags. "Student
        Support" covers 486 calls and tells nobody what support was wanted; the
        sub-topics below split it into remedial help, notes not completed,
        guidance, and so on — which are different actions. */
     var tagMap={};
-    ans.forEach(function(r){
+    panelRows.forEach(function(r){
       var subs=KPTM.subTopicsOf(r);
       if(subs.length) subs.forEach(function(b){ (tagMap[b.t]||(tagMap[b.t]=[])).push(r); });
       else if(KPTM.hasConcern(r)) (tagMap['Other / not stated clearly']||(tagMap['Other / not stated clearly']=[])).push(r);
@@ -16936,9 +16972,10 @@ window.KPTM = (function () {
     var maxT=Math.max.apply(null,tags.map(function(x){return x.n;}).concat([1]));
 
     /* ── dimensions, ranked among the responses that varied ── */
+    var pvaried = (PB==='ALL') ? varied : varied.filter(function(r){ return r.branch===PB; });
     var dims=KPTM.DIMS.map(function(d,i){
-      var lowN=varied.filter(function(r){ return r.scores[i]!==null && r.scores[i]<=3; });
-      var vals=varied.map(function(r){return r.scores[i];}).filter(function(x){return x!==null;});
+      var lowN=pvaried.filter(function(r){ return r.scores[i]!==null && r.scores[i]<=3; });
+      var vals=pvaried.map(function(r){return r.scores[i];}).filter(function(x){return x!==null;});
       /* what those parents wrote, so a low score has a reason attached */
       var why={};
       lowN.forEach(function(r){ KPTM.subTopicsOf(r).forEach(function(b){ why[b.t]=(why[b.t]||0)+1; }); });
@@ -16953,6 +16990,7 @@ window.KPTM = (function () {
       '<div class="au-sec"><div class="kp-h">🔟 Top 10 problems parents raised</div>'+
       '<div class="kp-sub">Read from the remark itself, not from the seven broad tags. A parent can raise '+
       'more than one, so the rows add to more than the total.</div>'+
+      branchSlider({id:'kp-slide-a', counts:brCounts, value:PB})+
       (tags.length?tags.map(function(x,i){
         var c=x.n>=100?'#DC2626':x.n>=40?'#D97706':'#1E4FD8';
         return '<div class="kp-row" data-tag="'+i+'" title="Click to view these calls">'+
@@ -16964,9 +17002,10 @@ window.KPTM = (function () {
           '<div class="kp-n" style="color:'+c+'">'+fi(x.n)+'</div></div>';
       }).join(''):'<div class="no-data">No concern tags recorded.</div>')+'</div>'+
       '<div class="au-sec"><div class="kp-h">📉 Where the low scores fall</div>'+
-      '<div class="kp-sub">Counted only among the '+fi(varied.length)+' parents who scored the questions '+
+      '<div class="kp-sub">Counted only among the '+fi(pvaried.length)+' parents who scored the questions '+
       'differently from one another \u2014 the rest tell us nothing about which dimension is weak. Each row '+
       'shows what those same parents wrote, so a low score carries a reason.</div>'+
+      branchSlider({id:'kp-slide-b', counts:brCounts, value:PB})+
       (dims.length?dims.map(function(x,i){
         var c=x.n>=30?'#DC2626':x.n>=15?'#D97706':'#1E4FD8';
         return '<div class="kp-row" data-dim="'+i+'" title="Click to view these calls">'+
@@ -17067,6 +17106,9 @@ window.KPTM = (function () {
       ' · '+fi(rows.length)+' families · '+fi(ans.length)+' answered · rating '+
       (overall===null?'—':overall.toFixed(2));
 
+    ['kp-slide-a','kp-slide-b'].forEach(function(sid){
+      wireBranchSlider(sid, function(b){ window._KP_PANEL_BR=b; safe(); });
+    });
     el.querySelectorAll('.kp-k').forEach(function(n){
       n.addEventListener('click',function(){ var k=K[+n.dataset.k]; open('⭐ '+k.t,k.d,k.list); });
     });
@@ -17162,6 +17204,49 @@ window.KPTM = (function () {
   if(typeof _af==='function') window.applyFilters=function(){
     var r=_af.apply(this,arguments); try{ safe(); }catch(e){} return r; };
 })();
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   HORIZONTAL BRANCH SLIDER
+
+   A panel-local branch switch. The filter bar at the top of the page changes
+   every tab at once; this changes one chart, so a reader can compare Boduppal's
+   problems against Keesara's without losing the rest of the page — and without
+   scrolling back up between each look.
+
+   It carries the row count per branch, because a branch with 76 responses and
+   one with 1,602 should not be read the same way and the label is the only
+   place that can say so.
+   ══════════════════════════════════════════════════════════════════════════ */
+window.branchSlider = function (opts) {
+  var id = opts.id, counts = opts.counts || {}, cur = opts.value || 'ALL';
+  var order = opts.order || Object.keys(counts).sort();
+  var total = 0;
+  order.forEach(function (b) { total += (counts[b] || 0); });
+  var html = '<div class="brslide" id="' + id + '">' +
+    '<button data-b="ALL" class="' + (cur === 'ALL' ? 'on' : '') + '">All branches' +
+      '<span class="n">' + total.toLocaleString('en-IN') + '</span></button>' +
+    order.map(function (b) {
+      var n = counts[b] || 0;
+      return '<button data-b="' + String(b).replace(/"/g, '&quot;') + '"' +
+        (n ? '' : ' disabled style="opacity:.4;cursor:default"') +
+        ' class="' + (cur === b ? 'on' : '') + '">' +
+        String(b).replace(/[&<>]/g, '') + '<span class="n">' + n.toLocaleString('en-IN') + '</span></button>';
+    }).join('') + '</div>';
+  return html;
+};
+window.wireBranchSlider = function (id, onPick) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.querySelectorAll('button[data-b]').forEach(function (b) {
+    if (b.disabled) return;
+    b.addEventListener('click', function (e) {
+      e.stopPropagation();
+      onPick(b.dataset.b);
+    });
+  });
+};
 </script>
 </body>
 </html>
