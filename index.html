@@ -16320,7 +16320,7 @@ window.KPTM = (function () {
     var low=hdr.map(norm), m={};
     function f(){ for(var i=0;i<arguments.length;i++){ var k=low.indexOf(norm(arguments[i])); if(k>=0) return k; } return -1; }
     m.branch=f('Branch'); m.cls=f('Class'); m.sec=f('Section'); m.board=f('Category / Board');
-    m.type=f('Student Type'); m.date=f('Call Date'); m.agent=f('Agent'); m.status=f('Call Status');
+    m.type=f('Student Type'); m.sstatus=f('Student Status'); m.date=f('Call Date'); m.agent=f('Agent'); m.status=f('Call Status');
     m.overall=f('Overall school Rating'); m.nps=f('Recommend us (0-5 scale)');
     m.feedback=f('FEEDBACK'); m.concerns=f('Concerns'); m.remarks=f('Remarks');
     m.dc=f('DC ISSUE'); m.student=f('Student Name'); m.sugg=f('Any suggestions');
@@ -16344,6 +16344,7 @@ window.KPTM = (function () {
         cls:M.cls>=0?String(r[M.cls]||'').trim():'', sec:M.sec>=0?String(r[M.sec]||'').trim():'',
         board:M.board>=0?String(r[M.board]||'').trim():'',
         type:M.type>=0?String(r[M.type]||'').trim().toUpperCase().replace(/_/g,' '):'',
+        sstatus:M.sstatus>=0?String(r[M.sstatus]||'').trim().toUpperCase():'',
         date:M.date>=0?String(r[M.date]||'').slice(0,10):'',
         agent:M.agent>=0?String(r[M.agent]||'').trim():'',
         status:M.status>=0?String(r[M.status]||'').trim().toUpperCase():'',
@@ -16361,6 +16362,82 @@ window.KPTM = (function () {
       };
     }).filter(function(x){ return x.branch!=='(no branch)'; });
   }
+  /* ══════════════════════════════════════════════════════════════════
+     WHAT PARENTS ACTUALLY SAID — sub-topics mined from the remarks
+
+     The Concerns column has seven broad tags; "Student Support" alone covers
+     486 calls and says nothing about what support. These sub-topics come from
+     n-gram analysis of the 1,222 concern remarks, after stripping the
+     narrative wrapper every agent writes ("Spoke to the parent, who said
+     that...") and the call-attempt boilerplate ("both numbers ringing but no
+     response"), which otherwise dominate every frequency count.
+
+     31 sub-topics, 92% of concern remarks matched.
+     ══════════════════════════════════════════════════════════════════ */
+  var KSUB=[
+    {t:'Extra academic support / remedial',i:'🎯',ph:['additional support','additional academic support','extra support','extra classes','remedial','special attention','individual attention','one on one','extra coaching','additional coaching','more attention','personal attention','support and guidance','academic support'],kw:[]},
+    {t:'Weak in a subject',i:'📉',ph:['weak in','poor in','struggling in','difficult in','not good in','low marks','needs improvement in','improve in'],kw:[]},
+    {t:'English & communication skills',i:'🔤',ph:['communication skills','english communication','spoken english','in english','english speaking','english subject','fluency','vocabulary'],kw:['english']},
+    {t:'Hindi / second language',i:'🕉️',ph:['in hindi','hindi subject','hindi teacher','second language','third language','telugu'],kw:['hindi','telugu']},
+    {t:'Maths & Science',i:'🔢',ph:['in mathematics','in maths','maths subject','math subject','in science','science subject'],kw:['mathematics','maths','science']},
+    {t:'Notes & homework not completed',i:'🖊️',ph:['the notes','notes are','notes not','homework','home work','not writing','assignments','worksheets','class work','classwork'],kw:['notes','homework']},
+    {t:'Syllabus pace & revision',i:'📅',ph:['syllabus','portion','revision','not completed the','pace of','too fast','not covered'],kw:['syllabus','revision']},
+    {t:'Teacher quality & teaching method',i:'📚',ph:['teaching method','quality of teaching','teachers to provide','teacher is not','teaching is not','not teaching','teacher changed','frequent change','new teacher','experienced teacher'],kw:[]},
+    {t:'Teacher behaviour & attitude',i:'🗣️',ph:['teacher behaviour','behaviour of the teacher','scolding','harsh','rude','shouting','partial','favouritism','not friendly'],kw:[]},
+    {t:'Evaluation & correction',i:'✔️',ph:['correction','evaluation','not corrected','checking','papers are not','marks are not'],kw:['correction']},
+    {t:'Exams, results & report cards',i:'📊',ph:['report card','exam','test','results','marks card','progress report','pt 1','assessment'],kw:['exam','marks','results']},
+    {t:'Homework load too heavy',i:'📝',ph:['too much homework','heavy homework','excess homework','burden','too many assignments'],kw:[]},
+    {t:'Sports & PE not conducted',i:'🏅',ph:['sports are not','not being conducted','games period','pe period','sports period','no sports','sports activities','physical activities','play time'],kw:['sports']},
+    {t:'Co-curricular & activities',i:'🎪',ph:['extra curricular','co curricular','activities are not','cultural','dance','music','art and craft','competitions','club'],kw:['activities']},
+    {t:'Washrooms & hygiene',i:'🚻',ph:['the washrooms','washroom','toilet','not being maintained','hygiene','cleanliness','not clean','unclean','bathroom'],kw:[]},
+    {t:'Drinking water',i:'🚰',ph:['drinking water','water facility','no water','water is not','ro water'],kw:[]},
+    {t:'Classroom & infrastructure',i:'🪑',ph:['classroom','fans','ac is not','furniture','benches','lighting','ventilation','building','campus maintenance','infrastructure'],kw:[]},
+    {t:'Food & canteen',i:'🍱',ph:['canteen','food','lunch','snacks','meal'],kw:[]},
+    {t:'Bus route & timing',i:'🚌',ph:['route no','on route','bus route','bus timing','bus is late','pick up','drop time','reaches early','waiting for the bus','long route','route change'],kw:[]},
+    {t:'Bus staff & safety',i:'⚠️',ph:['driver','attender','attendant','rash','over speed','bus safety','not helping','conductor'],kw:[]},
+    {t:'Own transport / bus availability',i:'🚏',ph:['bus facility','no bus','bus is not available','own transport','transport facility'],kw:[]},
+    {t:'Response from school / follow-up',i:'📮',ph:['look into the matter','concerned person','no response from','not responding','follow up','no action','not resolved','did not get a call','waiting for a response'],kw:[]},
+    {t:'Communication & information',i:'📵',ph:['not informed','no information','communication from the school','circular','not communicated','late communication','intimation','whatsapp','notice'],kw:['communication']},
+    {t:'Access to teachers & management',i:'🤝',ph:['meet the teacher','access to','not able to meet','appointment','principal','coordinator','management to','admin'],kw:[]},
+    {t:'Fees & payments',i:'💰',ph:['fee','fees','payment','receipt','refund','concession','hike'],kw:[]},
+    {t:'Books, uniform & supplies',i:'📦',ph:['books','uniform','stationery','id card','belt','shoes','diary','almanac'],kw:[]},
+    {t:'Safety, discipline & bullying',i:'🛡️',ph:['bullying','fighting','beaten','safety of','discipline','misbehav','teasing','security'],kw:[]},
+    {t:'Health & medical care',i:'🩺',ph:['first aid','health','fever','injury','sick','medical','nurse'],kw:[]},
+    {t:'General guidance & motivation',i:'🌟',ph:['more guidance','guidance and support','motivate','encourage','more improvement','improve academics','needs more attention','support to the child','focus more','more focus','equal opportunities','explain the lessons','explain properly','slow in academics','in all subjects'],kw:[]},
+    {t:'Campus surroundings & road',i:'🛣️',ph:['road in front','road needs','parking','entrance','gate','surroundings','traffic'],kw:[]},
+    {t:'Digital / app issues',i:'📱',ph:['dc app','app is not','portal','digital campus','online','login','erp'],kw:[]}
+  ];
+
+  /* Every agent opens with the same sentence and many rows carry the failed
+     call attempts before the real content. Both are stripped before matching —
+     left in, "spoke to the parent" and "ringing but no response" are the most
+     frequent phrases in the corpus and swamp everything a parent said. */
+  var KWRAP=[/(both the numbers?|the number)?\s*ringing but no response(\s*\/\/)?/gi,
+             /tried to connect[^.\/]*/gi, /tried calling[^.\/]*/gi,
+             /disconnected the call[^.\/]*/gi, /\/\/+/g];
+  function kclean(t){
+    var s=String(t||'');
+    KWRAP.forEach(function(rx){ s=s.replace(rx,' '); });
+    return ' '+s.toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim()+' ';
+  }
+  /* score, then keep the winner and anything close — the same shape used on the
+     care calls, so a remark naming two problems is counted under both */
+  function subTopicsOf(r){
+    var t=kclean((r.remarks||'')+' '+(r.concerns||'')+' '+(r.feedback||''));
+    if(t.trim().length<8) return [];
+    var sc=KSUB.map(function(b){
+      var s=0;
+      b.ph.forEach(function(x){ if(t.indexOf(' '+x)!==-1) s+=3+x.split(' ').length*0.5; });
+      b.kw.forEach(function(x){ if(t.indexOf(' '+x+' ')!==-1) s+=1; });
+      return {b:b,s:s};
+    }).filter(function(x){ return x.s>0; });
+    if(!sc.length) return [];
+    var mx=Math.max.apply(null,sc.map(function(x){return x.s;}));
+    return sc.filter(function(x){ return x.s>=mx*0.6; })
+             .sort(function(a,b){ return b.s-a.s; }).slice(0,3)
+             .map(function(x){ return x.b; });
+  }
+
   var ANSWERED=/^answered$/i;
   function answered(r){ return ANSWERED.test(r.status); }
   function noResponse(r){ return /^no response/i.test(r.status); }
@@ -16391,7 +16468,8 @@ window.KPTM = (function () {
     return !!r.feedback && !/^no concerns?$/i.test(r.feedback.trim());
   }
   return { DIMS:DIMS, toRows:toRows, answered:answered, noResponse:noResponse,
-           followUp:followUp, denied:denied, tagsOf:tagsOf, hasConcern:hasConcern };
+           followUp:followUp, denied:denied, tagsOf:tagsOf, hasConcern:hasConcern,
+           subTopicsOf:subTopicsOf, KSUB:KSUB };
 })();
 </script>
 <script>
@@ -16407,7 +16485,7 @@ window.KPTM = (function () {
 
   var COLS=[{key:'branch',label:'Branch'},{key:'cls',label:'Class'},{key:'sec',label:'Section'},
     {key:'student',label:'Student',maxW:'150px'},{key:'date',label:'Call date',date:true},
-    {key:'agent',label:'Agent'},{key:'status',label:'Call status',pill:true},
+    {key:'agent',label:'Agent'},{key:'status',label:'Call status',pill:true},{key:'sstatus',label:'Student status',pill:true},
     {key:'overall',label:'Rating'},{key:'feedback',label:'Feedback',pill:true},
     {key:'concerns',label:'Concern tags',maxW:'190px'},{key:'remarks',label:'What the parent said',maxW:'380px'}];
   function open(title,sub,rows){ if(typeof openModal==='function') openModal(title,sub,rows,COLS); }
@@ -16503,14 +16581,26 @@ window.KPTM = (function () {
     window._KP_BR=blist;
 
     /* ── TOP 10 PROBLEMS from the concern tags ── */
+    /* Ranked on what parents SAID, not on the seven broad tags. "Student
+       Support" covers 486 calls and tells nobody what support was wanted; the
+       sub-topics below split it into remedial help, notes not completed,
+       guidance, and so on — which are different actions. */
     var tagMap={};
-    ans.forEach(function(r){ KPTM.tagsOf(r).forEach(function(t){ (tagMap[t]||(tagMap[t]=[])).push(r); }); });
+    ans.forEach(function(r){
+      var subs=KPTM.subTopicsOf(r);
+      if(subs.length) subs.forEach(function(b){ (tagMap[b.t]||(tagMap[b.t]=[])).push(r); });
+      else if(KPTM.hasConcern(r)) (tagMap['Other / not stated clearly']||(tagMap['Other / not stated clearly']=[])).push(r);
+    });
+    var ICONS={}; KPTM.KSUB.forEach(function(b){ ICONS[b.t]=b.i; });
     var tags=Object.keys(tagMap).map(function(t){
       var rs=tagMap[t];
       var ov=mean(rs.map(function(r){return r.overall;}).filter(function(x){return x!==null;}));
       var brc={}; rs.forEach(function(r){ brc[r.branch]=(brc[r.branch]||0)+1; });
       var top=Object.keys(brc).sort(function(a,b){return brc[b]-brc[a];})[0];
-      return {t:t, rows:rs, n:rs.length, ov:ov, top:top, topN:brc[top]};
+      var tg={}; rs.forEach(function(r){ KPTM.tagsOf(r).forEach(function(x){ tg[x]=(tg[x]||0)+1; }); });
+      var ttag=Object.keys(tg).sort(function(a,b){return tg[b]-tg[a];})[0];
+      return {t:t, icon:ICONS[t]||'\ud83d\udd0e', rows:rs, n:rs.length, ov:ov,
+              top:top, topN:brc[top], tag:ttag};
     }).sort(function(a,b){ return b.n-a.n; }).slice(0,10);
     window._KP_TAGS=tags;
     var maxT=Math.max.apply(null,tags.map(function(x){return x.n;}).concat([1]));
@@ -16519,80 +16609,106 @@ window.KPTM = (function () {
     var dims=KPTM.DIMS.map(function(d,i){
       var lowN=varied.filter(function(r){ return r.scores[i]!==null && r.scores[i]<=3; });
       var vals=varied.map(function(r){return r.scores[i];}).filter(function(x){return x!==null;});
-      return {name:d[0], group:d[1], i:i, low:lowN, n:lowN.length, avg:mean(vals)};
+      /* what those parents wrote, so a low score has a reason attached */
+      var why={};
+      lowN.forEach(function(r){ KPTM.subTopicsOf(r).forEach(function(b){ why[b.t]=(why[b.t]||0)+1; }); });
+      var topWhy=Object.keys(why).sort(function(a,b){return why[b]-why[a];}).slice(0,2)
+        .map(function(k){ return k+' ('+why[k]+')'; });
+      return {name:d[0], group:d[1], i:i, low:lowN, n:lowN.length, avg:mean(vals), why:topWhy};
     }).filter(function(d){ return d.n>0; }).sort(function(a,b){ return b.n-a.n; }).slice(0,10);
     window._KP_DIMS=dims;
     var maxD=Math.max.apply(null,dims.map(function(x){return x.n;}).concat([1]));
 
     html+='<div class="kp-two">'+
       '<div class="au-sec"><div class="kp-h">🔟 Top 10 problems parents raised</div>'+
-      '<div class="kp-sub">From the concern tags on answered calls. A parent can raise more than one.</div>'+
+      '<div class="kp-sub">Read from the remark itself, not from the seven broad tags. A parent can raise '+
+      'more than one, so the rows add to more than the total.</div>'+
       (tags.length?tags.map(function(x,i){
         var c=x.n>=100?'#DC2626':x.n>=40?'#D97706':'#1E4FD8';
         return '<div class="kp-row" data-tag="'+i+'" title="Click to view these calls">'+
-          '<div><div class="kp-nm">'+esc(x.t)+'</div>'+
+          '<div><div class="kp-nm">'+x.icon+' '+esc(x.t)+'</div>'+
           '<div class="kp-bar"><i style="width:'+(x.n/maxT*100)+'%;background:'+c+'"></i></div>'+
           '<div class="kp-meta">avg rating '+(x.ov===null?'—':x.ov.toFixed(2))+
-          ' · most often '+esc(x.top)+' ('+x.topN+')</div></div>'+
+          ' \u00b7 most often '+esc(x.top)+' ('+x.topN+')'+
+          (x.tag?' \u00b7 tagged '+esc(x.tag):'')+'</div></div>'+
           '<div class="kp-n" style="color:'+c+'">'+fi(x.n)+'</div></div>';
       }).join(''):'<div class="no-data">No concern tags recorded.</div>')+'</div>'+
       '<div class="au-sec"><div class="kp-h">📉 Where the low scores fall</div>'+
       '<div class="kp-sub">Counted only among the '+fi(varied.length)+' parents who scored the questions '+
-      'differently from one another — the rest tell us nothing about which dimension is weak.</div>'+
+      'differently from one another \u2014 the rest tell us nothing about which dimension is weak. Each row '+
+      'shows what those same parents wrote, so a low score carries a reason.</div>'+
       (dims.length?dims.map(function(x,i){
         var c=x.n>=30?'#DC2626':x.n>=15?'#D97706':'#1E4FD8';
         return '<div class="kp-row" data-dim="'+i+'" title="Click to view these calls">'+
           '<div><div class="kp-nm">'+esc(x.name)+'</div>'+
           '<div class="kp-bar"><i style="width:'+(x.n/maxD*100)+'%;background:'+c+'"></i></div>'+
-          '<div class="kp-meta">'+esc(x.group)+' · avg '+(x.avg===null?'—':x.avg.toFixed(2))+
-          ' among varied responses</div></div>'+
+          '<div class="kp-meta">'+esc(x.group)+' \u00b7 avg '+(x.avg===null?'—':x.avg.toFixed(2))+
+          (x.why&&x.why.length?' \u00b7 they wrote about '+esc(x.why.join(', ')):'')+'</div></div>'+
           '<div class="kp-n" style="color:'+c+'">'+fi(x.n)+'</div></div>';
       }).join(''):'<div class="no-data">No low scores recorded.</div>')+'</div></div>';
 
-    /* ── agents and reach, because a low reach is an operations problem ── */
-    var ag={};
-    rows.forEach(function(r){ if(r.agent) (ag[r.agent]||(ag[r.agent]={a:r.agent,all:[],ans:[]})).all.push(r); });
-    rows.filter(KPTM.answered).forEach(function(r){ if(r.agent&&ag[r.agent]) ag[r.agent].ans.push(r); });
-    var agents=Object.keys(ag).map(function(k){
-      var o=ag[k]; return {a:o.a, all:o.all, ans:o.ans, reach:pc(o.ans.length,o.all.length)};
-    }).filter(function(x){ return x.all.length>=25; }).sort(function(a,b){ return b.reach-a.reach; });
-    window._KP_AG=agents;
 
-    /* ── class-level view ── */
-    var cl={};
-    ans.forEach(function(r){ var k=r.cls||'(no class)'; (cl[k]||(cl[k]={c:k,rows:[]})).rows.push(r); });
-    var classes=Object.keys(cl).map(function(k){
-      var o=cl[k];
-      var ov=mean(o.rows.map(function(r){return r.overall;}).filter(function(x){return x!==null;}));
-      return {c:o.c, rows:o.rows, n:o.rows.length, ov:ov,
-              conc:o.rows.filter(KPTM.hasConcern).length};
-    }).filter(function(x){ return x.n>=20; }).sort(function(a,b){ return (a.ov||9)-(b.ov||9); }).slice(0,10);
-    window._KP_CL=classes;
+    /* ── STRENGTH AND TC BY BRANCH ──
+       Student Status carries only ACTIVE or TC, so the roll is on the left and
+       the leavers beside it. TC as a share of the roll is the number that
+       matters: 278 leavers out of 3,897 is a very different story from 355 out
+       of 2,189, and the raw counts alone would rank them the wrong way round. */
+    var strength=Object.keys(brs).map(function(k){
+      var o=brs[k];
+      var tc=o.all.filter(function(r){ return /^tc$/i.test(r.sstatus); });
+      var act=o.all.filter(function(r){ return !/^tc$/i.test(r.sstatus); });
+      return {b:o.b, all:o.all, tc:tc, act:act, pct:pc(tc.length,o.all.length)};
+    }).sort(function(a,b){ return b.pct-a.pct || b.tc.length-a.tc.length; });
+    window._KP_STR=strength;
+    var totAll=rows.length, totTc=rows.filter(function(r){ return /^tc$/i.test(r.sstatus); }).length;
+
+    /* ── CALL STATUS ──
+       Reported as written, with the retry suffixes kept: "NO RESPONSE 2" is a
+       second attempt, and collapsing it into the first would hide how much
+       calling is being repeated to no effect. */
+    var stMap={};
+    rows.forEach(function(r){ var k=r.status||'(blank)'; (stMap[k]||(stMap[k]=[])).push(r); });
+    var stats=Object.keys(stMap).map(function(k){ return {s:k, rows:stMap[k], n:stMap[k].length}; })
+      .sort(function(a,b){ return b.n-a.n; });
+    window._KP_ST=stats;
+    var maxS=Math.max.apply(null,stats.map(function(x){return x.n;}).concat([1]));
+    var SC={'ANSWERED':'#059669','NO RESPONSE':'#DC2626','NO RESPONSE 2':'#B91C1C',
+            'NO RESPONSE 3':'#7F1D1D','NEED FOLLOW UP':'#D97706','NEED FOLLOW UP 2':'#B45309',
+            'DENIED FEEDBACK':'#7C3AED','(blank)':'#94A3B8','INVALID':'#64748B',
+            'WRONG NUMBER':'#64748B','LEFT THE SCHOOL':'#64748B','NEW ADMISSION':'#0891B2'};
 
     html+='<div class="kp-two">'+
-      '<div class="au-sec"><div class="kp-h">📞 Reach by agent</div>'+
-      '<div class="kp-sub">Share of assigned families who actually answered. Agents with fewer than 25 '+
-      'calls are omitted — a small list produces a percentage that swings on one call.</div>'+
-      '<div style="overflow-x:auto"><table class="kpt"><thead><tr><th class="nm">Agent</th>'+
-      '<th>Assigned</th><th>Reached</th><th>Reach %</th></tr></thead><tbody>'+
-      agents.map(function(x,i){
-        var c=x.reach>=60?'#059669':x.reach>=40?'#D97706':'#DC2626';
-        return '<tr><td class="nm">'+esc(x.a)+'</td>'+
-          '<td class="c" data-ag="'+i+'" data-f="all">'+fi(x.all.length)+'</td>'+
-          '<td class="c" data-ag="'+i+'" data-f="ans">'+fi(x.ans.length)+'</td>'+
-          '<td style="color:'+c+';font-weight:800">'+x.reach+'%</td></tr>';
-      }).join('')+'</tbody></table></div></div>'+
-      '<div class="au-sec"><div class="kp-h">🎓 Weakest classes by rating</div>'+
-      '<div class="kp-sub">Classes with at least 20 answered calls, lowest rating first.</div>'+
-      '<div style="overflow-x:auto"><table class="kpt"><thead><tr><th class="nm">Class</th>'+
-      '<th>Answered</th><th>Rating</th><th>Concerns</th></tr></thead><tbody>'+
-      classes.map(function(x,i){
-        var c=x.ov===null?'#94A3B8':x.ov>=4.5?'#059669':x.ov>=4?'#D97706':'#DC2626';
-        return '<tr><td class="nm">'+esc(x.c)+'</td>'+
-          '<td class="c" data-cl="'+i+'">'+fi(x.n)+'</td>'+
-          '<td style="color:'+c+';font-weight:800">'+(x.ov===null?'—':x.ov.toFixed(2))+'</td>'+
-          '<td>'+fi(x.conc)+'</td></tr>';
-      }).join('')+'</tbody></table></div></div></div>';
+      '<div class="au-sec"><div class="kp-h">🏫 Strength and TC by branch</div>'+
+      '<div class="kp-sub">On the roll against those who have taken a TC. Ranked by TC as a share of the '+
+      'branch, not by the raw count \u2014 the two order differently.</div>'+
+      '<div style="overflow-x:auto"><table class="kpt"><thead><tr><th class="nm">Branch</th>'+
+      '<th>On roll</th><th>Active</th><th>TC</th><th>TC %</th></tr></thead><tbody>'+
+      strength.map(function(x,i){
+        var c=x.pct>=15?'#DC2626':x.pct>=8?'#D97706':x.pct>0?'#1E4FD8':'#94A3B8';
+        return '<tr><td class="nm">'+esc(x.b)+'</td>'+
+          '<td class="c" data-str="'+i+'" data-f="all">'+fi(x.all.length)+'</td>'+
+          '<td class="c" data-str="'+i+'" data-f="act">'+fi(x.act.length)+'</td>'+
+          '<td class="c'+(x.tc.length?'':' z')+'" data-str="'+i+'" data-f="tc">'+fi(x.tc.length)+'</td>'+
+          '<td style="color:'+c+';font-weight:800">'+x.pct+'%</td></tr>';
+      }).join('')+
+      '<tr style="background:#F1F7F3;font-weight:800"><td class="nm">TOTAL</td>'+
+      '<td>'+fi(totAll)+'</td><td>'+fi(totAll-totTc)+'</td><td>'+fi(totTc)+'</td>'+
+      '<td>'+pc(totTc,totAll)+'%</td></tr>'+
+      '</tbody></table></div>'+
+      '<p class="au-note">Student Status records only ACTIVE or TC, so this is the position at the time the '+
+      'feedback list was drawn \u2014 not a live roll.</p></div>'+
+
+      '<div class="au-sec"><div class="kp-h">📞 Call status</div>'+
+      '<div class="kp-sub">Every outcome as recorded. Retry attempts are kept separate \u2014 a second '+
+      '"no response" is a second wasted call, and merging them would hide the repetition.</div>'+
+      stats.map(function(x,i){
+        var c=SC[x.s]||'#1E4FD8';
+        return '<div class="kp-row" data-st="'+i+'" title="Click to view these calls">'+
+          '<div><div class="kp-nm">'+esc(x.s)+'</div>'+
+          '<div class="kp-bar"><i style="width:'+(x.n/maxS*100)+'%;background:'+c+'"></i></div>'+
+          '<div class="kp-meta">'+pc(x.n,rows.length)+'% of '+fi(rows.length)+' families</div></div>'+
+          '<div class="kp-n" style="color:'+c+'">'+fi(x.n)+'</div></div>';
+      }).join('')+'</div></div>';
 
     /* ── what management should do about it ── */
     var acts=[];
@@ -16641,14 +16757,17 @@ window.KPTM = (function () {
       n.addEventListener('click',function(){ var x=window._KP_DIMS[+n.dataset.dim];
         open('📉 '+x.name+' — scored 3 or below', fi(x.n)+' response(s)', x.low); });
     });
-    el.querySelectorAll('[data-ag]').forEach(function(n){
-      n.addEventListener('click',function(){ var x=window._KP_AG[+n.dataset.ag], f=n.dataset.f;
-        open('📞 '+x.a+' — '+(f==='ans'?'reached':'assigned'), fi((f==='ans'?x.ans:x.all).length)+' record(s)',
-          f==='ans'?x.ans:x.all); });
+    el.querySelectorAll('[data-str]').forEach(function(n){
+      n.addEventListener('click',function(){
+        var x=window._KP_STR[+n.dataset.str], f=n.dataset.f;
+        var map={all:x.all, act:x.act, tc:x.tc};
+        var lbl={all:'on the roll', act:'active', tc:'taken a TC'};
+        open('🏫 '+x.b+' — '+lbl[f], fi(map[f].length)+' student(s)', map[f]);
+      });
     });
-    el.querySelectorAll('[data-cl]').forEach(function(n){
-      n.addEventListener('click',function(){ var x=window._KP_CL[+n.dataset.cl];
-        open('🎓 Class '+x.c, fi(x.n)+' answered · rating '+(x.ov===null?'—':x.ov.toFixed(2)), x.rows); });
+    el.querySelectorAll('[data-st]').forEach(function(n){
+      n.addEventListener('click',function(){ var x=window._KP_ST[+n.dataset.st];
+        open('📞 '+x.s, fi(x.n)+' call(s) · '+pc(x.n,rows.length)+'% of families', x.rows); });
     });
   }
 
