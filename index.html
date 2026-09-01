@@ -16871,7 +16871,7 @@ window.KPTM = (function () {
      from the rows actually opened — the branch spread, the ratings, the words
      the parents used — so the numbers in the briefing are the numbers in the
      table beneath it, not a generic template. */
-  function brief(topic, rows, extra){
+  function brief(topic, rows, extra, adviceKey){
     var by={}, low=0, rated=[];
     rows.forEach(function(r){
       by[r.branch]=(by[r.branch]||0)+1;
@@ -16879,7 +16879,9 @@ window.KPTM = (function () {
     });
     var brs=Object.keys(by).sort(function(a,b){ return by[b]-by[a]; });
     var avg=rated.length?(rated.reduce(function(a,b){return a+b;},0)/rated.length):null;
-    var A=KADVICE[topic];
+    /* the heading names what was clicked; the actions come from the sub-topic
+       that explains it, which is not always the same thing */
+    var A=KADVICE[adviceKey||topic] || KADVICE[topic];
     var quotes=rows.map(function(r){ return String(r.remarks||''); })
       .filter(function(t){ return t.length>60 && t.length<240; })
       .sort(function(a,b){ return a.length-b.length; }).slice(0,2);
@@ -16894,6 +16896,8 @@ window.KPTM = (function () {
       brs.slice(0,3).map(function(b){ return esc(b)+' ('+by[b]+')'; }).join(' \u00b7 ')+
       (brs.length>3?' and '+(brs.length-3)+' more':'')+'</div>'+
       (extra?'<div style="margin-bottom:6px">'+extra+'</div>':'')+
+      (A&&adviceKey&&adviceKey!==topic?'<div style="font-size:11px;color:#047857;margin-top:6px">'+
+        'Actions below are for <b>'+esc(adviceKey)+'</b>, the concern these parents raised most.</div>':'')+
       (A?'<div style="font-weight:700;margin:8px 0 3px">What to do</div><ol style="margin:0;padding-left:18px">'+
         A.a.map(function(x){ return '<li style="margin-bottom:3px">'+esc(x)+'</li>'; }).join('')+'</ol>':'')+
       (quotes.length?'<div style="font-weight:700;margin:8px 0 3px">In parents\u2019 own words</div>'+
@@ -16902,18 +16906,42 @@ window.KPTM = (function () {
       '</div>';
     return html;
   }
-  function openWithBrief(title, sub, rows, topic, extra){
+  function openWithBrief(title, sub, rows, topic, extra, adviceKey){
+    window.__KP_BRIEFING = true;
     open(title, sub, rows);
     setTimeout(function(){
       var body=document.getElementById('modal-body')||document.getElementById('drill-modal');
       if(!body) return;
-      if(body.querySelector('.kp-brief')) return;
+      /* Always REPLACE. The previous version bailed out if a briefing was
+         already present, on the assumption the modal is rebuilt between opens.
+         It is not — openModal repaints the table inside the same container — so
+         the first briefing stayed put and every topic after it showed whatever
+         had been clicked first. Removing any existing one before inserting is
+         what makes the guidance follow the topic. */
+      var prev=body.querySelectorAll('.kp-brief');
+      for(var i=0;i<prev.length;i++) prev[i].remove();
       var d=document.createElement('div');
       d.className='kp-brief';
-      d.innerHTML=brief(topic, rows, extra);
+      d.innerHTML=brief(topic, rows, extra, adviceKey);
       body.insertBefore(d, body.firstChild);
+      window.__KP_BRIEFING = false;
     }, 40);
   }
+  /* a plain drill-down must not inherit the briefing from an earlier click */
+  (function(){
+    var _om=window.openModal;
+    if(typeof _om!=='function') return;
+    window.openModal=function(){
+      var r=_om.apply(this,arguments);
+      setTimeout(function(){
+        var body=document.getElementById('modal-body')||document.getElementById('drill-modal');
+        if(!body || window.__KP_BRIEFING) return;
+        var prev=body.querySelectorAll('.kp-brief');
+        for(var i=0;i<prev.length;i++) prev[i].remove();
+      }, 10);
+      return r;
+    };
+  })();
 
 
   function scoped(){
@@ -17202,15 +17230,25 @@ window.KPTM = (function () {
     el.querySelectorAll('[data-dim]').forEach(function(n){
       n.addEventListener('click',function(){
         var x=window._KP_DIMS[+n.dataset.dim];
-        /* the briefing is keyed on what these parents WROTE, since a low score
-           with no words behind it cannot be acted on */
+        /* Headlined by the DIMENSION, not by whatever sub-topic happened to be
+           commonest among its parents. Three dimensions can share a leading
+           sub-topic — Quality of Teachers, Quality of Teaching and Evaluation
+           all attract "extra academic support" — and keying the briefing on
+           that made three different scores look like one finding. The written
+           evidence goes underneath, with the full spread rather than just the
+           top one. */
         var why={};
         x.low.forEach(function(r){ KPTM.subTopicsOf(r).forEach(function(b){ why[b.t]=(why[b.t]||0)+1; }); });
-        var top=Object.keys(why).sort(function(a,b){ return why[b]-why[a]; })[0];
-        var note=KDIMNOTE[x.name]?('<b>On this dimension:</b> '+esc(KDIMNOTE[x.name])):'';
+        var spread=Object.keys(why).sort(function(a,b){ return why[b]-why[a]; }).slice(0,4);
+        var top=spread[0];
+        var ev = spread.length
+          ? '<b>What these parents wrote about:</b> '+
+            spread.map(function(k){ return esc(k)+' ('+why[k]+')'; }).join(' \u00b7 ')
+          : '<b>These parents scored it low but wrote nothing specific</b> \u2014 the score is a signal, not yet a case.';
+        var note=KDIMNOTE[x.name]?('<div style="margin-top:5px"><b>On this dimension:</b> '+esc(KDIMNOTE[x.name])+'</div>'):'';
         openWithBrief('📉 '+x.name+' — scored 3 or below',
           fi(x.n)+' response(s) · avg '+(x.avg===null?'—':x.avg.toFixed(2)),
-          x.low, top||x.name, note);
+          x.low, x.name, ev+note, top);
       });
     });
     el.querySelectorAll('[data-str]').forEach(function(n){
