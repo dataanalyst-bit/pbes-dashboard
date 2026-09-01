@@ -2412,7 +2412,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       <div class="au-sec">
         <h3>Branch scorecard</h3>
-        <div class="sub">Compliance is <b>Yes ÷ (Yes + No + IP)</b> across the five stage columns — the same formula
+        <div class="sub">Compliance is <b>(Yes + ½ × In Progress) ÷ (Yes + No + In Progress)</b> across the five stage
+          columns. In Progress earns half credit — started but not finished is neither a pass nor the same as never
+          having begun. NA and NR are excluded from the denominator, so an item that does not apply to a campus
+          neither helps nor hurts it, and an all-NA row scores a dash rather than 0%. This is the same formula
           the branch sheets use in their own OVERALL COMPLIANCE SCORE row. NA and NR are excluded from the
           denominator rather than counted against a branch. <b>In progress counts as a miss</b>: unfinished work at
           audit time is not compliance, and half-crediting it would let a branch sit at 50% permanently by never
@@ -10093,7 +10096,7 @@ window.AUDIT = (function () {
 
     var K = [
       { v: pc(sc), k: 'Network compliance', c: A.colorFor(sc),
-        d: 'Yes as a share of Yes + No + IP. ' + (delta === null ? 'Across all audited months.'
+        d: '(Yes + \u00bd IP) \u00f7 (Yes + No + IP). ' + (delta === null ? 'Across all audited months.'
           : (delta >= 0 ? 'Up ' : 'Down ') + Math.abs(delta).toFixed(1) + ' points on ' + A.monthShort(D.prev) + '.') },
       { v: bands.ok + ' / ' + D.branches.length, k: 'Branches on track', c: '#059669',
         d: 'At or above ' + A.ON_TRACK + '%. ' + bands.review + ' in review, ' + bands.critical + ' critical.' },
