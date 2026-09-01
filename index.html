@@ -9726,8 +9726,18 @@ window.AUDIT = (function () {
       else t.none++;
     }
   }
+  /* ── HOW AN AUDIT SCORE IS CALCULATED ──
+       score = (Yes + 0.5 × In Progress) / (Yes + No + In Progress)
+
+     In Progress earns half credit: the work has been started but is not
+     finished, so scoring it as a flat fail would read the same as never having
+     begun, and scoring it as a pass would say the item is closed when it is
+     not. NA and NR are excluded from the denominator entirely — an item that
+     does not apply to a campus should neither help nor hurt it. Where every
+     item is NA the denominator is zero and the score is a dash rather than 0%,
+     because "nothing applicable" is not the same as "nothing achieved". */
   function scored(t) { return t.yes + t.no + t.ip; }
-  function score(t) { var s = scored(t); return s ? t.yes / s * 100 : null; }
+  function score(t) { var s = scored(t); return s ? (t.yes + 0.5 * t.ip) / s * 100 : null; }
   function coverage(t) {
     var tot = scored(t) + t.na + t.nr + t.none;
     return tot ? scored(t) / tot * 100 : null;
