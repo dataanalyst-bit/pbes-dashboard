@@ -10628,6 +10628,53 @@ window.AUDIT = (function () {
     return t;
   }
 
+
+  /* stage-by-stage ranking table */
+  function renderCoordTable(list){
+    var med = A.GRADES.map(function(g, i){
+      var vs = list.map(function(x){ return x.per[i] && x.per[i].v; })
+                   .filter(function(v){ return v !== null && v !== undefined; })
+                   .sort(function(a,b){ return a-b; });
+      return vs.length ? vs[Math.floor(vs.length/2)] : null;
+    });
+    function cell(x, i){
+      var c = x.per[i];
+      if (!c) return '<td style="color:#E2E8F0">\u00b7</td>';       // not their stage
+      if (c.v === null) return '<td style="color:#94A3B8">no data</td>';
+      var col = c.v >= 95 ? '#B8860B' : c.v >= 90 ? '#475569' : c.v >= 80 ? '#9A5B2D'
+              : c.v >= 70 ? '#B45309' : '#B91C1C';
+      return '<td class="c" data-co="' + x.__i + '" data-gi="' + i + '" ' +
+        'style="cursor:pointer;font-weight:800;color:' + col + '" ' +
+        'title="' + c.n + ' checks \u00b7 click for the audit file">' + c.v.toFixed(1) + '%</td>';
+    }
+    list.forEach(function(x, i){ x.__i = i; });
+    var MED = ['\ud83e\udd47','\ud83e\udd48','\ud83e\udd49'];
+    return '<div style="overflow-x:auto"><table class="hrs kpt" style="min-width:720px">' +
+      '<thead><tr><th class="nm">Rank</th><th class="nm">Coordinator</th>' +
+      A.GRADES.map(function(g){ return '<th>' + g.replace('\u2013','\u2013') + '</th>'; }).join('') +
+      '<th>Overall</th><th>Checks</th><th class="nm">Award</th></tr></thead><tbody>' +
+      list.map(function(x, i){
+        var aw = awardOf(x.v);
+        return '<tr class="clk" data-co="' + i + '" style="cursor:pointer">' +
+          '<td class="nm" style="font-weight:800">' + (i < 3 ? MED[i] : (i+1)) + '</td>' +
+          '<td class="nm"><b>' + A.esc(x.name) + '</b>' +
+            '<div style="font-size:10px;color:var(--txm)">' + A.esc(x.role) + ' \u00b7 ' + A.esc(x.b) + '</div></td>' +
+          A.GRADES.map(function(g, gi){ return cell(x, gi); }).join('') +
+          '<td style="font-weight:800">' + awPct(x.v) + '</td>' +
+          '<td style="color:var(--txm)">' + x.n + '</td>' +
+          '<td class="nm"><span style="background:' + aw.bg + ';color:' + aw.c +
+            ';font-size:10px;font-weight:800;padding:2px 8px;border-radius:99px;white-space:nowrap">' +
+            aw.ic + ' ' + aw.l + '</span></td></tr>';
+      }).join('') +
+      '<tr style="background:#F1F7F3;font-weight:800"><td class="nm"></td><td class="nm">Median per stage</td>' +
+      med.map(function(v){ return '<td>' + (v === null ? '\u2014' : v.toFixed(1) + '%') + '</td>'; }).join('') +
+      '<td colspan="3"></td></tr>' +
+      '</tbody></table></div>' +
+      '<p class="au-note">A dot means the stage is not that coordinator\u2019s. Each percentage is scored on ' +
+      'that stage\u2019s column alone, so the figures across a row are directly comparable and the column ' +
+      'medians show whether a weak cell is the person or the grade band. Click any cell for its audit file.</p>';
+  }
+
   function renderAwards(){
     var elP = $('au-prin'), elC = $('au-coord');
     if (!elP || !elC) return;
@@ -10644,18 +10691,42 @@ window.AUDIT = (function () {
       '<div class="no-data">No audit rows for the selected months.</div>';
     window._AW_P = P;
 
-    /* ── coordinators ── */
+    /* ── coordinators ──
+       A column per stage rather than one overall figure. Two coordinators on
+       78% are not comparable if one holds Prep alone and the other holds 6 to
+       10: the stages are audited on different checklists and different numbers
+       of them. Showing each stage separately makes the comparison honest, and a
+       coordinator who is strong in one grade band and weak in another becomes
+       visible instead of averaging out to unremarkable. */
     var C = COORDS.filter(function(c){ return !only || c.b === only; }).map(function(c){
       var t = awTally(c.b, c.g);
+      /* per-stage figures, computed on that stage's column alone */
+      var per = A.GRADES.map(function(g, i){
+        if (c.g.indexOf(i) < 0) return null;              // not this person's stage
+        var st = awTally(c.b, [i]);
+        var sc = A.score(st), n = A.scored(st);
+        return n > 0 ? { v:sc, n:n, t:st, gi:i } : { v:null, n:0, t:st, gi:i };
+      });
       return { b:c.b, name:c.n, role:c.r, gis:c.g, t:t, v:A.score(t), n:A.scored(t),
+               per: per,
                stages: c.g.map(function(i){ return A.GRADES[i]; }).join(', ') };
     }).filter(function(x){ return x.n > 0; })
       .sort(function(a,b){ return b.v - a.v; });
 
-    elC.innerHTML = C.length ? renderRankTable(C, 'coordinator') :
+    elC.innerHTML = C.length ? renderCoordTable(C) :
       '<div class="no-data">No audit rows for the selected months.</div>';
     window._AW_C = C;
 
+    elC.querySelectorAll('td.c[data-gi]').forEach(function(td){
+      td.addEventListener('click', function(e){
+        e.stopPropagation();
+        var x = window._AW_C[+td.dataset.co], gi = +td.dataset.gi, c = x.per[gi];
+        if (!c || c.v === null) return;
+        openAuditRows('\ud83c\udf96\ufe0f ' + x.name + ' \u2014 ' + A.GRADES[gi],
+          x.role + ' \u00b7 ' + x.b + ' \u00b7 ' + c.n + ' checks \u00b7 ' + awPct(c.v) + ' compliance',
+          x.b, [gi]);
+      });
+    });
     elP.querySelectorAll('tr.clk').forEach(function(tr){
       tr.addEventListener('click', function(){
         var x = window._AW_P[+tr.dataset.i];
@@ -10665,7 +10736,7 @@ window.AUDIT = (function () {
     });
     elC.querySelectorAll('tr.clk').forEach(function(tr){
       tr.addEventListener('click', function(){
-        var x = window._AW_C[+tr.dataset.i];
+        var x = window._AW_C[+(tr.dataset.co !== undefined ? tr.dataset.co : tr.dataset.i)];
         openAuditRows('\ud83c\udf96\ufe0f ' + x.name + ' \u2014 ' + x.b,
           x.role + ' \u00b7 ' + x.stages + ' \u00b7 ' + awPct(x.v) + ' compliance', x.b, x.gis);
       });
