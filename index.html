@@ -6705,7 +6705,16 @@ function renderCareSummary(){
     {topic:'Fees & accounts',ph:['fee','fees','payment','receipt','due','concession','refund'],kw:[]},
     {topic:'Admission, TC & section',ph:['transfer certificate','tc','admission','section change','changed the section','shift the section'],kw:[]},
     {topic:'Communication & information',ph:['not informed','no information','communication gap','not communicated','no response from school','not aware','circular','message not received','whatsapp'],kw:[]},
-    {topic:'Washrooms, water & cleanliness',ph:['washroom','wash room','toilet','bathroom','drinking water','no water in','cleanliness','not clean','hygiene and','housekeeping','smell'],kw:[]},
+    /* Washrooms and water, widened from the misses in the export. Parents and
+       staff spell these many ways — "washrooms are not c;ean", "not hygenie",
+       "water isssue", "neatness of washrooms", "not in a proper way" — so the
+       bare nouns trigger the topic and the qualifier is not required.
+
+       What is deliberately NOT here is the bare word "hygiene". It appears 120
+       times and almost all of them are inside the standard teacher-conversation
+       template ("...5. Check well being / behaviour / hygiene..."). Matching it
+       alone would invent a 120-call problem out of a checklist heading. */
+    {topic:'Washrooms, water & cleanliness',fac:true,ph:['washroom','washrooms','wash room','wash rooms','washroms','toilet','toilets','bathroom','bathrooms','bath room','rest room','restroom','urinal','drinking water','no water','water issue','water isssue','water problem','water supply','water is not','not clean','not cleaned','not neat','not hygienic','not hygiene','not hygenie','unhygienic','uncleaned','cleanliness','neatness','housekeeping','ayamma','ayas are not','helpers near washroom','not in good condition','not in a proper way','unpleasant smell','bad smell'],kw:[]},
     {topic:'Classroom & facilities',ph:['fan not working','light not working','ac not working','bench','desk','seating','projector','ventilation','classroom is hot'],kw:[]},
     {topic:'Teacher / staff conduct',ph:['teacher scold','teacher shouted','staff is rude','misbehaved with','partial','punished','beaten by teacher'],kw:[]},
     {topic:'Counselling & guidance',ph:['council him','counsel him','council her','counsel her','counselling','counseling','guide the child','warn her','warn him','moral values'],kw:[]},
