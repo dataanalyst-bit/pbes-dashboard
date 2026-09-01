@@ -474,6 +474,23 @@ table.auhm tr.au-itemrow td{border-color:#E8EEF2}
 .cp-hd span:last-child{text-align:right}
 
 
+
+/* ═══ AUDIT AWARDS ═══ */
+.aw-t{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;min-width:640px}
+.aw-t th{background:#F1F7F3;color:#07361F;font-size:9.5px;font-weight:800;text-transform:uppercase;
+  letter-spacing:.05em;padding:8px 10px;border-bottom:2px solid #B7CFC0;text-align:center;white-space:nowrap}
+.aw-t th.nm,.aw-t td.nm{text-align:left}
+.aw-t td{padding:9px 10px;text-align:center;border-bottom:1px solid #E6EEF7}
+.aw-t tr.clk{cursor:pointer}
+.aw-t tr.clk:hover td{background:var(--pl)}
+.aw-rk{font-size:15px;font-weight:800;width:44px}
+.aw-md{font-size:17px}
+.aw-band{display:inline-block;font-size:9.5px;font-weight:800;padding:3px 8px;border-radius:99px;white-space:nowrap}
+.aw-bar{height:8px;background:#EEF2FF;border-radius:99px;overflow:hidden;margin-top:4px;min-width:80px}
+.aw-bar i{display:block;height:100%;border-radius:99px}
+.aw-sub{font-size:9.5px;color:#94A3B8;margin-top:2px}
+.aw-note{font-size:11.5px;color:var(--txm);line-height:1.6;margin:10px 0 0}
+
 /* ═══ K-INNOVATIVE PTM ═══ */
 .kp-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:16px}
 .kp-k{border:1px solid var(--bor);border-top:3px solid var(--p);border-radius:11px;padding:12px 14px;background:var(--sur);cursor:pointer}
@@ -2433,6 +2450,21 @@ document.addEventListener('DOMContentLoaded', async () => {
           <button class="exm-refresh" id="au-cmp-all" title="Open or close every stage">⇕ Expand all</button>
         </div>
         <div id="au-stage-cmp" style="margin-top:14px"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>🏅 Principal performance and ranking</h3>
+        <div class="sub">Each principal's campus scored on the same audit checklist, all stages together. Ranked on
+          compliance, with the award band shown beside it. Click any row for that branch's full audit file.</div>
+        <div id="au-prin"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>🎖️ Coordinator performance and ranking</h3>
+        <div class="sub">Each coordinator scored on the stages they actually hold, from the branch allotment.
+          A coordinator covering 6 to 10 is scored on 6–8 and 9–10 together; one holding Prep alone is scored on Prep.
+          Click a row to open the stage detail behind it.</div>
+        <div id="au-coord"></div>
       </div>
 
       <div class="au-sec">
@@ -10500,6 +10532,184 @@ window.AUDIT = (function () {
   }
 
   /* ── stage by stage, branches as columns, sections as rows ── */
+
+  /* ══════════════════════════════════════════════════════════════════════
+     PRINCIPAL AND COORDINATOR RANKING
+
+     Same audit checklist, same months, same scoring as every other panel on
+     this tab — only the grouping differs. A principal is scored on their whole
+     campus; a coordinator only on the stages the branch allotment actually
+     gives them, so a Prep coordinator is never measured on Grade 9 and a 6-to-10
+     coordinator is never credited with the primary result.
+
+     Award bands are fixed thresholds, not a curve. Ranking alone would hand a
+     gold to whoever came first in a weak year; a band says what the score
+     actually means, and it is possible for nobody to reach Gold.
+     ══════════════════════════════════════════════════════════════════════ */
+  var PRINCIPALS = {
+    'Keesara':    'Ms. Vaishnavi Yeelarthi',
+    'Pocharam':   'Ms. Prabhjot Kaur Arneja',
+    'Boduppal':   'Ms. Tanuja',
+    'Bachupally': 'Ms. Neelima Guntupalli',
+    'Gowdavalli': 'Ms. Poonam Jha'
+  };
+  /* stage indices into A.GRADES = ['Prep','1 & 2','3–5','6–8','9–10'] */
+  var COORDS = [
+    { n:'Poornima Raman',           b:'Bachupally', r:'Academic Coordinator, 6 to 10',   g:[3,4] },
+    { n:'Racha Poorna Swetha',      b:'Bachupally', r:'Grade 3 to 5 Coordinator',        g:[2]   },
+    { n:'M Nirmaladevi',            b:'Bachupally', r:'Grade 1 & 2 Coordinator',         g:[1]   },
+    { n:'Mekapothula Ramya',        b:'Bachupally', r:'EY Coordinator & Prep',           g:[0]   },
+    { n:'Ms. Srivalli',             b:'Pocharam',   r:'CBSE Coordinator, 1 to 10',       g:[1,2,3,4] },
+    { n:'Ms. Divya Nair',           b:'Pocharam',   r:'Cambridge Coordinator, 1 to 8',   g:[1,2,3]   },
+    { n:'Ms. Reetu',                b:'Pocharam',   r:'EY Coordinator & Prep',           g:[0]   },
+    { n:'Nisha Banoth',             b:'Boduppal',   r:'HM, 3 to 5',                      g:[2]   },
+    { n:'Vidhi Bhatnagar',          b:'Boduppal',   r:'Primary in-charge, 1 & 2',        g:[1]   },
+    { n:'Sujatha Santosh Mukpogle', b:'Boduppal',   r:'Pre-primary in-charge, 6 to 10',  g:[3,4] },
+    { n:'Srivalli Soujanya',        b:'Keesara',    r:'Primary Coordinator, 3 to 5',     g:[2]   },
+    { n:'Sushma Shalini',           b:'Keesara',    r:'Coordinator, Prep and 1 & 2',     g:[0,1] },
+    { n:'Dharmesh',                 b:'Keesara',    r:'Coordinator, 6 to 10',            g:[3,4] },
+    { n:'Asra Khan',                b:'Gowdavalli', r:'EY Coordinator & Prep',           g:[0]   },
+    { n:'Madhavi Das',              b:'Gowdavalli', r:'Primary Coordinator, 1 & 2',      g:[1]   }
+  ];
+  var AWARDS = [
+    { min:95, l:'Gold \u2014 Exemplary',      c:'#B8860B', bg:'#FEF3C7', ic:'\ud83c\udfc6' },
+    { min:90, l:'Silver \u2014 Strong',       c:'#475569', bg:'#F1F5F9', ic:'\ud83e\udd48' },
+    { min:80, l:'Bronze \u2014 Sound',        c:'#9A5B2D', bg:'#FEF0E6', ic:'\ud83e\udd49' },
+    { min:70, l:'Needs attention',            c:'#B45309', bg:'#FFFBEB', ic:'\u26a0\ufe0f' },
+    { min:0,  l:'Action required',            c:'#B91C1C', bg:'#FEF2F2', ic:'\ud83d\udd34' }
+  ];
+  function awPct(v){ return v === null ? '\u2014' : v.toFixed(1) + '%'; }
+  function awardOf(v){
+    if(v===null) return { l:'Not audited', c:'#94A3B8', bg:'#F8FAFC', ic:'\u2014' };
+    for(var i=0;i<AWARDS.length;i++) if(v>=AWARDS[i].min) return AWARDS[i];
+    return AWARDS[AWARDS.length-1];
+  }
+
+  /* one tally for a branch, optionally narrowed to a set of stage columns */
+  function awTally(branch, gis){
+    var t = A.blank(), R = D.raw, ms = months();
+    var cols = (gis && gis.length) ? gis.map(function(i){ return R.cols[i]; }) : R.cols;
+    R.rows.forEach(function (r) {
+      if (ms.indexOf(A.str(r[R.iM])) < 0) return;
+      if (branch && A.str(r[R.iB]) !== branch) return;
+      addRowLocal(t, r, cols);
+    });
+    return t;
+  }
+
+  function renderAwards(){
+    var elP = $('au-prin'), elC = $('au-coord');
+    if (!elP || !elC) return;
+    var only = VIEW.branch || null;
+
+    /* ── principals ── */
+    var P = D.branches.filter(function(b){ return !only || b === only; }).map(function(b){
+      var t = awTally(b, null);
+      return { b:b, name:PRINCIPALS[b] || b, t:t, v:A.score(t), n:A.scored(t) };
+    }).filter(function(x){ return x.n > 0; })
+      .sort(function(a,b){ return b.v - a.v; });
+
+    elP.innerHTML = P.length ? renderRankTable(P, 'principal') :
+      '<div class="no-data">No audit rows for the selected months.</div>';
+    window._AW_P = P;
+
+    /* ── coordinators ── */
+    var C = COORDS.filter(function(c){ return !only || c.b === only; }).map(function(c){
+      var t = awTally(c.b, c.g);
+      return { b:c.b, name:c.n, role:c.r, gis:c.g, t:t, v:A.score(t), n:A.scored(t),
+               stages: c.g.map(function(i){ return A.GRADES[i]; }).join(', ') };
+    }).filter(function(x){ return x.n > 0; })
+      .sort(function(a,b){ return b.v - a.v; });
+
+    elC.innerHTML = C.length ? renderRankTable(C, 'coordinator') :
+      '<div class="no-data">No audit rows for the selected months.</div>';
+    window._AW_C = C;
+
+    elP.querySelectorAll('tr.clk').forEach(function(tr){
+      tr.addEventListener('click', function(){
+        var x = window._AW_P[+tr.dataset.i];
+        openAuditRows('\ud83c\udfc5 ' + x.name + ' \u2014 ' + x.b,
+          'Whole campus \u00b7 ' + awPct(x.v) + ' compliance', x.b, null);
+      });
+    });
+    elC.querySelectorAll('tr.clk').forEach(function(tr){
+      tr.addEventListener('click', function(){
+        var x = window._AW_C[+tr.dataset.i];
+        openAuditRows('\ud83c\udf96\ufe0f ' + x.name + ' \u2014 ' + x.b,
+          x.role + ' \u00b7 ' + x.stages + ' \u00b7 ' + awPct(x.v) + ' compliance', x.b, x.gis);
+      });
+    });
+  }
+
+  function renderRankTable(list, kind){
+    var isC = kind === 'coordinator';
+    var top = list.length ? list[0].v : 0;
+    var MED = ['\ud83e\udd47','\ud83e\udd48','\ud83e\udd49'];
+    return '<div style="overflow-x:auto"><table class="aw-t"><thead><tr>' +
+      '<th class="nm">Rank</th><th class="nm">' + (isC ? 'Coordinator' : 'Principal') + '</th>' +
+      '<th class="nm">' + (isC ? 'Stages held' : 'Campus') + '</th>' +
+      '<th>Compliance</th><th>Checks</th><th>Behind the leader</th><th class="nm">Award</th>' +
+      '</tr></thead><tbody>' +
+      list.map(function(x,i){
+        var a = awardOf(x.v);
+        var col = A.colorFor(x.v);
+        return '<tr class="clk" data-i="' + i + '" title="Click to view the audit rows behind this">' +
+          '<td class="nm aw-rk" style="color:' + (i<3?'#B8860B':'#94A3B8') + '">' +
+            (i<3 ? '<span class="aw-md">' + MED[i] + '</span>' : (i+1)) + '</td>' +
+          '<td class="nm"><b>' + esc(x.name) + '</b>' +
+            (isC ? '<div class="aw-sub">' + esc(x.role) + '</div>' : '') + '</td>' +
+          '<td class="nm">' + esc(isC ? x.stages : x.b) +
+            (isC ? '<div class="aw-sub">' + esc(x.b) + '</div>' : '') + '</td>' +
+          '<td style="font-weight:800;color:' + col + '">' + awPct(x.v) +
+            '<div class="aw-bar"><i style="width:' + (x.v||0) + '%;background:' + col + '"></i></div></td>' +
+          '<td>' + x.n.toLocaleString('en-IN') + '</td>' +
+          '<td style="color:' + (i===0?'#059669':'#64748B') + '">' +
+            (i===0 ? 'leader' : '\u2212' + (top - x.v).toFixed(1)) + '</td>' +
+          '<td class="nm"><span class="aw-band" style="color:' + a.c + ';background:' + a.bg + '">' +
+            a.ic + ' ' + esc(a.l) + '</span></td></tr>';
+      }).join('') +
+      '</tbody></table></div>' +
+      '<p class="aw-note">Bands are fixed, not a curve: <b>Gold</b> 95%+, <b>Silver</b> 90\u201395, ' +
+      '<b>Bronze</b> 80\u201390, <b>Needs attention</b> 70\u201380, <b>Action required</b> below 70. ' +
+      'Ranking alone would award a gold to whoever came first in a weak year \u2014 the band says what the ' +
+      'score means. ' + (isC
+        ? 'Each coordinator is scored only on the stages the branch allotment gives them, so a Prep ' +
+          'coordinator is never measured on Grade 9. Where two coordinators share a stage, both carry ' +
+          'that stage\u2019s result: the audit records the campus, not who supervised each checklist.'
+        : 'Every campus is scored on the same checklist across all five stages, so the comparison is ' +
+          'like for like \u2014 but a branch with fewer sections has fewer checks behind its figure.') +
+      '</p>';
+  }
+
+  /* the audit rows behind a rank, using the same modal as the rest of the tab */
+  function openAuditRows(title, sub, branch, gis){
+    /* R.cols is a list of column INDICES, one per stage — not objects. Reading
+       c.i returned undefined, so every drill-down opened empty. */
+    var R = D.raw, ms = months();
+    var idxs = (gis && gis.length) ? gis.slice() : A.GRADES.map(function(_, i){ return i; });
+    var out = [];
+    R.rows.forEach(function (r) {
+      if (ms.indexOf(A.str(r[R.iM])) < 0) return;
+      if (branch && A.str(r[R.iB]) !== branch) return;
+      idxs.forEach(function (gi) {
+        var col = R.cols[gi];
+        if (col === undefined || col < 0) return;
+        var v = A.str(r[col]);
+        if (!v) return;
+        out.push({
+          Branch: A.str(r[R.iB]), Month: A.str(r[R.iM]),
+          Stage: A.GRADES[gi] || '',
+          Section: A.str(r[R.iC]), Item: A.str(r[R.iI]), Result: v
+        });
+      });
+    });
+    if (typeof openModal === 'function')
+      openModal(title, sub + ' \u00b7 ' + out.length.toLocaleString('en-IN') + ' checklist entries', out,
+        [{key:'Branch',label:'Branch'},{key:'Month',label:'Month'},{key:'Stage',label:'Grade and stage'},
+         {key:'Section',label:'Section',maxW:'220px'},{key:'Item',label:'Checklist item',maxW:'320px'},
+         {key:'Result',label:'Result',pill:true}]);
+  }
+
   function renderStageCompare(){
     var el = $('au-stage-cmp'); if (!el) return;
     var G = A.GRADES, R = D.raw, ms = months(), ex = CMP_EXP(), bs = D.branches;
@@ -10940,7 +11150,7 @@ window.AUDIT = (function () {
   function renderAll() {
     renderControls();
     renderKPIs(); renderScorecard(); renderTrend(); renderHeat();
-    renderStages(); renderStageCompare(); renderChronic(); renderMovers(); renderWorst();
+    renderStages(); renderStageCompare(); renderAwards(); renderChronic(); renderMovers(); renderWorst();
     renderQuality(); renderRemarks();
     wire();
   }
