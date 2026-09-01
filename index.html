@@ -11127,11 +11127,18 @@ window.AUDIT = (function () {
              ms.indexOf(A.str(r[R.iM])) >= 0;
     }).map(function (r) {
       var cells = R.cols.map(function (ci) { return ci < 0 ? '' : A.str(r[ci]); });
-      var y = 0, n = 0, p = 0;
-      cells.forEach(function (v) { if (v === 'Yes') y++; else if (v === 'No') n++; else if (v === 'IP') p++; });
+      var t = A.blank();
+      cells.forEach(function (v) {
+        if (v === 'Yes') t.yes++; else if (v === 'No') t.no++; else if (v === 'IP') t.ip++;
+        else if (v === 'NA') t.na++; else if (v === 'NR') t.nr++; else t.none++;
+      });
       return {
         param: A.cleanParam(A.str(r[R.iP])), month: A.str(r[R.iM]), cells: cells,
-        v: (y + n + p) ? y / (y + n + p) * 100 : null,
+        /* Scored through A.score, not a local formula. This row previously used
+           a private "Yes ÷ (Yes+No+IP)" of its own, so an all-IP item read 0%
+           here while the same item read 50% everywhere else on the tab. One
+           scorer means the number cannot depend on which panel you opened. */
+        v: A.score(t),
         rem: R.iR >= 0 ? A.str(r[R.iR]) : ''
       };
     }).sort(function (x, z) { return (x.v === null ? 999 : x.v) - (z.v === null ? 999 : z.v); });
