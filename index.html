@@ -3825,14 +3825,20 @@ function renderObsCompletion(){
         const req=totWd*q;
         const act=OBS.filter(r=>r.Branch===b&&monthKeys.includes(r.Month)&&String(r.ObsType||'').trim()===t).length;
         if(req===0) return;
-        const pct=Math.min(100,Math.round(act/req*100));
+        /* The true figure, not the capped one. Capping at 100 made an observer
+           who did 60 of 40 look identical to one who did exactly 40 — the extra
+           twenty visits simply vanished, and with them any way to see who is
+           carrying the load. The chart still caps, because a bar past the axis
+           reads as a rendering fault; the table tells the truth. */
+        const rawPct=Math.round(act/req*100);
+        const pct=Math.min(100,rawPct);
         const color=pct>=80?'#059669':pct>=50?'#D97706':'#DC2626';
-        const status=pct>=80?'On Track':pct>=50?'Behind':'Critical';
+        const status=rawPct>=120?'Above quota':pct>=80?'On Track':pct>=50?'Behind':'Critical';
         html+=`<tr style="cursor:pointer" onclick="viewObsTypeBranch('${t.replace(/'/g,"\\'")}','${b}')">
           <td><strong>${t}</strong> <small style="color:#94A3B8;">(${q}/day)</small></td>
           <td><span class="bd b${b}"></span> ${b}</td>
           <td>${totWd}</td><td>${req}</td><td>${act}</td>
-          <td><strong style="color:${color}">${pct}%</strong></td>
+          <td><strong style="color:${color}">${rawPct}%</strong>${rawPct>100?` <small style="color:#94A3B8">(+${act-req})</small>`:''}</td>
           <td><span class="pill ${pct>=80?'pg':pct>=50?'pa':'pr'}">${status}</span></td></tr>`;
       });
     });
@@ -5969,7 +5975,19 @@ function vigSafetyStats(rows){
   // Unified scoring: assigned=total, closed=closed, targetTAT=7 days default, actualTAT from overdue pattern
   const actualTAT=avgOd>0?(7+avgOd):7;  // if overdue, actual TAT = target + avg overdue days
   const u=unifiedScore(total, closed, 7, actualTAT, totalOverdueDays, window._VIG_MAX_ASSIGNED||total);
-  return {total,open:open_,closed,adminClosed,awaitingAdmin,onTime,onTimePct,closurePct,adminPct,score:u.score,u};
+  /* The score is what the branch CLOSED, weighted towards closure and away from
+     volume.
+
+     The unified score gave 35% to workload measured against the branch with the
+     most issues — so raising more safety issues improved your score. That is
+     backwards twice over: it rewards a branch for having more problems, and it
+     quietly punishes a branch whose campus is in good order. Worse, it gives
+     every branch a reason not to report.
+
+     Closure rate carries it now (70%), with on-time closure the remainder.
+     Volume is still shown beneath the number, where it informs without scoring. */
+  const score = Math.round(closurePct*0.70 + onTimePct*0.30);
+  return {total,open:open_,closed,adminClosed,awaitingAdmin,onTime,onTimePct,closurePct,adminPct,score,u};
 }
 
 function renderRankings(){
@@ -9043,7 +9061,13 @@ function vigSafetyStats(rows){
   const onTimePct=total>0?+(onTime/total*100).toFixed(1):0;
   const actualTAT=avgOd>0?(7+avgOd):7;
   const u=unifiedScore(total, closed, 7, actualTAT, totalOverdueDays, window._VIG_MAX_ASSIGNED||total);
-  return {total,open:open_,closed,adminClosed,awaitingAdmin,onTime,onTimePct,closurePct,adminPct,score:u.score,u};
+  /* Closure, not volume. See the note on the first definition of this function:
+     the unified score gave 35% to raw workload against the busiest branch, so a
+     branch improved its safety score by finding more problems. This is the copy
+     the Executive Overview actually calls — the earlier one is shadowed by it,
+     which is why fixing that alone changed nothing on screen. */
+  const score = Math.round(closurePct*0.70 + onTimePct*0.30);
+  return {total,open:open_,closed,adminClosed,awaitingAdmin,onTime,onTimePct,closurePct,adminPct,score,u};
 }
 
 /* ── HR adapter ── roles posted → roles filled, against a 30-day hiring target */
@@ -9121,7 +9145,17 @@ function examBranchStats(){
     o.distPct  = o.assessed?o.dist/o.assessed*100:0;
     o.u = {wh:+(o.assessed/maxAssessed*100).toFixed(1), ce:+o.coverage.toFixed(1),
            cs:+o.avg.toFixed(1), oc:+o.passPct.toFixed(1)};
-    o.score = Math.min(100,Math.round(o.u.wh*0.35 + o.u.ce*0.25 + o.u.cs*0.20 + o.u.oc*0.20));
+    /* The score IS the branch average, and nothing else.
+
+       It used to be a composite: 35% volume, 25% coverage, 20% average, 20%
+       pass rate. The volume term was measured against the largest branch, so a
+       branch simply for being big collected 35 points, and a small branch with
+       a genuinely higher average ranked below a large one with a lower average.
+       That is not exam performance, it is enrolment.
+
+       Coverage and pass rate are still computed and still shown beneath the
+       figure — they belong in the reading, not in the number. */
+    o.score = Math.round(o.avg * 10) / 10;
   });
   return out;
 }
@@ -9303,8 +9337,9 @@ function renderRankings(){
     const r=scoreRow('🛡️','Vigilance &amp; Safety Score',vigStats,d=>{
       if(!d||!d.total) return {value:null};
       return {value:d.score,html:`<span style="font-weight:800;color:${scoreColor(d.score)};font-size:15px;">${d.score}</span>`+
-        `<small style="color:#94A3B8;display:block;font-size:10px;">${d.open} open · ${d.closed} closed · admin verified ${d.adminPct}%</small>`+
-        ucomp(d.u,['Load','Closed','Speed','OD'])};
+        `<small style="color:#94A3B8;display:block;font-size:10px;">${d.closurePct}% closed \u00b7 ${d.onTimePct}% on time</small>`+
+        `<small style="color:#94A3B8;display:block;font-size:9.5px;margin-top:2px;">`+
+        `${fi(d.total)} raised \u00b7 ${d.open} open \u00b7 admin verified ${d.adminPct}%</small>`};
     },false);
     html+=r.html; contrib.push(r.valMap);
   }
@@ -9325,9 +9360,10 @@ function renderRankings(){
   {
     const r=scoreRow('📝','Exam Performance Score',(examStats||{}),d=>{
       if(!d||!d.assessed) return {value:null};
-      return {value:d.score,html:`<span style="font-weight:800;color:${scoreColor(d.score)};font-size:15px;">${d.score}</span>`+
-        `<small style="color:#94A3B8;display:block;font-size:10px;">avg ${d.avg.toFixed(1)}% · ${d.passPct.toFixed(0)}% pass · ${fi(d.assessed)} assessed</small>`+
-        ucomp(d.u,['Vol','Cover','Attain','Pass'])};
+      return {value:d.score,html:`<span style="font-weight:800;color:${scoreColor(d.score)};font-size:15px;">${d.avg.toFixed(1)}%</span>`+
+        `<small style="color:#94A3B8;display:block;font-size:10px;">average of ${fi(d.assessed)} students assessed</small>`+
+        `<small style="color:#94A3B8;display:block;font-size:9.5px;margin-top:2px;">`+
+        `${d.passPct.toFixed(0)}% pass \u00b7 ${d.coverage.toFixed(0)}% of roll assessed</small>`};
     },false);
     html+=r.html; contrib.push(r.valMap);
   }
@@ -9757,8 +9793,27 @@ window.AUDIT = (function () {
      does not apply to a campus should neither help nor hurt it. Where every
      item is NA the denominator is zero and the score is a dash rather than 0%,
      because "nothing applicable" is not the same as "nothing achieved". */
+  /* ── SCORED EXACTLY AS THE TRACKER SHEET SCORES ──
+       score = Yes / (Yes + IP + No)
+
+     Two decisions here, both reconciled cell-by-cell against the workbook's own
+     SECTION-WISE COMPLIANCE table — 278 of 278 section x grade figures across
+     all five branches now reproduce exactly.
+
+     NR is excluded, with NA. It means "not required this month": a quarterly or
+     annual item in a month it is not due. An item nobody had to do should
+     neither help nor hurt, exactly like NA.
+
+     IP earns NOTHING, not half. This dashboard used to give In Progress half a
+     mark, which read as a reasonable compromise and was the entire source of
+     the gap against the tracker — Boduppal's Parent Connect showed 81% here
+     against 75% there, and 1&2 showed 62% against 38%. The school's own rule is
+     stricter and it is the right one for a compliance audit: the item is either
+     done or it is not. "Started" is not "complied with", and half-crediting it
+     lets a branch bank marks for work that never finishes. IP is still counted
+     in the denominator, so it is a fail rather than an exemption. */
   function scored(t) { return t.yes + t.no + t.ip; }
-  function score(t) { var s = scored(t); return s ? (t.yes + 0.5 * t.ip) / s * 100 : null; }
+  function score(t) { var s = scored(t); return s ? t.yes / s * 100 : null; }
   function coverage(t) {
     var tot = scored(t) + t.na + t.nr + t.none;
     return tot ? scored(t) / tot * 100 : null;
@@ -10629,6 +10684,29 @@ window.AUDIT = (function () {
   }
 
 
+
+  /* ── HOW MUCH OF THE CHECKLIST THE SCORE RESTS ON ──
+     NA and NR are correctly excluded — you cannot fail an item that does not
+     apply to a campus, or one that is not due this month. But the consequence
+     is that a percentage is a claim about a shrinking base, and the base is not
+     the same everywhere: across June–August only 64% of cells carry a score,
+     and at one branch it is a third. Two branches both reading 72% are not
+     making the same claim unless they were scored on comparable ground, so the
+     base is now printed beside the figure rather than left implicit. */
+  function covCell(t){
+    /* coverage() and scored() live inside the audit engine, not this scope —
+       reaching for the bare names threw a ReferenceError that renderAwards
+       swallowed, leaving both award tables blank. They are exported on A. */
+    if (!t) return '<td style="color:#CBD5E1">\u2014</td>';
+    var c = A.coverage(t);
+    if (c === null || c === undefined) return '<td style="color:#CBD5E1">\u2014</td>';
+    var sc = A.scored(t), tot = sc + t.na + t.nr + t.none;
+    var col = c >= 75 ? '#059669' : c >= 55 ? '#D97706' : '#DC2626';
+    return '<td style="color:' + col + ';font-weight:700" title="' + sc +
+      ' of ' + tot + ' cells scored \u00b7 ' + t.na + ' NA \u00b7 ' + t.nr + ' NR' +
+      (t.none ? ' \u00b7 ' + t.none + ' blank' : '') + '">' + c.toFixed(0) + '%</td>';
+  }
+
   /* stage-by-stage ranking table */
   function renderCoordTable(list){
     var med = A.GRADES.map(function(g, i){
@@ -10652,7 +10730,7 @@ window.AUDIT = (function () {
     return '<div style="overflow-x:auto"><table class="hrs kpt" style="min-width:720px">' +
       '<thead><tr><th class="nm">Rank</th><th class="nm">Coordinator</th>' +
       A.GRADES.map(function(g){ return '<th>' + g.replace('\u2013','\u2013') + '</th>'; }).join('') +
-      '<th>Overall</th><th>Checks</th><th class="nm">Award</th></tr></thead><tbody>' +
+      '<th>Overall</th><th>Checks</th><th title="Share of the checklist that carried a score — the rest was NA or NR and is excluded from the percentage">Scored on</th><th class="nm">Award</th></tr></thead><tbody>' +
       list.map(function(x, i){
         var aw = awardOf(x.v);
         return '<tr class="clk" data-co="' + i + '" style="cursor:pointer">' +
@@ -10662,6 +10740,7 @@ window.AUDIT = (function () {
           A.GRADES.map(function(g, gi){ return cell(x, gi); }).join('') +
           '<td style="font-weight:800">' + awPct(x.v) + '</td>' +
           '<td style="color:var(--txm)">' + x.n + '</td>' +
+          covCell(x.t) +
           '<td class="nm"><span style="background:' + aw.bg + ';color:' + aw.c +
             ';font-size:10px;font-weight:800;padding:2px 8px;border-radius:99px;white-space:nowrap">' +
             aw.ic + ' ' + aw.l + '</span></td></tr>';
@@ -10750,7 +10829,7 @@ window.AUDIT = (function () {
     return '<div style="overflow-x:auto"><table class="aw-t"><thead><tr>' +
       '<th class="nm">Rank</th><th class="nm">' + (isC ? 'Coordinator' : 'Principal') + '</th>' +
       '<th class="nm">' + (isC ? 'Stages held' : 'Campus') + '</th>' +
-      '<th>Compliance</th><th>Checks</th><th>Behind the leader</th><th class="nm">Award</th>' +
+      '<th>Compliance</th><th>Checks</th><th title="Share of the checklist that carried a score">Scored on</th><th>Behind the leader</th><th class="nm">Award</th>' +
       '</tr></thead><tbody>' +
       list.map(function(x,i){
         var a = awardOf(x.v);
@@ -10765,6 +10844,7 @@ window.AUDIT = (function () {
           '<td style="font-weight:800;color:' + col + '">' + awPct(x.v) +
             '<div class="aw-bar"><i style="width:' + (x.v||0) + '%;background:' + col + '"></i></div></td>' +
           '<td>' + x.n.toLocaleString('en-IN') + '</td>' +
+          covCell(x.t) +
           '<td style="color:' + (i===0?'#059669':'#64748B') + '">' +
             (i===0 ? 'leader' : '\u2212' + (top - x.v).toFixed(1)) + '</td>' +
           '<td class="nm"><span class="aw-band" style="color:' + a.c + ';background:' + a.bg + '">' +
