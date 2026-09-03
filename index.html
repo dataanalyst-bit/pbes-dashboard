@@ -1146,7 +1146,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   </div>
 
   <div class="row r2">
-    <div class="card"><div class="ch"><h3>🏫 Branch Completion Rate</h3><span class="fnote">Previous month · calls made ÷ total students</span></div><div class="cb" id="ov-branch-bars"></div></div>
+    <div class="card"><div class="ch"><h3>🏫 Branch Completion Rate</h3><span class="fnote" id="ov-bcb-fn">Previous month · calls made ÷ total students</span></div><div class="cb" id="ov-branch-bars"></div></div>
     <div class="card"><div class="ch"><h3>📊 Call Status Breakdown</h3></div><div class="cb"><div class="cw sm"><canvas id="ov-status"></canvas></div></div></div>
   </div>
   <div class="row r3">
@@ -1376,9 +1376,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="card" style="margin-bottom:16px;">
     <div class="ch"><h3>🏆 Recruiter Rankings &amp; Awards</h3><span class="fnote">Unified score: Workload 35% + Closure Efficiency 25% + Closure Speed (TAT) 20% + Overdue Control 20% · resigned staff excluded · click a row to view</span></div>
     <div class="cb-0" style="overflow-x:auto"><table class="dt">
-      <thead><tr><th>Rank</th><th>Recruiter</th><th>Closed</th><th>Open</th><th>Avg Days</th><th>Fast Closure %</th><th>Slow Closures</th><th>Score</th></tr></thead>
+      <thead><tr><th>Rank</th><th>Recruiter</th><th>Closed</th><th>Open</th>
+        <th>Workload<small style="display:block;font-size:9px;color:#94A3B8">35%</small></th>
+        <th>Closure Efficiency<small style="display:block;font-size:9px;color:#94A3B8">25%</small></th>
+        <th>Closure Speed (TAT)<small style="display:block;font-size:9px;color:#94A3B8">20%</small></th>
+        <th>Overdue Control<small style="display:block;font-size:9px;color:#94A3B8">20%</small></th>
+        <th>Score</th></tr></thead>
       <tbody id="hr-rank-tbody"></tbody>
     </table></div>
+  </div>
+
+<!-- Forecast built from the closed-role history -->
+  <div class="card" style="margin-bottom:14px">
+    <div class="ch"><h3>🔮 Hiring forecast &amp; ageing pipeline</h3>
+      <span class="fnote" id="hr-fc-fn">Fitted on every closed role · click any row for the records</span></div>
+    <div class="cb" id="hr-forecast"></div>
   </div>
 
 <!-- All Records -->
@@ -2983,10 +2995,21 @@ function renderOverview(){
   let html='';
   const SB=window._STUDENTS_BY_BRANCH||{};
   BRANCHES.forEach(b=>{
-    const lm=getPrevMonth(b);
-    if(!lm)return;
+    /* Strictly the previous calendar month. getPrevMonth() falls back to the
+       newest month that has data, which on 3 September quietly showed July
+       under a "previous month" heading — the panel looked a month behind and
+       there was nothing on screen to say why. A branch with no calls logged for
+       the month is now named as such instead of being replaced by an older
+       one. */
+    const lm=getPrevCalendarMonth();
     const rec=TRACKER.find(r=>r.branch===b&&r.month===lm&&r.calls>0);
-    if(!rec)return;
+    if(!rec){
+      html+=`<div class="bcb"><div class="bcb-name"><span class="bd b${b}"></span>${b}</div>
+        <div class="bcb-track"><div class="bcb-fill" style="width:0"></div></div>
+        <div class="bcb-val" style="color:#94A3B8">—</div>
+        <div class="bcb-sub" style="color:#94A3B8">no calls logged for ${lm.slice(0,3)} yet</div></div>`;
+      return;
+    }
     const students=+SB[b]||rec.students||0;
     const pct=students>0?+(Math.min(rec.calls/students*100,100).toFixed(1)):0;
     const pc=pct>=95?'pbg':pct>=85?'pba':'pbr';
@@ -2996,6 +3019,8 @@ function renderOverview(){
       <div class="bcb-sub">${lm.slice(0,3)}: ${fi(rec.calls)}/${fi(students)}</div></div>`;
   });
   document.getElementById('ov-branch-bars').innerHTML=html||'<div class="no-data">No data</div>';
+  { const _f=document.getElementById('ov-bcb-fn');
+    if(_f) _f.textContent=getPrevCalendarMonth()+' \u00b7 calls made \u00f7 total students'; }
 
   mkChart('ov-status',dnutCfg(['Resolved','In Progress','Pending'],[s.resolved,s.ip,s.pending],['#059669','#3B82F6','#D97706']));
 
@@ -4549,7 +4574,10 @@ const HR_NAMES = ['Kavitha','Priya','Navya','Swathi Priya','Preethi','Stella'];
 // Recruiters who have LEFT the organization: hidden from performance ranking & scorecard,
 // but the positions they posted (open or closed) still count in the KPI totals.
 // To bring someone back or add a new leaver, just edit this list.
-const HR_RESIGNED_LIST = ['Priya'];
+/* Recruiters who have left. Their closed roles still count in every KPI and
+   record view — the work happened — but they are kept out of the live ranking,
+   where a leaver cannot act on the result. Keesara is now held by Savina. */
+const HR_RESIGNED_LIST = ['Priya', 'Navya'];
 const HR_BRANCH_MAP = {Pocharam:'Kavitha',Boduppal:[],Keesara:'Navya',Gowdavalli:'Swathi Priya',Bachupally:['Preethi','Stella']};
 
 function renderHR(){
@@ -4842,7 +4870,149 @@ function renderHR(){
 }
 
 // HR Rankings & Awards table
+
+/* ══════════════════════════════════════════════════════════════════════════
+   HIRING FORECAST
+
+   Fitted on the closed-role history rather than assumed. The distribution of
+   time-to-fill is heavily skewed — half of all roles close in a week, but the
+   slowest tenth take five weeks or more — so a mean is a poor predictor and
+   percentiles are used throughout.
+
+   For each open role the model asks a survival question: of all past roles at
+   the same priority, what share were still unfilled at this age? That share is
+   the chance this one still closes on the historic pattern. It falls sharply
+   with age, which is what makes an ageing role a genuine signal rather than a
+   complaint.
+   ══════════════════════════════════════════════════════════════════════════ */
+function renderHRForecast(){
+  var el=document.getElementById('hr-forecast');
+  if(!el) return;
+  /* this scope has no esc() of its own */
+  var esc=function(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
+  var fi=function(n){ return (n||0).toLocaleString('en-IN'); };
+  var all=(typeof HR_RECORDS!=='undefined'&&Array.isArray(HR_RECORDS))?HR_RECORDS:[];
+  if(!all.length){ el.innerHTML='<div class="no-data">No HR records loaded.</div>'; return; }
+  var isClosed=function(s){ return /closed|filled/i.test(String(s||'')); };
+  function dnum(r){
+    var n=parseFloat(r.DaysToClose);
+    if(!isNaN(n)&&n>=0) return n;
+    var a=Date.parse(r.PostDate), b=Date.parse(r.ClosedDate);
+    return (isFinite(a)&&isFinite(b))?Math.round((b-a)/86400000):null;
+  }
+  var closed=all.filter(function(r){ return isClosed(r.Status); });
+  var D=closed.map(dnum).filter(function(x){ return x!==null&&x>=0; }).sort(function(a,b){return a-b;});
+  if(D.length<10){ el.innerHTML='<div class="no-data">Not enough closed roles yet to fit a forecast.</div>'; return; }
+  var q=function(p){ return D[Math.max(0,Math.min(D.length-1,Math.ceil(p*D.length)-1))]; };
+  var P50=q(0.5), P75=q(0.75), P90=q(0.90);
+
+  /* per-priority pools, so a High role is judged against High history */
+  var pool={};
+  closed.forEach(function(r){
+    var k=String(r.Priority||'—').trim(), d=dnum(r);
+    if(d!==null&&d>=0) (pool[k]||(pool[k]=[])).push(d);
+  });
+  var now=Date.now();
+  var open=all.filter(function(r){ return /^open$/i.test(String(r.Status||'').trim()); })
+    .map(function(r){
+      var t=Date.parse(r.PostDate);
+      var age=isFinite(t)?Math.round((now-t)/86400000):null;
+      var pl=pool[String(r.Priority||'—').trim()]||D;
+      var beyond=pl.filter(function(x){ return x>=age; }).length;
+      return {r:r, age:age, p:(age===null||!pl.length)?null:beyond/pl.length};
+    }).filter(function(x){ return x.age!==null; })
+    .sort(function(a,b){ return b.age-a.age; });
+  var stalled=open.filter(function(x){ return x.age>P90; });
+
+  /* what the history says drives a slow fill */
+  function medBy(key){
+    var g={};
+    closed.forEach(function(r){
+      var d=dnum(r); if(d===null) return;
+      var k=String(r[key]||'—').trim();
+      (g[k]||(g[k]=[])).push(d);
+    });
+    return Object.keys(g).filter(function(k){ return g[k].length>=6; })
+      .map(function(k){ var v=g[k].sort(function(a,b){return a-b;});
+        return {k:k, med:v[Math.floor(v.length/2)], n:v.length}; })
+      .sort(function(a,b){ return b.med-a.med; });
+  }
+  var byBranch=medBy('Branch'), byPri=medBy('Priority');
+
+  var html='<div class="kp-kpis" style="margin-bottom:14px">'+
+    [{l:'Half fill within',v:P50+'d',c:'#059669',d:'the median role, across '+fi(D.length)+' closed'},
+     {l:'Three in four within',v:P75+'d',c:'#1E4FD8',d:'a realistic promise to a principal'},
+     {l:'Nine in ten within',v:P90+'d',c:'#D97706',d:'past this, history says it rarely closes'},
+     {l:'Open past that line',v:fi(stalled.length),c:stalled.length?'#DC2626':'#059669',
+      d:'of '+fi(open.length)+' open roles — these need a different approach, not more waiting'}]
+    .map(function(k){
+      return '<div class="kp-k" style="border-top-color:'+k.c+';cursor:default">'+
+        '<div class="l">'+k.l+'</div><div class="v" style="color:'+k.c+'">'+k.v+'</div>'+
+        '<div class="d">'+k.d+'</div></div>';
+    }).join('')+'</div>';
+
+  html+='<div class="kp-two">'+
+    '<div class="au-sec"><div class="kp-h">⏳ Ageing pipeline — least likely to close</div>'+
+    '<div class="kp-sub">The chance column is the share of past roles at the same priority that were '+
+    'still unfilled at this age. It is a historic base rate, not a promise.</div>'+
+    '<div style="overflow-x:auto"><table class="kpt"><thead><tr><th class="nm">Position</th>'+
+    '<th class="nm">Branch</th><th class="nm">Recruiter</th><th>Age</th><th>Still closes</th></tr></thead><tbody>'+
+    open.slice(0,10).map(function(x){
+      var c=x.p===null?'#64748B':x.p>=0.15?'#059669':x.p>=0.05?'#D97706':'#DC2626';
+      return '<tr><td class="nm">'+esc(String(x.r.Position||'—'))+'</td>'+
+        '<td class="nm">'+esc(String(x.r.Branch||'—'))+'</td>'+
+        '<td class="nm">'+esc(String(x.r.HR||'—'))+'</td>'+
+        '<td style="font-weight:800;color:'+(x.age>P90?'#DC2626':'#64748B')+'">'+x.age+'d</td>'+
+        '<td style="font-weight:800;color:'+c+'">'+(x.p===null?'—':Math.round(x.p*100)+'%')+'</td></tr>';
+    }).join('')+'</tbody></table></div></div>'+
+
+    '<div class="au-sec"><div class="kp-h">📊 What actually drives time-to-fill</div>'+
+    '<div class="kp-sub">Median days by branch and by priority, from closed roles only. These are the '+
+    'features that separate a fast fill from a slow one.</div>'+
+    '<div style="overflow-x:auto"><table class="kpt"><thead><tr><th class="nm">Branch</th>'+
+    '<th>Median days</th><th>Roles</th></tr></thead><tbody>'+
+    byBranch.map(function(b){
+      var c=b.med>=14?'#DC2626':b.med>=7?'#D97706':'#059669';
+      return '<tr><td class="nm">'+esc(b.k)+'</td><td style="font-weight:800;color:'+c+'">'+
+        b.med+'d</td><td style="color:#64748B">'+b.n+'</td></tr>';
+    }).join('')+
+    byPri.map(function(b){
+      return '<tr style="background:#F8FAFC"><td class="nm" style="color:#64748B">'+esc(b.k)+' priority</td>'+
+        '<td style="font-weight:700;color:#64748B">'+b.med+'d</td>'+
+        '<td style="color:#94A3B8">'+b.n+'</td></tr>';
+    }).join('')+'</tbody></table></div></div></div>';
+
+  /* the read-out, written from the numbers above */
+  var acts=[];
+  if(stalled.length) acts.push('<b>'+fi(stalled.length)+' open roles have passed '+P90+' days<\/b>, the point '+
+    'beyond which only one role in ten has ever been filled. Waiting longer is not a strategy for these — '+
+    'they need a rewritten brief, a different channel, or a decision to stop.');
+  if(byBranch.length>1){
+    var slow=byBranch[0], fast=byBranch[byBranch.length-1];
+    acts.push('<b>'+esc(slow.k)+'<\/b> takes a median '+slow.med+' days against <b>'+esc(fast.k)+
+      '</b> at '+fast.med+'. Same group, same roles, same market \u2014 the gap is process, and it is worth '+
+      'an hour with both recruiters to find what differs.');
+  }
+  if(byPri.length>1 && byPri[0].med>byPri[byPri.length-1].med){
+    acts.push('Roles marked <b>'+esc(byPri[0].k)+'<\/b> priority take a median '+byPri[0].med+
+      ' days \u2014 longer than lower-priority ones at '+byPri[byPri.length-1].med+
+      '. The priority flag is not shortening anything, so it is either being set on the genuinely harder '+
+      'roles or it carries no operational meaning. Worth knowing which.');
+  }
+  acts.push('A principal asking \u201chow long?\u201d should be told <b>'+P75+' days<\/b>, not the '+P50+
+    '-day median. Quoting the median means missing the date one time in two.');
+  html+='<div class="au-sec"><div class="kp-h">💡 What this suggests</div>'+
+    '<ul style="margin:6px 0 0;padding-left:18px;font-size:12.5px;line-height:1.75;color:var(--tx)">'+
+    acts.map(function(a){ return '<li>'+a+'</li>'; }).join('')+'</ul></div>';
+
+  el.innerHTML=html;
+  var fn=document.getElementById('hr-fc-fn');
+  if(fn) fn.textContent='Fitted on '+fi(D.length)+' closed roles \u00b7 '+fi(open.length)+' open';
+}
+
 function renderHRRanking(){
+  try{ renderHRForecast(); }catch(e){ console.error('HR forecast:',e&&e.message); }
   const tbody=document.getElementById('hr-rank-tbody');
   if(!tbody)return;
   const allRec=(typeof HR_RECORDS!=='undefined'&&Array.isArray(HR_RECORDS))?HR_RECORDS:[];
@@ -4890,21 +5060,22 @@ function renderHRRanking(){
         + rows.filter(r=>isOpen(r.Status)).map(r=>{const pd=r.PostDate; if(!pd||pd==='–')return 0; const age=Math.round((Date.now()-new Date(pd))/86400000); return age>30?(age-30):0;}).reduce((a,b)=>a+b,0);
     })();
     const u=unifiedScore(assigned, s.closed, targetTAT, actualTAT, odDays, maxClosed);
-    return {...s,score:u.score,u};
+    return {...s,score:u.score,u,odDays:Math.round(odDays),assigned};
   }).sort((a,b)=>b.score-a.score || b.closed-a.closed);
 
   const medals=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣'];
   tbody.innerHTML=stats.map((s,i)=>{
     const scoreColor=s.score>=80?'#059669':s.score>=60?'#D97706':'#DC2626';
-    const adColor=s.avgDays===null?'#94A3B8':s.avgDays<=15?'#059669':s.avgDays<=30?'#D97706':'#DC2626';
-    const fpColor=s.fastPct>=60?'#059669':s.fastPct>=30?'#D97706':'#DC2626';
+    /* one scale for all four components, so a weak column is visible at a glance */
+    const cmp=v=>v>=80?'#059669':v>=60?'#D97706':'#DC2626';
     return `<tr style="cursor:pointer" onclick="viewHRByRecruiter('${s.hr.replace(/'/g,"\\\\'")}','ALL')">
       <td style="font-size:17px;text-align:center">${medals[i]||(i+1)}</td>
       <td><strong>${s.hr}</strong><br><small style="color:#94A3B8;font-size:10px;">${s.branch}</small></td>
       <td><strong>${fi(s.closed)}</strong></td><td>${s.open>0?`<span style="color:#DC2626;font-weight:600">${s.open}</span>`:'0'}</td>
-      <td><strong style="color:${adColor}">${s.avgDays===null?'–':s.avgDays+'d'}</strong></td>
-      <td><strong style="color:${fpColor}">${s.fastPct}%</strong> <small style="color:#94A3B8;">≤15d</small></td>
-      <td>${s.slow>0?`<span style="color:#DC2626;font-weight:600">${s.slow}</span>`:'0'} <small style="color:#94A3B8;">&gt;30d</small></td>
+      <td><strong style="color:${cmp(s.u.wh)}">${s.u.wh}%</strong><small style="display:block;font-size:9px;color:#94A3B8">${fi(s.closed+s.open)} roles</small></td>
+      <td><strong style="color:${cmp(s.u.ce)}">${s.u.ce}%</strong><small style="display:block;font-size:9px;color:#94A3B8">${fi(s.closed)} of ${fi(s.closed+s.open)}</small></td>
+      <td><strong style="color:${cmp(s.u.cs)}">${s.u.cs}%</strong><small style="display:block;font-size:9px;color:#94A3B8">${s.avgDays===null?'–':s.avgDays+'d avg vs 15d'}</small></td>
+      <td><strong style="color:${cmp(s.u.oc)}">${s.u.oc}%</strong><small style="display:block;font-size:9px;color:#94A3B8">${fi(s.odDays)} overdue days${s.open>0?` · ${s.open} still open`:''}</small></td>
       <td><span style="display:inline-block;min-width:44px;padding:2px 8px;border-radius:8px;background:${scoreColor};color:#fff;font-weight:800;font-size:11px;text-align:center">${s.score}</span>
         <div style="font-size:9px;color:#94A3B8;margin-top:1px;display:flex;gap:3px;flex-wrap:wrap;">
           <span title="Workload 35%">WH${s.u.wh.toFixed(0)}</span>·<span title="Closure 25%">CE${s.u.ce.toFixed(0)}</span>·<span title="Speed 20%">CS${s.u.cs.toFixed(0)}</span>·<span title="Overdue 20%">OC${s.u.oc.toFixed(0)}</span>
@@ -5889,8 +6060,17 @@ function unifiedScore(assigned, closed, targetTAT, actualTAT, totalOverdueDays, 
   const wh = (assigned / (maxAssigned||assigned)) * 100;          // workload handled
   const ce = (closed / assigned) * 100;                           // closure efficiency
   const cs = actualTAT>0 ? Math.min(100, (targetTAT/actualTAT)*100) : 100; // closure speed
-  const overdueRatio = totalOverdueDays / assigned;
-  const oc = Math.max(0, 100 - (overdueRatio * 100));             // overdue control
+  /* Overdue control was totalOverdueDays / assigned, then read as a
+     percentage — days divided by a count. One role a fortnight late pushed the
+     ratio past 1, the subtraction went negative, and Math.max clamped it to
+     zero. Every recruiter scored 0% on this component and it contributed
+     nothing to any ranking.
+
+     Overdue days are now measured against the time actually allowed:
+     assigned x targetTAT. Use all of that budget and no more and you score
+     100; run a full target period late on every role and you score 0. */
+  const allowed = assigned * (targetTAT > 0 ? targetTAT : 1);
+  const oc = Math.max(0, 100 - (totalOverdueDays / allowed) * 100); // overdue control
   const score = Math.round(wh*0.35 + ce*0.25 + cs*0.20 + oc*0.20);
   return {score:Math.min(100,score), wh:+wh.toFixed(1), ce:+ce.toFixed(1), cs:+cs.toFixed(1), oc:+oc.toFixed(1)};
 }
@@ -5961,9 +6141,13 @@ function renderRankings(){
   const ALLB=['Keesara','Pocharam','Bachupally','Boduppal','Gowdavalli'];
   const MO_MAP={March:'Mar-2026',April:'Apr-2026',May:'May-2026',June:'Jun-2026',July:'Jul-2026',August:'Aug-2026',September:'Sep-2026',October:'Oct-2026',November:'Nov-2026',December:'Dec-2026',January:'Jan-2027',February:'Feb-2027'};
 
-  // PREVIOUS month with care-call data, per branch (July → June)
+  /* The care row was pinned to the previous month and ignored the Month
+     dropdown, so changing the filter moved every other row and left this one
+     where it was — which reads as a broken filter rather than a deliberate
+     choice. A month selection now drives it; with no selection it still falls
+     back to the previous month. */
   const prevMonth={};
-  ALLB.forEach(b=>{prevMonth[b]=getPrevMonth(b);});
+  ALLB.forEach(b=>{prevMonth[b]=(typeof fMonth!=='undefined'&&fMonth!=='ALL')?fMonth:getPrevMonth(b);});
 
   // ── Row 1: Care Call Rate (PREVIOUS month per branch) ──
   const careStats={};
@@ -9168,8 +9352,11 @@ function renderRankings(){
   const ALLB=['Keesara','Pocharam','Bachupally','Boduppal','Gowdavalli'];
   const MO_MAP={March:'Mar-2026',April:'Apr-2026',May:'May-2026',June:'Jun-2026',July:'Jul-2026',August:'Aug-2026',September:'Sep-2026',October:'Oct-2026',November:'Nov-2026',December:'Dec-2026',January:'Jan-2027',February:'Feb-2027'};
 
-  // ── Care Call Rate (previous month per branch) ── unchanged
-  const prevMonth={}; ALLB.forEach(b=>{prevMonth[b]=getPrevMonth(b);});
+  /* This is the SECOND definition of renderRankings in the file and it silently
+     overrides the first, so the month fix had to land here to take effect.
+     A month selection drives the care row; with none, the previous month. */
+  const prevMonth={};
+  ALLB.forEach(b=>{prevMonth[b]=(typeof fMonth!=='undefined'&&fMonth!=='ALL')?fMonth:getPrevMonth(b);});
   const careStats={};
   ALLB.forEach(b=>{
     const rec=prevMonth[b]?TRACKER.find(d=>d.branch===b&&d.month===prevMonth[b]&&d.calls>0):null;
