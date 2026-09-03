@@ -1206,41 +1206,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="card"><div class="ch"><h3>🏫 Branch Completion Rate Comparison</h3><span class="fnote">Current month always · follows Branch dropdown (ignores Month filter so it never goes stale)</span></div><div class="cb" id="care-bars"></div></div>
     <div class="card"><div class="ch"><h3>📈 Completion Rate Trend (Month-wise)</h3></div><div class="cb"><div class="cw tall"><canvas id="care-trend"></canvas></div></div></div>
   </div>
-  <!-- Quick View: Pending & In Progress records, live-filtered by branch/month -->
-  <div class="card" style="margin-bottom:16px;">
-    <div class="ch"><h3>⚡ Quick View — Pending &amp; In Progress Calls</h3><span class="fnote" id="cc-quick-fn">All Branches · All Months</span></div>
-    <div class="row r2" style="margin:0;padding:0 14px 14px;">
-      <div>
-        <div style="font-size:11px;font-weight:700;color:#D97706;text-transform:uppercase;margin-bottom:6px;">⏳ Pending — <span id="cc-pend-count">0</span> <span style="font-weight:500;color:#94A3B8;">(click any row to view full record)</span></div>
-        <div style="overflow-x:auto;max-height:260px;overflow-y:auto;border:1px solid #E0E8FF;border-radius:8px;">
-          <table style="width:100%;border-collapse:collapse;font-size:11.5px;">
-            <thead><tr style="background:#FFFBEB;position:sticky;top:0;">
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#D97706;text-transform:uppercase;">Branch</th>
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#D97706;text-transform:uppercase;">Student</th>
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#D97706;text-transform:uppercase;">Grievance</th>
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#D97706;text-transform:uppercase;">Date</th>
-            </tr></thead>
-            <tbody id="cc-pend-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-      <div>
-        <div style="font-size:11px;font-weight:700;color:#7C3AED;text-transform:uppercase;margin-bottom:6px;">🔄 In Progress — <span id="cc-ip-count">0</span> <span style="font-weight:500;color:#94A3B8;">(click any row to view full record)</span></div>
-        <div style="overflow-x:auto;max-height:260px;overflow-y:auto;border:1px solid #E0E8FF;border-radius:8px;">
-          <table style="width:100%;border-collapse:collapse;font-size:11.5px;">
-            <thead><tr style="background:#F5F3FF;position:sticky;top:0;">
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#7C3AED;text-transform:uppercase;">Branch</th>
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#7C3AED;text-transform:uppercase;">Student</th>
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#7C3AED;text-transform:uppercase;">Grievance</th>
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#7C3AED;text-transform:uppercase;">Date</th>
-            </tr></thead>
-            <tbody id="cc-ip-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- Branch-wise compliance report, in the printed PGOS layout -->
   <div class="card" style="margin-bottom:16px;">
     <div class="ch"><h3>📋 Parent Feedback Compliance Report</h3>
@@ -7466,33 +7431,6 @@ function renderCare(){
   document.getElementById('cc-ip').textContent=fi(s.ip);
   document.getElementById('cc-ip-s').textContent=s.calls>0?fp(s.ip/s.calls*100)+' of calls':'–';
 
-  // ── Quick View: Pending & In Progress records (live-filtered) ──
-  {
-    document.getElementById('cc-quick-fn').textContent=bl+' · '+ml;
-    const ALLCARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
-    const baseRows=ALLCARE.filter(r=>(fBranch==='ALL'||r.Branch===fBranch)&&(fMonth==='ALL'||r.Month===fMonth));
-    const pendRows=baseRows.filter(r=>r.Status==='Pending');
-    const ipRows=baseRows.filter(r=>r.Status==='In Progress');
-    document.getElementById('cc-pend-count').textContent=fi(pendRows.length);
-    document.getElementById('cc-ip-count').textContent=fi(ipRows.length);
-
-    function quickRowsHtml(rows,color){
-      const shown=rows.slice(0,200); // cap for render performance; full list via KPI-card click
-      if(shown.length===0) return '<tr><td colspan="4" style="padding:14px;text-align:center;color:#94A3B8;font-style:italic;">No records</td></tr>';
-      return shown.map((r,i)=>{
-        const bg=i%2===0?'#fff':'#F8FAFF';
-        return `<tr style="background:${bg};cursor:pointer;" onclick="viewCareRecords('${r.Status}')">
-          <td style="padding:6px 10px;border-bottom:1px solid #F1F5F9;"><span class="bd b${r.Branch}"></span>${r.Branch}</td>
-          <td style="padding:6px 10px;border-bottom:1px solid #F1F5F9;">${r.Student}</td>
-          <td style="padding:6px 10px;border-bottom:1px solid #F1F5F9;">${r.Grievance}</td>
-          <td style="padding:6px 10px;border-bottom:1px solid #F1F5F9;color:#94A3B8;">${fmtDispDate(r.Date)}</td>
-        </tr>`;
-      }).join('')+(rows.length>200?`<tr><td colspan="4" style="padding:8px 10px;text-align:center;color:${color};font-weight:600;font-size:11px;cursor:pointer;" onclick="viewCareRecords('${rows[0].Status}')">+ ${rows.length-200} more — click to view all</td></tr>`:'');
-    }
-    document.getElementById('cc-pend-tbody').innerHTML=quickRowsHtml(pendRows,'#D97706');
-    document.getElementById('cc-ip-tbody').innerHTML=quickRowsHtml(ipRows,'#7C3AED');
-  }
-
   // Branch bars — ALWAYS the current calendar month by default (never silently substitutes
   // an older month just because it has data); a Month selection in the dropdown overrides it.
   let html='';
@@ -7528,16 +7466,55 @@ function renderCare(){
   document.getElementById('care-bars').innerHTML=html||'<div class="no-data">No data for this filter</div>';
 
   // Trend line — all branches
-  const td={};BRANCHES.forEach(b=>td[b]=[null,null,null,null]);
+  /* Two things made this chart unreadable.
+
+     A month with no calls anywhere still occupied a slot, so the lines ran
+     through empty space — May is the usual culprit. Those months are dropped
+     entirely rather than drawn as a gap.
+
+     And a 0-100 axis pushed every branch into the top tenth of the plot, five
+     lines on top of one another. The axis is cropped to the values actually
+     present, with a floor no higher than the lowest point and a span never
+     under 10 points so a quiet month is not magnified into a swing. */
+  const td={};BRANCHES.forEach(b=>td[b]=MONTHS.map(()=>null));
   TRACKER.forEach(r=>{
     if(fBranch!=='ALL'&&r.branch!==fBranch)return;
     const mi=MONTHS.indexOf(r.month);
     if(mi>=0&&r.calls>0)td[r.branch][mi]=r.comp;
   });
-  mkChart('care-trend',lineCfg(MONTHS.map(m=>m.slice(0,3)),BRANCHES.map(b=>({
-    label:b,data:td[b],borderColor:BC[b],backgroundColor:BC[b]+'22',
-    fill:false,tension:0.3,pointRadius:5,pointBackgroundColor:BC[b],spanGaps:true
-  }))));
+  const keep=MONTHS.map((m,i)=>BRANCHES.some(b=>td[b][i]!==null)?i:-1).filter(i=>i>=0);
+  const tLbl=keep.map(i=>MONTHS[i].slice(0,3));
+  const tSets=BRANCHES.filter(b=>keep.some(i=>td[b][i]!==null)).map(b=>({
+    label:b,data:keep.map(i=>td[b][i]),borderColor:BC[b],backgroundColor:BC[b]+'22',
+    fill:false,tension:0.25,pointRadius:4,pointHoverRadius:7,borderWidth:2.5,
+    pointBackgroundColor:BC[b],pointBorderColor:'#fff',pointBorderWidth:1.5,spanGaps:true
+  }));
+  const tAll=tSets.flatMap(s=>s.data).filter(v=>v!==null&&v!==undefined);
+  let tMin=0,tMax=100;
+  if(tAll.length){
+    const lo=Math.min(...tAll), hi=Math.max(...tAll);
+    const pad=Math.max(2,(hi-lo)*0.25);
+    tMin=Math.max(0,Math.floor((lo-pad)/2)*2);
+    tMax=Math.min(100,Math.ceil((hi+pad)/2)*2);
+    if(tMax-tMin<10){tMin=Math.max(0,tMax-10);tMax=Math.min(100,tMin+10);}
+  }
+  if(!tSets.length||tLbl.length<2){
+    const el=document.getElementById('care-trend');
+    if(el&&el.parentElement) el.parentElement.innerHTML=
+      '<div class="no-data">Two months of completed calls are needed before a trend can be drawn.</div>';
+  } else {
+    const cfg=lineCfg(tLbl,tSets);
+    cfg.options=cfg.options||{}; cfg.options.scales=cfg.options.scales||{};
+    cfg.options.scales.y=Object.assign({},cfg.options.scales.y,{
+      min:tMin,max:tMax,ticks:{callback:v=>v+'%',font:{size:11}},
+      title:{display:true,text:'Completion rate',font:{size:11}}
+    });
+    cfg.options.plugins=cfg.options.plugins||{};
+    cfg.options.plugins.tooltip=Object.assign({},cfg.options.plugins.tooltip,{
+      callbacks:{label:c=>c.dataset.label+': '+c.parsed.y+'%'}
+    });
+    mkChart('care-trend',cfg);
+  }
 
   // Table
   const tRows=TRACKER.filter(r=>(fBranch==='ALL'||r.branch===fBranch)&&(fMonth==='ALL'||r.month===fMonth)&&r.calls>0);
@@ -10216,29 +10193,31 @@ window.AUDIT = (function () {
       '<table class="au-tbl"><thead><tr>' +
       '<th>Branch</th><th class="n">Compliance</th><th></th><th class="n">Change</th>' +
       D.months.map(function (m) { return '<th class="n">' + esc(A.monthShort(m)) + '</th>'; }).join('') +
-      '<th class="n">Cells scored</th><th class="n">Coverage</th><th class="n">Best</th><th class="n">Weakest</th>' +
+      '<th class="n">Best</th><th class="n">Weakest</th>' +
       '</tr></thead><tbody>' +
       rows.map(function (r) {
         return '<tr class="clk" data-b="' + esc(r.b) + '">' +
           '<td><b>' + esc(r.b) + '</b></td>' +
-          '<td class="n" style="font-weight:700;color:' + A.colorFor(r.sc) + '">' + pc(r.sc) + '</td>' +
+          '<td class="n auc" data-b="' + esc(r.b) + '" style="font-weight:700;color:' + A.colorFor(r.sc) + '">' + pc(r.sc) + '</td>' +
           '<td style="width:150px"><div class="au-bar"><i style="width:' +
             (r.sc === null ? 0 : Math.max(1, r.sc)) + '%;background:' + A.colorFor(r.sc) + '"></i>' +
             '<span class="tgt" style="left:' + A.ON_TRACK + '%"></span></div></td>' +
-          '<td class="n" style="color:' + (r.d === null ? '#94A3B8' : r.d >= 0 ? '#059669' : '#DC2626') + '">' +
-            (r.d === null ? '—' : sgn(r.d)) + '</td>' +
-          r.hist.map(function (h) {
-            return '<td class="n" style="color:' + A.colorFor(h) + '">' + (h === null ? '—' : h.toFixed(1)) + '</td>';
+          '<td class="n' + (r.d === null ? '' : ' auc') + '" data-b="' + esc(r.b) + '" style="color:' +
+            (r.d === null ? '#94A3B8' : r.d >= 0 ? '#059669' : '#DC2626') + '">' +
+            (r.d === null ? '\u2014' : sgn(r.d)) + '</td>' +
+          r.hist.map(function (h, hi) {
+            return '<td class="n' + (h === null ? '' : ' auc') + '" data-b="' + esc(r.b) + '" data-m="' +
+              esc(D.months[hi]) + '" style="color:' + A.colorFor(h) + '">' +
+              (h === null ? '\u2014' : h.toFixed(1)) + '</td>';
           }).join('') +
-          '<td class="n" style="color:#64748B">' + (r.t ? A.scored(r.t) : 0) + '</td>' +
-          '<td class="n" style="color:' + (r.cov !== null && r.cov < 55 ? '#D97706' : '#64748B') + '">' + pc(r.cov, 0) + '</td>' +
-          '<td class="n" style="color:#059669">' + esc(r.best ? A.monthShort(r.best) : '—') + '</td>' +
-          '<td class="n" style="color:#DC2626">' + esc(r.worst ? A.monthShort(r.worst) : '—') + '</td>' +
+          '<td class="n auc" data-b="' + esc(r.b) + '" data-m="' + esc(r.best || '') + '" style="color:#059669">' +
+            esc(r.best ? A.monthShort(r.best) : '—') + '</td>' +
+          '<td class="n auc" data-b="' + esc(r.b) + '" data-m="' + esc(r.worst || '') + '" style="color:#DC2626">' +
+            esc(r.worst ? A.monthShort(r.worst) : '—') + '</td>' +
           '</tr>';
       }).join('') + '</tbody></table>' +
-      '<p class="au-note">The marker on each bar is the ' + A.ON_TRACK + '% on-track line. <b>Cells scored</b> is how much evidence the ' +
-      'percentage rests on — ' + esc(rows[0].b) + ' is scored on ' + (rows[0].t ? A.scored(rows[0].t) : 0) + ' cells, and a branch ' +
-      'scored on far fewer is not directly comparable however high it looks. Click any branch for its full file.</p>';
+      '<p class="au-note">The marker on each bar is the ' + A.ON_TRACK + '% on-track line. Every figure opens the ' +
+      'audit rows behind it \u2014 a month column opens that branch\u2019s file for that month.</p>';
   }
 
   /* ══════════════════ 3. TREND ══════════════════ */
@@ -10248,15 +10227,37 @@ window.AUDIT = (function () {
         'The trend appears once a second month is entered.</p>';
       return;
     }
-    var W = 720, H = 260, PL = 42, PR = 96, PT = 16, PB = 34;
+    var W = 720, H = 300, PL = 42, PR = 96, PT = 16, PB = 34;
     var iw = W - PL - PR, ih = H - PT - PB;
+    /* A 0-100 axis put every branch inside the top fifth of the chart, so five
+       lines sat on top of one another and no movement was legible. The axis is
+       now cropped to the data with a small margin, which is what makes the
+       differences between branches visible at all. The floor is never above the
+       lowest point and the range never smaller than 25 points, so a flat month
+       cannot be magnified into drama. */
+    var seen = [];
+    D.branches.forEach(function (b) {
+      D.months.forEach(function (m) {
+        var v = A.scoreOf(D.byBM, b + '\u241f' + m);
+        if (v !== null) seen.push(v);
+      });
+    });
+    var lo = seen.length ? Math.min.apply(null, seen) : 0;
+    var hi = seen.length ? Math.max.apply(null, seen) : 100;
+    var pad = Math.max(4, (hi - lo) * 0.18);
+    var Y0 = Math.max(0, Math.floor((lo - pad) / 5) * 5);
+    var Y1 = Math.min(100, Math.ceil((hi + pad) / 5) * 5);
+    if (Y1 - Y0 < 25) { Y0 = Math.max(0, Y1 - 25); Y1 = Math.min(100, Y0 + 25); }
     var x = function (i) { return PL + (D.months.length === 1 ? iw / 2 : i * iw / (D.months.length - 1)); };
-    var y = function (v) { return PT + ih - (v / 100) * ih; };
+    var y = function (v) { return PT + ih - ((v - Y0) / (Y1 - Y0)) * ih; };
     var PALETTE = ['#1E4FD8', '#059669', '#D97706', '#7C3AED', '#0D9488', '#DC2626'];
 
     var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto" role="img" aria-label="Compliance by month and branch">';
-    [0, 25, 50, 65, 85, 100].forEach(function (v) {
-      var isBand = v === 85 || v === 65;
+    var ticks = [];
+    for (var tv = Y0; tv <= Y1 + 0.001; tv += (Y1 - Y0) / 5) ticks.push(Math.round(tv));
+    [A.ON_TRACK, A.REVIEW].forEach(function (v) { if (v > Y0 && v < Y1) ticks.push(v); });
+    ticks.sort(function (a, b) { return a - b; }).forEach(function (v) {
+      var isBand = v === A.ON_TRACK || v === A.REVIEW;
       s += '<line x1="' + PL + '" x2="' + (W - PR) + '" y1="' + y(v) + '" y2="' + y(v) +
         '" stroke="' + (isBand ? '#CBD5E1' : '#EEF2F7') + '"' + (isBand ? ' stroke-dasharray="4 3"' : '') + '/>' +
         '<text x="' + (PL - 6) + '" y="' + (y(v) + 3.5) + '" text-anchor="end" font-size="9.5" fill="#94A3B8">' + v + '</text>';
@@ -10714,22 +10715,39 @@ window.AUDIT = (function () {
                    .sort(function(a,b){ return a-b; });
       return vs.length ? vs[Math.floor(vs.length/2)] : null;
     });
+    /* Each stage is ranked on its own. A Prep coordinator competes with the
+       other Prep coordinators and nobody else — comparing a Prep figure with a
+       9-10 figure was never meaningful, since the two are audited on different
+       checklists and different numbers of them. */
+    var stageRank = A.GRADES.map(function (g, i) {
+      var ord = list.map(function (x, k) { return { k: k, v: x.per[i] && x.per[i].v }; })
+        .filter(function (o) { return o.v !== null && o.v !== undefined; })
+        .sort(function (a, b) { return b.v - a.v; });
+      var r = {};
+      ord.forEach(function (o, n) { r[o.k] = n + 1; });
+      return { rank: r, n: ord.length };
+    });
+    var MEDAL = ['\ud83e\udd47', '\ud83e\udd48', '\ud83e\udd49'];
     function cell(x, i){
       var c = x.per[i];
       if (!c) return '<td style="color:#E2E8F0">\u00b7</td>';       // not their stage
       if (c.v === null) return '<td style="color:#94A3B8">no data</td>';
+      var rk = stageRank[i].rank[x.__i], tot = stageRank[i].n;
+      var badge = rk ? '<div style="font-size:9px;font-weight:700;color:' +
+        (rk <= 3 ? '#B8860B' : '#94A3B8') + ';margin-top:1px">' +
+        (rk <= 3 ? MEDAL[rk-1] + ' ' : '') + 'rank ' + rk + ' of ' + tot + '</div>' : '';
       var col = c.v >= 95 ? '#B8860B' : c.v >= 90 ? '#475569' : c.v >= 80 ? '#9A5B2D'
               : c.v >= 70 ? '#B45309' : '#B91C1C';
       return '<td class="c" data-co="' + x.__i + '" data-gi="' + i + '" ' +
         'style="cursor:pointer;font-weight:800;color:' + col + '" ' +
-        'title="' + c.n + ' checks \u00b7 click for the audit file">' + c.v.toFixed(1) + '%</td>';
+        'title="' + c.n + ' checks \u00b7 click for the audit file">' + c.v.toFixed(1) + '%' + badge + '</td>';
     }
     list.forEach(function(x, i){ x.__i = i; });
     var MED = ['\ud83e\udd47','\ud83e\udd48','\ud83e\udd49'];
     return '<div style="overflow-x:auto"><table class="hrs kpt" style="min-width:720px">' +
       '<thead><tr><th class="nm">Rank</th><th class="nm">Coordinator</th>' +
       A.GRADES.map(function(g){ return '<th>' + g.replace('\u2013','\u2013') + '</th>'; }).join('') +
-      '<th>Overall</th><th>Checks</th><th title="Share of the checklist that carried a score — the rest was NA or NR and is excluded from the percentage">Scored on</th><th class="nm">Award</th></tr></thead><tbody>' +
+      '<th>Overall</th><th>Checks</th><th class="nm">Award</th></tr></thead><tbody>' +
       list.map(function(x, i){
         var aw = awardOf(x.v);
         return '<tr class="clk" data-co="' + i + '" style="cursor:pointer">' +
@@ -10739,7 +10757,6 @@ window.AUDIT = (function () {
           A.GRADES.map(function(g, gi){ return cell(x, gi); }).join('') +
           '<td style="font-weight:800">' + awPct(x.v) + '</td>' +
           '<td style="color:var(--txm)">' + x.n + '</td>' +
-          covCell(x.t) +
           '<td class="nm"><span style="background:' + aw.bg + ';color:' + aw.c +
             ';font-size:10px;font-weight:800;padding:2px 8px;border-radius:99px;white-space:nowrap">' +
             aw.ic + ' ' + aw.l + '</span></td></tr>';
@@ -10828,7 +10845,7 @@ window.AUDIT = (function () {
     return '<div style="overflow-x:auto"><table class="aw-t"><thead><tr>' +
       '<th class="nm">Rank</th><th class="nm">' + (isC ? 'Coordinator' : 'Principal') + '</th>' +
       '<th class="nm">' + (isC ? 'Stages held' : 'Campus') + '</th>' +
-      '<th>Compliance</th><th>Checks</th><th title="Share of the checklist that carried a score">Scored on</th><th>Behind the leader</th><th class="nm">Award</th>' +
+      '<th>Compliance</th><th>Checks</th><th>Behind the leader</th><th class="nm">Award</th>' +
       '</tr></thead><tbody>' +
       list.map(function(x,i){
         var a = awardOf(x.v);
@@ -10843,7 +10860,6 @@ window.AUDIT = (function () {
           '<td style="font-weight:800;color:' + col + '">' + awPct(x.v) +
             '<div class="aw-bar"><i style="width:' + (x.v||0) + '%;background:' + col + '"></i></div></td>' +
           '<td>' + x.n.toLocaleString('en-IN') + '</td>' +
-          covCell(x.t) +
           '<td style="color:' + (i===0?'#059669':'#64748B') + '">' +
             (i===0 ? 'leader' : '\u2212' + (top - x.v).toFixed(1)) + '</td>' +
           '<td class="nm"><span class="aw-band" style="color:' + a.c + ';background:' + a.bg + '">' +
@@ -11345,6 +11361,43 @@ window.AUDIT = (function () {
   function wire() {
     $('au-score').querySelectorAll('tr.clk').forEach(function (tr) {
       tr.addEventListener('click', function () { branchModal(tr.dataset.b); });
+    });
+    /* Every figure in the scorecard opens the rows behind it. A month column
+       opens that branch's file for that month; the rest open the branch. */
+    $('au-score').querySelectorAll('td.auc').forEach(function (td) {
+      td.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var b = td.dataset.b, m = td.dataset.m;
+        var t = m ? D.byBM[b + '\u241f' + m] : null;
+        if (t) {
+          /* that branch's file for that one month, section by section */
+          var cats = D.cats.map(function (c) {
+            var x = D.byBMC[b + '\u241f' + m + '\u241f' + c];
+            return { c: c, v: x ? A.score(x) : null, t: x };
+          }).filter(function (r) { return r.t; })
+            .sort(function (a, z) { return (a.v === null ? 999 : a.v) - (z.v === null ? 999 : z.v); });
+          modal('\ud83c\udfeb ' + esc(b) + ' \u00b7 ' + esc(A.monthShort(m)),
+            A.scored(t) + ' checks scored \u00b7 ' + pc(A.score(t)) + ' compliance',
+            '<table class="au-tbl"><thead><tr><th>Section</th><th class="n">Score</th><th></th>' +
+            '<th class="n">Yes</th><th class="n">No</th><th class="n">IP</th><th class="n">Not scored</th>' +
+            '</tr></thead><tbody>' +
+            cats.map(function (r) {
+              var x = r.t;
+              return '<tr><td>' + esc(r.c) + '</td>' +
+                '<td class="n" style="font-weight:600;color:' + A.colorFor(r.v) + '">' + pc(r.v, 0) + '</td>' +
+                '<td style="width:110px"><div class="au-bar"><i style="width:' +
+                  (r.v === null ? 0 : Math.max(1, r.v)) + '%;background:' + A.colorFor(r.v) + '"></i></div></td>' +
+                '<td class="n" style="color:#059669">' + x.yes + '</td>' +
+                '<td class="n" style="color:#DC2626">' + x.no + '</td>' +
+                '<td class="n" style="color:#D97706">' + x.ip + '</td>' +
+                '<td class="n" style="color:#94A3B8">' + (x.na + x.nr + x.none) + '</td></tr>';
+            }).join('') + '</tbody></table>' +
+            '<p class="au-note">Not scored is NA or NR \u2014 not applicable to this campus, or not required ' +
+            'this month. Both are excluded from the percentage.</p>');
+          return;
+        }
+        branchModal(b);
+      });
     });
     $('au-heat').querySelectorAll('.au-cell').forEach(function (el) {
       el.addEventListener('click', function () { cellModal(el.dataset.b, el.dataset.c); });
