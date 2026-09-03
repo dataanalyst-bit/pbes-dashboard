@@ -6147,7 +6147,9 @@ function renderRankings(){
      choice. A month selection now drives it; with no selection it still falls
      back to the previous month. */
   const prevMonth={};
-  ALLB.forEach(b=>{prevMonth[b]=(typeof fMonth!=='undefined'&&fMonth!=='ALL')?fMonth:getPrevMonth(b);});
+  ALLB.forEach(b=>{
+    prevMonth[b]=(typeof fMonth!=='undefined'&&fMonth!=='ALL')?fMonth:getPrevCalendarMonth();
+  });
 
   // ── Row 1: Care Call Rate (PREVIOUS month per branch) ──
   const careStats={};
@@ -9354,9 +9356,17 @@ function renderRankings(){
 
   /* This is the SECOND definition of renderRankings in the file and it silently
      overrides the first, so the month fix had to land here to take effect.
-     A month selection drives the care row; with none, the previous month. */
+
+     Strictly the previous CALENDAR month. getPrevMonth() walks backwards to the
+     newest month that happens to hold data, so on 3 September \u2014 with August
+     not yet entered \u2014 it returned July and the row read a month behind with
+     nothing on screen to say so. A branch with no calls entered for the month
+     now shows a dash, which is the truth, rather than an older month's figure
+     wearing this month's label. A month picked in the filter still wins. */
   const prevMonth={};
-  ALLB.forEach(b=>{prevMonth[b]=(typeof fMonth!=='undefined'&&fMonth!=='ALL')?fMonth:getPrevMonth(b);});
+  ALLB.forEach(b=>{
+    prevMonth[b]=(typeof fMonth!=='undefined'&&fMonth!=='ALL')?fMonth:getPrevCalendarMonth();
+  });
   const careStats={};
   ALLB.forEach(b=>{
     const rec=prevMonth[b]?TRACKER.find(d=>d.branch===b&&d.month===prevMonth[b]&&d.calls>0):null;
@@ -9448,10 +9458,12 @@ function renderRankings(){
   {
     const valMap={}; ALLB.forEach(b=>{valMap[b]=careStats[b]?careStats[b].pct:null;});
     const win=winners(valMap);
-    html+=`<tr><td style="padding:10px 14px;font-size:12.5px;font-weight:600;border-bottom:1px solid #E0E8FF;color:#0F172A;">📞 Care Call Rate</td>`;
+    const _cm=(typeof fMonth!=='undefined'&&fMonth!=='ALL')?fMonth:getPrevCalendarMonth();
+    html+=`<tr><td style="padding:10px 14px;font-size:12.5px;font-weight:600;border-bottom:1px solid #E0E8FF;color:#0F172A;">📞 Care Call Rate<small style="display:block;font-weight:400;font-size:10px;color:#94A3B8">${_cm} 2026</small></td>`;
     ALLB.forEach(b=>{
       const d=careStats[b];
-      if(!d){html+=cell('<span style="color:#94A3B8;">No data</span>',false);return;}
+      /* names the month, so a dash can never be read as a broken feed */
+      if(!d){html+=cell('<span style="color:#94A3B8;">\u2014</span><br><small style="color:#94A3B8;font-size:10px;">no calls entered for '+_cm.slice(0,3)+'</small>',false);return;}
       const color=d.pct>=95?'#059669':d.pct>=85?'#D97706':'#DC2626';
       html+=cell(`<span style="font-weight:700;color:${color}">${d.pct}%</span><br><small style="color:#94A3B8;font-size:10px;">${d.month.slice(0,3)}: ${fi(d.calls)}/${fi(d.students)}</small>`,win.includes(b));
     });
