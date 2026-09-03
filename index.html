@@ -9793,27 +9793,26 @@ window.AUDIT = (function () {
      does not apply to a campus should neither help nor hurt it. Where every
      item is NA the denominator is zero and the score is a dash rather than 0%,
      because "nothing applicable" is not the same as "nothing achieved". */
-  /* ── SCORED EXACTLY AS THE TRACKER SHEET SCORES ──
-       score = Yes / (Yes + IP + No)
+  /* ── IN PROGRESS EARNS HALF ──
+       score = (Yes + 0.5 x IP) / (Yes + IP + No)      NA and NR excluded
 
-     Two decisions here, both reconciled cell-by-cell against the workbook's own
-     SECTION-WISE COMPLIANCE table — 278 of 278 section x grade figures across
-     all five branches now reproduce exactly.
+     The tracker workbook contradicts itself on this, which is why the two have
+     been so hard to reconcile:
 
-     NR is excluded, with NA. It means "not required this month": a quarterly or
-     annual item in a month it is not due. An item nobody had to do should
-     neither help nor hurt, exactly like NA.
+       · its per-item Score column gives IP half credit  — 77 of 77 rows match,
+         and five IP cells read 50% exactly as you would expect
+       · its section and overall rows give IP nothing    — 278 of 278 match
 
-     IP earns NOTHING, not half. This dashboard used to give In Progress half a
-     mark, which read as a reasonable compromise and was the entire source of
-     the gap against the tracker — Boduppal's Parent Connect showed 81% here
-     against 75% there, and 1&2 showed 62% against 38%. The school's own rule is
-     stricter and it is the right one for a compliance audit: the item is either
-     done or it is not. "Started" is not "complied with", and half-crediting it
-     lets a branch bank marks for work that never finishes. IP is still counted
-     in the denominator, so it is a fail rather than an exemption. */
+     So the workbook's headline figure is NOT the roll-up of its own item
+     scores. No single rule can match both, and matching the overall row is what
+     made a row of five IP cells read 0% here.
+
+     Half credit is the rule to keep. It is what the item column already shows,
+     it is what anyone reading "In Progress" expects, and scoring started work
+     identically to work never begun destroys the distinction the IP value
+     exists to record. NA and NR stay out of the denominator; IP stays in. */
   function scored(t) { return t.yes + t.no + t.ip; }
-  function score(t) { var s = scored(t); return s ? t.yes / s * 100 : null; }
+  function score(t) { var s = scored(t); return s ? (t.yes + 0.5 * t.ip) / s * 100 : null; }
   function coverage(t) {
     var tot = scored(t) + t.na + t.nr + t.none;
     return tot ? scored(t) / tot * 100 : null;
