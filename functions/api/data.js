@@ -1,4 +1,8 @@
 // functions/api/data.js
+// v6 — branch matching is normalised (see sameBranch) and a tab emptied by the
+//      filter carries a `_branchFilter` note so the dashboard can explain it.
+//      `diag` blocks from Apps Script pass through untouched (they are not
+//      {hdr,rows} tables, so the filter leaves them alone).
 // v5 — the Exam Analytics section is replaced by the PT-1 / IA-1 Academic Review.
 //   ?section=pt1    → the three raw marks/staff/period tabs, cached under their
 //                     own edge key and branch-filtered for principals.
@@ -35,7 +39,21 @@ const SECTION_TTL_SECONDS = 1800;
 // Column headers that carry the campus name, in the order they are looked for.
 // The three PT-1 tabs all use "Branch", but this keeps a rename from silently
 // disabling the filter and leaking other campuses to a principal.
-const BRANCH_HEADERS = ["Branch", "branch", "BRANCH"];
+const BRANCH_HEADERS = ["Branch", "branch", "BRANCH", "Campus", "campus", "Branch Name", "branchName"];
+
+// Branch values are compared loosely: "bachupally", "Bachupally ", "BACHUPALLY"
+// and "Bachupally Branch" all belong to Bachupally. The five campus names are
+// distinct words, so a normalised contains-match cannot cross campuses. Exact
+// string equality was silently emptying the syllabus/notebook feed for
+// principals whenever the ledger spelled the branch differently from Supabase.
+function normBranch(v) {
+  return String(v == null ? "" : v).toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+function sameBranch(cell, branch) {
+  const a = normBranch(cell), b = normBranch(branch);
+  if (!a || !b) return false;
+  return a === b || a.indexOf(b) !== -1 || b.indexOf(a) !== -1;
+}
 
 export async function onRequestGet({ request, env }) {
   const json = (obj, status = 200) =>
@@ -109,9 +127,15 @@ export async function onRequestGet({ request, env }) {
         {
           error: true,
           message:
-            "Apps Script returned non-JSON (HTTP " + resp.status + "). " +
-            "Check the deployment is the latest version with access = Anyone. " +
-            "First bytes: " + head,
+            "Apps Script returned non-JSON (HTTP " + resp.status + ")" +
+            (section ? " for ?section=" + section : " for the main payload") + ". " +
+            (resp.status === 404
+              ? "A 404 means the APPS_SCRIPT_URL this Function is configured with no longer exists. " +
+                "In Apps Script use Deploy \u2192 Manage deployments \u2192 edit the EXISTING deployment " +
+                "\u2192 New version (creating a NEW deployment changes the /exec id, and the old one 404s). " +
+                "Then check the URL in the Cloudflare Pages environment variables matches."
+              : "Check the deployment is the latest version with access = Anyone.") +
+            " First bytes: " + head,
         },
         502
       );
@@ -202,10 +226,19 @@ function filterTablesByBranch(data, branch, wrapper) {
       if (col >= 0) break;
     }
     if (col < 0) { out[key] = tab; return; }
-    out[key] = {
-      ...tab,
-      rows: tab.rows.filter((r) => String(r[col] || "").trim() === branch),
-    };
+    const rows = tab.rows.filter((r) => sameBranch(r[col], branch));
+    out[key] = { ...tab, rows };
+    // Say so when the filter removed everything: the tab then shows this
+    // instead of a bare "no rows", and the fix (branch spelling) is obvious.
+    if (tab.rows.length && !rows.length) {
+      const seen = {};
+      tab.rows.forEach((r) => { const v = String(r[col] == null ? "" : r[col]).trim() || "(blank)"; seen[v] = 1; });
+      out[key]._branchFilter = {
+        branch, before: tab.rows.length, after: 0,
+        valuesInSheet: Object.keys(seen).slice(0, 12),
+        note: "No row in this tab matched the branch on your account (" + branch + ").",
+      };
+    }
   });
   return { ...data, [wrapper]: out };
 }
@@ -224,7 +257,7 @@ function filterByBranch(data, branch) {
   ];
   arrayKeys.forEach((k) => {
     if (!KEEP_FULL[k] && Array.isArray(out[k])) {
-      out[k] = out[k].filter((r) => (r.Branch || r.branch) === branch);
+      out[k] = out[k].filter((r) => sameBranch(r.Branch || r.branch, branch));
     }
   });
   // Transport & IT are nested objects of arrays — filter each inner array to the branch.
@@ -232,7 +265,7 @@ function filterByBranch(data, branch) {
     if (out[k] && typeof out[k] === "object") {
       const nk = {};
       Object.entries(out[k]).forEach(([kk, arr]) => {
-        nk[kk] = Array.isArray(arr) ? arr.filter((r) => (r.Branch || r.branch) === branch) : arr;
+        nk[kk] = Array.isArray(arr) ? arr.filter((r) => sameBranch(r.Branch || r.branch, branch)) : arr;
       });
       out[k] = nk;
     }
@@ -241,14 +274,14 @@ function filterByBranch(data, branch) {
   const branchKeyedObjects = ["STUDENTS_BY_BRANCH", "LEAD_SUMMARY", "COMBINED_SUMMARY"];
   branchKeyedObjects.forEach((k) => {
     if (out[k] && typeof out[k] === "object") {
-      out[k] = Object.fromEntries(Object.entries(out[k]).filter(([key]) => key === branch));
+      out[k] = Object.fromEntries(Object.entries(out[k]).filter(([key]) => sameBranch(key, branch)));
     }
   });
   if (out.OWNER_QUALITY && typeof out.OWNER_QUALITY === "object") {
     out.OWNER_QUALITY = Object.fromEntries(
-      Object.entries(out.OWNER_QUALITY).filter(([, v]) => v.branch === branch)
+      Object.entries(out.OWNER_QUALITY).filter(([, v]) => sameBranch(v.branch, branch))
     );
   }
-  out.TOTAL_STUDENTS = out.STUDENTS_BY_BRANCH?.[branch] || 0;
+  out.TOTAL_STUDENTS = Object.values(out.STUDENTS_BY_BRANCH || {})[0] || 0;
   return out;
 }
