@@ -14793,7 +14793,7 @@ window.__SYL_PAGE__ = "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charse
    exact headers to add.
    ══════════════════════════════════════════════════════════════════════════ */
 var SYL_FIELDS = {
-  module:      ['module','metricname','type','checktype','monitortype','category'],
+  module:      ['module','metricname','type','checktype','monitortype','category','check','checkname','kind','metric'],
   branch:      ['branch','branchname','campus','school'],
   stream:      ['stream','curriculum','board'],
   grade:       ['grade','gradename','classlabel','class'],
@@ -14804,8 +14804,8 @@ var SYL_FIELDS = {
   subject:     ['subject'],
   group:       ['subjectgroup','subjgroup','group'],
   month:       ['month'],
-  date:        ['checkdate','date','dateofcheck'],
-  status:      ['statusgroup','status','workflowstatus'],
+  date:        ['checkdate','date','dateofcheck','checkedon','datechecked','timestamp'],
+  status:      ['statusgroup','status','workflowstatus','state','progress'],
   pct:         ['completionpct','completionpercent','completion','pct','percent'],
   /* Students are the unit that matters for notebook correction: one student,
      one notebook. numerator/denominator are NOT that — on an almanac row they
@@ -14871,10 +14871,17 @@ var _SYL_MON = ['January','February','March','April','May','June',
    MOD BR STR GR GO STG FL SEC SUB GRP MO DT STA PCT NUM TOT INC REM DEN */
 function sylRowsFromSheet(tab){
   var idx = _sylIndex(tab.hdr.map(function(x){ return String(x==null?'':x).trim(); }));
-  if(idx.missing.indexOf('branch')>=0 || idx.missing.indexOf('status')>=0){
-    throw new Error('Master_Syllabus is missing a column for: '+idx.missing.join(', ')+
-      '. Run testSylRaw() in the Apps Script editor — it prints the exact headers.');
+  if(idx.missing.indexOf('branch')>=0){
+    throw new Error('The monitoring ledger has no Branch column. Columns received: '+
+      tab.hdr.join(' | ')+'. Run testSylRaw() in the Apps Script editor — it prints which tab was used and why.');
   }
+  /* status is derived from the percentage when the sheet does not carry one,
+     so an export without a statusGroup column still renders */
+  var _sylStatusOf = function(pct, num, den){
+    if(pct>=100 || (den>0 && num>=den)) return 'Completed';
+    if(pct>0 || num>0) return 'In Progress';
+    return 'Pending';
+  };
   var M = idx.map;
   var g = function(r,k){ return M[k]>=0 ? r[M[k]] : ''; };
 
@@ -14911,7 +14918,7 @@ function sylRowsFromSheet(tab){
       String(g(r,'group')||'').trim() || (subject || 'All subjects'),
       mon,
       date,
-      String(g(r,'status')||'').trim(),
+      String(g(r,'status')||'').trim() || _sylStatusOf(pct, num, den),
       pct, num, den,
       String(g(r,'incharge')||'').trim() || String(g(r,'teacher')||'').trim(),
       String(g(r,'remarks')||'').trim(),
@@ -14921,6 +14928,32 @@ function sylRowsFromSheet(tab){
       (M.itemsTotal>=0 ? _sylNum(g(r,'itemsTotal')) : 0) || den
     ];
   }).filter(function(t){ return t[1]; });        // a row with no branch is unusable
+}
+
+/* Turn an empty ?section=syl reply into a message that names the cause.
+   Apps Script v9 sends a `diag` block (tab chosen, why, headers, rows per
+   branch) and /api/data adds `_branchFilter` when the branch filter removed
+   every row. Both are quoted here so nobody has to open the Apps Script logs
+   to find out which of the three layers dropped the data. */
+function _sylExplainEmpty(d, raw){
+  var esc = function(v){ return String(v==null?'':v).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); };
+  if(!d || typeof d!=='object') return 'The data service returned nothing readable for ?section=syl.';
+  if(!raw) return 'The reply carried no SYL_RAW block. /api/data is not forwarding ?section=syl to Apps Script, '+
+    'or the Apps Script deployment is older than v9 — redeploy Code.gs (Deploy → Manage deployments → Edit → New version).';
+  var t = raw.syl || {};
+  if(t._branchFilter){
+    var bf = t._branchFilter;
+    return 'The ledger has '+bf.before+' rows but none is tagged with your branch ("'+esc(bf.branch)+'"). '+
+      'Branch values in the sheet: '+esc((bf.valuesInSheet||[]).join(', '))+'. Fix the spelling in the ledger '+
+      'or in the Supabase account\'s app_metadata.branch.';
+  }
+  var dg = raw.diag && raw.diag.syl;
+  if(dg && dg.problem) return esc(dg.problem);
+  if(dg) return 'Apps Script used tab "'+esc(dg.tab)+'" ('+esc(dg.how)+', header row '+dg.headerRow+') and read '+
+    dg.rawRows+' rows, but '+dg.rows+' survived. Columns: '+esc((dg.columns||[]).join(' | '));
+  if(t.missing) return 'Apps Script looked for a tab named "'+esc(t.missing)+'" and could not find it. '+
+    'The deployed Code.gs is older than v9, which finds the ledger by its columns instead — redeploy it.';
+  return 'No rows returned for ?section=syl and the reply carried no diagnostic. Redeploy Code.gs (v9) and press Refresh.';
 }
 
 /* ══════════════════ loader ══════════════════ */
@@ -14947,7 +14980,7 @@ function _sylPost(){
   var rows;
   try{ rows = sylRowsFromSheet(_sylRaw.syl); }
   catch(err){ _sylFail(String(err&&err.message||err)); return; }
-  if(!rows.length){ _sylFail('Master_Syllabus returned no usable rows — every row was missing a branch.'); return; }
+  if(!rows.length){ _sylFail(_sylExplainEmpty({SYL_RAW:_sylRaw}, _sylRaw)); return; }
   if(!_sylReady){ _sylPending=rows; return; }
   f.contentWindow.postMessage({ type:'PBES_SYL_DATA', rows: rows }, '*');
   _sylcPost();
@@ -14983,7 +15016,11 @@ function _sylcPost(){
     return;
   }
   var msg;
-  if (t && t.missing) msg = 'Apps Script looked for a tab named "' + t.missing +
+  if (t && t._branchFilter) msg = 'The Syllabus Completion tab has ' + t._branchFilter.before +
+    ' rows but none is tagged with your branch ("' + t._branchFilter.branch + '"). Values in the sheet: ' +
+    (t._branchFilter.valuesInSheet || []).join(', ') + '.';
+  else if (_sylRaw.diag && _sylRaw.diag.sylc && _sylRaw.diag.sylc.problem) msg = _sylRaw.diag.sylc.problem;
+  else if (t && t.missing) msg = 'Apps Script looked for a tab named "' + t.missing +
     '" and could not find it in the spreadsheet.';
   else if (t) msg = 'The Syllabus Completion tab was found but returned no rows.';
   else msg = 'The feed carried no Syllabus Completion block, which means Code.gs has not been ' +
@@ -15045,6 +15082,7 @@ async function loadSyl(force){
   if(_sylLoading) return;
   if(_sylLoaded && !force){ _sylPost(); return; }
   _sylLoading=true; _sylStatus(force?'Refreshing…':'Loading…');
+  if(force){ try{ await idbSet('pbes_syl', null); }catch(e){} }
   try{
     if(!force){
       try{
@@ -15068,8 +15106,7 @@ async function loadSyl(force){
 
     var raw=(d && d.SYL_RAW) ? d.SYL_RAW : (d && d.syl ? d : null);
     if(!raw || !raw.syl || !raw.syl.rows || !raw.syl.rows.length)
-      throw new Error('No rows returned. Check that the "Master_Syllabus" tab exists and that '+
-                      '/api/data forwards ?section=syl');
+      throw new Error(_sylExplainEmpty(d, raw));
 
     _sylRaw=raw; _sylLoaded=true;
     try{ idbSet('pbes_syl',{ t:Date.now(), data:raw }); }catch(e){}
