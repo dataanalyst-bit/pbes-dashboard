@@ -14995,24 +14995,75 @@ function _sylPost(){
    The rows now arrive inside the same SYL_RAW payload as Master_Syllabus, so
    there is nothing extra to fetch and nothing extra to deploy on the Cloudflare
    side. If the block is absent it means Apps Script has not been redeployed. */
+/* The panel reads fixed property names (r.Branch, r.completionPct, r.monthOrder
+   …). The sheet spells its headers however it likes — the Syllabus Completion
+   tab uses a lower-case "branch", which used to leave every row looking as
+   though it carried no branch at all. So the header is normalised here and each
+   column is mapped onto the name the panel expects, case- and punctuation-
+   insensitively. A column the panel does not know about is passed through under
+   its own name rather than dropped. */
+var SYLC_CANON = ['Branch','stream','grade','section','classLabel','subject','subjectCode',
+  'subjectGroup','month','monthOrder','isDue','status','completionPct','numerator',
+  'denominator','countsToward','isChecked','inExpectedSet','topicsPlanned','periodsPlanned',
+  'teacher','remarks'];
+/* alternative spellings for the columns the panel cannot do without */
+var SYLC_ALIAS = {
+  branch:'Branch', branchname:'Branch', campus:'Branch', school:'Branch',
+  classlabel:'classLabel', clabel:'classLabel',
+  subjectgroup:'subjectGroup', subjgroup:'subjectGroup', group:'subjectGroup',
+  monthorder:'monthOrder', monthno:'monthOrder', monthnumber:'monthOrder',
+  completionpct:'completionPct', completionpercent:'completionPct',
+  completion:'completionPct', pct:'completionPct',
+  countstoward:'countsToward', counts:'countsToward', scored:'countsToward',
+  ischecked:'isChecked', checked:'isChecked',
+  inexpectedset:'inExpectedSet', expected:'inExpectedSet',
+  isdue:'isDue', due:'isDue',
+  statusgroup:'status', workflowstatus:'status',
+  topicsplanned:'topicsPlanned', periodsplanned:'periodsPlanned',
+  subjectcode:'subjectCode', curriculum:'stream', board:'stream',
+  gradename:'grade', sec:'section'
+};
+function _sylcCanonKey(h){
+  var raw = String(h==null?'':h).trim();
+  var n = raw.toLowerCase().replace(/[^a-z0-9]/g,'');
+  if (SYLC_ALIAS[n]) return SYLC_ALIAS[n];
+  for (var i=0;i<SYLC_CANON.length;i++){
+    if (SYLC_CANON[i].toLowerCase() === n) return SYLC_CANON[i];
+  }
+  return raw;                     // unknown column — keep it as the sheet spells it
+}
+function _sylcObjects(t){
+  var hdr = (t.hdr||[]).map(_sylcCanonKey);
+  return (t.rows||[]).map(function(r){
+    var o = {};
+    hdr.forEach(function(k,i){ if(k && o[k]===undefined) o[k] = r[i]; });
+    return o;
+  });
+}
 function _sylcPost(){
   var f = document.getElementById('syl-frame');
   if (!f || !f.contentWindow) return;
   if (!_sylRaw){ return; }
   var t = _sylRaw.sylc;
   if (t && t.rows && t.rows.length){
-    var hdr = (t.hdr||[]).map(function(x){ return String(x==null?'':x).trim(); });
-    var rows = t.rows.map(function(r){
-      var o = {};
-      hdr.forEach(function(h2,i){ if(h2) o[h2] = r[i]; });
-      return o;
-    }).filter(function(o){ return String(o.Branch||'').trim(); });
+    var all  = _sylcObjects(t);
+    var rows = all.filter(function(o){ return String(o.Branch==null?'':o.Branch).trim(); });
     if (rows.length){
       f.contentWindow.postMessage({ type:'PBES_SYLC_DATA', rows:rows }, '*');
       return;
     }
+    /* Still nothing: say which column was read as the branch and what the tab
+       actually carries, so the fix is one look rather than one deploy. */
+    if (t._branchFilter){
+      f.contentWindow.postMessage({ type:'PBES_SYLC_ERR',
+        message: t._branchFilter.before + ' rows arrived but none is tagged with your branch ("' +
+          t._branchFilter.branch + '"). Branch values in the sheet: ' +
+          (t._branchFilter.valuesInSheet||[]).join(', ') + '.' }, '*');
+      return;
+    }
     f.contentWindow.postMessage({ type:'PBES_SYLC_ERR',
-      message: t.rows.length + ' rows arrived but none carry a Branch value.' }, '*');
+      message: t.rows.length + ' rows arrived but no column could be read as the branch. ' +
+        'Columns received: ' + (t.hdr||[]).join(' | ') + '. Rename one of them to "branch".' }, '*');
     return;
   }
   var msg;
