@@ -8998,6 +8998,27 @@ const FORMULA_BOOK = [
      n:'Branches missing a metric are ranked on the metrics they do have, so a branch with fewer feeds is not penalised for the gap — check the underlying counts before acting on a rank.'}]}
 ];
 
+/* Opens the full working behind one cell of the head-to-head scorecard. */
+function viewScorecardCell(cat, branch){
+  const fx=(window._SC_FX&&window._SC_FX[cat])?window._SC_FX[cat][branch]:null;
+  const esc=v=>String(v==null?'':v).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  if(!fx){
+    openHTMLModal(`🏆 ${branch} — ${cat}`,'No calculation recorded for this cell',
+      '<div style="padding:18px;color:#64748B;font-size:12.5px">This cell has no figure for the current selection, so there is nothing to show the working for.</div>', null);
+    return;
+  }
+  const html =
+    '<div style="padding:16px 18px">' +
+      '<div style="font-weight:800;color:#1E4FD8;font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Formula</div>' +
+      `<div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:#1F2937;background:#F8FAFF;border:1px solid #E0E8FF;border-radius:8px;padding:10px 12px;white-space:pre-wrap;line-height:1.7">${esc(fx.expr)}</div>` +
+      '<div style="font-weight:800;color:#1E4FD8;font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin:16px 0 6px">Values used for ' + esc(branch) + '</div>' +
+      `<div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:#0F172A;background:#ECFDF5;border:1px solid #BBF7D0;border-radius:8px;padding:10px 12px;white-space:pre-wrap;line-height:1.8">${esc(fx.work)}</div>` +
+      (fx.note ? '<div style="font-weight:800;color:#1E4FD8;font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin:16px 0 6px">What this includes and excludes</div>' +
+        `<div style="color:#475569;font-size:12px;line-height:1.65">${esc(fx.note)}</div>` : '') +
+    '</div>';
+  openHTMLModal(`🏆 ${branch} — ${cat}`, 'How this figure was calculated', html, null);
+}
+
 function openFormulaBook(){
   const html = FORMULA_BOOK.map(g =>
     `<div style="margin-bottom:18px">
@@ -10237,8 +10258,20 @@ function renderRankings(){
     if(names.length===0)return '<span style="color:#94A3B8;font-size:11px;">–</span>';
     return `<span style="background:#ECFDF5;color:#059669;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;">🥇 ${names.join(' &amp; ')}</span>`;
   }
-  function cell(content,highlight){
-    return `<td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;${highlight?'background:#ECFDF5;':''}">${content}</td>`;
+  /* Every cell in this table is a ranked figure, so every cell has to be able to
+     show its own working. fx is registered per category per branch as the row
+     is built, and the cell carries a click into it. */
+  window._SC_FX = {};
+  function regFx(cat, branch, fx){
+    if(!fx) return;
+    (window._SC_FX[cat] = window._SC_FX[cat] || {})[branch] = fx;
+  }
+  function cell(content,highlight,cat,branch){
+    const clickable = cat && branch && window._SC_FX[cat] && window._SC_FX[cat][branch];
+    return `<td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;`+
+      `${highlight?'background:#ECFDF5;':''}${clickable?'cursor:pointer;':''}"`+
+      (clickable?` onclick="viewScorecardCell('${String(cat).replace(/'/g,"\\'")}','${String(branch).replace(/'/g,"\\'")}')" title="Click for the full calculation"`:'')+
+      `>${content}</td>`;
   }
   const scoreColor=v=>v>=80?'#059669':v>=60?'#D97706':'#DC2626';
   // The four components, spelled out under every score so a rank is auditable.
@@ -10248,14 +10281,15 @@ function renderRankings(){
     return `<small style="color:#94A3B8;display:block;font-size:9.5px;margin-top:2px;">`+
       `${L[0]} ${Math.round(u.wh)} · ${L[1]} ${Math.round(u.ce)} · ${L[2]} ${Math.round(u.cs)} · ${L[3]} ${Math.round(u.oc)}</small>`;
   }
-  function scoreRow(icon,title,statMap,render,alt){
+  function scoreRow(icon,title,statMap,render,alt,cat,fxOf){
     const valMap={}; ALLB.forEach(b=>{valMap[b]=render(statMap[b]).value;});
+    if(cat&&fxOf) ALLB.forEach(b=>{ try{ regFx(cat,b,fxOf(statMap[b],b)); }catch(e){} });
     const win=winners(valMap);
     let h=`<tr${alt?' style="background:#F8FAFF;"':''}><td style="padding:10px 14px;font-size:12.5px;font-weight:600;border-bottom:1px solid #E0E8FF;color:#0F172A;">${icon} ${title}</td>`;
     ALLB.forEach(b=>{
       const r=render(statMap[b]);
       h+= r.value==null ? cell('<span style="color:#94A3B8;">No data</span>',false)
-                        : cell(r.html,win.includes(b));
+                        : cell(r.html,win.includes(b),cat,b);
     });
     h+=`<td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;">${winnerBadge(win)}</td></tr>`;
     return {html:h,valMap};
@@ -10290,7 +10324,12 @@ function renderRankings(){
       const d=obsCompletionStats[b];
       if(!d){html+=cell('<span style="color:#94A3B8;">No data</span>',false);return;}
       const color=d.pct>=80?'#059669':d.pct>=50?'#D97706':'#DC2626';
-      html+=cell(`<span style="font-weight:800;color:${color};font-size:15px;">${d.pct}%</span><br><small style="color:#94A3B8;font-size:10px;">${d.actual}/${d.required} · ${(d.month||'').replace('-',' ')}</small>`,win.includes(b));
+      regFx('Observation Completion', b, {
+        expr:'completion % = observations done \u00f7 required \u00d7 100,  required = \u03a3 per observer role (that role\'s working days \u00d7 its daily quota)',
+        work:`${d.actual} \u00f7 ${d.required} \u00d7 100 = ${d.pct}%   (${(d.month||'')} ${d.year||''})`,
+        note:'Daily quota is 2 for Principal, VP, HM, Incharges and Coordinators and 1 for each subject HOD; working days per role come from Month_Config. Only roles that have recorded at least one observation at the branch are charged for. Capped at 100.'
+      });
+      html+=cell(`<span style="font-weight:800;color:${color};font-size:15px;">${d.pct}%</span><br><small style="color:#94A3B8;font-size:10px;">${d.actual}/${d.required} · ${(d.month||'').replace('-',' ')}</small>`,win.includes(b),'Observation Completion',b);
     });
     html+=`<td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;">${winnerBadge(win)}</td></tr>`;
     contrib.push(valMap);
@@ -10303,7 +10342,10 @@ function renderRankings(){
       return {value:d.score,html:`<span style="font-weight:800;color:${scoreColor(d.score)};font-size:15px;">${d.score}</span>`+
         `<small style="color:#94A3B8;display:block;font-size:10px;">${d.closed}/${d.total} filled${d.avgDays!=null?' · avg '+d.avgDays+'d':''}</small>`+
         ucomp(d.u,['Vol','Fill','Speed','Age'])};
-    },false);
+    },false,'HR Hiring Score',(d)=>d&&d.total?unifiedFx(d.u,{
+      assigned:d.total, closed:d.closed, maxAssigned:(d.fxIn&&d.fxIn.maxAssigned)||d.total,
+      targetTAT:(d.fxIn&&d.fxIn.targetTAT)||15, actualTAT:(d.fxIn&&d.fxIn.actualTAT)||d.avgDays||15,
+      overdueDays:(d.fxIn&&d.fxIn.overdueDays)||0},{item:'roles',assigned:'posted',closed:'filled'}):null);
     html+=r.html; contrib.push(r.valMap);
   }
 
@@ -10314,7 +10356,8 @@ function renderRankings(){
       return {value:d.score,html:`<span style="font-weight:800;color:${scoreColor(d.score)};font-size:15px;">${d.score}</span>`+
         `<small style="color:#94A3B8;display:block;font-size:10px;">${d.done}/${d.total} done · ${d.overdue} overdue${d.overdue>0?' (~'+d.avgOd+'d)':''}</small>`+
         ucomp(d.u,['Load','Done','Speed','OD'])};
-    },true);
+    },true,'Admin Closing Speed',(d)=>d&&d.total&&d.fxIn?unifiedFx(d.u,d.fxIn,
+      {item:'tasks',assigned:'assigned',closed:'completed'}):null);
     html+=r.html; contrib.push(r.valMap);
   }
 
@@ -10326,7 +10369,11 @@ function renderRankings(){
         `<small style="color:#94A3B8;display:block;font-size:10px;">${d.closurePct}% closed \u00b7 ${d.onTimePct}% on time</small>`+
         `<small style="color:#94A3B8;display:block;font-size:9.5px;margin-top:2px;">`+
         `${fi(d.total)} raised \u00b7 ${d.open} open \u00b7 admin verified ${d.adminPct}%</small>`};
-    },false);
+    },false,'Vigilance & Safety',(d)=>d&&d.total?(d.fxIn?unifiedFx(d.u,d.fxIn,
+      {item:'issues',assigned:'raised',closed:'closed'}):{
+        expr:'score = WH\u00d70.35 + CE\u00d70.25 + CS\u00d70.20 + OC\u00d70.20',
+        work:`closure ${d.closurePct}% \u00b7 on time ${d.onTimePct}% \u00b7 ${fi(d.total)} raised \u00b7 ${d.open} open \u00b7 admin verified ${d.adminPct}%`,
+        note:'Closure counts issues whose vigilance status is Closed. Admin verification is tracked separately and is NOT part of this score, which is why an issue can be closed here and still awaiting admin sign-off.'}):null);
     html+=r.html; contrib.push(r.valMap);
   }
 
@@ -10338,7 +10385,11 @@ function renderRankings(){
       return {value:d.score,html:`<span style="font-weight:800;color:${scoreColor(d.score)};font-size:15px;">${d.score}</span>`+
         `<small style="color:#94A3B8;display:block;font-size:10px;">${d.resolved}/${d.total} resolved · ${sd}% same-day</small>`+
         ucomp(d.u,['Load','Closed','Speed','OD'])};
-    },true);
+    },true,'Grievance Handling',(d)=>d&&d.total?(d.fxIn?unifiedFx(d.u,d.fxIn,
+      {item:'cases',assigned:'raised',closed:'resolved'}):{
+        expr:'score = WH\u00d70.35 + CE\u00d70.25 + CS\u00d70.20 + OC\u00d70.20',
+        work:`${d.resolved} of ${d.total} resolved \u00b7 same-day ${d.closedN?Math.round(d.sameDay/d.closedN*100):0}% of ${d.closedN} closed`,
+        note:'Same-day share is measured against cases CLOSED, not cases raised.'}):null);
     html+=r.html; contrib.push(r.valMap);
   }
 
@@ -10350,7 +10401,10 @@ function renderRankings(){
         `<small style="color:#94A3B8;display:block;font-size:10px;">average of ${fi(d.assessed)} students assessed</small>`+
         `<small style="color:#94A3B8;display:block;font-size:9.5px;margin-top:2px;">`+
         `${d.passPct.toFixed(0)}% pass \u00b7 ${d.coverage.toFixed(0)}% of roll assessed</small>`};
-    },false);
+    },false,'Exam Performance',(d)=>d&&d.assessed?{
+      expr:'average % = \u03a3 student marks \u00f7 students assessed   \u00b7   pass % = students at or above the pass mark \u00f7 assessed \u00d7 100   \u00b7   coverage % = assessed \u00f7 roll \u00d7 100',
+      work:`average ${d.avg.toFixed(1)}% over ${fi(d.assessed)} assessed \u00b7 pass ${d.passPct.toFixed(0)}% \u00b7 coverage ${d.coverage.toFixed(0)}% of roll`,
+      note:'The ranked figure is the AVERAGE mark, not the pass rate. Coverage matters when reading it: a branch that assessed a third of its roll is being averaged over that third only, so a high average with low coverage is not comparable to a high average with full coverage.'}:null);
     html+=r.html; contrib.push(r.valMap);
   }
 
@@ -10380,7 +10434,7 @@ function renderRankings(){
   ALLB.forEach(b=>{
     const rank=ranked.indexOf(b), mc=medalColors[rank];
     const av=avgScore[b];
-    html+=`<td style="padding:12px 14px;text-align:center;"><span style="background:${mc.bg};color:${mc.color};padding:5px 12px;border-radius:20px;font-size:12px;font-weight:800;">${medals[rank]}</span><small style="display:block;color:#94A3B8;font-size:9.5px;margin-top:2px;">${av==null?'no data':av+' avg · '+avgScore[b+'__n']+' categories'}</small></td>`;
+    html+=`<td style="padding:12px 14px;text-align:center;cursor:pointer" onclick="viewScorecardCell('Overall Ranking','${b.replace(/'/g,"\\'")}')" title="Click for the full calculation"><span style="background:${mc.bg};color:${mc.color};padding:5px 12px;border-radius:20px;font-size:12px;font-weight:800;">${medals[rank]}</span><small style="display:block;color:#94A3B8;font-size:9.5px;margin-top:2px;">${av==null?'no data':av+' avg · '+avgScore[b+'__n']+' categories'}</small></td>`;
   });
   html+=`<td style="padding:12px 14px;text-align:center;"><span style="background:linear-gradient(135deg,#1E4FD8,#7C3AED);color:#fff;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:800;">🏆 ${champion}</span></td></tr>`;
 
