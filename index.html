@@ -1749,6 +1749,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div id="admin-pagination" style="padding:12px 16px;background:#F8FAFF;border-top:1px solid #E0E8FF;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;"></div>
     </div>
   </div>
+
+  <div class="card" style="margin-bottom:16px;"><div class="ch"><h3>&#128197; Branch &times; Month Completion % &mdash; Every Month</h3>
+      <span class="fnote">Tasks marked Done or Completed &divide; tasks due, grouped by the month each task was due.
+        Shows all branches and all months regardless of the filters above, so the comparison is never a partial one.
+        Click any figure for the tasks behind it.</span></div>
+    <div class="cb-0" style="overflow-x:auto"><table class="dt" id="admin-matrix"></table></div>
+  </div>
 </div>
 <div id="pane-vigilance" class="pane">
   <div class="sh">
@@ -1779,6 +1786,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       <thead><tr><th>Branch</th><th>Visit Date</th><th>Area</th><th>Issue</th><th>Risk</th><th>Vigilance Status</th><th>Admin Status</th><th>Branch Remarks</th><th>Overdue</th></tr></thead>
       <tbody id="vig-tbody"></tbody>
     </table></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;"><div class="ch"><h3>&#128197; Branch &times; Month Closure % &mdash; Every Month</h3>
+      <span class="fnote">Issues closed &divide; issues raised, grouped by visit month. Shows all branches and all
+        months regardless of the filters above, so the comparison is never a partial one. Click any figure for the
+        issues behind it.</span></div>
+    <div class="cb-0" style="overflow-x:auto"><table class="dt" id="vig-matrix"></table></div>
   </div>
 </div>
 
@@ -1902,6 +1916,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       <thead><tr><th>Branch</th><th>Date</th><th>Student</th><th>Category</th><th>Severity</th><th>Assigned To</th><th>Status</th><th>Satisfaction</th></tr></thead>
       <tbody id="gr-tbody"></tbody>
     </table></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;"><div class="ch"><h3>&#128197; Branch &times; Month Resolved % &mdash; Every Month</h3>
+      <span class="fnote">Cases resolved &divide; cases raised, grouped by the month the case was raised. Shows all
+        branches and all months regardless of the filters above, so the comparison is never a partial one. Click any
+        figure for the cases behind it.</span></div>
+    <div class="cb-0" style="overflow-x:auto"><table class="dt" id="gr-matrix"></table></div>
   </div>
 </div>
 
@@ -3375,6 +3396,189 @@ function viewCallsByBranch(){
   openModal('📞 Calls Made — Branch-wise',`Count of calls made · ${ml}`,rows,cols);
 }
 
+/* ══════════════════ Branch × Month completion matrices ══════════════════
+   One implementation behind the Admin, Vigilance and Grievance tables: rows are
+   branches, columns are months, each cell is done ÷ total for that branch in
+   that month. What counts as "done" and where the month comes from differ per
+   tab and are passed in, because each sheet words its statuses differently.
+
+   Totals add up the underlying records, never the percentages — a branch with
+   400 tasks and one with 12 should not weigh the same in the group figure. */
+
+const _MX_MONTHS=['January','February','March','April','May','June','July',
+  'August','September','October','November','December'];
+
+/* Month name from a yyyy-mm-dd date, or '' when the row carries no usable one.
+   Rows without a date cannot be placed in a month and are left out of the
+   matrix rather than being quietly dropped into the first column. */
+function mxMonthOf(v){
+  const m=String(v==null?'':v).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return _MX_MONTHS[+m[2]-1]||'';
+  const d=String(v==null?'':v).trim();
+  if(!d||d==='–') return '';
+  const t=Date.parse(d);
+  return isNaN(t)?'':_MX_MONTHS[new Date(t).getMonth()];
+}
+
+/* opts: { rows, monthOf, isDone, onClick, good, fair, undated } */
+function renderBranchMonthMatrix(hostId, opts){
+  const host=document.getElementById(hostId);
+  if(!host) return;
+  const rows=(opts.rows||[]).filter(r=>r && r.Branch && r.Branch!=='–');
+
+  const branches=[], seenM={}, cell={};
+  let undated=0;
+  rows.forEach(r=>{
+    const m=opts.monthOf(r);
+    if(!m){ undated++; return; }
+    if(branches.indexOf(r.Branch)<0) branches.push(r.Branch);
+    seenM[m]=1;
+    const k=r.Branch+'|'+m;
+    if(!cell[k]) cell[k]={n:0,done:0};
+    cell[k].n++;
+    if(opts.isDone(r)) cell[k].done++;
+  });
+  branches.sort();
+  const months=_MX_MONTHS.filter(m=>seenM[m]);
+
+  if(!branches.length||!months.length){
+    host.innerHTML='<tbody><tr><td class="no-data">Nothing to compare yet'+
+      (undated?' — '+undated+' record(s) carry no usable date':'')+'.</td></tr></tbody>';
+    return;
+  }
+
+  const good=opts.good===undefined?90:opts.good, fair=opts.fair===undefined?70:opts.fair;
+  const col=p=>p===null?'#94A3B8':p>=good?'#059669':p>=fair?'#D97706':'#DC2626';
+
+  let head='<thead><tr><th style="text-align:left">Branch</th>'+
+    months.map(m=>`<th>${m.slice(0,3)}</th>`).join('')+
+    '<th style="border-left:2px solid #E0E8FF">Overall</th></tr></thead>';
+
+  const colTot=months.map(()=>({n:0,done:0}));
+  let body='<tbody>';
+  branches.forEach(b=>{
+    let rn=0,rd=0;
+    const tds=months.map((m,i)=>{
+      const c=cell[b+'|'+m];
+      if(!c){ return '<td style="color:#CBD5E1" title="Nothing recorded in this month">–</td>'; }
+      rn+=c.n; rd+=c.done; colTot[i].n+=c.n; colTot[i].done+=c.done;
+      const p=Math.round(c.done/c.n*100);
+      const click=opts.onClick
+        ? ` style="font-weight:700;color:${col(p)};cursor:pointer" onclick="${opts.onClick(b,m)}"`
+        : ` style="font-weight:700;color:${col(p)}"`;
+      return `<td${click} title="${c.done} of ${c.n} complete">${p}%</td>`;
+    }).join('');
+    const rp=rn?Math.round(rd/rn*100):null;
+    body+=`<tr><td style="text-align:left"><span class="bd b${b}"></span> ${b}</td>${tds}`+
+      `<td style="border-left:2px solid #E0E8FF;font-weight:800;color:${col(rp)}" `+
+      `title="${rd} of ${rn} across all months">`+(rp===null?'–':rp+'%')+'</td></tr>';
+  });
+
+  let gn=0,gd=0;
+  const foot=colTot.map(c=>{
+    gn+=c.n; gd+=c.done;
+    const p=c.n?Math.round(c.done/c.n*100):null;
+    return `<td style="font-weight:700;color:${col(p)}">${p===null?'–':p+'%'}</td>`;
+  }).join('');
+  const gp=gn?Math.round(gd/gn*100):null;
+  body+='<tr style="background:#F8FAFF;border-top:2px solid #E0E8FF">'+
+    '<td style="text-align:left;font-weight:800">All branches</td>'+foot+
+    `<td style="border-left:2px solid #E0E8FF;font-weight:800;color:${col(gp)}">`+
+    (gp===null?'–':gp+'%')+'</td></tr></tbody>';
+
+  /* Records with no date are named rather than silently excluded: a month
+     column that looks complete while fifty undated rows sit outside it is a
+     more dangerous number than an obviously missing one. */
+  const note=undated
+    ? `<tfoot><tr><td colspan="${months.length+2}" style="text-align:left;color:#B3402F;`+
+      `font-size:11.5px;padding:8px 10px">${undated} record(s) carry no usable date and are `+
+      `not in any column. ${opts.undated||'Fill the date in the sheet to bring them in.'}</td></tr></tfoot>`
+    : '';
+  host.innerHTML=head+body+note;
+}
+
+/* ── Admin tasks: due month, done when the status says so ── */
+function renderAdminMatrix(){
+  const ADM=(typeof ADMIN_DATA!=='undefined'&&Array.isArray(ADMIN_DATA))?ADMIN_DATA:[];
+  renderBranchMonthMatrix('admin-matrix',{
+    rows:ADM,
+    /* Deadline is the honest anchor: a task belongs to the month it was due,
+       not the month somebody got round to it. Falls back to the start date. */
+    monthOf:r=>mxMonthOf(r.Deadline)||mxMonthOf(r.StartDate),
+    isDone:r=>/done|completed/i.test(String(r.Status||'')),
+    onClick:(b,m)=>`viewAdminMatrixCell('${b.replace(/'/g,"\\'")}','${m}')`,
+    good:90, fair:70,
+    undated:'These tasks have neither a deadline nor a start date.'
+  });
+}
+function viewAdminMatrixCell(branch,month){
+  const ADM=(typeof ADMIN_DATA!=='undefined'&&Array.isArray(ADMIN_DATA))?ADMIN_DATA:[];
+  const rows=ADM.filter(r=>r.Branch===branch &&
+    (mxMonthOf(r.Deadline)||mxMonthOf(r.StartDate))===month);
+  const done=rows.filter(r=>/done|completed/i.test(String(r.Status||''))).length;
+  openModal(`🗂️ ${branch} — ${month}`,`${done} of ${rows.length} tasks complete`,rows,[
+    {key:'Branch',label:'Branch'},{key:'TaskID',label:'Task ID'},{key:'Task',label:'Task',maxW:'220px'},
+    {key:'Priority',label:'Priority',pill:true},{key:'Deadline',label:'Deadline',date:true},
+    {key:'CompletionDate',label:'Completed',date:true},{key:'Status',label:'Status',pill:true},
+    {key:'CreatedBy',label:'Created by'},{key:'Remarks',label:'Remarks',maxW:'220px'}]);
+}
+
+/* ── Vigilance: visit month, done when the issue is closed ── */
+function renderVigMatrix(){
+  const VIG=(typeof VIG_DATA!=='undefined'&&Array.isArray(VIG_DATA))?VIG_DATA:[];
+  renderBranchMonthMatrix('vig-matrix',{
+    rows:VIG,
+    /* This feed already carries a month name from the visit date. */
+    monthOf:r=>{
+      const m=String(r.Month||'').trim();
+      if(_MX_MONTHS.indexOf(m)>=0) return m;
+      return mxMonthOf(r.VisitDate);
+    },
+    isDone:r=>/closed|completed|resolved|done/i.test(String(r.Status||'')),
+    onClick:(b,m)=>`viewVigMatrixCell('${b.replace(/'/g,"\\'")}','${m}')`,
+    good:90, fair:70,
+    undated:'These issues have no visit date.'
+  });
+}
+function viewVigMatrixCell(branch,month){
+  const VIG=(typeof VIG_DATA!=='undefined'&&Array.isArray(VIG_DATA))?VIG_DATA:[];
+  const mo=r=>{const m=String(r.Month||'').trim();
+    return _MX_MONTHS.indexOf(m)>=0?m:mxMonthOf(r.VisitDate);};
+  const rows=VIG.filter(r=>r.Branch===branch && mo(r)===month);
+  const done=rows.filter(r=>/closed|completed|resolved|done/i.test(String(r.Status||''))).length;
+  openModal(`🛡️ ${branch} — ${month}`,`${done} of ${rows.length} issues closed`,rows,[
+    {key:'Branch',label:'Branch'},{key:'VisitDate',label:'Visit',date:true},{key:'Area',label:'Area'},
+    {key:'Issue',label:'Issue',maxW:'240px'},{key:'RiskLevel',label:'Risk',pill:true},
+    {key:'Owner',label:'Owner'},{key:'TargetDate',label:'Target',date:true},
+    {key:'Status',label:'Status',pill:true},{key:'AdminStatus',label:'Admin status',pill:true}]);
+}
+
+/* ── Grievance: month raised, done when resolved ── */
+function renderGrievMatrix(){
+  const GR=(typeof GRIEVANCE_DATA!=='undefined'&&Array.isArray(GRIEVANCE_DATA))?GRIEVANCE_DATA:[];
+  renderBranchMonthMatrix('gr-matrix',{
+    rows:GR,
+    /* Grouped by when the case was RAISED, so an unresolved case keeps counting
+       against the month a parent actually complained rather than disappearing
+       until somebody closes it. */
+    monthOf:r=>mxMonthOf(r.Date),
+    isDone:r=>/resolved|closed/i.test(String(r.Status||'')),
+    onClick:(b,m)=>`viewGrievMatrixCell('${b.replace(/'/g,"\\'")}','${m}')`,
+    good:90, fair:70,
+    undated:'These cases have no raised date.'
+  });
+}
+function viewGrievMatrixCell(branch,month){
+  const GR=(typeof GRIEVANCE_DATA!=='undefined'&&Array.isArray(GRIEVANCE_DATA))?GRIEVANCE_DATA:[];
+  const rows=GR.filter(r=>r.Branch===branch && mxMonthOf(r.Date)===month);
+  const done=rows.filter(r=>/resolved|closed/i.test(String(r.Status||''))).length;
+  openModal(`📣 ${branch} — ${month}`,`${done} of ${rows.length} cases resolved`,rows,[
+    {key:'Branch',label:'Branch'},{key:'Date',label:'Raised',date:true},{key:'Student',label:'Student',maxW:'160px'},
+    {key:'Grade',label:'Grade'},{key:'Category',label:'Category'},{key:'Severity',label:'Severity',pill:true},
+    {key:'AssignedTo',label:'Assigned to'},{key:'TargetDate',label:'Target',date:true},
+    {key:'Status',label:'Status',pill:true},{key:'Remarks',label:'Remarks',maxW:'220px'}]);
+}
+
 /* ══════════════════ Branch × Month resolved rate ══════════════════
    Resolved calls over calls made, per branch per month. Read from CARE_DATA
    rather than the pre-aggregated TRACKER so a month the tracker has not been
@@ -4185,6 +4389,7 @@ function viewTeacherGrandAvg(bandKey){
 // ADMIN
 // ════════════════════════════════════════════
 function renderAdmin(){
+  renderAdminMatrix();
   const BRANCHES=['Boduppal','Keesara','Pocharam','Bachupally','Gowdavalli'];
   // Admin data — filter by branch AND by month so the completion rate reflects the selected
   // period, not all-time totals (which never changed week-to-week, causing the "stale" bug).
@@ -4425,6 +4630,7 @@ function viewAdminByBranchStatus(branch,statusBand){
 // VIGILANCE
 // ════════════════════════════════════════════
 function renderVigilance(){
+  renderVigMatrix();
   const bl=fBranch==='ALL'?'All Branches':fBranch, ml=fMonth==='ALL'?'All Months':fMonth+' 2026';
   document.getElementById('vig-tag').textContent=bl+' · '+ml;
   document.getElementById('vig-fn').textContent=bl;
@@ -4612,6 +4818,7 @@ function _isOverdue(r){
 }
 
 function renderGrievance(){
+  renderGrievMatrix();
   const card=document.getElementById('pane-grievance');
   if(!card) return;
   const rows=_grievRows();
