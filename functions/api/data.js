@@ -341,7 +341,7 @@ function filterByBranch(data, branch) {
   branchKeyedObjects.forEach((k) => {
     if (out[k] && typeof out[k] === "object") {
       out[k] = Object.fromEntries(Object.entries(out[k]).filter(([key]) => sameBranch(key, branch)));
-    }
+    } 
   });
   if (out.OWNER_QUALITY && typeof out.OWNER_QUALITY === "object") {
     out.OWNER_QUALITY = Object.fromEntries(
