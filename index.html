@@ -5534,8 +5534,13 @@ function renderHRRanking(){
         + rows.filter(r=>isOpen(r.Status)).map(r=>{const pd=r.PostDate; if(!pd||pd==='–')return 0; const age=Math.round((Date.now()-new Date(pd))/86400000); return age>30?(age-30):0;}).reduce((a,b)=>a+b,0);
     })();
     const u=unifiedScore(assigned, s.closed, targetTAT, actualTAT, odDays, maxClosed);
-    return {...s,score:u.score,u,odDays:Math.round(odDays),assigned};
+    return {...s,score:u.score,u,odDays:Math.round(odDays),assigned,
+            targetTAT,actualTAT,maxAssigned:maxClosed};
   }).sort((a,b)=>b.score-a.score || b.closed-a.closed);
+
+  /* Kept so clicking a recruiter can show every input that produced the score,
+     rather than the reader having to trust four percentages. */
+  window._HR_UNIFIED={}; stats.forEach(s=>{ window._HR_UNIFIED[s.hr]=s; });
 
   const medals=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣'];
   tbody.innerHTML=stats.map((s,i)=>{
@@ -5583,7 +5588,12 @@ function viewHRByRecruiter(hr,status){
     {key:'Position',label:'Position',maxW:'180px'},{key:'Branch',label:'Branch'},{key:'Status',label:'Status',pill:true},
     {key:'ClosedDate',label:'Closed',date:true},{key:'DaysToClose',label:'Days'},
     {key:'CandidateName',label:'Candidate',maxW:'150px'},{key:'Notes',label:'Notes',maxW:'220px'}];
-  openModal(`👥 ${hr} — ${status==='ALL'?'All Positions':status}`,`${rows.length} positions`,rows,cols);
+  const st=(window._HR_UNIFIED||{})[hr];
+  const fx = st ? unifiedFx(st.u, {assigned:st.assigned, closed:st.closed, maxAssigned:st.maxAssigned,
+      targetTAT:st.targetTAT, actualTAT:st.actualTAT, overdueDays:st.odDays},
+      {item:'roles', assigned:'assigned', closed:'closed'}) : null;
+  openModal(`👥 ${hr} — ${status==='ALL'?'All Positions':status}`,
+    `${rows.length} positions`+(st?` · score ${st.score}`:''),rows,cols,fx);
 }
 
 function viewHRRecords(filter){
@@ -6529,6 +6539,36 @@ function hrCloseDays(r){
 // (assigned, closed, targetTAT, actualTAT, totalOverdueDays) from its data shape.
 // ══════════════════════════════════════════════════════════════════════════
 
+/* Spells out a unified score with the actual numbers that produced it. Used by
+   the HR, Admin, Vigilance and Grievance scorecards, which all share the
+   formula below. `nouns` names the unit for the department (roles, tasks,
+   issues, cases) so the working reads as the tab does. */
+function unifiedFx(u, inp, nouns){
+  if(!u || !inp) return null;
+  const n=nouns||{item:'items', assigned:'assigned', closed:'closed'};
+  const r1=v=>(Math.round(v*10)/10);
+  const allowed=inp.assigned*(inp.targetTAT>0?inp.targetTAT:1);
+  const capped=inp.actualTAT>0 && (inp.targetTAT/inp.actualTAT)*100>100;
+  return {
+    expr:'score = WH×0.35 + CE×0.25 + CS×0.20 + OC×0.20   ·   '+
+         'WH = assigned ÷ busiest assigned ×100   ·   CE = closed ÷ assigned ×100   ·   '+
+         'CS = min(100, target TAT ÷ actual TAT ×100)   ·   OC = max(0, 100 − overdue days ÷ (assigned × target TAT) ×100)',
+    work:
+      `WH = ${inp.assigned} ÷ ${inp.maxAssigned} × 100 = ${r1(u.wh)}%\n`+
+      `CE = ${inp.closed} ÷ ${inp.assigned} × 100 = ${r1(u.ce)}%\n`+
+      `CS = ${inp.targetTAT} ÷ ${r1(inp.actualTAT)} × 100 = ${r1(u.cs)}%`+(capped?'  (capped at 100)':'')+`\n`+
+      `OC = 100 − ${Math.round(inp.overdueDays)} ÷ (${inp.assigned} × ${inp.targetTAT} = ${Math.round(allowed)}) × 100 = ${r1(u.oc)}%\n`+
+      `score = ${r1(u.wh)}×0.35 + ${r1(u.ce)}×0.25 + ${r1(u.cs)}×0.20 + ${r1(u.oc)}×0.20 = `+
+      `${r1(u.wh*0.35)} + ${r1(u.ce*0.25)} + ${r1(u.cs*0.20)} + ${r1(u.oc*0.20)} = ${Math.round(u.wh*0.35+u.ce*0.25+u.cs*0.20+u.oc*0.20)}`,
+    note:
+      `WH is relative, not absolute: it compares this person's ${n.assigned} ${n.item} against the busiest person's `+
+      `${inp.maxAssigned}, so the busiest always scores 100 and a light caseload scores low however well it was handled. `+
+      `CS uses a target of ${inp.targetTAT} days and is capped at 100, so finishing far ahead of target earns no extra credit. `+
+      `OC measures overdue days against the time actually allowed (${n.assigned} × target TAT). `+
+      `The four are weighted 35/25/20/20 and rounded once at the end.`
+  };
+}
+
 function unifiedScore(assigned, closed, targetTAT, actualTAT, totalOverdueDays, maxAssigned){
   if(!assigned || assigned===0) return {score:0,wh:0,ce:0,cs:0,oc:0};
   const wh = (assigned / (maxAssigned||assigned)) * 100;          // workload handled
@@ -6572,9 +6612,13 @@ function adminSpeedStats(rows){
     if(earlyV.length) avgEarly=+(earlyV.reduce((a,b)=>a+b,0)/earlyV.length).toFixed(1);
     if(tatV.length) actualTAT=+(tatV.reduce((a,b)=>a+b,0)/tatV.length).toFixed(1);
   }
-  const u=unifiedScore(total, completed, targetTAT, actualTAT||targetTAT, totalOverdueDays, window._ADMIN_MAX_ASSIGNED||total);
+  const _maxA=window._ADMIN_MAX_ASSIGNED||total;
+  const u=unifiedScore(total, completed, targetTAT, actualTAT||targetTAT, totalOverdueDays, _maxA);
   return {total,done:completed,overdue:odRows.length,onTrack,avgOd,avgEarly,
-          pct:compPct,onSchedulePct,score:u.score,u};
+          pct:compPct,onSchedulePct,score:u.score,u,
+          /* inputs kept so the score can be shown with its working */
+          fxIn:{assigned:total,closed:completed,maxAssigned:_maxA,targetTAT,
+                actualTAT:actualTAT||targetTAT,overdueDays:totalOverdueDays}};
 }
 // ── Vigilance adapter (unified formula) ──
 function vigSafetyStats(rows){
@@ -8931,6 +8975,23 @@ const FORMULA_BOOK = [
      f:'units marked Done ÷ units due × 100',
      n:'A different measure from the two above and a different source (the Syllabus Completion tab), which is why a card can show 98% notebook and a very different syllabus figure. Units the sheet flags countsToward = FALSE are excluded from both sides.'}]},
 
+  {tab:'Unified performance score (HR, Admin, Vigilance, Grievance)', items:[
+    {m:'Score (0–100)',
+     f:'score = WH×0.35 + CE×0.25 + CS×0.20 + OC×0.20',
+     n:'The four components below are each a 0–100 percentage. They are weighted, added, then rounded once at the end. Every department that shows a performance score uses this same formula; only the target TAT and the unit differ.'},
+    {m:'WH · Workload handled (35%)',
+     f:'assigned ÷ busiest person\'s assigned × 100',
+     n:'RELATIVE, not absolute. The busiest person always scores 100 by definition, and everyone else is measured against them. A recruiter handling 10 roles perfectly scores 12% here when the busiest handled 82. This is the largest single weight, so the ranking is driven more by volume than by quality — worth knowing before it is used to compare people.'},
+    {m:'CE · Closure efficiency (25%)',
+     f:'closed ÷ assigned × 100',
+     n:'Assigned = closed + still open. A recruiter with nothing open scores 100 here regardless of how long anything took.'},
+    {m:'CS · Closure speed / TAT (20%)',
+     f:'min(100, target TAT ÷ actual average TAT × 100)',
+     n:'Target is 15 days for HR, 7 for Vigilance and Grievance, 7 for Admin. Capped at 100, so beating the target by a wide margin earns no more than meeting it. Where no closure dates exist the actual TAT falls back to the target, which scores 100 — an absence of data reads as on time.'},
+    {m:'OC · Overdue control (20%)',
+     f:'max(0, 100 − overdue days ÷ (assigned × target TAT) × 100)',
+     n:'Overdue days are counted against the time actually allowed. For HR a position counts as overdue past 30 days, and open positions accrue overdue days from their post date. Floored at 0, so a very late caseload bottoms out rather than going negative.'}]},
+
   {tab:'Head-to-Head scorecard', items:[
     {m:'Branch rank',
      f:'mean of the branch\'s available metric percentages',
@@ -9012,7 +9073,7 @@ const FX_RULES = [
     return {expr:'fill rate % = positions Closed or Filled ÷ positions posted × 100     ·     average days to close = Σ days ÷ positions closed',
       work:`${closed} ÷ ${base.length} × 100 = ${fxPct(closed,base.length)}`+
         (avg===null?'':`  ·  avg days to close (this list) = ${avg} over ${withDays.length} closed`),
-      note:'HR ranking runs across every branch on purpose, so a branch HR user still sees where they stand. Positions with no days-to-close value are left out of the average rather than counted as zero.'};
+      note:'HR ranking runs across every branch on purpose, so a branch HR user still sees where they stand. Positions with no days-to-close value are left out of the average rather than counted as zero. For the four components behind a recruiter\'s score, click their row in Recruiter Rankings — the working is shown in full there.'};
   }},
 
   /* ── Admin tasks ── */
@@ -9103,7 +9164,11 @@ function showModalFx(fx){
   if(!fx || !fx.expr){ box.style.display='none'; return; }
   document.getElementById('modal-fx-expr').textContent = 'formula:  ' + fx.expr;
   const w=document.getElementById('modal-fx-work');
+  /* Working can be several lines (a weighted score shows each component), so it
+     is rendered pre-wrapped rather than collapsed onto one line. */
   w.textContent = fx.work ? ('this cell:  ' + fx.work) : '';
+  w.style.whiteSpace = 'pre-wrap';
+  w.style.lineHeight = '1.7';
   w.style.display = fx.work ? '' : 'none';
   const n=document.getElementById('modal-fx-note');
   n.textContent = fx.note || '';
