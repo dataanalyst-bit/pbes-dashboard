@@ -37,7 +37,9 @@ const ALLOWED_SECTIONS = { pt1: 1, audit: 1, ptm: 1, civil: 1, syl: 1, vchk: 1, 
 // ledger is the exception: floor incharges enter checks through the day, so a
 // 30-minute edge copy hides the morning's work until lunchtime.
 const SECTION_TTL_SECONDS = 1800;
-const SECTION_TTL_OVERRIDE = { syl: 120, sylc: 120 };
+// meet changes the instant somebody uploads a transcript, and every other user
+// needs that on their next load rather than half an hour later.
+const SECTION_TTL_OVERRIDE = { syl: 120, sylc: 120, meet: 30 };
 
 // Column headers that carry the campus name, in the order they are looked for.
 // The three PT-1 tabs all use "Branch", but this keeps a rename from silently
@@ -255,6 +257,9 @@ export async function onRequestGet({ request, env }) {
   if (section === "vchk")  return withCookie(json(filterTablesByBranch(data, userBranch, "VCHK_RAW")));
   if (section === "kptm")  return withCookie(json(filterTablesByBranch(data, userBranch, "KPTM_RAW")));
   if (section === "sylc")  return withCookie(json(filterTablesByBranch(data, userBranch, "SYLC_RAW")));
+  // The meeting transcript is one group-wide document with no branch column;
+  // filtering it by branch would blank it for every principal.
+  if (section === "meet")  return withCookie(json(data));
 
   //   Cross-branch aggregates needed by the Head-to-Head scorecard stay full.
   return withCookie(json(filterByBranch(data, userBranch)));
