@@ -17495,7 +17495,7 @@ window.VCHK = (function () {
   }
   /* Drive links must be turned into something an <img> can actually load —
      the share URL renders a viewer page, not an image. */
-  function viewable(u, px){
+  function viewable(u, px, direct){
     var m = String(u).match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?[^]*id=)([-\w]{10,})/);
     /* Drive links are served through /api/photo rather than fetched from Drive
        directly. A Drive URL only renders for someone the file has been shared
@@ -17506,15 +17506,29 @@ window.VCHK = (function () {
        The size is asked for explicitly: a 44px cell does not need a 1600px
        file, and a table of twenty rows would otherwise pull twenty full-size
        photographs on open. */
-    if(m) return '/api/photo?id=' + encodeURIComponent(m[1]) + '&sz=' + (px || 1600);
+    if(m) return direct
+      ? ('https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w' + (px || 1600))
+      : ('/api/photo?id=' + encodeURIComponent(m[1]) + '&sz=' + (px || 1600));
     return u;
+  }
+  /* True when this URL is a Drive file we could fall back to directly. */
+  function driveId(u){
+    var m = String(u).match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?[^]*id=)([-\w]{10,})/);
+    return m ? m[1] : null;
   }
   /* A thumbnail that fails once may simply have outrun the hour-long photo
      cookie. Ask /api/data for a fresh one and retry the image a single time
      before hiding it, so a long-open dashboard does not lose its photographs. */
   var _thumbRenewing = null;
   function thumbFail(img){
-    if(img.dataset.retried){ img.style.display = 'none'; return; }
+    /* Second chance: go straight to Drive. Renders for whoever the file is
+       shared with, so the gallery is not empty while the proxy is unavailable. */
+    if(img.dataset.retried && !img.dataset.direct && img.dataset.raw && driveId(img.dataset.raw)){
+      img.dataset.direct = '1';
+      img.src = viewable(img.dataset.raw, 160, true);
+      return;
+    }
+    if(img.dataset.retried){ img.style.opacity = '.25'; return; }
     img.dataset.retried = '1';
     var src = img.src;
     if(!_thumbRenewing){
@@ -17571,7 +17585,7 @@ window.VCHK = (function () {
     var d = dt(r.raised); return d ? Math.max(0, Math.round((today-d)/86400000)) : null;
   }
   return { toRows: toRows, isOpen: isOpen, isCritical: isCritical, photosOf: photosOf,
-           viewable: viewable, thumbFail: thumbFail, dt: dt, daysOpen: daysOpen,
+           viewable: viewable, driveId: driveId, thumbFail: thumbFail, dt: dt, daysOpen: daysOpen,
            toVerify: toVerify,
            awaitingSanction: awaitingSanction, isRed: isRed, unassigned: unassigned };
 })();
@@ -17601,7 +17615,8 @@ window.VCHK = (function () {
     s.style.display = 'flex';
     s.innerHTML = L.list.map(function(u, i){
       return '<img src="' + VCHK.viewable(u, 160) + '" data-i="' + i + '" alt="photo ' + (i+1) + '"' +
-             ' onerror="this.style.opacity=.25">';
+             ' data-raw="' + String(u).replace(/"/g,'&quot;') + '"' +
+             ' onerror="VCHK.thumbFail(this)">';
     }).join('');
   }
 
@@ -17612,11 +17627,26 @@ window.VCHK = (function () {
     $('ph-load').style.display = 'block';
     $('ph-load').textContent = 'Loading…';
     img.onload  = function(){ img.style.visibility = 'visible'; $('ph-load').style.display = 'none'; };
+    /* Two attempts, in this order:
+         1. /api/photo — works for every signed-in user, Drive file stays private
+         2. Drive directly — only renders for someone the file is shared with,
+            but it means the photo still appears if the Function is not deployed
+       Only after BOTH fail is a message shown, and it says which case it is. */
     img.onerror = function(){
+      if(!img.dataset.fallback && VCHK.driveId(raw)){
+        img.dataset.fallback = '1';
+        img.src = VCHK.viewable(raw, 1600, true);
+        return;
+      }
       $('ph-load').style.display = 'block';
-      $('ph-load').innerHTML = 'This photo will not display here.<br>' +
-        'The Drive file is probably restricted \u2014 use <b>Open original</b>.';
+      $('ph-load').innerHTML =
+        'This photo did not load.<br>' +
+        '<span style="font-weight:400;font-size:12px;opacity:.85">' +
+        'If the dashboard has been open for over an hour, reload the page and try again. ' +
+        'Otherwise the photo service may not be deployed yet, or the Drive file has been removed. ' +
+        'Use <b>Open original</b> to check.</span>';
     };
+    delete img.dataset.fallback;
     img.src = VCHK.viewable(raw, 1600);
 
     $('ph-count').textContent = (L.i + 1) + ' of ' + L.list.length;
@@ -17709,7 +17739,10 @@ window.VCHK = (function () {
            will not load is hidden rather than left as a broken icon, and the
            button below still opens the original. */
         var thumbs = v.slice(0,3).map(function(u,i){
+          /* data-raw keeps the original Drive URL so a failed thumbnail can be
+             retried straight against Drive without re-deriving it. */
           return '<img class="ph-th" src="'+esc(VCHK.viewable(u))+'" data-ph="'+payload+'" '+
+                 'data-raw="'+esc(u)+'" '+
                  'data-i="'+i+'" data-cap="'+esc(cap)+'" alt="inspection photo" loading="lazy" '+
                  'onerror="VCHK.thumbFail(this)">';
         }).join('');
