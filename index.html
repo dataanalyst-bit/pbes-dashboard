@@ -16729,6 +16729,10 @@ window.MEET = (function () {
       if (st) { st.textContent = ''; st.className = 'exm-status'; }
       renderAllMeet();
       try { idbSet('pbes_meet_txt', { t: Date.now(), text: text, date: dateStr }); } catch (e) {}
+      /* IndexedDB is this browser only, which is why nobody else ever saw the
+         transcript. The shared copy lives in the workbook — push it there too,
+         so every user opens the same meeting. */
+      meetSaveShared(text, dateStr);
     } catch (err) {
       $('mt-body').style.display = 'none';
       if (st) { st.textContent = String(err && err.message || err); st.className = 'exm-status err'; }
@@ -16741,6 +16745,50 @@ window.MEET = (function () {
       } else if ($('mt-err')) { $('mt-err').textContent = String(err && err.message || err); }
     }
   };
+
+  /* ── the shared transcript ──
+     Read through /api/data?section=meet like every other section; written
+     through /api/meet, which only accepts uploads from a group-wide account.
+     A principal opening this tab reads what management uploaded and cannot
+     overwrite it — the save simply reports that it was not permitted. */
+  async function meetLoadShared() {
+    try {
+      var ss = await sb.auth.getSession();
+      var tok = ss && ss.data && ss.data.session && ss.data.session.access_token;
+      if (!tok) return null;
+      var r = await fetch('/api/data?section=meet', { headers: { Authorization: 'Bearer ' + tok } });
+      if (!r.ok) return null;
+      var j = await r.json();
+      return (j && j.MEET_RAW && j.MEET_RAW.text) ? j.MEET_RAW : null;
+    } catch (e) { return null; }
+  }
+
+  async function meetSaveShared(text, date) {
+    var st = $('mt-status');
+    try {
+      var ss = await sb.auth.getSession();
+      var tok = ss && ss.data && ss.data.session && ss.data.session.access_token;
+      if (!tok) return;
+      if (st) st.textContent = 'Saving for everyone…';
+      var r = await fetch('/api/meet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+        body: JSON.stringify({ text: text, date: date })
+      });
+      var j = await r.json().catch(function () { return null; });
+      if (r.ok && j && j.ok) {
+        if (st) st.textContent = text ? 'Saved — every user will see this transcript' : 'Cleared for all users';
+      } else if (r.status === 403) {
+        /* not an error the reader caused: they simply cannot replace the group copy */
+        if (st) st.textContent = 'Analysed here. Only a group-wide account can replace the shared transcript.';
+      } else {
+        if (st) st.textContent = 'Analysed here, but the shared copy did not save: ' +
+          ((j && j.message) || ('HTTP ' + r.status));
+      }
+    } catch (e) {
+      if (st) st.textContent = 'Analysed here, but the shared copy did not save: ' + (e && e.message || e);
+    }
+  }
 
   document.addEventListener('DOMContentLoaded', wire);
   if (document.readyState !== 'loading') wire();
@@ -16756,6 +16804,7 @@ window.MEET = (function () {
       var old = $('mt-err'); if (old) old.remove();
       $('mt-meta').textContent = 'Paste a meeting transcript to see which directives left a trace in the trackers';
       try { idbSet('pbes_meet_txt', { t: Date.now(), text: '', date: '' }); } catch (e) {}
+      meetSaveShared('', '');       // clear it for everyone, not just here
     });
     $('mt-file').addEventListener('change', function (ev) {
       var f = ev.target.files && ev.target.files[0]; if (!f) return;
@@ -16788,15 +16837,28 @@ window.MEET = (function () {
     var d = new Date();
     $('mt-date').value = d.getFullYear() + '-' +
       String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-    try {
-      idbGet('pbes_meet_txt').then(function (c) {
-        if (c && c.text) {
-          $('mt-text').value = c.text;
-          if (c.date) $('mt-date').value = c.date;
-          setTimeout(function () { window.meetAnalyse(c.text, c.date); }, 400);
-        }
-      }).catch(function () {});
-    } catch (e) {}
+    /* The shared copy wins over anything cached locally: one meeting, one
+       transcript, the same for management and for every principal. The local
+       copy is only a fallback for when the network is unavailable. */
+    meetLoadShared().then(function (shared) {
+      if (shared && shared.text) {
+        $('mt-text').value = shared.text;
+        if (shared.date) $('mt-date').value = shared.date;
+        $('mt-status').textContent = shared.savedBy
+          ? ('Shared transcript · uploaded by ' + shared.savedBy) : 'Shared transcript';
+        setTimeout(function () { window.meetAnalyse(shared.text, shared.date); }, 200);
+        return;
+      }
+      try {
+        idbGet('pbes_meet_txt').then(function (c) {
+          if (c && c.text) {
+            $('mt-text').value = c.text;
+            if (c.date) $('mt-date').value = c.date;
+            setTimeout(function () { window.meetAnalyse(c.text, c.date); }, 400);
+          }
+        }).catch(function () {});
+      } catch (e) {}
+    });
   }
 })();
 
@@ -17469,8 +17531,15 @@ window.VCHK = (function () {
       };
     }).filter(function(x){ return x.branch; });
   }
+  /* "Work Done - Verification Pending" means the work HAS been done and only the
+     sign-off is outstanding. Counting it as an open issue overstated the backlog
+     and made branches look as though they were sitting on work they had already
+     finished, so it is excluded from open, and from everything derived from open
+     (unassigned, overdue, open critical, over 30 days). It gets its own counter
+     instead, because an unverified fix is still a loose end — just a different
+     one, owned by whoever verifies rather than by the branch. */
   function isOpen(r){ return !/^(closed|verified|resolved|rejected|not valid)/i.test(String(r.status).trim())
-      && !/verified/i.test(r.status); }
+      && !/verified/i.test(r.status) && !toVerify(r); }
   function toVerify(r){ return /work done.*verification pending|verification pending/i.test(r.status); }
   function awaitingSanction(r){ return /awaiting approval|awaiting sanction|approval pending/i.test(r.status+' '+r.approval); }
   function isRed(r){ return /^red$/i.test(String(r.flag).trim()); }
@@ -17675,15 +17744,20 @@ window.VCHK = (function () {
     }
 
     /* ═════ RIGHT NOW ═════ */
+    var redOpen=rows.filter(function(r){ return VCHK.isRed(r) && !VCHK.toVerify(r); });
     var K=[
       {l:'Open',              v:open.length,                              c:'#0F172A', list:open, ic:'📂'},
+      {l:'Work done · verification pending',
+                              v:rows.filter(VCHK.toVerify).length,        c:'#0891B2',
+                              list:rows.filter(VCHK.toVerify), ic:'✅'},
       {l:'Unassigned',        v:open.filter(VCHK.unassigned).length,      c:'#B91C1C', list:open.filter(VCHK.unassigned), ic:'🙋'},
-      {l:'Red flagged',       v:rows.filter(VCHK.isRed).length,           c:'#DC2626', list:rows.filter(VCHK.isRed), ic:'🚩'},
+      /* a red flag on work that is already done is a verification queue item,
+         not an open red issue — it is counted in the card above instead */
+      {l:'Red flagged',       v:redOpen.length,                           c:'#DC2626', list:redOpen, ic:'🚩'},
       {l:'Overdue',           v:rows.filter(overdue).length,              c:'#DC2626', list:rows.filter(overdue), ic:'⏰'},
       {l:'Open critical',     v:open.filter(VCHK.isCritical).length,      c:'#DC2626', list:open.filter(VCHK.isCritical), ic:'🔥'},
       {l:'Over 30 days',      v:open.filter(function(r){var d=dOf(r);return d&&(today-d)/D>30;}).length,
                               c:'#B91C1C', list:open.filter(function(r){var d=dOf(r);return d&&(today-d)/D>30;}), ic:'📅'},
-      {l:'To verify',         v:rows.filter(VCHK.toVerify).length,        c:'#0891B2', list:rows.filter(VCHK.toVerify), ic:'🔍'},
       {l:'Awaiting sanction', v:rows.filter(VCHK.awaitingSanction).length,c:'#D97706', list:rows.filter(VCHK.awaitingSanction), ic:'💰'}
     ];
     var html='<div class="vck-h">📍 Right now</div><div class="vck-grid">'+K.map(function(k,i){
