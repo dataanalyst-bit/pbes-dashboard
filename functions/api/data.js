@@ -32,9 +32,12 @@ const CACHE_TTL_SECONDS = 300; // edge freshness window (Apps Script keep-warm k
 // or hand-typed ?section= can never be used to probe the upstream script.
 const ALLOWED_SECTIONS = { pt1: 1, audit: 1, ptm: 1, civil: 1, syl: 1, vchk: 1, kptm: 1, sylc: 1 };
 
-// Heavier than the main payload and it changes only when marks are entered, so it
-// can sit in the edge cache far longer.
+// Heavier than the main payload and most sections change only when marks are
+// entered, so they can sit in the edge cache far longer. The syllabus/notebook
+// ledger is the exception: floor incharges enter checks through the day, so a
+// 30-minute edge copy hides the morning's work until lunchtime.
 const SECTION_TTL_SECONDS = 1800;
+const SECTION_TTL_OVERRIDE = { syl: 120, sylc: 120 };
 
 // Column headers that carry the campus name, in the order they are looked for.
 // The three PT-1 tabs all use "Branch", but this keeps a rename from silently
@@ -53,6 +56,43 @@ function sameBranch(cell, branch) {
   const a = normBranch(cell), b = normBranch(branch);
   if (!a || !b) return false;
   return a === b || a.indexOf(b) !== -1 || b.indexOf(a) !== -1;
+}
+
+// ── Photo pass ──
+// An <img> tag cannot carry an Authorization header, so /api/photo cannot be
+// protected the way this endpoint is. Instead, once a caller has been
+// authenticated here, they are issued a short-lived signed cookie; /api/photo
+// accepts that cookie and nothing else. The cookie is HttpOnly, so page script
+// (or anything injected into it) cannot read it, and it carries the branch so a
+// principal cannot pull another campus's photographs.
+export const PHOTO_COOKIE = "pbes_ph";
+const PHOTO_TTL_SECONDS = 3600;
+
+function b64url(bytes) {
+  let s = "";
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+export async function signPhotoToken(payload, secret) {
+  const body = b64url(new TextEncoder().encode(JSON.stringify(payload)));
+  const key = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body));
+  return body + "." + b64url(new Uint8Array(sig));
+}
+export async function verifyPhotoToken(token, secret) {
+  if (!token || token.indexOf(".") < 0) return null;
+  const [body] = token.split(".");
+  const expect = await signPhotoToken(
+    JSON.parse(atob(body.replace(/-/g, "+").replace(/_/g, "/"))), secret);
+  // constant-length compare is enough here; the tokens are the same length
+  if (expect !== token) return null;
+  let claims;
+  try { claims = JSON.parse(atob(body.replace(/-/g, "+").replace(/_/g, "/"))); }
+  catch { return null; }
+  if (!claims || !claims.exp || claims.exp < Math.floor(Date.now() / 1000)) return null;
+  return claims;
 }
 
 export async function onRequestGet({ request, env }) {
@@ -89,6 +129,25 @@ export async function onRequestGet({ request, env }) {
   const user = await check.json();
   const role = (user?.app_metadata?.role || "").toLowerCase().trim();
   const userBranch = user?.app_metadata?.branch || null;
+
+  // Mint the photo cookie for this caller. Failure here is not fatal: the rest
+  // of the dashboard works, only the vigilance photographs would not load.
+  let photoCookie = null;
+  try {
+    const secret = env.PHOTO_SECRET || env.APPS_SCRIPT_KEY;
+    if (secret) {
+      const token = await signPhotoToken({
+        sub: user?.id || "", branch: userBranch || "", role,
+        exp: Math.floor(Date.now() / 1000) + PHOTO_TTL_SECONDS,
+      }, secret);
+      photoCookie = PHOTO_COOKIE + "=" + token + "; Path=/api/photo; Max-Age=" +
+        PHOTO_TTL_SECONDS + "; HttpOnly; Secure; SameSite=Strict";
+    }
+  } catch (err) { /* photographs will simply not load */ }
+  const withCookie = (resp) => {
+    if (photoCookie) resp.headers.append("Set-Cookie", photoCookie);
+    return resp;
+  };
 
   // ── 2. Get the payload: edge cache first, Apps Script second ──
   //   Each section gets its OWN cache key, so the exam payload never overwrites
@@ -141,7 +200,9 @@ export async function onRequestGet({ request, env }) {
       );
     }
 
-    const ttl = section ? SECTION_TTL_SECONDS : CACHE_TTL_SECONDS;
+    const ttl = section
+      ? (SECTION_TTL_OVERRIDE[section] || SECTION_TTL_SECONDS)
+      : CACHE_TTL_SECONDS;
     upstream = new Response(resp.body, {
       status: 200,
       headers: {
@@ -170,10 +231,10 @@ export async function onRequestGet({ request, env }) {
   const fullAccess =
     !userBranch || role === "admin_manager" || role === "hr" || role === "management";
   if (fullAccess) {
-    return new Response(upstream.body, {
+    return withCookie(new Response(upstream.body, {
       status: 200,
       headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-    });
+    }));
   }
 
   // ── 4. Branch principals: parse once and filter DETAIL to their branch ──
@@ -186,17 +247,17 @@ export async function onRequestGet({ request, env }) {
 
   // The review carries student-level marks and named staff, so other campuses are
   // stripped server-side rather than relying on the browser to hide them.
-  if (section === "pt1")   return json(filterTablesByBranch(data, userBranch, "PT1_RAW"));
-  if (section === "audit") return json(filterTablesByBranch(data, userBranch, "AUDIT_RAW"));
-  if (section === "ptm")   return json(filterTablesByBranch(data, userBranch, "PTM_RAW"));
-  if (section === "civil") return json(filterTablesByBranch(data, userBranch, "CIVIL_RAW"));
-  if (section === "syl")   return json(filterTablesByBranch(data, userBranch, "SYL_RAW"));
-  if (section === "vchk")  return json(filterTablesByBranch(data, userBranch, "VCHK_RAW"));
-  if (section === "kptm")  return json(filterTablesByBranch(data, userBranch, "KPTM_RAW"));
-  if (section === "sylc")  return json(filterTablesByBranch(data, userBranch, "SYLC_RAW"));
+  if (section === "pt1")   return withCookie(json(filterTablesByBranch(data, userBranch, "PT1_RAW")));
+  if (section === "audit") return withCookie(json(filterTablesByBranch(data, userBranch, "AUDIT_RAW")));
+  if (section === "ptm")   return withCookie(json(filterTablesByBranch(data, userBranch, "PTM_RAW")));
+  if (section === "civil") return withCookie(json(filterTablesByBranch(data, userBranch, "CIVIL_RAW")));
+  if (section === "syl")   return withCookie(json(filterTablesByBranch(data, userBranch, "SYL_RAW")));
+  if (section === "vchk")  return withCookie(json(filterTablesByBranch(data, userBranch, "VCHK_RAW")));
+  if (section === "kptm")  return withCookie(json(filterTablesByBranch(data, userBranch, "KPTM_RAW")));
+  if (section === "sylc")  return withCookie(json(filterTablesByBranch(data, userBranch, "SYLC_RAW")));
 
   //   Cross-branch aggregates needed by the Head-to-Head scorecard stay full.
-  return json(filterByBranch(data, userBranch));
+  return withCookie(json(filterByBranch(data, userBranch)));
 }
 
 // ── Raw section payloads: keep only this branch's rows in every tab ──
