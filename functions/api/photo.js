@@ -21,7 +21,40 @@
 //   after it has authenticated the caller; this function accepts that cookie.
 //   No cookie, no photograph.
 
-import { PHOTO_COOKIE, verifyPhotoToken } from "./data.js";
+// This file is deliberately SELF-CONTAINED. It used to import the cookie name
+// and verifier from ./data.js, but Cloudflare Pages compiles each function as
+// its own entry point: if data.js is even one commit behind, the build dies
+// with "No matching export in api/data.js". The two copies below must stay in
+// step with the ones in data.js — they are ten lines and they never change.
+
+const PHOTO_COOKIE = "pbes_ph";
+
+function b64url(bytes) {
+  let s = "";
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function signPhotoToken(payload, secret) {
+  const body = b64url(new TextEncoder().encode(JSON.stringify(payload)));
+  const key = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body));
+  return body + "." + b64url(new Uint8Array(sig));
+}
+
+async function verifyPhotoToken(token, secret) {
+  if (!token || token.indexOf(".") < 0) return null;
+  const [body] = token.split(".");
+  let claims;
+  try { claims = JSON.parse(atob(body.replace(/-/g, "+").replace(/_/g, "/"))); }
+  catch { return null; }
+  const expect = await signPhotoToken(claims, secret);
+  if (expect !== token) return null;
+  if (!claims || !claims.exp || claims.exp < Math.floor(Date.now() / 1000)) return null;
+  return claims;
+}
 
 const MAX_WIDTH = 2400;
 // Photographs never change once uploaded, so once fetched they can sit in the
