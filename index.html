@@ -1231,7 +1231,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="row r2" style="margin-bottom:16px;">
   <div class="card">
     <div class="ch"><h3>🔟 Top 10 problems — this month against last</h3>
-      <span class="fnote" id="cp-fn">What CHANGED — this month against last</span>
+      <span class="fnote" id="cp-fn">Negative remarks only &mdash; what CHANGED, this month against last</span>
       <div class="vt-toggle" id="cp-toggle">
         <button data-v="chart" class="on">📊 Chart</button><button data-v="table">📋 Table</button>
       </div>
@@ -1240,7 +1240,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   </div>
   <div class="card">
     <div class="ch"><h3>📅 Top 10 problems — March to date</h3>
-      <span class="fnote" id="cpy-fn">What is BIGGEST — the whole year so far</span>
+      <span class="fnote" id="cpy-fn">Negative remarks only &mdash; what is BIGGEST, the whole year so far</span>
     </div>
     <div class="cb" style="padding:14px 18px;"><div id="cpy-body"></div></div>
   </div>
@@ -7999,7 +7999,7 @@ function renderCareSummary(){
     const tc=m.c;
     const subHtml=topics.length>0?('<div style="margin:2px 0 4px 12px;padding:5px 7px;background:#F8FAFC;border-radius:6px;border-left:2px solid '+tc+';">'
       +'<div style="font-size:9px;font-weight:700;color:#94A3B8;margin-bottom:2px;" '
-      +'title="Every call in this category mentioning the topic. The Top 10 problems panel counts only calls carrying a concern, so its figures are lower.">'
+      +'title="Every call in this category mentioning the topic, whatever the parent said. The Top 10 problems panels count only calls where the remark is NEGATIVE, so their figures are lower.">'
       +'🔍 SUB-TOPICS <span style="font-weight:400;">· all calls</span></div>'
       +topics.slice(0,5).map(t=>{
         const tp=Math.round(t.count/catRows.length*100);
@@ -18179,8 +18179,27 @@ window.CARE_PROBLEMS = (function () {
   /* A problem is a sub-topic under a concern category. "No Concern" carries
      sub-topics too (Parent Satisfied, General Check-in) but those are not
      problems, so that category is excluded here — everything else counts. */
+  /* A row counts toward a problem only when the parent's own words are
+     NEGATIVE. The category alone is not enough: a call filed under Academics
+     saying "child is doing well in maths, parent satisfied" mentions maths and
+     was being counted as a maths problem. So the sentiment engine — the same
+     one driving the Positive/Neutral/Negative split on this tab — decides.
+
+     Unanswered calls carry no parent view and are excluded outright. */
   function isProblem(row){
-    var cat = window._careCatOf ? window._careCatOf(row) : String(row.Grievance||'');
+    var cat = window._careCatOf ? window._careCatOf(row) : String(row.Grievance || '');
+    if (/^(not answering|no response)/i.test(cat)) return false;
+    if (window.CARE_NLP && CARE_NLP.classify) {
+      var c = CARE_NLP.classify(row);
+      if (c && c.klass === 'No Answer') return false;
+      /* Negative wording is a problem wherever it was filed — including under
+         "No Concern", where a genuine complaint sometimes ends up. */
+      if (c && c.klass === 'Negative') return true;
+      /* Anything the engine reads as Positive or Neutral is not a problem, even
+         if the call was filed under a concern category. */
+      return false;
+    }
+    /* Sentiment engine not loaded: fall back to the category, as before. */
     return !/^(no concern|not answering|no response)/i.test(cat);
   }
   var META = {}, CATCHALL = {}, SUBJ = {};
@@ -18203,27 +18222,29 @@ window.CARE_PROBLEMS = (function () {
                icon:iconFor(x.topic), c:colorFor(x.topic) };
     });
   }
-  /* Counts EVERY call that mentions the topic — exactly the set the Category
-     Mix sub-topics above count, so the same label can never carry two different
-     numbers on one screen. That was the whole complaint, and no amount of
-     explaining the distinction fixes a screen that appears to contradict
-     itself.
+  /* Counts only the calls where something was actually WRONG. It used to count
+     every call that mentioned a topic, so "Transport" carried every remark that
+     said the word — including "bus service is good, parent happy". On a panel
+     headed "Top 10 problems" that is the wrong number: it measures what gets
+     TALKED about, not what needs fixing.
 
-     The concern/no-concern split is not lost: each row carries it, and the
-     panel shows "of which N are concerns" underneath. So DC App reads 355,
-     matching the sub-topics, and says 157 of those were concerns rather than
-     confirmations that the app is working. */
+     Both sets are kept. `rows` is now the negative ones and drives the ranking;
+     `allRows` is every mention, so the panel can still say how often a topic
+     came up at all, and the two can be told apart. */
   function tally(rows){
     var by = {}, n = 0;
     rows.forEach(function(r){
       var isP = isProblem(r);
       if(isP) n++;
       themesOf(r).forEach(function(th){
-        var e = by[th.k] || (by[th.k] = { th: th, rows: [], concernRows: [] });
-        e.rows.push(r);
-        if(isP) e.concernRows.push(r);
+        var e = by[th.k] || (by[th.k] = { th: th, rows: [], allRows: [], concernRows: [] });
+        e.allRows.push(r);
+        if(isP){ e.rows.push(r); e.concernRows.push(r); }
       });
     });
+    /* A topic mentioned only in positive or neutral terms is not a problem and
+       is dropped, rather than sitting in the list with a count of zero. */
+    Object.keys(by).forEach(function(k){ if(!by[k].rows.length) delete by[k]; });
     return { by: by, negatives: n, total: rows.length };
   }
 
