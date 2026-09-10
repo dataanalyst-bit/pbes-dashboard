@@ -361,7 +361,7 @@ function filterByBranch(data, branch) {
         nk[kk] = Array.isArray(arr) ? arr.filter((r) => sameBranch(r.Branch || r.branch, branch)) : arr;
       });
       out[k] = nk;
-    } 
+    }
   });
   // Branch-keyed objects → keep only this branch (MONTH_CONFIG stays FULL for Head-to-Head).
   const branchKeyedObjects = ["STUDENTS_BY_BRANCH", "LEAD_SUMMARY", "COMBINED_SUMMARY"];
