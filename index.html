@@ -1101,6 +1101,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="sn-scroll">
     <div class="sn-grp">Overview</div>
     <button class="tb active" onclick="showTab('overview',this)" title="Executive Overview"><span class="ic">📊</span><span class="lb">Executive Overview</span></button>
+    <button class="tb" onclick="showTab('glance',this)" title="Consolidated Glance"><span class="ic">🗂️</span><span class="lb">Consolidated Glance</span></button>
     <button class="tb" onclick="showTab('meet',this)" title="Meeting Actions"><span class="ic">🎙️</span><span class="lb">Meeting Actions</span></button>
     <div class="sn-grp">Academics</div>
     <button class="tb" onclick="showTab('pt1',this)" title="PT-1 Academic Review"><span class="ic">📝</span><span class="lb">PT-1 Academic Review</span></button>
@@ -1762,6 +1763,52 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="cb-0" style="overflow-x:auto"><table class="dt" id="admin-matrix"></table></div>
   </div>
 </div>
+<div id="pane-glance" class="pane">
+  <div class="exm-head">
+    <h2 style="margin:0;font-size:20px;font-weight:800">Consolidated Glance</h2>
+    <span class="exm-sub" id="cg-meta"></span>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;"><div class="ch">
+      <h3>&#128202; Where each branch stands</h3>
+      <span class="fnote">Each cell is that department's completion for the branch. The index weights them &mdash;
+        safety and parent-facing work count for more than internal housekeeping. &#9888; marks a branch sitting
+        clearly below the others on that measure. Click any figure for the rows and the formula.</span></div>
+    <div class="cb-0" style="overflow-x:auto"><table class="dt" id="cg-scores"></table></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;"><div class="ch">
+      <h3>&#9200; Open and overdue right now</h3>
+      <span class="fnote">Counts, not percentages &mdash; what is actually sitting unfinished today.
+        &#9888; marks a count clearly higher than the other branches. Click any number for the records.</span></div>
+    <div class="cb-0" style="overflow-x:auto"><table class="dt" id="cg-open"></table></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;"><div class="ch">
+      <h3>&#128172; What the written entries say</h3>
+      <span class="fnote">Read from the observation, description and remark fields of the vigilance, grievance,
+        care-call and admin trackers. Terms are weighted by how RARE they are across branches, so what shows is
+        what makes a branch different &mdash; not the words every branch uses. Click a term for the entries.</span></div>
+    <div class="cb-0" style="overflow-x:auto"><table class="dt" id="cg-themes"></table></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;"><div class="ch">
+      <h3>&#128257; The same thing, logged again and again</h3>
+      <span class="fnote">Entries written three or more times in similar words, matched on meaning rather than
+        exact text &mdash; so "water leakage in boys washroom" and "leakage of water, boys toilet" count as one.
+        A high number here usually means the underlying cause was never fixed.</span></div>
+    <div class="cb-0" id="cg-clusters"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;"><div class="ch">
+      <h3>&#128269; What stands out</h3>
+      <span class="fnote">Branches more than two robust standard deviations from the group median, worst first.
+        Median and MAD are used rather than mean and standard deviation because with five branches one weak
+        branch moves the mean far enough to hide itself.</span></div>
+    <div class="cb-0" id="cg-flags"></div>
+  </div>
+</div>
+
 <div id="pane-dm" class="pane">
   <div class="exm-head">
     <h2 style="margin:0;font-size:20px;font-weight:800">Digital Marketing</h2>
@@ -8846,7 +8893,8 @@ var _RENDERERS = {
   transport:     ['Transport', function(){ renderTransport(); }],
   it:            ['IT', function(){ renderIT(); }],
   hr:            ['HR', function(){ renderHR(); }],
-  dm:            ['Digital Marketing', function(){ renderDm(); }]
+  dm:            ['Digital Marketing', function(){ renderDm(); }],
+  glance:        ['Consolidated Glance', function(){ renderConsolidated(); }]
 };
 var _stale = {};
 function _currentTab(){
@@ -9174,22 +9222,19 @@ const FX_RULES = [
   })}
 ];
 
-/* Used when no rule matches: says what the list is without inventing a rate. */
-function _fxFallback(rows){
-  return {expr:'records shown = every row matching what was clicked, under the current filters',
-    work:`${rows.length} record(s)  ·  ${_fxSel()}`,
-    note:'This list is a count, not a percentage — no rate was calculated to produce it.'};
-}
-
+/* A formula strip belongs on a RANKING or PERFORMANCE figure — a rate, a score,
+   an index. A plain record list is a count, and printing "records shown = every
+   row matching what was clicked" above it was noise on every modal in the
+   dashboard. So when no rule matches, nothing is shown. */
 function deriveFx(title, rows){
   const t=String(title||'');
   for(const r of FX_RULES){
     if(r.t.test(t)){
       try{ return r.f(rows||[], t); }
-      catch(e){ return _fxFallback(rows||[]); }
+      catch(e){ return null; }
     }
   }
-  return _fxFallback(rows||[]);
+  return null;
 }
 
 /* Paints the formula strip in the record modal. */
@@ -16012,6 +16057,834 @@ async function _lazyFetch(section, force, session, ms){
    can outrun the timeout. Other tabs never showed that to the reader, and this
    one no longer does either: the second attempt is served from the warm cache,
    so it retries once by itself and only reports a failure if that also fails. */
+/* ══════════════════════════════════════════════════════════════════════════
+   CONSOLIDATED GLANCE — every department, branch by branch, on one screen.
+
+   Built entirely from the main payload that is already in the browser, so this
+   tab has nothing to fetch and cannot fail on its own.
+
+   ── On the analytics, and what this deliberately does NOT do ──
+   There are five branches. That is five data points per metric. A neural
+   network needs thousands of examples to learn anything that is not noise, and
+   it would return a score nobody in the meeting could question. Every other
+   figure on this dashboard shows its working; a black box here would be the
+   one number that cannot be challenged, which is the opposite of useful.
+
+   So the statistics below are chosen to be RIGHT at this scale and explainable
+   in a sentence:
+
+   • Outliers use the MEDIAN and MAD (median absolute deviation), not mean and
+     standard deviation. With five values, one bad branch pulls the mean far
+     enough to make itself look normal — the median does not move. This is the
+     standard robust estimator for small samples.
+   • Trend is the least-squares slope across the months present, reported as
+     direction, not as a forecast. Three or four monthly points cannot support
+     a forecast and this does not pretend otherwise.
+   • The risk index is a weighted mean of the department scores a branch
+     actually has, so a branch missing a feed is not penalised for the gap.
+
+   Every cell opens its own rows and its own formula.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── robust statistics ────────────────────────────────────────────────── */
+
+function cgMedian(a){
+  const v = a.filter(x => typeof x === 'number' && isFinite(x)).sort((x, y) => x - y);
+  if (!v.length) return null;
+  const m = Math.floor(v.length / 2);
+  return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
+}
+
+/* Median absolute deviation, scaled to be comparable with a standard
+   deviation on normal data (the 1.4826 is the usual consistency constant). */
+function cgMad(a){
+  const med = cgMedian(a);
+  if (med === null) return null;
+  const d = a.filter(x => typeof x === 'number' && isFinite(x)).map(x => Math.abs(x - med));
+  const m = cgMedian(d);
+  return m === null ? null : m * 1.4826;
+}
+
+/* How far from the group a value sits, in robust standard deviations.
+   |z| >= 2 is the flag threshold — with five branches that is roughly "clearly
+   apart from the other four", not a probability claim. */
+function cgZ(value, all){
+  if (typeof value !== 'number' || !isFinite(value)) return null;
+  const med = cgMedian(all), mad = cgMad(all);
+  if (med === null) return null;
+  if (!mad) {
+    /* MAD is zero when most branches hold the SAME value — four at 100% and one
+       at 40%, say. Returning null there would hide the one branch that differs,
+       which is the exact case worth flagging. So: identical to the median is
+       normal, anything else is as far out as it gets. */
+    if (value === med) return 0;
+    return value > med ? 99 : -99;
+  }
+  return (value - med) / mad;
+}
+
+/* Least-squares slope of y against 0,1,2… Returns units per period. */
+function cgSlope(ys){
+  const v = ys.filter(y => typeof y === 'number' && isFinite(y));
+  const n = v.length;
+  if (n < 3) return null;                   // two points is a line, not a trend
+  const mx = (n - 1) / 2;
+  const my = v.reduce((a, b) => a + b, 0) / n;
+  let num = 0, den = 0;
+  v.forEach((y, i) => { num += (i - mx) * (y - my); den += (i - mx) * (i - mx); });
+  return den ? num / den : null;
+}
+
+function cgArrow(slope, goodIsUp){
+  if (slope === null) return { txt: '–', col: '#94A3B8', word: 'not enough months' };
+  if (Math.abs(slope) < 0.5) return { txt: '→', col: '#64748B', word: 'flat' };
+  const up = slope > 0;
+  const good = goodIsUp ? up : !up;
+  return { txt: up ? '↑' : '↓', col: good ? '#059669' : '#DC2626',
+           word: (up ? 'rising' : 'falling') + ' by about ' + Math.abs(slope).toFixed(1) + ' a month' };
+}
+
+/* ── data access ──────────────────────────────────────────────────────── */
+
+function cgBranches(){
+  const seen = {};
+  [CARE_DATA, GRIEVANCE_DATA, ADMIN_DATA, VIG_DATA, OBS_DATA, PUR_DATA, HR_RECORDS]
+    .forEach(arr => (arr || []).forEach(r => { if (r && r.Branch) seen[r.Branch] = 1; }));
+  Object.keys(MONTH_CONFIG || {}).forEach(b => seen[b] = 1);
+  const order = ['Bachupally', 'Boduppal', 'Gowdavalli', 'Keesara', 'Pocharam'];
+  return order.filter(b => seen[b]).concat(Object.keys(seen).filter(b => order.indexOf(b) < 0).sort());
+}
+
+const cgIsClosed = s => /closed|verified|resolved|completed|done|filled/i.test(String(s || ''));
+const cgNum = v => { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; };
+const cgDate = v => { const t = Date.parse(String(v || '')); return isNaN(t) ? null : t; };
+const CG_DAY = 86400000;
+
+/* One object per branch holding every count the tab needs. Each entry keeps the
+   ROWS behind it so a cell can open them. */
+function cgCollect(){
+  const today = Date.now();
+  const out = {};
+  cgBranches().forEach(b => {
+    const care  = (CARE_DATA || []).filter(r => r.Branch === b);
+    const griev = (GRIEVANCE_DATA || []).filter(r => r.Branch === b);
+    const admin = (ADMIN_DATA || []).filter(r => r.Branch === b);
+    const vig   = (VIG_DATA || []).filter(r => r.Branch === b);
+    const obs   = (OBS_DATA || []).filter(r => r.Branch === b);
+    const pur   = (PUR_DATA || []).filter(r => r.Branch === b);
+    const hr    = (HR_RECORDS || []).filter(r => r.Branch === b);
+
+    const careRes = care.filter(r => /resolved|no concern/i.test(String(r.Status || '')));
+    const grOpen  = griev.filter(r => !cgIsClosed(r.Status));
+    const grOver  = grOpen.filter(r => { const t = cgDate(r.TargetDate); return t && t < today; });
+    const admOpen = admin.filter(r => !cgIsClosed(r.Status));
+    const admOver = admOpen.filter(r => { const t = cgDate(r.Deadline); return t && t < today; });
+    const vigOpen = vig.filter(r => !cgIsClosed(r.Status));
+    const vigOver = vigOpen.filter(r => { const t = cgDate(r.TargetDate); return t && t < today; });
+    const vigCrit = vigOpen.filter(r => /critical|high/i.test(String(r.RiskLevel || '')));
+    const purOpen = pur.filter(r => !/delivered|completed|closed|rejected/i.test(String(r.PurchaseStatus || '')));
+    const hrOpen  = hr.filter(r => !/closed|filled/i.test(String(r.Status || '')));
+
+    /* Observation completion needs the working-day config, the same way the
+       Teacher Observations tab computes it. */
+    let obsReq = 0;
+    const cfg = (MONTH_CONFIG || {})[b] || {};
+    const types = [];
+    obs.forEach(r => { const t = String(r.ObsType || '').trim();
+      if (t && t !== '–' && types.indexOf(t) < 0) types.push(t); });
+    Object.keys(cfg).forEach(mk => {
+      types.forEach(t => {
+        const wd = (typeof mcRoleWD === 'function') ? mcRoleWD(cfg, mk, t) : 0;
+        if (wd > 0) obsReq += wd * (/hod|head of dep/i.test(t) ? 1 : 2);
+      });
+    });
+    const scored = obs.filter(r => !isNaN(parseFloat(r.Score)));
+    const obsAvg = scored.length ? scored.reduce((a, r) => a + parseFloat(r.Score), 0) / scored.length : null;
+
+    /* IT and transport are nested objects rather than flat arrays. */
+    const it = (window._IT && window._IT.health) ? window._IT.health.filter(r => r.Branch === b) : [];
+    const itTot = it.reduce((a, r) => a + cgNum(r.Total), 0);
+    const itDown = it.reduce((a, r) => a + cgNum(r.NotWorking), 0);
+
+    const tr = (window._TRANSPORT && window._TRANSPORT.vehicles)
+      ? window._TRANSPORT.vehicles.filter(r => r.Branch === b) : [];
+    const trExp = tr.filter(r => {
+      const d = r.DaysToExpiry;
+      return d === null || d === undefined || d === '' || cgNum(d) <= 30;
+    });
+
+    /* Syllabus arrives with its own tab, so it is only here once that has been
+       opened. Reported as unavailable rather than as zero. */
+    let syl = null;
+    if (window._sylRaw && window._sylRaw.sylc && window._sylRaw.sylc.rows) {
+      const t = window._sylRaw.sylc;
+      const iB = t.hdr.findIndex(h => /^branch$/i.test(String(h).trim()));
+      const iS = t.hdr.findIndex(h => /^status$/i.test(String(h).trim()));
+      if (iB >= 0 && iS >= 0) {
+        const mine = t.rows.filter(r => String(r[iB] || '').trim() === b);
+        const done = mine.filter(r => /^done$/i.test(String(r[iS] || '').trim()));
+        syl = { due: mine.length, done: done.length, rows: mine };
+      }
+    }
+
+    out[b] = {
+      branch: b,
+      care: { made: care.length, resolved: careRes.length, rows: care, resRows: careRes },
+      griev: { total: griev.length, open: grOpen.length, over: grOver.length,
+               rows: griev, openRows: grOpen, overRows: grOver },
+      admin: { total: admin.length, open: admOpen.length, over: admOver.length,
+               rows: admin, openRows: admOpen, overRows: admOver },
+      vig: { total: vig.length, open: vigOpen.length, over: vigOver.length, crit: vigCrit.length,
+             rows: vig, openRows: vigOpen, overRows: vigOver, critRows: vigCrit },
+      obs: { done: obs.length, required: obsReq, avg: obsAvg, rows: obs },
+      syl: syl,
+      it: { total: itTot, down: itDown, rows: it },
+      tr: { vehicles: tr.length, expiring: trExp.length, rows: tr, expRows: trExp },
+      pur: { total: pur.length, open: purOpen.length, rows: pur, openRows: purOpen },
+      hr:  { total: hr.length, open: hrOpen.length, rows: hr, openRows: hrOpen }
+    };
+  });
+  return out;
+}
+
+/* ── department health scores, 0-100, higher is better ─────────────────── */
+
+const CG_DEPTS = [
+  { key: 'care',  label: 'Care calls',
+    score: d => d.care.made ? d.care.resolved / d.care.made * 100 : null,
+    fx:    d => 'resolved ' + d.care.resolved + ' ÷ ' + d.care.made + ' calls × 100' },
+  { key: 'griev', label: 'Grievance',
+    score: d => d.griev.total ? (d.griev.total - d.griev.open) / d.griev.total * 100 : null,
+    fx:    d => 'closed ' + (d.griev.total - d.griev.open) + ' ÷ ' + d.griev.total + ' cases × 100' },
+  { key: 'admin', label: 'Admin tasks',
+    score: d => d.admin.total ? (d.admin.total - d.admin.open) / d.admin.total * 100 : null,
+    fx:    d => 'done ' + (d.admin.total - d.admin.open) + ' ÷ ' + d.admin.total + ' tasks × 100' },
+  { key: 'vig',   label: 'Vigilance',
+    score: d => d.vig.total ? (d.vig.total - d.vig.open) / d.vig.total * 100 : null,
+    fx:    d => 'closed ' + (d.vig.total - d.vig.open) + ' ÷ ' + d.vig.total + ' issues × 100' },
+  { key: 'obs',   label: 'Observations',
+    score: d => d.obs.required ? Math.min(100, d.obs.done / d.obs.required * 100) : null,
+    fx:    d => 'done ' + d.obs.done + ' ÷ ' + d.obs.required + ' required × 100, capped at 100' },
+  { key: 'syl',   label: 'Syllabus',
+    score: d => (d.syl && d.syl.due) ? d.syl.done / d.syl.due * 100 : null,
+    fx:    d => d.syl ? ('on time ' + d.syl.done + ' ÷ ' + d.syl.due + ' units × 100')
+                      : 'open the Syllabus & Notebook tab once to load this feed' },
+  { key: 'it',    label: 'IT uptime',
+    score: d => d.it.total ? (d.it.total - d.it.down) / d.it.total * 100 : null,
+    fx:    d => 'working ' + (d.it.total - d.it.down) + ' ÷ ' + d.it.total + ' assets × 100' },
+  { key: 'tr',    label: 'Transport docs',
+    score: d => d.tr.vehicles ? (d.tr.vehicles - d.tr.expiring) / d.tr.vehicles * 100 : null,
+    fx:    d => 'compliant ' + (d.tr.vehicles - d.tr.expiring) + ' ÷ ' + d.tr.vehicles + ' vehicles × 100' }
+];
+
+/* Weights reflect what a review actually acts on: safety and parent-facing
+   work above internal housekeeping. Change them here, in one place. */
+const CG_WEIGHTS = { vig: 1.6, griev: 1.4, care: 1.2, syl: 1.1, obs: 1.0, admin: 1.0, tr: 1.2, it: 0.8 };
+
+function cgRisk(d){
+  let num = 0, den = 0, have = [];
+  CG_DEPTS.forEach(dep => {
+    const s = dep.score(d);
+    if (s === null) return;
+    const w = CG_WEIGHTS[dep.key] || 1;
+    num += s * w; den += w; have.push(dep.label);
+  });
+  return { score: den ? num / den : null, n: have.length, have: have };
+}
+
+/* ── rendering ────────────────────────────────────────────────────────── */
+
+function cgColor(v){ return v === null ? '#94A3B8' : v >= 90 ? '#059669' : v >= 75 ? '#D97706' : '#DC2626'; }
+function cgCountColor(v){ return v === 0 ? '#059669' : v <= 3 ? '#D97706' : '#DC2626'; }
+
+/* Opens the rows behind a cell, with the formula that produced it. */
+function cgOpen(title, sub, rows, cols, fx){
+  openModal(title, sub, rows || [], cols, fx);
+}
+const CG_COLS = {
+  care:  [{key:'Branch',label:'Branch'},{key:'Month',label:'Month'},{key:'Class',label:'Class'},
+          {key:'Student',label:'Student',maxW:'160px'},{key:'Date',label:'Date',date:true},
+          {key:'Status',label:'Status',pill:true},{key:'Remarks',label:'Remarks',maxW:'240px'}],
+  griev: [{key:'Branch',label:'Branch'},{key:'Date',label:'Raised',date:true},{key:'Student',label:'Student'},
+          {key:'Category',label:'Category'},{key:'Severity',label:'Severity',pill:true},
+          {key:'AssignedTo',label:'Assigned to'},{key:'TargetDate',label:'Target',date:true},
+          {key:'Status',label:'Status',pill:true}],
+  admin: [{key:'Branch',label:'Branch'},{key:'TaskID',label:'ID'},{key:'Task',label:'Task',maxW:'240px'},
+          {key:'Priority',label:'Priority',pill:true},{key:'Deadline',label:'Deadline',date:true},
+          {key:'Status',label:'Status',pill:true},{key:'Remarks',label:'Remarks',maxW:'200px'}],
+  vig:   [{key:'Branch',label:'Branch'},{key:'VisitDate',label:'Visit',date:true},{key:'Area',label:'Area'},
+          {key:'Issue',label:'Issue',maxW:'260px'},{key:'RiskLevel',label:'Risk',pill:true},
+          {key:'Owner',label:'Owner'},{key:'TargetDate',label:'Target',date:true},
+          {key:'Status',label:'Status',pill:true}],
+  obs:   [{key:'Branch',label:'Branch'},{key:'Date',label:'Date',date:true},{key:'Teacher',label:'Teacher'},
+          {key:'ObsType',label:'Observer'},{key:'Class',label:'Class'},{key:'Score',label:'Score',score:true}],
+  it:    [{key:'Branch',label:'Branch'},{key:'System',label:'System'},{key:'Total',label:'Total'},
+          {key:'Working',label:'Working'},{key:'NotWorking',label:'Down'},{key:'Remarks',label:'Remarks',maxW:'220px'}],
+  tr:    [{key:'Branch',label:'Branch'},{key:'VehicleNo',label:'Vehicle'},{key:'RouteNo',label:'Route'},
+          {key:'Driver',label:'Driver'},{key:'InsuranceExp',label:'Insurance',date:true},
+          {key:'FitnessExp',label:'Fitness',date:true},{key:'PermitExp',label:'Permit',date:true},
+          {key:'PucExp',label:'PUC',date:true}],
+  pur:   [{key:'Branch',label:'Branch'},{key:'Item',label:'Item',maxW:'240px'},{key:'Dept',label:'Dept'},
+          {key:'Amount',label:'Amount'},{key:'Priority',label:'Priority',pill:true},
+          {key:'PurchaseStatus',label:'Status',pill:true}],
+  hr:    [{key:'Branch',label:'Branch'},{key:'Position',label:'Position'},{key:'PostDate',label:'Posted',date:true},
+          {key:'Status',label:'Status',pill:true},{key:'DaysToClose',label:'Days'}]
+};
+
+/* Table 1 — where each branch stands. */
+function cgRenderScores(D, branches){
+  const host = document.getElementById('cg-scores');
+  if (!host) return;
+  const risks = branches.map(b => cgRisk(D[b]).score);
+  const ranked = branches.slice().filter(b => cgRisk(D[b]).score !== null)
+    .sort((a, c) => cgRisk(D[c]).score - cgRisk(D[a]).score);
+
+  let h = '<thead><tr><th style="text-align:left">Branch</th>' +
+    CG_DEPTS.map(d => '<th>' + d.label + '</th>').join('') +
+    '<th style="border-left:2px solid #E0E8FF">Index</th><th>Rank</th></tr></thead><tbody>';
+
+  branches.forEach(b => {
+    const d = D[b], r = cgRisk(d);
+    const tds = CG_DEPTS.map(dep => {
+      const s = dep.score(d);
+      if (s === null) return '<td style="color:#CBD5E1" title="No data for this department">–</td>';
+      const z = cgZ(s, branches.map(x => dep.score(D[x])).filter(v => v !== null));
+      const flag = (z !== null && z <= -2) ? ' ⚠' : '';
+      return '<td style="font-weight:700;color:' + cgColor(s) + ';cursor:pointer" ' +
+        'title="' + dep.fx(d).replace(/"/g, '&quot;') + '" ' +
+        'onclick="cgCell(\'' + dep.key + '\',\'' + b.replace(/'/g, "\\'") + '\')">' +
+        Math.round(s) + '%' + flag + '</td>';
+    }).join('');
+    const rank = ranked.indexOf(b);
+    h += '<tr><td style="text-align:left"><span class="bd b' + b + '"></span> ' + b + '</td>' + tds +
+      '<td style="border-left:2px solid #E0E8FF;font-weight:800;color:' + cgColor(r.score) + ';cursor:pointer" ' +
+      'onclick="cgRiskDetail(\'' + b.replace(/'/g, "\\'") + '\')">' +
+      (r.score === null ? '–' : Math.round(r.score)) + '</td>' +
+      '<td style="font-weight:700">' + (rank < 0 ? '–' : (rank + 1)) + '</td></tr>';
+  });
+
+  /* Group row: the median, not the mean — one weak branch should not move the
+     line everyone else is compared against. */
+  h += '<tr style="background:#F8FAFF;border-top:2px solid #E0E8FF"><td style="text-align:left;font-weight:800">Group median</td>' +
+    CG_DEPTS.map(dep => {
+      const m = cgMedian(branches.map(b => dep.score(D[b])).filter(v => v !== null));
+      return '<td style="font-weight:700;color:' + cgColor(m) + '">' + (m === null ? '–' : Math.round(m) + '%') + '</td>';
+    }).join('') +
+    '<td style="border-left:2px solid #E0E8FF;font-weight:800">' +
+    (cgMedian(risks) === null ? '–' : Math.round(cgMedian(risks))) + '</td><td></td></tr></tbody>';
+  host.innerHTML = h;
+}
+
+/* Table 2 — what is open and overdue right now. */
+const CG_OPEN_COLS = [
+  { l: 'Care calls pending',   get: d => d.care.made - d.care.resolved, k: 'care-pending' },
+  { l: 'Grievance open',       get: d => d.griev.open,  k: 'griev-open' },
+  { l: 'Grievance overdue',    get: d => d.griev.over,  k: 'griev-over' },
+  { l: 'Admin open',           get: d => d.admin.open,  k: 'admin-open' },
+  { l: 'Admin overdue',        get: d => d.admin.over,  k: 'admin-over' },
+  { l: 'Vigilance open',       get: d => d.vig.open,    k: 'vig-open' },
+  { l: 'Vigilance overdue',    get: d => d.vig.over,    k: 'vig-over' },
+  { l: 'Open critical',        get: d => d.vig.crit,    k: 'vig-crit' },
+  { l: 'IT assets down',       get: d => d.it.down,     k: 'it-down' },
+  { l: 'Vehicle docs due ≤30d',get: d => d.tr.expiring, k: 'tr-exp' },
+  { l: 'Purchase pending',     get: d => d.pur.open,    k: 'pur-open' },
+  { l: 'Positions open',       get: d => d.hr.open,     k: 'hr-open' }
+];
+
+function cgRenderOpen(D, branches){
+  const host = document.getElementById('cg-open');
+  if (!host) return;
+  let h = '<thead><tr><th style="text-align:left">Branch</th>' +
+    CG_OPEN_COLS.map(c => '<th>' + c.l + '</th>').join('') +
+    '<th style="border-left:2px solid #E0E8FF">Total open</th></tr></thead><tbody>';
+  const totals = CG_OPEN_COLS.map(() => 0);
+  branches.forEach(b => {
+    const d = D[b];
+    let rowTot = 0;
+    const tds = CG_OPEN_COLS.map((c, i) => {
+      const v = c.get(d) || 0;
+      totals[i] += v; rowTot += v;
+      const all = branches.map(x => CG_OPEN_COLS[i].get(D[x]) || 0);
+      const z = cgZ(v, all);
+      const flag = (z !== null && z >= 2) ? ' ⚠' : '';
+      return '<td style="font-weight:700;color:' + cgCountColor(v) + ';cursor:pointer" ' +
+        'onclick="cgCell(\'' + c.k + '\',\'' + b.replace(/'/g, "\\'") + '\')">' + v + flag + '</td>';
+    }).join('');
+    h += '<tr><td style="text-align:left"><span class="bd b' + b + '"></span> ' + b + '</td>' + tds +
+      '<td style="border-left:2px solid #E0E8FF;font-weight:800">' + rowTot + '</td></tr>';
+  });
+  h += '<tr style="background:#F8FAFF;border-top:2px solid #E0E8FF"><td style="text-align:left;font-weight:800">All branches</td>' +
+    totals.map(t => '<td style="font-weight:700">' + t + '</td>').join('') +
+    '<td style="border-left:2px solid #E0E8FF;font-weight:800">' +
+    totals.reduce((a, b2) => a + b2, 0) + '</td></tr></tbody>';
+  host.innerHTML = h;
+}
+
+/* Table 3 — what stands out, by robust z-score. */
+function cgRenderFlags(D, branches){
+  const host = document.getElementById('cg-flags');
+  if (!host) return;
+  const flags = [];
+
+  CG_DEPTS.forEach(dep => {
+    const vals = branches.map(b => dep.score(D[b]));
+    const known = vals.filter(v => v !== null);
+    if (known.length < 3) return;
+    branches.forEach((b, i) => {
+      const z = cgZ(vals[i], known);
+      if (z !== null && z <= -2) flags.push({
+        b: b, what: dep.label, z: z,
+        txt: dep.label + ' at ' + Math.round(vals[i]) + '%, against a group median of ' +
+             Math.round(cgMedian(known)) + '%',
+        act: 'cgCell(\'' + dep.key + '\',\'' + b.replace(/'/g, "\\'") + '\')'
+      });
+    });
+  });
+
+  CG_OPEN_COLS.forEach(c => {
+    const vals = branches.map(b => c.get(D[b]) || 0);
+    if (cgMedian(vals) === null) return;
+    branches.forEach((b, i) => {
+      const z = cgZ(vals[i], vals);
+      if (z !== null && z >= 2 && vals[i] > 0) flags.push({
+        b: b, what: c.l, z: -z,
+        txt: c.l + ': ' + vals[i] + ', against a group median of ' + cgMedian(vals),
+        act: 'cgCell(\'' + c.k + '\',\'' + b.replace(/'/g, "\\'") + '\')'
+      });
+    });
+  });
+
+  flags.sort((a, b) => a.z - b.z);
+  if (!flags.length){
+    host.innerHTML = '<div style="padding:18px;color:#64748B;font-size:13px">' +
+      'No branch sits clearly apart from the others on any measure. That is a real ' +
+      'finding, not a missing one — the branches are performing alike.</div>';
+    return;
+  }
+  host.innerHTML = flags.slice(0, 14).map(f =>
+    '<div style="display:flex;gap:12px;align-items:flex-start;padding:10px 14px;border-bottom:1px solid #EEF2FF;cursor:pointer" ' +
+    'onclick="' + f.act + '">' +
+    '<span style="font-weight:800;color:#1E4FD8;min-width:110px">' + f.b + '</span>' +
+    '<span style="color:#1F2937;font-size:13px">' + f.txt + '</span></div>').join('');
+}
+
+/* Drill-through for any cell in either table. */
+function cgCell(key, branch){
+  const D = cgCollect(), d = D[branch];
+  if (!d) return;
+  const T = (t, s, rows, cols, fx) => cgOpen('📋 ' + branch + ' — ' + t, s, rows, cols, fx);
+  const all = cgBranches();
+  const med = arr => cgMedian(arr);
+
+  switch (key) {
+    case 'care':  return T('Care calls', d.care.resolved + ' resolved of ' + d.care.made, d.care.rows, CG_COLS.care,
+      { expr: 'resolved % = calls Resolved or No Concern ÷ calls made × 100',
+        work: d.care.resolved + ' ÷ ' + d.care.made + ' × 100 = ' + fxPct(d.care.resolved, d.care.made),
+        note: 'Group median ' + Math.round(med(all.map(b => D[b].care.made ? D[b].care.resolved / D[b].care.made * 100 : null).filter(v => v !== null))) + '%.' });
+    case 'griev': return T('Grievance', d.griev.open + ' open of ' + d.griev.total, d.griev.rows, CG_COLS.griev,
+      { expr: 'closed % = (cases raised − cases open) ÷ cases raised × 100',
+        work: '(' + d.griev.total + ' − ' + d.griev.open + ') ÷ ' + d.griev.total + ' × 100 = ' + fxPct(d.griev.total - d.griev.open, d.griev.total) });
+    case 'admin': return T('Admin tasks', d.admin.open + ' open of ' + d.admin.total, d.admin.rows, CG_COLS.admin,
+      { expr: 'done % = (tasks − open) ÷ tasks × 100',
+        work: '(' + d.admin.total + ' − ' + d.admin.open + ') ÷ ' + d.admin.total + ' × 100 = ' + fxPct(d.admin.total - d.admin.open, d.admin.total) });
+    case 'vig':   return T('Vigilance', d.vig.open + ' open of ' + d.vig.total, d.vig.rows, CG_COLS.vig,
+      { expr: 'closed % = (issues raised − issues open) ÷ issues raised × 100',
+        work: '(' + d.vig.total + ' − ' + d.vig.open + ') ÷ ' + d.vig.total + ' × 100 = ' + fxPct(d.vig.total - d.vig.open, d.vig.total),
+        note: '"Work done — verification pending" counts as open here, matching the Vigilance tab.' });
+    case 'obs':   return T('Observations', d.obs.done + ' done of ' + d.obs.required + ' required', d.obs.rows, CG_COLS.obs,
+      { expr: 'completion % = observations done ÷ required × 100, where required = Σ per role (working days × daily quota)',
+        work: d.obs.done + ' ÷ ' + d.obs.required + ' × 100 = ' + fxPct(d.obs.done, d.obs.required, true),
+        note: 'Quota 2/day for leadership roles, 1/day for each subject HOD. Capped at 100.' });
+    case 'syl':   return d.syl
+      ? T('Syllabus units', d.syl.done + ' on time of ' + d.syl.due, [], [],
+          { expr: 'on-time % = units marked Done ÷ units due × 100',
+            work: d.syl.done + ' ÷ ' + d.syl.due + ' × 100 = ' + fxPct(d.syl.done, d.syl.due),
+            note: 'Open the Syllabus & Notebook tab for the unit-level records.' })
+      : T('Syllabus units', 'not loaded', [], [], { expr: 'on-time % = units Done ÷ units due × 100',
+            work: 'the syllabus feed loads with its own tab — open Syllabus & Notebook once, then return here' });
+    case 'it':    return T('IT assets', d.it.down + ' down of ' + d.it.total, d.it.rows, CG_COLS.it,
+      { expr: 'uptime % = (assets − not working) ÷ assets × 100',
+        work: '(' + d.it.total + ' − ' + d.it.down + ') ÷ ' + d.it.total + ' × 100 = ' + fxPct(d.it.total - d.it.down, d.it.total) });
+    case 'tr':    return T('Vehicle compliance', d.tr.expiring + ' of ' + d.tr.vehicles + ' need documents', d.tr.rows, CG_COLS.tr,
+      { expr: 'compliant % = (vehicles − vehicles with a document due within 30 days or missing) ÷ vehicles × 100',
+        work: '(' + d.tr.vehicles + ' − ' + d.tr.expiring + ') ÷ ' + d.tr.vehicles + ' × 100 = ' + fxPct(d.tr.vehicles - d.tr.expiring, d.tr.vehicles),
+        note: 'A vehicle with no expiry date recorded counts as non-compliant, not as unknown.' });
+
+    case 'care-pending': return T('Care calls not yet resolved', (d.care.made - d.care.resolved) + ' pending',
+      d.care.rows.filter(r => !/resolved|no concern/i.test(String(r.Status || ''))), CG_COLS.care,
+      { expr: 'pending = calls made − calls Resolved or No Concern', work: d.care.made + ' − ' + d.care.resolved + ' = ' + (d.care.made - d.care.resolved) });
+    case 'griev-open': return T('Grievance open', d.griev.open + ' open', d.griev.openRows, CG_COLS.griev,
+      { expr: 'open = cases whose status is not Resolved or Closed', work: d.griev.open + ' of ' + d.griev.total });
+    case 'griev-over': return T('Grievance past target date', d.griev.over + ' overdue', d.griev.overRows, CG_COLS.griev,
+      { expr: 'overdue = open AND target closure date earlier than today', work: d.griev.over + ' of ' + d.griev.open + ' open' });
+    case 'admin-open': return T('Admin tasks open', d.admin.open + ' open', d.admin.openRows, CG_COLS.admin,
+      { expr: 'open = tasks not marked Done or Completed', work: d.admin.open + ' of ' + d.admin.total });
+    case 'admin-over': return T('Admin tasks overdue', d.admin.over + ' overdue', d.admin.overRows, CG_COLS.admin,
+      { expr: 'overdue = open AND deadline earlier than today',
+        work: d.admin.over + ' of ' + d.admin.open + ' open',
+        note: 'A task finished after its deadline is late but closed, and is not counted here.' });
+    case 'vig-open': return T('Vigilance issues open', d.vig.open + ' open', d.vig.openRows, CG_COLS.vig,
+      { expr: 'open = issues not Closed, Verified or Resolved', work: d.vig.open + ' of ' + d.vig.total });
+    case 'vig-over': return T('Vigilance overdue', d.vig.over + ' overdue', d.vig.overRows, CG_COLS.vig,
+      { expr: 'overdue = open AND target date earlier than today', work: d.vig.over + ' of ' + d.vig.open + ' open' });
+    case 'vig-crit': return T('Open critical issues', d.vig.crit + ' critical', d.vig.critRows, CG_COLS.vig,
+      { expr: 'open AND risk level Critical or High', work: d.vig.crit + ' of ' + d.vig.open + ' open',
+        note: 'These are the rows a safety review should start from.' });
+    case 'it-down': return T('IT assets not working', d.it.down + ' down', d.it.rows, CG_COLS.it,
+      { expr: 'sum of the Not Working column across systems', work: d.it.down + ' of ' + d.it.total + ' assets' });
+    case 'tr-exp': return T('Vehicle documents due or missing', d.tr.expiring + ' vehicles', d.tr.expRows, CG_COLS.tr,
+      { expr: 'vehicles with any document expiring within 30 days, or with no expiry recorded',
+        work: d.tr.expiring + ' of ' + d.tr.vehicles + ' vehicles' });
+    case 'pur-open': return T('Purchase pending', d.pur.open + ' pending', d.pur.openRows, CG_COLS.pur,
+      { expr: 'not Delivered, Completed, Closed or Rejected', work: d.pur.open + ' of ' + d.pur.total });
+    case 'hr-open': return T('Positions open', d.hr.open + ' open', d.hr.openRows, CG_COLS.hr,
+      { expr: 'positions whose status is not Closed or Filled', work: d.hr.open + ' of ' + d.hr.total });
+  }
+}
+
+/* The index, spelled out — every department that fed it and its weight. */
+function cgRiskDetail(branch){
+  const D = cgCollect(), d = D[branch], r = cgRisk(d);
+  const parts = [];
+  CG_DEPTS.forEach(dep => {
+    const s = dep.score(d);
+    if (s === null) return;
+    const w = CG_WEIGHTS[dep.key] || 1;
+    parts.push({ l: dep.label, s: s, w: w });
+  });
+  const esc = v => String(v == null ? '' : v).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const rows = parts.map(p =>
+    '<tr><td style="padding:6px 10px">' + esc(p.l) + '</td>' +
+    '<td style="padding:6px 10px;text-align:right;font-weight:700;color:' + cgColor(p.s) + '">' + Math.round(p.s) + '%</td>' +
+    '<td style="padding:6px 10px;text-align:right">× ' + p.w + '</td>' +
+    '<td style="padding:6px 10px;text-align:right">' + (p.s * p.w).toFixed(1) + '</td></tr>').join('');
+  const den = parts.reduce((a, p) => a + p.w, 0);
+  const num = parts.reduce((a, p) => a + p.s * p.w, 0);
+
+  openHTMLModal('🏆 ' + branch + ' — health index',
+    (r.score === null ? 'no departments with data' : Math.round(r.score) + ' from ' + r.n + ' of ' + CG_DEPTS.length + ' departments'),
+    '<div style="padding:16px 18px">' +
+      '<div style="font-weight:800;color:#1E4FD8;font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Formula</div>' +
+      '<div style="font-family:\'JetBrains Mono\',ui-monospace,monospace;font-size:12px;background:#F8FAFF;border:1px solid #E0E8FF;border-radius:8px;padding:10px 12px">' +
+      'index = Σ (department score × weight) ÷ Σ weight, over the departments this branch has data for</div>' +
+      '<table style="width:100%;border-collapse:collapse;margin-top:14px;font-size:12.5px">' +
+      '<thead><tr style="background:#F1F5FF"><th style="padding:6px 10px;text-align:left">Department</th>' +
+      '<th style="padding:6px 10px;text-align:right">Score</th><th style="padding:6px 10px;text-align:right">Weight</th>' +
+      '<th style="padding:6px 10px;text-align:right">Contribution</th></tr></thead><tbody>' + rows +
+      '<tr style="border-top:2px solid #E0E8FF;font-weight:800"><td style="padding:8px 10px">Index</td>' +
+      '<td colspan="2" style="padding:8px 10px;text-align:right">' + num.toFixed(1) + ' ÷ ' + den.toFixed(1) + '</td>' +
+      '<td style="padding:8px 10px;text-align:right">' + (den ? Math.round(num / den) : '–') + '</td></tr>' +
+      '</tbody></table>' +
+      '<div style="color:#475569;font-size:12px;line-height:1.6;margin-top:14px">' +
+      'Weights put safety and parent-facing work above internal housekeeping. A branch missing a feed is ' +
+      'scored on the departments it does have, so it is neither penalised nor credited for the gap — ' +
+      'which also means two branches averaged over different departments are not strictly comparable. ' +
+      'Check the department count above before acting on a rank.</div></div>', null);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   TEXT ANALYSIS — what the written entries say, branch by branch.
+
+   The trackers hold thousands of free-text fields that nobody reads in bulk:
+   vigilance observations, grievance descriptions, care-call remarks, admin task
+   notes. Counting them tells you how many there are; it does not tell you what
+   they are ABOUT, or that the same complaint has been logged fourteen times.
+
+   Two standard techniques, both explainable in a sentence:
+
+   • TF-IDF for themes. Raw frequency is useless here — "school", "student" and
+     "please" top every branch. Inverse document frequency divides a term's
+     weight by how many branches use it, so what survives is what makes a branch
+     DIFFERENT, not what every branch says. That is the whole point: management
+     needs Keesara's distinctive problem, not the words common to all five.
+
+   • Cosine similarity over TF-IDF vectors for near-duplicates, with
+     single-link agglomerative grouping at a fixed threshold. This catches the
+     same issue worded differently — "water leakage in boys washroom" and
+     "leakage of water, boys toilet 3rd floor" cluster together where an exact
+     match finds nothing.
+
+   Both run in the browser on data already loaded. No model, no service, no
+   text leaves the page — these are parents' and staff members' words.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Words carrying no information about WHAT an entry is about. Includes the
+   domain filler that swamps school records — "please", "kindly", "sir". */
+const NLP_STOP = new Set(('a about above after again against all am an and any are as at be because been ' +
+  'before being below between both but by can cannot could did do does doing done down during each few for ' +
+  'from further had has have having he her here hers him his how i if in into is it its itself just me more ' +
+  'most my no nor not now of off on once only or other our out over own same she should so some such than ' +
+  'that the their them then there these they this those through to too under until up very was we were what ' +
+  'when where which while who whom why will with would you your ' +
+  'please kindly sir madam thanks thank ok okay yes no na nil none nan needs need needed required require ' +
+  'requested request given give given taken take taking done doing also already still yet shall must may ' +
+  'branch school class section student students teacher teachers parent parents day days date today ' +
+  'issue issues problem problems work works action actions status update updated remark remarks note notes ' +
+  'informed inform information regarding respect concern concerned matter thing').split(' '));
+
+/* Light suffix stripping — enough to fold plurals and tenses, not a real
+   stemmer. Aggressive stemming would merge words that matter here. */
+function nlpStem(w){
+  if (w.length > 5 && /ies$/.test(w)) return w.slice(0, -3) + 'y';
+  if (w.length > 4 && /(sses|shes|ches)$/.test(w)) return w.slice(0, -2);
+  if (w.length > 4 && /s$/.test(w) && !/ss$/.test(w)) return w.slice(0, -1);
+  if (w.length > 5 && /ing$/.test(w)) return w.slice(0, -3);
+  if (w.length > 4 && /ed$/.test(w)) return w.slice(0, -2);
+  return w;
+}
+
+function nlpTokens(text){
+  const raw = String(text || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/);
+  const out = [];
+  raw.forEach(w => {
+    if (w.length < 3 || NLP_STOP.has(w) || /^\d+$/.test(w)) return;
+    const st = nlpStem(w);
+    if (st.length >= 3 && !NLP_STOP.has(st)) out.push(st);
+  });
+  return out;
+}
+
+/* Unigrams plus adjacent bigrams. Bigrams are what make a theme readable:
+   "water leakage" says something "water" and "leakage" separately do not. */
+function nlpTerms(text){
+  const t = nlpTokens(text);
+  const terms = t.slice();
+  for (let i = 0; i < t.length - 1; i++) terms.push(t[i] + ' ' + t[i + 1]);
+  return terms;
+}
+
+/* Every free-text entry in the dashboard, tagged with where it came from. */
+function nlpDocs(){
+  const docs = [];
+  const push = (branch, dept, text, row, colsKey) => {
+    const s = String(text || '').trim();
+    if (s.length < 12 || /^(nil|na|n\/a|none|-|–|nan)$/i.test(s)) return;
+    docs.push({ branch: branch, dept: dept, text: s, row: row, cols: colsKey });
+  };
+  (VIG_DATA || []).forEach(r => {
+    push(r.Branch, 'Vigilance', r.Issue, r, 'vig');
+    push(r.Branch, 'Vigilance', r.Action, r, 'vig');
+    push(r.Branch, 'Vigilance', r.BranchRemarks, r, 'vig');
+  });
+  (GRIEVANCE_DATA || []).forEach(r => {
+    push(r.Branch, 'Grievance', r.Description, r, 'griev');
+    push(r.Branch, 'Grievance', r.ActionTaken, r, 'griev');
+  });
+  (CARE_DATA || []).forEach(r => {
+    push(r.Branch, 'Care calls', r.Remarks, r, 'care');
+    push(r.Branch, 'Care calls', r.Followup, r, 'care');
+  });
+  (ADMIN_DATA || []).forEach(r => {
+    push(r.Branch, 'Admin', r.Description, r, 'admin');
+    push(r.Branch, 'Admin', r.Task, r, 'admin');
+  });
+  return docs;
+}
+
+/* ── TF-IDF themes, per branch ─────────────────────────────────────────── */
+function nlpThemes(docs, branches){
+  const tf = {}, df = {}, where = {};
+  branches.forEach(b => { tf[b] = {}; where[b] = {}; });
+  docs.forEach((d, di) => {
+    if (!tf[d.branch]) return;
+    const seen = {};
+    nlpTerms(d.text).forEach(t => {
+      tf[d.branch][t] = (tf[d.branch][t] || 0) + 1;
+      seen[t] = 1;
+    });
+    Object.keys(seen).forEach(t => {
+      df[t] = df[t] || {}; df[t][d.branch] = 1;
+      /* which entries each term came from — used below to tell one theme from
+         five phrasings of the same theme */
+      (where[d.branch][t] = where[d.branch][t] || new Set()).add(di);
+    });
+  });
+
+  const N = branches.length;
+  const out = {};
+  branches.forEach(b => {
+    const scored = Object.keys(tf[b]).map(term => {
+      const n = Object.keys(df[term] || {}).length || 1;
+      /* log((N+1)/n): a term every branch uses still scores, but only just, so a
+         term unique to one branch beats it even on far fewer mentions. The "+1"
+         floor used before was too generous — "repair maintenance", written at
+         all five branches, outranked each branch's own distinctive issue. */
+      const idf = Math.log((N + 1) / n);
+      const count = tf[b][term];
+      if (count < 3) return null;                    // one mention is not a theme
+      /* A term every branch writes is not what this branch writes that the
+         others do not — which is what the card promises. Those belong in the
+         repeated-entries card below, and they are shown there. */
+      if (N > 1 && n >= N) return null;
+      const words = term.split(' ').length;
+      return { term: term, count: count, branches: n, score: count * idf * (words > 1 ? 1.4 : 1) };
+    }).filter(Boolean);
+    scored.sort((x, y) => y.score - x.score);
+    /* Sliding bigrams over one sentence produce a chain — "water leakage",
+       "leakage boys", "boys washroom", "washroom third" — which is five ways of
+       saying one thing. Comparing WORDS cannot tell them apart. Comparing the
+       ENTRIES they came from can: terms drawn from substantially the same set
+       of records ARE the same theme, so only the highest-scoring one is kept. */
+    const kept = [];
+    const overlap = (a, c) => {
+      let hit = 0;
+      a.forEach(x => { if (c.has(x)) hit++; });
+      return hit / Math.min(a.size, c.size);
+    };
+    scored.forEach(s => {
+      if (kept.length >= 5) return;
+      const mine = where[b][s.term];
+      if (!mine) return;
+      if (kept.some(k => overlap(mine, where[b][k.term]) > 0.6)) return;
+      kept.push(s);
+    });
+    out[b] = kept;
+  });
+  return out;
+}
+
+/* ── near-duplicate clustering ─────────────────────────────────────────── */
+function nlpVector(text){
+  const v = {}, terms = nlpTerms(text);
+  terms.forEach(t => v[t] = (v[t] || 0) + 1);
+  let norm = 0;
+  Object.keys(v).forEach(k => norm += v[k] * v[k]);
+  norm = Math.sqrt(norm) || 1;
+  Object.keys(v).forEach(k => v[k] /= norm);
+  return v;
+}
+function nlpCosine(a, b){
+  let s = 0;
+  const ka = Object.keys(a), kb = Object.keys(b);
+  const [small, large] = ka.length < kb.length ? [ka, b] : [kb, a];
+  small.forEach(k => { if (large[k]) s += (ka.length < kb.length ? a[k] : b[k]) * large[k]; });
+  return s;
+}
+
+/* Single-link grouping at a fixed threshold. Quadratic, so capped — with a few
+   thousand entries that is milliseconds, and the cap keeps a very large sheet
+   from freezing the tab. */
+function nlpClusters(docs, threshold, maxDocs){
+  const use = docs.slice(0, maxDocs || 1200);
+  const vecs = use.map(d => nlpVector(d.text));
+  const owner = use.map((_, i) => i);
+  const find = i => { while (owner[i] !== i) { owner[i] = owner[owner[i]]; i = owner[i]; } return i; };
+
+  for (let i = 0; i < use.length; i++) {
+    for (let j = i + 1; j < use.length; j++) {
+      if (find(i) === find(j)) continue;
+      if (nlpCosine(vecs[i], vecs[j]) >= (threshold || 0.5)) owner[find(j)] = find(i);
+    }
+  }
+  const groups = {};
+  use.forEach((d, i) => {
+    const k = find(i);
+    (groups[k] = groups[k] || []).push(d);
+  });
+  return Object.values(groups)
+    .filter(g => g.length >= 3)
+    .map(g => {
+      const branches = [...new Set(g.map(d => d.branch))].filter(Boolean);
+      /* The entry closest to the middle of the group reads as its label. */
+      const label = g.slice().sort((a, b) => a.text.length - b.text.length)[Math.floor(g.length / 2)];
+      return { n: g.length, branches: branches, dept: g[0].dept, label: label.text, docs: g };
+    })
+    .sort((a, b) => b.n - a.n);
+}
+
+/* ── rendering ─────────────────────────────────────────────────────────── */
+function nlpOpenDocs(title, sub, docs){
+  const byCol = {};
+  docs.forEach(d => { (byCol[d.cols] = byCol[d.cols] || []).push(d.row); });
+  const key = Object.keys(byCol).sort((a, b) => byCol[b].length - byCol[a].length)[0];
+  const rows = [];
+  const seen = new Set();
+  docs.forEach(d => { if (!seen.has(d.row)) { seen.add(d.row); rows.push(d.row); } });
+  /* No formula strip: this is a list of records, not a rate. */
+  openModal('💬 ' + title, sub, rows, CG_COLS[key] || CG_COLS.vig, null);
+}
+
+function cgRenderText(branches){
+  const host = document.getElementById('cg-themes');
+  const chost = document.getElementById('cg-clusters');
+  if (!host) return;
+
+  const docs = nlpDocs();
+  if (docs.length < 20){
+    host.innerHTML = '<div style="padding:18px;color:#64748B;font-size:13px">' +
+      'Not enough written entries to read yet (' + docs.length + ' found). ' +
+      'This reads the observation, description and remark fields of the vigilance, grievance, ' +
+      'care-call and admin trackers.</div>';
+    if (chost) chost.innerHTML = '';
+    return;
+  }
+  window._NLP_DOCS = docs;
+
+  const themes = nlpThemes(docs, branches);
+  let h = '<thead><tr><th style="text-align:left">Branch</th><th style="text-align:left">' +
+    'What this branch writes about that the others do not</th><th>Entries</th></tr></thead><tbody>';
+  branches.forEach(b => {
+    const t = themes[b] || [];
+    const chips = t.length
+      ? t.map(x => '<span style="display:inline-block;background:#EEF2FF;border:1px solid #DDE3FF;' +
+          'border-radius:14px;padding:3px 11px;margin:2px 5px 2px 0;font-size:12px;cursor:pointer" ' +
+          'title="' + x.count + ' entries · appears in ' + x.branches + ' of ' + branches.length + ' branches" ' +
+          'onclick="nlpTheme(\'' + b.replace(/'/g, "\\'") + '\',\'' + x.term.replace(/'/g, "\\'") + '\')">' +
+          x.term + ' <b>' + x.count + '</b></span>').join('')
+      : '<span style="color:#94A3B8;font-size:12px">nothing distinctive — this branch writes about the same things as the rest</span>';
+    const n = docs.filter(d => d.branch === b).length;
+    h += '<tr><td style="text-align:left;vertical-align:top"><span class="bd b' + b + '"></span> ' + b + '</td>' +
+      '<td style="text-align:left">' + chips + '</td>' +
+      '<td style="vertical-align:top;font-weight:700">' + n + '</td></tr>';
+  });
+  host.innerHTML = h + '</tbody>';
+
+  if (!chost) return;
+  const cl = nlpClusters(docs, 0.5, 1200);
+  if (!cl.length){
+    chost.innerHTML = '<div style="padding:18px;color:#64748B;font-size:13px">' +
+      'No entry has been written three or more times in similar words. Nothing is being ' +
+      'logged repeatedly.</div>';
+    return;
+  }
+  chost.innerHTML = cl.slice(0, 12).map((c, i) =>
+    '<div style="padding:11px 14px;border-bottom:1px solid #EEF2FF;cursor:pointer" ' +
+    'onclick="nlpCluster(' + i + ')">' +
+    '<div style="display:flex;gap:10px;align-items:baseline">' +
+    '<span style="font-weight:800;color:#DC2626;min-width:42px">×' + c.n + '</span>' +
+    '<span style="font-size:12.5px;color:#1F2937">' + c.label.slice(0, 150) +
+    (c.label.length > 150 ? '…' : '') + '</span></div>' +
+    '<div style="margin-left:52px;margin-top:3px;color:#64748B;font-size:11.5px">' +
+    c.dept + ' · ' + c.branches.join(', ') + '</div></div>').join('');
+  window._NLP_CLUSTERS = cl;
+}
+
+function nlpTheme(branch, term){
+  const docs = (window._NLP_DOCS || []).filter(d =>
+    d.branch === branch && nlpTerms(d.text).indexOf(term) >= 0);
+  nlpOpenDocs(branch + ' — “' + term + '”',
+    docs.length + ' entr' + (docs.length === 1 ? 'y' : 'ies') + ' mentioning this', docs);
+}
+function nlpCluster(i){
+  const c = (window._NLP_CLUSTERS || [])[i];
+  if (!c) return;
+  nlpOpenDocs('Repeated ' + c.dept.toLowerCase() + ' entry',
+    c.n + ' similar entries across ' + c.branches.join(', '), c.docs);
+}
+
+function renderConsolidated(){
+  const branches = cgBranches();
+  if (!branches.length) return;
+  const D = cgCollect();
+  cgRenderScores(D, branches);
+  cgRenderOpen(D, branches);
+  cgRenderFlags(D, branches);
+  try { cgRenderText(branches); } catch(e){ console.error('text analysis:', e && e.message); }
+  const meta = document.getElementById('cg-meta');
+  if (meta) meta.textContent = branches.length + ' branches · ' +
+    CG_DEPTS.filter(dep => branches.some(b => dep.score(D[b]) !== null)).length + ' departments with data';
+}
+
 /* ══════════════════ Digital Marketing ══════════════════
    DM_DATA arrives in the main payload, exactly like CARE_DATA and OBS_DATA, so
    this tab has nothing to fetch and nothing to wait for. The panel runs in a
