@@ -740,7 +740,7 @@ const DATA_API = '/api/data';   // server-side proxy — no Apps Script URL in t
 const AUTO_REFRESH_SECONDS = 120;
 
 // ---- Global data arrays (populated by fetch, read by renderAll) ----
-let GO_DATA = [], GRIEVANCE_DATA = [], ADM_TRENDS = [], MONTH_CONFIG = {}, ALL_TEACHER = [], CARE_DATA = [], OBS_DATA = [], ADMIN_DATA = [], PUR_DATA = [],
+let GO_DATA = [], GRIEVANCE_DATA = [], ADM_TRENDS = [], MONTH_CONFIG = {}, ALL_TEACHER = [], CARE_DATA = [], OBS_DATA = [], ADMIN_DATA = [], PUR_DATA = [], DM_DATA = [],
     HR_RECORDS = [], VIG_DATA = [], TRACKER = [],
     ADM1_DATA = [], ADM2_DATA = [], LEAD_DATES = [],
     LEAD_SUMMARY = {}, OWNER_STATS = [], COMBINED_ADM = [],
@@ -883,6 +883,7 @@ function applyLiveData(data){
     if (data.PUR_DATA)         PUR_DATA         = data.PUR_DATA;
     if (data.HR_RECORDS)       HR_RECORDS       = data.HR_RECORDS;
     if (data.VIG_DATA)         VIG_DATA         = data.VIG_DATA;
+    if (data.DM_DATA)          DM_DATA          = data.DM_DATA;
     if (data.ADM1_DATA)        ADM1_DATA        = data.ADM1_DATA;
     if (data.ADM2_DATA)        ADM2_DATA        = data.ADM2_DATA;
     if (data.LEAD_DATES)       LEAD_DATES       = data.LEAD_DATES;
@@ -8844,7 +8845,8 @@ var _RENDERERS = {
   grievance:     ['Grievance', function(){ renderGrievance(); renderGrievanceOfficer(); }],
   transport:     ['Transport', function(){ renderTransport(); }],
   it:            ['IT', function(){ renderIT(); }],
-  hr:            ['HR', function(){ renderHR(); }]
+  hr:            ['HR', function(){ renderHR(); }],
+  dm:            ['Digital Marketing', function(){ renderDm(); }]
 };
 var _stale = {};
 function _currentTab(){
@@ -16011,12 +16013,15 @@ async function _lazyFetch(section, force, session, ms){
    one no longer does either: the second attempt is served from the warm cache,
    so it retries once by itself and only reports a failure if that also fails. */
 /* ══════════════════ Digital Marketing ══════════════════
-   The campaign panel runs in a frame and holds no data of its own: records are
-   read from the "Digital Marketing" tab through /api/data?section=dm and posted
-   in. Same pattern as the syllabus panel — read on open, re-read in the
-   background while the tab is showing, and no Refresh button, because the other
-   department tabs do not have one either. */
-var _dmLoaded=false, _dmLoading=false, _dmReady=false, _dmPending=null, _dmTimer=null, _dmRetried=false;
+   DM_DATA arrives in the main payload, exactly like CARE_DATA and OBS_DATA, so
+   this tab has nothing to fetch and nothing to wait for. The panel runs in a
+   frame only because it is a large self-contained page; the records are handed
+   to it the moment the frame is ready. No loading text, no refresh. */
+var _dmReady=false, _dmSent=false;
+
+function dmRecords(){
+  return (typeof DM_DATA !== 'undefined' && Array.isArray(DM_DATA)) ? DM_DATA : [];
+}
 
 function _dmMount(){
   var host=document.getElementById('dm-mount');
@@ -16030,91 +16035,46 @@ function _dmMount(){
   f.srcdoc=window.__DM_PAGE__;
   window.addEventListener('message',function(ev){
     var m=ev.data||{};
-    if(m.type==='PBES_DM_READY'){ _dmReady=true; if(_dmPending) _dmPost(); }
+    if(m.type==='PBES_DM_READY'){ _dmReady=true; _dmPost(); }
     if(m.type==='PBES_DM_HEIGHT' && m.height){ f.style.height=(m.height+40)+'px'; }
   });
 }
 
-function _dmStatus(msg, bad){
-  var el=document.getElementById('dm-status');
-  if(!el) return;
-  el.textContent=msg||'';
-  el.style.color=bad?'#B3402F':'#6B7280';
-}
-
 function _dmPost(){
   var f=document.getElementById('dm-frame');
-  if(!f||!f.contentWindow||!_dmPending) return;
-  if(!_dmReady) return;
-  f.contentWindow.postMessage({type:'PBES_DM_DATA', recs:_dmPending}, '*');
+  if(!f || !f.contentWindow || !_dmReady) return;
+  var recs=dmRecords();
+  f.contentWindow.postMessage({type:'PBES_DM_DATA', recs:recs}, '*');
+  _dmSent = recs.length > 0;
   var b=(typeof fBranch!=='undefined')?fBranch:'ALL';
   if(b && b!=='ALL') f.contentWindow.postMessage({type:'PBES_DM_BRANCH', branch:b}, '*');
+
+  var meta=document.getElementById('dm-meta');
+  if(meta){
+    meta.textContent = recs.length
+      ? (recs.length+' rows · '+recs.filter(function(x){return x.level==='Campaign';}).length+' campaigns')
+      : '';
+  }
+  /* The only failure worth reporting is a payload with no DM_DATA at all, which
+     means Apps Script has not been redeployed with the builder. */
+  var host=document.getElementById('dm-mount');
+  if(!recs.length && host && !host.dataset.warned){
+    host.dataset.warned='1';
+    var note=document.createElement('div');
+    note.style.cssText='padding:22px;color:#B3402F;font-size:13px;line-height:1.6';
+    note.innerHTML='<b>No campaign rows in this payload.</b><br><br>'+
+      'The dashboard loaded, so the connection is fine \u2014 the "Digital Marketing" tab '+
+      'returned nothing. Run <code>testDigitalRaw()</code> in the Apps Script editor; it prints '+
+      'what it found. If it reports rows, redeploy Code.gs as a NEW VERSION of the existing deployment.';
+    host.insertBefore(note, host.firstChild);
+  }
 }
 
-async function loadDm(force){
+/* Called on every render pass, so a branch or month change reaches the panel
+   the same way it reaches every other tab. */
+function renderDm(){
   _dmMount();
-  if(_dmLoading) return;
-  if(_dmLoaded && !force){ _dmPost(); return; }
-  _dmLoading=true;
-  _dmStatus(_dmLoaded?'':'Loading…');
-  if(force){ try{ await idbSet('pbes_dm', null); }catch(e){} }
-  try{
-    if(!_dmLoaded && !force){
-      try{
-        var c=await idbGet('pbes_dm');
-        if(c && c.recs && c.recs.length && (Date.now()-c.t) < 24*3600*1000){
-          _dmPending=c.recs; _dmLoaded=true; _dmPost();
-          _dmStatus('Showing the last copy · reading the sheet now');
-        }
-      }catch(e){}
-    }
-    var ss=await sb.auth.getSession();
-    var tok=ss && ss.data && ss.data.session && ss.data.session.access_token;
-    if(!tok) throw new Error('Not signed in');
-    var url='/api/data?section=dm'+(force?'&nocache=1':'');
-    var r=await fetch(url,{headers:{Authorization:'Bearer '+tok}});
-    if(!r.ok) throw new Error('The data service returned HTTP '+r.status);
-    var d=await r.json();
-    var raw=d && d.DM_RAW;
-    if(!raw) throw new Error('The reply carried no DM_RAW block. Redeploy Code.gs and data.js together.');
-    if(raw.problem) throw new Error(raw.problem);
-    if(!raw.recs || !raw.recs.length)
-      throw new Error('The "Digital Marketing" tab returned no campaign rows. '+
-                      'Run testDigitalRaw() in the Apps Script editor — it prints what it found.');
-
-    _dmPending=raw.recs; _dmLoaded=true; _dmPost();
-    try{ idbSet('pbes_dm',{t:Date.now(), recs:raw.recs}); }catch(e){}
-    var meta=document.getElementById('dm-meta');
-    if(meta) meta.textContent=raw.recs.length+' rows · '+
-      raw.recs.filter(function(x){return x.level==='Campaign';}).length+' campaigns';
-    _dmStatus(_sylAgeLabel(raw.generatedAt));
-    _dmRetried=false;
-  }catch(err){
-    var msg=String(err && err.message || err);
-    if(/did not answer|Failed to fetch|Could not reach/i.test(msg) && !_dmRetried){
-      _dmRetried=true; _dmLoading=false; _dmStatus('Reading the sheet…');
-      setTimeout(function(){ loadDm(force); }, 1200);
-      return;
-    }
-    if(!_dmLoaded){
-      var host=document.getElementById('dm-mount');
-      if(host) host.innerHTML='<div style="padding:26px;color:#B3402F;font-size:13px;line-height:1.6">'+
-        '<b>The Digital Marketing feed has not arrived</b><br><br>'+msg+'</div>';
-    }
-    _dmStatus(_dmLoaded?'':msg, !_dmLoaded);
-  }finally{ _dmLoading=false; }
-}
-
-function _dmAutoRefresh(on){
-  if(_dmTimer){ clearInterval(_dmTimer); _dmTimer=null; }
-  if(!on) return;
-  var every=(typeof AUTO_REFRESH_SECONDS==='number'&&AUTO_REFRESH_SECONDS>0)?AUTO_REFRESH_SECONDS:120;
-  _dmTimer=setInterval(function(){
-    if(document.hidden) return;
-    var pane=document.getElementById('pane-dm');
-    if(!pane||!pane.classList.contains('active')) return;
-    loadDm(true);
-  }, Math.max(60,every)*1000);
+  _dmPost();
 }
 
 var _sylRetried = false, _sylStaleRetried = false;
@@ -16242,12 +16202,12 @@ function _sylPushBranch(){
     if(typeof renderTabIfStale==='function') renderTabIfStale(id);
     if(id==='syl'){ loadSyl(false); setTimeout(_sylPushBranch,300); _sylAutoRefresh(true); }
     else _sylAutoRefresh(false);
-    if(id==='dm'){ loadDm(false); _dmAutoRefresh(true); } else _dmAutoRefresh(false);
+    if(id==='dm') renderDm();
   };
   window.switchTab=function(id){ _w(id);
     if(id==='syl'){ loadSyl(false); setTimeout(_sylPushBranch,300); _sylAutoRefresh(true); }
     else _sylAutoRefresh(false);
-    if(id==='dm'){ loadDm(false); _dmAutoRefresh(true); } else _dmAutoRefresh(false); };
+    if(id==='dm') renderDm(); };
   var _af=window.applyFilters;
   if(typeof _af==='function') window.applyFilters=function(){
     var r=_af.apply(this,arguments); _sylPushBranch(); return r;
