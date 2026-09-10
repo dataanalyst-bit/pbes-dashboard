@@ -1770,41 +1770,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   </div>
 
   <div class="card" style="margin-bottom:16px;"><div class="ch">
-      <h3>&#128202; Where each branch stands</h3>
-      <span class="fnote">Each cell is that department's completion for the branch. The index weights them &mdash;
-        safety and parent-facing work count for more than internal housekeeping. &#9888; marks a branch sitting
-        clearly below the others on that measure. Click any figure for the rows and the formula.</span></div>
-    <div class="cb-0" style="overflow-x:auto"><table class="dt" id="cg-scores"></table></div>
-  </div>
-
-  <div class="card" style="margin-bottom:16px;"><div class="ch">
       <h3>&#9200; Open and overdue right now</h3>
-      <span class="fnote">Counts, not percentages &mdash; what is actually sitting unfinished today.
-        &#9888; marks a count clearly higher than the other branches. Click any number for the records.</span></div>
+      <span class="fnote">Everything sitting unfinished today, branch by branch. &#9888; marks a count clearly
+        higher than the other branches. Click any number for the records behind it.</span></div>
     <div class="cb-0" style="overflow-x:auto"><table class="dt" id="cg-open"></table></div>
   </div>
 
-  <div class="card" style="margin-bottom:16px;"><div class="ch">
-      <h3>&#128172; What the written entries say</h3>
-      <span class="fnote">Read from the observation, description and remark fields of the vigilance, grievance,
-        care-call and admin trackers. Terms are weighted by how RARE they are across branches, so what shows is
-        what makes a branch different &mdash; not the words every branch uses. Click a term for the entries.</span></div>
-    <div class="cb-0" style="overflow-x:auto"><table class="dt" id="cg-themes"></table></div>
-  </div>
+  <div id="cg-blocks"></div>
 
   <div class="card" style="margin-bottom:16px;"><div class="ch">
       <h3>&#128257; The same thing, logged again and again</h3>
-      <span class="fnote">Entries written three or more times in similar words, matched on meaning rather than
-        exact text &mdash; so "water leakage in boys washroom" and "leakage of water, boys toilet" count as one.
-        A high number here usually means the underlying cause was never fixed.</span></div>
+      <span class="fnote">Entries still open or in progress that have been written three or more times in similar
+        words, matched on meaning rather than exact text. Closed work is excluded &mdash; a repeated entry only
+        matters while it is still outstanding.</span></div>
     <div class="cb-0" id="cg-clusters"></div>
   </div>
 
   <div class="card" style="margin-bottom:16px;"><div class="ch">
       <h3>&#128269; What stands out</h3>
-      <span class="fnote">Branches more than two robust standard deviations from the group median, worst first.
-        Median and MAD are used rather than mean and standard deviation because with five branches one weak
-        branch moves the mean far enough to hide itself.</span></div>
+      <span class="fnote">Branches sitting clearly apart from the group, worst first. Median and MAD are used
+        rather than mean and standard deviation because with five branches one weak branch moves the mean far
+        enough to hide itself.</span></div>
     <div class="cb-0" id="cg-flags"></div>
   </div>
 </div>
@@ -16227,21 +16213,47 @@ function cgCollect(){
       }
     }
 
+    /* Ageing: how long the oldest still-open item has been sitting. A count of
+       open items does not distinguish ten raised yesterday from one raised in
+       April, and the second is the one that needs naming in a meeting. */
+    const ageOf = (rows, field) => {
+      let worst = 0;
+      rows.forEach(r => { const t = cgDate(r[field]); if (t) worst = Math.max(worst, Math.round((today - t) / CG_DAY)); });
+      return worst;
+    };
+    const grSevere = grOpen.filter(r => /high|critical|severe|major/i.test(String(r.Severity || '')));
+    const admHigh  = admOpen.filter(r => /high|urgent|critical/i.test(String(r.Priority || '')));
+    const careProg = care.filter(r => /progress/i.test(String(r.Status || '')));
+    const obsWeak  = (ALL_TEACHER || []).filter(r => r.Branch === b &&
+      !isNaN(parseFloat(r.GrandAvg)) && parseFloat(r.GrandAvg) < 3);
+    const trExpired = tr.filter(r => {
+      const d = r.DaysToExpiry;
+      return d !== null && d !== undefined && d !== '' && cgNum(d) <= 0;
+    });
+    const hrStale = hrOpen.filter(r => { const t = cgDate(r.PostDate); return t && (today - t) / CG_DAY > 30; });
+
     out[b] = {
       branch: b,
-      care: { made: care.length, resolved: careRes.length, rows: care, resRows: careRes },
+      care: { made: care.length, resolved: careRes.length, progress: careProg.length,
+              rows: care, resRows: careRes, progRows: careProg },
       griev: { total: griev.length, open: grOpen.length, over: grOver.length,
-               rows: griev, openRows: grOpen, overRows: grOver },
+               severe: grSevere.length, oldest: ageOf(grOpen, 'Date'),
+               rows: griev, openRows: grOpen, overRows: grOver, severeRows: grSevere },
       admin: { total: admin.length, open: admOpen.length, over: admOver.length,
-               rows: admin, openRows: admOpen, overRows: admOver },
+               high: admHigh.length, oldest: ageOf(admOver, 'Deadline'),
+               rows: admin, openRows: admOpen, overRows: admOver, highRows: admHigh },
       vig: { total: vig.length, open: vigOpen.length, over: vigOver.length, crit: vigCrit.length,
+             oldest: ageOf(vigOpen, 'VisitDate'),
              rows: vig, openRows: vigOpen, overRows: vigOver, critRows: vigCrit },
-      obs: { done: obs.length, required: obsReq, avg: obsAvg, rows: obs },
+      obs: { done: obs.length, required: obsReq, avg: obsAvg, weak: obsWeak.length,
+             rows: obs, weakRows: obsWeak },
       syl: syl,
       it: { total: itTot, down: itDown, rows: it },
-      tr: { vehicles: tr.length, expiring: trExp.length, rows: tr, expRows: trExp },
+      tr: { vehicles: tr.length, expiring: trExp.length, expired: trExpired.length,
+            rows: tr, expRows: trExp, expiredRows: trExpired },
       pur: { total: pur.length, open: purOpen.length, rows: pur, openRows: purOpen },
-      hr:  { total: hr.length, open: hrOpen.length, rows: hr, openRows: hrOpen }
+      hr:  { total: hr.length, open: hrOpen.length, stale: hrStale.length,
+             rows: hr, openRows: hrOpen, staleRows: hrStale }
     };
   });
   return out;
@@ -16331,71 +16343,152 @@ const CG_COLS = {
           {key:'Status',label:'Status',pill:true},{key:'DaysToClose',label:'Days'}]
 };
 
-/* Table 1 — where each branch stands. */
-function cgRenderScores(D, branches){
-  const host = document.getElementById('cg-scores');
+/* ── Department blocks ───────────────────────────────────────────────────
+   One block per department, in the layout of the meeting workbook: a green
+   strip naming the department, branches down the side, the fields that matter
+   across the top. Every field here is something OUTSTANDING — the point of the
+   sheet is what still needs doing, not what has been done. */
+
+const CG_BLOCKS = [
+  { icon:'🛡️', name:'Vigilance & safety', cols:[
+      {l:'Issues raised',      g:d=>d.vig.total,             k:'vig'},
+      {l:'Still open',         g:d=>d.vig.open,              k:'vig-open',  bad:true},
+      {l:'Past target date',   g:d=>d.vig.over,              k:'vig-over',  bad:true},
+      {l:'Critical still open',g:d=>d.vig.crit,              k:'vig-crit',  bad:true},
+      {l:'Oldest open (days)', g:d=>d.vig.oldest,            k:'vig-open',  bad:true},
+      {l:'Closed',             g:d=>d.vig.total-d.vig.open,  k:'vig'}
+    ]},
+  { icon:'📣', name:'Grievance', cols:[
+      {l:'Cases raised',       g:d=>d.griev.total,               k:'griev'},
+      {l:'Still open',         g:d=>d.griev.open,                k:'griev-open', bad:true},
+      {l:'Past target date',   g:d=>d.griev.over,                k:'griev-over', bad:true},
+      {l:'Severe still open',  g:d=>d.griev.severe,              k:'griev-severe', bad:true},
+      {l:'Oldest open (days)', g:d=>d.griev.oldest,              k:'griev-open', bad:true},
+      {l:'Resolved',           g:d=>d.griev.total-d.griev.open,  k:'griev'}
+    ]},
+  { icon:'🗂️', name:'Admin tasks', cols:[
+      {l:'Tasks',              g:d=>d.admin.total,               k:'admin'},
+      {l:'Still open',         g:d=>d.admin.open,                k:'admin-open', bad:true},
+      {l:'Past deadline',      g:d=>d.admin.over,                k:'admin-over', bad:true},
+      {l:'High priority open', g:d=>d.admin.high,                k:'admin-high', bad:true},
+      {l:'Oldest overdue (days)',g:d=>d.admin.oldest,            k:'admin-over', bad:true},
+      {l:'Completed',          g:d=>d.admin.total-d.admin.open,  k:'admin'}
+    ]},
+  { icon:'📞', name:'Care calls', cols:[
+      {l:'Calls made',         g:d=>d.care.made,                       k:'care'},
+      {l:'Not resolved',       g:d=>d.care.made-d.care.resolved,       k:'care-pending', bad:true},
+      {l:'In progress',        g:d=>d.care.progress,                   k:'care-progress', bad:true},
+      {l:'Resolved',           g:d=>d.care.resolved,                   k:'care'}
+    ]},
+  { icon:'👁️', name:'Teacher observations', cols:[
+      {l:'Required',           g:d=>d.obs.required,                                  k:'obs'},
+      {l:'Done',               g:d=>d.obs.done,                                      k:'obs'},
+      {l:'Shortfall',          g:d=>Math.max(0,d.obs.required-d.obs.done),           k:'obs', bad:true},
+      {l:'Avg score',          g:d=>d.obs.avg===null?null:Math.round(d.obs.avg*10)/10, k:'obs'},
+      {l:'Scoring below 3',    g:d=>d.obs.weak,                                      k:'obs-weak', bad:true}
+    ]},
+  { icon:'📗', name:'Syllabus & notebooks', cols:[
+      {l:'Units due',          g:d=>d.syl?d.syl.due:null,            k:'syl'},
+      {l:'Not done on time',   g:d=>d.syl?(d.syl.due-d.syl.done):null,k:'syl', bad:true},
+      {l:'Done on time',       g:d=>d.syl?d.syl.done:null,           k:'syl'}
+    ]},
+  { icon:'💻', name:'IT', cols:[
+      {l:'Assets',             g:d=>d.it.total,             k:'it'},
+      {l:'Not working',        g:d=>d.it.down,              k:'it-down', bad:true},
+      {l:'Working',            g:d=>d.it.total-d.it.down,   k:'it'}
+    ]},
+  { icon:'🚌', name:'Transport', cols:[
+      {l:'Vehicles',           g:d=>d.tr.vehicles,                    k:'tr'},
+      {l:'Docs expired',       g:d=>d.tr.expired,                     k:'tr-expired', bad:true},
+      {l:'Docs due ≤30 days',  g:d=>d.tr.expiring,                    k:'tr-exp', bad:true},
+      {l:'Compliant',          g:d=>d.tr.vehicles-d.tr.expiring,      k:'tr'}
+    ]},
+  { icon:'🛒', name:'Purchase', cols:[
+      {l:'Indents',            g:d=>d.pur.total,               k:'pur'},
+      {l:'Pending',            g:d=>d.pur.open,                k:'pur-open', bad:true},
+      {l:'Completed',          g:d=>d.pur.total-d.pur.open,    k:'pur'}
+    ]},
+  { icon:'👥', name:'Human resources', cols:[
+      {l:'Positions posted',   g:d=>d.hr.total,              k:'hr'},
+      {l:'Still open',         g:d=>d.hr.open,               k:'hr-open', bad:true},
+      {l:'Open > 30 days',     g:d=>d.hr.stale,              k:'hr-stale', bad:true},
+      {l:'Filled',             g:d=>d.hr.total-d.hr.open,    k:'hr'}
+    ]}
+];
+
+function cgRenderBlocks(D, branches){
+  const host = document.getElementById('cg-blocks');
   if (!host) return;
-  const risks = branches.map(b => cgRisk(D[b]).score);
-  const ranked = branches.slice().filter(b => cgRisk(D[b]).score !== null)
-    .sort((a, c) => cgRisk(D[c]).score - cgRisk(D[a]).score);
+  let html = '';
 
-  let h = '<thead><tr><th style="text-align:left">Branch</th>' +
-    CG_DEPTS.map(d => '<th>' + d.label + '</th>').join('') +
-    '<th style="border-left:2px solid #E0E8FF">Index</th><th>Rank</th></tr></thead><tbody>';
+  CG_BLOCKS.forEach(blk => {
+    /* A department with nothing recorded anywhere is left out rather than
+       shown as a wall of zeroes nobody can act on. */
+    const any = branches.some(b => blk.cols.some(c => { const v = c.g(D[b]); return v !== null && v !== 0; }));
+    if (!any) return;
 
-  branches.forEach(b => {
-    const d = D[b], r = cgRisk(d);
-    const tds = CG_DEPTS.map(dep => {
-      const s = dep.score(d);
-      if (s === null) return '<td style="color:#CBD5E1" title="No data for this department">–</td>';
-      const z = cgZ(s, branches.map(x => dep.score(D[x])).filter(v => v !== null));
-      const flag = (z !== null && z <= -2) ? ' ⚠' : '';
-      return '<td style="font-weight:700;color:' + cgColor(s) + ';cursor:pointer" ' +
-        'title="' + dep.fx(d).replace(/"/g, '&quot;') + '" ' +
-        'onclick="cgCell(\'' + dep.key + '\',\'' + b.replace(/'/g, "\\'") + '\')">' +
-        Math.round(s) + '%' + flag + '</td>';
-    }).join('');
-    const rank = ranked.indexOf(b);
-    h += '<tr><td style="text-align:left"><span class="bd b' + b + '"></span> ' + b + '</td>' + tds +
-      '<td style="border-left:2px solid #E0E8FF;font-weight:800;color:' + cgColor(r.score) + ';cursor:pointer" ' +
-      'onclick="cgRiskDetail(\'' + b.replace(/'/g, "\\'") + '\')">' +
-      (r.score === null ? '–' : Math.round(r.score)) + '</td>' +
-      '<td style="font-weight:700">' + (rank < 0 ? '–' : (rank + 1)) + '</td></tr>';
+    let rows = '';
+    const tot = blk.cols.map(() => 0);
+    let havеTot = blk.cols.map(() => false);
+
+    branches.forEach(b => {
+      const d = D[b];
+      const tds = blk.cols.map((c, i) => {
+        const v = c.g(d);
+        if (v === null || v === undefined)
+          return '<td style="color:#CBD5E1" title="not recorded">–</td>';
+        if (!/avg|oldest/i.test(c.l)) { tot[i] += v; havеTot[i] = true; }
+        const all = branches.map(x => c.g(D[x])).filter(z => z !== null && z !== undefined);
+        const z = c.bad ? cgZ(v, all) : null;
+        const flag = (z !== null && z >= 2 && v > 0) ? ' ⚠' : '';
+        const col = c.bad ? cgCountColor(v) : '#1F2937';
+        return '<td style="font-weight:' + (c.bad ? 700 : 600) + ';color:' + col + ';cursor:pointer" ' +
+          'onclick="cgCell(\'' + c.k + '\',\'' + b.replace(/'/g, "\\'") + '\')">' + v + flag + '</td>';
+      }).join('');
+      rows += '<tr><td style="text-align:left"><span class="bd b' + b + '"></span> ' + b + '</td>' + tds + '</tr>';
+    });
+
+    const foot = blk.cols.map((c, i) =>
+      '<td style="font-weight:800">' + (havеTot[i] ? tot[i] : '–') + '</td>').join('');
+
+    html +=
+      '<div class="card" style="margin-bottom:14px"><div class="ch" style="background:#1B5E34">' +
+      '<h3 style="color:#fff">' + blk.icon + '&nbsp; ' + blk.name + '</h3></div>' +
+      '<div class="cb-0" style="overflow-x:auto"><table class="dt">' +
+      '<thead><tr><th style="text-align:left">Branch</th>' +
+      blk.cols.map(c => '<th>' + c.l + '</th>').join('') + '</tr></thead><tbody>' + rows +
+      '<tr style="background:#F8FAFF;border-top:2px solid #E0E8FF">' +
+      '<td style="text-align:left;font-weight:800">All branches</td>' + foot + '</tr>' +
+      '</tbody></table></div></div>';
   });
 
-  /* Group row: the median, not the mean — one weak branch should not move the
-     line everyone else is compared against. */
-  h += '<tr style="background:#F8FAFF;border-top:2px solid #E0E8FF"><td style="text-align:left;font-weight:800">Group median</td>' +
-    CG_DEPTS.map(dep => {
-      const m = cgMedian(branches.map(b => dep.score(D[b])).filter(v => v !== null));
-      return '<td style="font-weight:700;color:' + cgColor(m) + '">' + (m === null ? '–' : Math.round(m) + '%') + '</td>';
-    }).join('') +
-    '<td style="border-left:2px solid #E0E8FF;font-weight:800">' +
-    (cgMedian(risks) === null ? '–' : Math.round(cgMedian(risks))) + '</td><td></td></tr></tbody>';
-  host.innerHTML = h;
+  host.innerHTML = html;
 }
 
 /* Table 2 — what is open and overdue right now. */
+/* The icon carries the department, the label carries the state, so a column can
+   be found at a glance in a meeting without reading every heading. */
 const CG_OPEN_COLS = [
-  { l: 'Care calls pending',   get: d => d.care.made - d.care.resolved, k: 'care-pending' },
-  { l: 'Grievance open',       get: d => d.griev.open,  k: 'griev-open' },
-  { l: 'Grievance overdue',    get: d => d.griev.over,  k: 'griev-over' },
-  { l: 'Admin open',           get: d => d.admin.open,  k: 'admin-open' },
-  { l: 'Admin overdue',        get: d => d.admin.over,  k: 'admin-over' },
-  { l: 'Vigilance open',       get: d => d.vig.open,    k: 'vig-open' },
-  { l: 'Vigilance overdue',    get: d => d.vig.over,    k: 'vig-over' },
-  { l: 'Open critical',        get: d => d.vig.crit,    k: 'vig-crit' },
-  { l: 'IT assets down',       get: d => d.it.down,     k: 'it-down' },
-  { l: 'Vehicle docs due ≤30d',get: d => d.tr.expiring, k: 'tr-exp' },
-  { l: 'Purchase pending',     get: d => d.pur.open,    k: 'pur-open' },
-  { l: 'Positions open',       get: d => d.hr.open,     k: 'hr-open' }
+  { i:'📞', l:'Care calls<br>pending',    get: d => d.care.made - d.care.resolved, k:'care-pending' },
+  { i:'📣', l:'Grievance<br>open',        get: d => d.griev.open,  k:'griev-open' },
+  { i:'⏳', l:'Grievance<br>overdue',     get: d => d.griev.over,  k:'griev-over' },
+  { i:'🗂️', l:'Admin tasks<br>open',      get: d => d.admin.open,  k:'admin-open' },
+  { i:'⏳', l:'Admin tasks<br>overdue',   get: d => d.admin.over,  k:'admin-over' },
+  { i:'🛡️', l:'Vigilance<br>open',        get: d => d.vig.open,    k:'vig-open' },
+  { i:'⏳', l:'Vigilance<br>overdue',     get: d => d.vig.over,    k:'vig-over' },
+  { i:'🔥', l:'Critical<br>still open',   get: d => d.vig.crit,    k:'vig-crit' },
+  { i:'💻', l:'IT assets<br>down',        get: d => d.it.down,     k:'it-down' },
+  { i:'🚌', l:'Vehicle docs<br>due ≤30d', get: d => d.tr.expiring, k:'tr-exp' },
+  { i:'🛒', l:'Purchase<br>pending',      get: d => d.pur.open,    k:'pur-open' },
+  { i:'👥', l:'Positions<br>open',        get: d => d.hr.open,     k:'hr-open' }
 ];
 
 function cgRenderOpen(D, branches){
   const host = document.getElementById('cg-open');
   if (!host) return;
   let h = '<thead><tr><th style="text-align:left">Branch</th>' +
-    CG_OPEN_COLS.map(c => '<th>' + c.l + '</th>').join('') +
+    CG_OPEN_COLS.map(c => '<th style="line-height:1.35"><span style="font-size:16px;display:block">' +
+      c.i + '</span><span style="font-size:11px">' + c.l + '</span></th>').join('') +
     '<th style="border-left:2px solid #E0E8FF">Total open</th></tr></thead><tbody>';
   const totals = CG_OPEN_COLS.map(() => 0);
   branches.forEach(b => {
@@ -16537,6 +16630,22 @@ function cgCell(key, branch){
         work: d.tr.expiring + ' of ' + d.tr.vehicles + ' vehicles' });
     case 'pur-open': return T('Purchase pending', d.pur.open + ' pending', d.pur.openRows, CG_COLS.pur,
       { expr: 'not Delivered, Completed, Closed or Rejected', work: d.pur.open + ' of ' + d.pur.total });
+    case 'griev-severe': return T('Severe cases still open', d.griev.severe + ' open', d.griev.severeRows, CG_COLS.griev,
+      { expr: 'open AND severity High, Critical, Severe or Major', work: d.griev.severe + ' of ' + d.griev.open + ' open' });
+    case 'admin-high': return T('High-priority tasks open', d.admin.high + ' open', d.admin.highRows, CG_COLS.admin,
+      { expr: 'open AND priority High, Urgent or Critical', work: d.admin.high + ' of ' + d.admin.open + ' open' });
+    case 'care-progress': return T('Care calls in progress', d.care.progress + ' in progress',
+      d.care.progRows, CG_COLS.care, { expr: 'status contains "progress"', work: d.care.progress + ' of ' + d.care.made });
+    case 'obs-weak': return T('Teachers averaging below 3', d.obs.weak + ' teachers', d.obs.weakRows,
+      [{key:'Branch',label:'Branch'},{key:'Teacher',label:'Teacher'},{key:'Designation',label:'Designation'},
+       {key:'Subject',label:'Subject'},{key:'GrandAvg',label:'Grand avg',score:true}],
+      { expr: 'grand average score below 3 across all observations of that teacher',
+        work: d.obs.weak + ' teacher(s)', note: 'Teachers with no scored observation are not counted here.' });
+    case 'tr-expired': return T('Vehicle documents already expired', d.tr.expired + ' vehicles', d.tr.expiredRows,
+      CG_COLS.tr, { expr: 'days to expiry at or below zero', work: d.tr.expired + ' of ' + d.tr.vehicles + ' vehicles',
+        note: 'A vehicle running on an expired document is a legal exposure, not a housekeeping item.' });
+    case 'hr-stale': return T('Positions open beyond 30 days', d.hr.stale + ' positions', d.hr.staleRows, CG_COLS.hr,
+      { expr: 'open AND posted more than 30 days ago', work: d.hr.stale + ' of ' + d.hr.open + ' open' });
     case 'hr-open': return T('Positions open', d.hr.open + ' open', d.hr.openRows, CG_COLS.hr,
       { expr: 'positions whose status is not Closed or Filled', work: d.hr.open + ' of ' + d.hr.total });
   }
@@ -16656,7 +16765,16 @@ function nlpTerms(text){
 /* Every free-text entry in the dashboard, tagged with where it came from. */
 function nlpDocs(){
   const docs = [];
+  /* Only work that is still outstanding. A complaint logged fifteen times and
+     since fixed is history; the same complaint still open is the finding. */
+  const stillOpen = r => {
+    const st = String(r.Status || '').trim();
+    if (!st) return true;
+    if (/progress|assigned|open|pending|hold|verification/i.test(st)) return true;
+    return !/closed|verified|resolved|completed|done|rejected|not valid|no concern/i.test(st);
+  };
   const push = (branch, dept, text, row, colsKey) => {
+    if (!stillOpen(row)) return;
     const s = String(text || '').trim();
     if (s.length < 12 || /^(nil|na|n\/a|none|-|–|nan)$/i.test(s)) return;
     docs.push({ branch: branch, dept: dept, text: s, row: row, cols: colsKey });
@@ -16805,46 +16923,23 @@ function nlpOpenDocs(title, sub, docs){
 }
 
 function cgRenderText(branches){
-  const host = document.getElementById('cg-themes');
   const chost = document.getElementById('cg-clusters');
-  if (!host) return;
+  if (!chost) return;
 
   const docs = nlpDocs();
+  window._NLP_DOCS = docs;
   if (docs.length < 20){
-    host.innerHTML = '<div style="padding:18px;color:#64748B;font-size:13px">' +
-      'Not enough written entries to read yet (' + docs.length + ' found). ' +
+    chost.innerHTML = '<div style="padding:18px;color:#64748B;font-size:13px">' +
+      'Not enough outstanding written entries to read yet (' + docs.length + ' found). ' +
       'This reads the observation, description and remark fields of the vigilance, grievance, ' +
-      'care-call and admin trackers.</div>';
-    if (chost) chost.innerHTML = '';
+      'care-call and admin trackers, for work still open or in progress.</div>';
     return;
   }
-  window._NLP_DOCS = docs;
-
-  const themes = nlpThemes(docs, branches);
-  let h = '<thead><tr><th style="text-align:left">Branch</th><th style="text-align:left">' +
-    'What this branch writes about that the others do not</th><th>Entries</th></tr></thead><tbody>';
-  branches.forEach(b => {
-    const t = themes[b] || [];
-    const chips = t.length
-      ? t.map(x => '<span style="display:inline-block;background:#EEF2FF;border:1px solid #DDE3FF;' +
-          'border-radius:14px;padding:3px 11px;margin:2px 5px 2px 0;font-size:12px;cursor:pointer" ' +
-          'title="' + x.count + ' entries · appears in ' + x.branches + ' of ' + branches.length + ' branches" ' +
-          'onclick="nlpTheme(\'' + b.replace(/'/g, "\\'") + '\',\'' + x.term.replace(/'/g, "\\'") + '\')">' +
-          x.term + ' <b>' + x.count + '</b></span>').join('')
-      : '<span style="color:#94A3B8;font-size:12px">nothing distinctive — this branch writes about the same things as the rest</span>';
-    const n = docs.filter(d => d.branch === b).length;
-    h += '<tr><td style="text-align:left;vertical-align:top"><span class="bd b' + b + '"></span> ' + b + '</td>' +
-      '<td style="text-align:left">' + chips + '</td>' +
-      '<td style="vertical-align:top;font-weight:700">' + n + '</td></tr>';
-  });
-  host.innerHTML = h + '</tbody>';
-
-  if (!chost) return;
   const cl = nlpClusters(docs, 0.5, 1200);
   if (!cl.length){
     chost.innerHTML = '<div style="padding:18px;color:#64748B;font-size:13px">' +
-      'No entry has been written three or more times in similar words. Nothing is being ' +
-      'logged repeatedly.</div>';
+      'No outstanding entry has been written three or more times in similar words. ' +
+      'Nothing open is being logged repeatedly.</div>';
     return;
   }
   chost.innerHTML = cl.slice(0, 12).map((c, i) =>
@@ -16868,16 +16963,16 @@ function nlpTheme(branch, term){
 function nlpCluster(i){
   const c = (window._NLP_CLUSTERS || [])[i];
   if (!c) return;
-  nlpOpenDocs('Repeated ' + c.dept.toLowerCase() + ' entry',
-    c.n + ' similar entries across ' + c.branches.join(', '), c.docs);
+  nlpOpenDocs('Repeated ' + c.dept.toLowerCase() + ' entry, still outstanding',
+    c.n + ' similar open entries across ' + c.branches.join(', '), c.docs);
 }
 
 function renderConsolidated(){
   const branches = cgBranches();
   if (!branches.length) return;
   const D = cgCollect();
-  cgRenderScores(D, branches);
   cgRenderOpen(D, branches);
+  cgRenderBlocks(D, branches);
   cgRenderFlags(D, branches);
   try { cgRenderText(branches); } catch(e){ console.error('text analysis:', e && e.message); }
   const meta = document.getElementById('cg-meta');
