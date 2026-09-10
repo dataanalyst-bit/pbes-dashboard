@@ -39,7 +39,7 @@ const ALLOWED_SECTIONS = { pt1: 1, audit: 1, ptm: 1, civil: 1, syl: 1, vchk: 1, 
 const SECTION_TTL_SECONDS = 1800;
 // meet changes the instant somebody uploads a transcript, and every other user
 // needs that on their next load rather than half an hour later.
-const SECTION_TTL_OVERRIDE = { syl: 120, sylc: 120, meet: 30 };
+const SECTION_TTL_OVERRIDE = { syl: 120, sylc: 120, meet: 30, dm: 120 };
 
 // Column headers that carry the campus name, in the order they are looked for.
 // The three PT-1 tabs all use "Branch", but this keeps a rename from silently
@@ -136,7 +136,13 @@ export async function onRequestGet({ request, env }) {
   // of the dashboard works, only the vigilance photographs would not load.
   let photoCookie = null;
   try {
-    const secret = env.PHOTO_SECRET || env.APPS_SCRIPT_KEY;
+  // The signing secret. PHOTO_SECRET if it has been set, otherwise
+  // APPS_SCRIPT_KEY, otherwise the Supabase anon key — which is always
+  // configured, or nothing on this dashboard would load at all. Without this
+  // last fallback the cookie was never issued on deployments that carry the
+  // Apps Script key inside APPS_SCRIPT_URL rather than as its own variable,
+  // and every photograph failed with no visible reason.
+    const secret = env.PHOTO_SECRET || env.APPS_SCRIPT_KEY || env.SUPABASE_ANON_KEY;
     if (secret) {
       const token = await signPhotoToken({
         sub: user?.id || "", branch: userBranch || "", role,
@@ -260,6 +266,19 @@ export async function onRequestGet({ request, env }) {
   // The meeting transcript is one group-wide document with no branch column;
   // filtering it by branch would blank it for every principal.
   if (section === "meet")  return withCookie(json(data));
+  // Digital marketing: a record belongs to the campus its ads were run FOR,
+  // which is not always the account that paid — a Boduppal account runs
+  // Bachupally hiring ads. servedList is what the builder resolved, so filter on
+  // that rather than on the ad account.
+  if (section === "dm") {
+    const dm = data && data.DM_RAW;
+    if (!dm || !Array.isArray(dm.recs)) return withCookie(json(data));
+    const keep = dm.recs.filter((r) => {
+      const list = Array.isArray(r.servedList) ? r.servedList : [r.served];
+      return list.some((b) => sameBranch(b, userBranch));
+    });
+    return withCookie(json({ ...data, DM_RAW: { ...dm, recs: keep } }));
+  }
 
   //   Cross-branch aggregates needed by the Head-to-Head scorecard stay full.
   return withCookie(json(filterByBranch(data, userBranch)));
@@ -341,7 +360,7 @@ function filterByBranch(data, branch) {
   branchKeyedObjects.forEach((k) => {
     if (out[k] && typeof out[k] === "object") {
       out[k] = Object.fromEntries(Object.entries(out[k]).filter(([key]) => sameBranch(key, branch)));
-    } 
+    }
   });
   if (out.OWNER_QUALITY && typeof out.OWNER_QUALITY === "object") {
     out.OWNER_QUALITY = Object.fromEntries(
