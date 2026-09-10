@@ -16265,12 +16265,35 @@ function cgArrow(slope, goodIsUp){
 
 /* ── data access ──────────────────────────────────────────────────────── */
 
+/* Values that turn up in a Branch column but are not branches. They arrive when
+   a tracker carries a summary row, or when a status has been typed into the
+   wrong column — "Open", "Closed", "All Branches" were all appearing as their
+   own branch rows, each showing zeros down the table. */
+const CG_NOT_A_BRANCH = /^(all|all branches|total|totals|grand total|summary|open|closed|resolved|pending|in progress|done|completed|verified|assigned|yes|no|nil|na|n\/a|none|-|–|nan|null|true|false|\d+)$/i;
+
 function cgBranches(){
+  /* Authoritative lists first: Month_Config and the student roll are keyed BY
+     branch, so anything in them is genuinely a branch. Where they exist, data
+     values are accepted only if they match — which keeps a stray status out
+     without needing to guess. */
+  const known = {};
+  Object.keys(MONTH_CONFIG || {}).forEach(b => { if (b) known[b] = 1; });
+  Object.keys((window._STUDENTS_BY_BRANCH) || {}).forEach(b => { if (b) known[b] = 1; });
+  const order = ['Bachupally', 'Boduppal', 'Gowdavalli', 'Keesara', 'Pocharam'];
+  order.forEach(b => known[b] = 1);
+
   const seen = {};
   [CARE_DATA, GRIEVANCE_DATA, ADMIN_DATA, VIG_DATA, OBS_DATA, PUR_DATA, HR_RECORDS]
-    .forEach(arr => (arr || []).forEach(r => { if (r && r.Branch) seen[r.Branch] = 1; }));
-  Object.keys(MONTH_CONFIG || {}).forEach(b => seen[b] = 1);
-  const order = ['Bachupally', 'Boduppal', 'Gowdavalli', 'Keesara', 'Pocharam'];
+    .forEach(arr => (arr || []).forEach(r => {
+      const b = r && r.Branch ? String(r.Branch).trim() : '';
+      if (!b || CG_NOT_A_BRANCH.test(b)) return;
+      if (Object.keys(known).length && !known[b]) return;   // not a known branch
+      seen[b] = 1;
+    }));
+  Object.keys(known).forEach(b => {
+    if (!CG_NOT_A_BRANCH.test(b) && (MONTH_CONFIG || {})[b]) seen[b] = 1;
+  });
+
   return order.filter(b => seen[b]).concat(Object.keys(seen).filter(b => order.indexOf(b) < 0).sort());
 }
 
