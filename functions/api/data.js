@@ -340,6 +340,14 @@ function filterByBranch(data, branch) {
     "ADMIN_DATA", "PUR_DATA", "VIG_DATA", "OWNER_STATS",
     "COMBINED_ADM", "ADM1_DATA", "ADM2_DATA", "LEAD_DATES", "AVIS_DATA",
   ];
+  // Digital marketing is filtered on the campus the ads were run FOR, not the
+  // account that paid — a Boduppal account runs Bachupally hiring ads.
+  if (Array.isArray(out.DM_DATA)) {
+    out.DM_DATA = out.DM_DATA.filter((r) => {
+      const list = Array.isArray(r.servedList) ? r.servedList : [r.served];
+      return list.some((b) => sameBranch(b, branch));
+    });
+  }
   arrayKeys.forEach((k) => {
     if (!KEEP_FULL[k] && Array.isArray(out[k])) {
       out[k] = out[k].filter((r) => sameBranch(r.Branch || r.branch, branch));
@@ -353,7 +361,7 @@ function filterByBranch(data, branch) {
         nk[kk] = Array.isArray(arr) ? arr.filter((r) => sameBranch(r.Branch || r.branch, branch)) : arr;
       });
       out[k] = nk;
-    }
+    } 
   });
   // Branch-keyed objects → keep only this branch (MONTH_CONFIG stays FULL for Head-to-Head).
   const branchKeyedObjects = ["STUDENTS_BY_BRANCH", "LEAD_SUMMARY", "COMBINED_SUMMARY"];
