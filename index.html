@@ -2054,6 +2054,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="card"><div class="ch"><h3>🏫 Assets by Branch</h3><span class="fnote">Click a bar to view that branch's assets</span></div><div class="cb"><div class="cw tall"><canvas id="it-branch"></canvas></div></div></div>
     <div class="card"><div class="ch"><h3>🩺 System Health — Working vs Down vs Pending</h3><span class="fnote">Top systems by asset count</span></div><div class="cb"><div class="cw tall"><canvas id="it-system"></canvas></div></div></div>
   </div>
+</div>
+
 <div id="pane-civil" class="pane">
   <div class="au-wrap">
 
@@ -2128,9 +2130,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     </div>
   </div>
-</div>
-
-
 </div>
 
 <div class="au-modal" id="cv-modal">
@@ -4671,7 +4670,13 @@ function renderVigilance(){
   const bl=fBranch==='ALL'?'All Branches':fBranch, ml=fMonth==='ALL'?'All Months':fMonth+' 2026';
   document.getElementById('vig-tag').textContent=bl+' · '+ml;
   document.getElementById('vig-fn').textContent=bl;
-  document.getElementById('vig-table-fn').textContent=bl+' · '+ml;
+  /* The board-attention card was removed from this tab, so these two elements no
+     longer exist. Writing to them threw, and the throw happened BEFORE any of
+     the KPIs were painted — which is why the whole tab came up blank rather
+     than just missing one card. Guarded so a removed card can never take the
+     rest of the tab down with it. */
+  const _vigFn=document.getElementById('vig-table-fn');
+  if(_vigFn) _vigFn.textContent=bl+' · '+ml;
 
   const ALLVIG=(typeof VIG_DATA!=='undefined'&&Array.isArray(VIG_DATA))?VIG_DATA:[];
   const rows=ALLVIG.filter(r=>(fBranch==='ALL'||r.Branch===fBranch)&&(fMonth==='ALL'||r.Month===fMonth));
@@ -4791,7 +4796,8 @@ function renderVigilance(){
       return (order[a.RiskLevel]??9)-(order[b.RiskLevel]??9);
     });
   const tbody=document.getElementById('vig-tbody');
-  if(tableRows.length===0){
+  if(!tbody){ /* board-attention table removed from this tab */ }
+  else if(tableRows.length===0){
     tbody.innerHTML='<tr><td colspan="9" class="no-data">No open or in-progress issues for selected filter 🎉</td></tr>';
   }else{
     tbody.innerHTML=tableRows.map(r=>{
@@ -4932,7 +4938,10 @@ function renderGrievance(){
       <td><span class="pill ${STAT_PILL[r.Status]||'pa'}">${r.Status}</span></td>
       <td>${sat==='–'?'–':`<span class="pill ${SAT_PILL[sat]||'pa'}">${sat}</span>`}</td></tr>`;
   }).join(''):'<tr><td colspan="8" class="no-data">No grievance records for this branch</td></tr>';
-  document.getElementById('gr-all-fn').textContent = rows.length+' records'+(rows.length>200?' (showing first 200 — use View All)':'');
+  /* The All Grievance Records card was removed from this tab; guarded so its
+     absence cannot stop the rest of the grievance tab rendering. */
+  const _grFn=document.getElementById('gr-all-fn');
+  if(_grFn) _grFn.textContent = rows.length+' records'+(rows.length>200?' (showing first 200 — use View All)':'');
 }
 
 // Purchase Manager Performance per branch
