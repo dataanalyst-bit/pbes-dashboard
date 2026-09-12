@@ -1694,7 +1694,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     </div>
   </div>
   <div class="row r2">
-    <div class="card"><div class="ch"><h3>🏗️ Task Status by Branch</h3></div><div class="cb"><div class="cw tall"><canvas id="admin-br"></canvas></div></div></div>
+    <div class="card"><div class="ch"><h3>🏗️ Task Status by Branch</h3><span class="fnote">Open work only — completed tasks are excluded so the outstanding bars stay readable</span></div><div class="cb"><div class="cw tall"><canvas id="admin-br"></canvas></div></div></div>
     <div class="card"><div class="ch"><h3>📊 Branch Completion Rate</h3><span class="fnote">Done ÷ total tasks per branch · click a branch to view</span></div><div class="cb" id="admin-comp-box">
       <div class="no-data" style="padding:16px;">Loading…</div>
     </div></div>
@@ -1778,21 +1778,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   <div id="cg-blocks"></div>
 
-  <div class="card" style="margin-bottom:16px;"><div class="ch">
-      <h3>&#128257; The same thing, logged again and again</h3>
-      <span class="fnote">Entries still open or in progress that have been written three or more times in similar
-        words, matched on meaning rather than exact text. Closed work is excluded &mdash; a repeated entry only
-        matters while it is still outstanding.</span></div>
-    <div class="cb-0" id="cg-clusters"></div>
-  </div>
-
-  <div class="card" style="margin-bottom:16px;"><div class="ch">
-      <h3>&#128269; What stands out</h3>
-      <span class="fnote">Branches sitting clearly apart from the group, worst first. Median and MAD are used
-        rather than mean and standard deviation because with five branches one weak branch moves the mean far
-        enough to hide itself.</span></div>
-    <div class="cb-0" id="cg-flags"></div>
-  </div>
 </div>
 
 <div id="pane-dm" class="pane">
@@ -1830,12 +1815,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="cb" style="padding:14px 18px"><div id="vck-body">
       <div class="no-data">Reading the inspection checklist…</div></div></div>
   </div>
-  <div class="card"><div class="ch"><h3>🚨 Open & Critical Issues — Board Attention Required</h3><span class="fnote" id="vig-table-fn">All Branches · All Months</span></div>
-    <div class="cb-0" style="overflow-x:auto"><table class="dt">
-      <thead><tr><th>Branch</th><th>Visit Date</th><th>Area</th><th>Issue</th><th>Risk</th><th>Vigilance Status</th><th>Admin Status</th><th>Branch Remarks</th><th>Overdue</th></tr></thead>
-      <tbody id="vig-tbody"></tbody>
-    </table></div>
-  </div>
+<!-- removed on request: Open & Critical Issues — Board Attention Required -->
 
   <div class="card" style="margin-bottom:16px;"><div class="ch"><h3>&#128197; Branch &times; Month Closure % &mdash; Every Month</h3>
       <span class="fnote">Issues closed &divide; issues raised, grouped by visit month. Shows all branches and all
@@ -1958,14 +1938,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   </div>
 
   <!-- All Records -->
-  <div class="card"><div class="ch"><h3>📋 All Grievance Records</h3><span class="fnote" id="gr-all-fn">Click any row for full details</span>
-    <button onclick="viewGrievRecords('ALL')" style="margin-left:auto;padding:6px 14px;background:#1E4FD8;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">📋 View All Records →</button>
-  </div>
-    <div class="cb-0" style="overflow-x:auto"><table class="dt">
-      <thead><tr><th>Branch</th><th>Date</th><th>Student</th><th>Category</th><th>Severity</th><th>Assigned To</th><th>Status</th><th>Satisfaction</th></tr></thead>
-      <tbody id="gr-tbody"></tbody>
-    </table></div>
-  </div>
+<!-- removed on request: All Grievance Records -->
 
   <div class="card" style="margin-bottom:16px;"><div class="ch"><h3>&#128197; Branch &times; Month Resolved % &mdash; Every Month</h3>
       <span class="fnote">Cases resolved &divide; cases raised, grouped by the month the case was raised. Shows all
@@ -1990,12 +1963,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   </div>
 
   <div class="row r2">
-    <div class="card"><div class="ch"><h3>🏫 Branch Occupancy — Riders vs Seats</h3><span class="fnote">Click a bar to view that branch's transport students</span></div><div class="cb"><div class="cw tall"><canvas id="tr-branch-occ"></canvas></div></div></div>
+<!-- removed on request: Branch Occupancy -->
     <div class="card"><div class="ch"><h3>🚦 Route Occupancy (Top / Overloaded)</h3><span class="fnote">Occupancy % per route · red &gt; 100% (over capacity)</span></div><div class="cb"><div class="cw tall"><canvas id="tr-route-occ"></canvas></div></div></div>
   </div>
   <div class="row r2">
-    <div class="card"><div class="ch"><h3>🛡️ Fleet Compliance</h3><span class="fnote">Document status across the fleet · click to view</span></div><div class="cb"><div class="cw tall"><canvas id="tr-compliance"></canvas></div></div></div>
-    <div class="card"><div class="ch"><h3>🔧 Maintenance Cost by Branch</h3><span class="fnote">Repair &amp; service spend · click a bar to view records</span></div><div class="cb"><div class="cw tall"><canvas id="tr-repair"></canvas></div></div></div>
+<!-- removed on request: Fleet Compliance -->
+<!-- removed on request: Maintenance Cost by Branch -->
   </div>
   <div class="card" style="margin-bottom:16px;">
     <div class="ch"><h3>🚍 Fleet Register</h3><span class="fnote">Branch-wise vehicle list · click a row for full detail</span></div>
@@ -2060,6 +2033,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div id="it-sys-summary" style="font-size:12px;color:#334155;text-align:right;min-width:200px;"></div>
     </div>
   </div>
+  <style>
+    /* Pinned first column for the monthly matrix. */
+    table.itfreeze th:first-child, table.itfreeze td:first-child{
+      position:sticky; left:0; z-index:2; background:#fff;
+      box-shadow:1px 0 0 #E0E8FF;
+    }
+    table.itfreeze thead th:first-child{ z-index:3; background:#F8FAFF; }
+    table.itfreeze tr[style*="F8FAFF"] td:first-child{ background:#F8FAFF; }
+  </style>
   <div class="card" style="margin-bottom:16px;">
     <div class="ch"><h3>&#128197; Monthly asset check &mdash; branch &times; system</h3>
       <span class="fnote">One table per month, newest first. Rows are branches, columns are systems, and each cell
@@ -2072,24 +2054,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="card"><div class="ch"><h3>🏫 Assets by Branch</h3><span class="fnote">Click a bar to view that branch's assets</span></div><div class="cb"><div class="cw tall"><canvas id="it-branch"></canvas></div></div></div>
     <div class="card"><div class="ch"><h3>🩺 System Health — Working vs Down vs Pending</h3><span class="fnote">Top systems by asset count</span></div><div class="cb"><div class="cw tall"><canvas id="it-system"></canvas></div></div></div>
   </div>
-  <div class="card" style="margin-bottom:16px;">
-    <div class="ch"><h3>⚠️ Lowest-Health Systems</h3><span class="fnote">Systems needing attention · click a row for records</span></div>
-    <div class="cb" style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:680px;">
-      <thead><tr style="background:#EEF2FF;">
-        <th style="padding:8px 10px;text-align:left;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Branch</th>
-        <th style="padding:8px 10px;text-align:left;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">System</th>
-        <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Total</th>
-        <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Working</th>
-        <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Down</th>
-        <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Health %</th>
-      </tr></thead><tbody id="it-tbody"></tbody></table></div>
-  </div>
-</div>
-
-
-
-
-<!-- ═══ CIVIL WORK ═══ -->
 <div id="pane-civil" class="pane">
   <div class="au-wrap">
 
@@ -2115,7 +2079,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     <div id="cv-body" style="display:none;flex-direction:column;gap:16px">
 
-      <div class="au-kpis" id="cv-kpis"></div>
+      <!-- KPI strip removed on request -->
 
       <div class="au-sec">
         <h3>Branch scorecard</h3>
@@ -2124,17 +2088,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div id="cv-branches"></div>
       </div>
 
-      <div class="au-sec">
-        <h3>Where each branch's work stands</h3>
-        <div class="sub">Every work at every branch, by status.</div>
-        <div id="cv-status-chart"></div>
-      </div>
+      
 
-      <div class="au-sec">
-        <h3>Priority against progress</h3>
-        <div class="sub">Whether the work called urgent is actually the work being done.</div>
-        <div id="cv-grid"></div>
-      </div>
+      
 
       <div class="au-sec">
         <h3>Past their target date</h3>
@@ -2142,17 +2098,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div id="cv-overdue"></div>
       </div>
 
-      <div class="au-sec">
-        <h3>Falling due in the next fortnight</h3>
-        <div class="sub">The list that decides how long the table above gets next month.</div>
-        <div id="cv-atrisk"></div>
-      </div>
+      
 
-      <div class="au-sec">
-        <h3>Open work with no target date</h3>
-        <div class="sub">Committed to nobody by no date — and invisible to every overdue count.</div>
-        <div id="cv-unscheduled"></div>
-      </div>
+      
 
       <div class="au-sec">
         <h3>Raised but never started</h3>
@@ -2160,18 +2108,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div id="cv-stalled"></div>
       </div>
 
-      <div class="au-sec">
-        <h3>What kind of work, and who is carrying it</h3>
-        <div class="sub">Category mix, then open workload by the person the job is assigned to.</div>
-        <div id="cv-cats" style="margin-bottom:18px"></div>
-        <div id="cv-people"></div>
-      </div>
+      
 
-      <div class="au-sec">
-        <h3>Raised against completed, by month</h3>
-        <div class="sub">Grouped by the month the work was requested.</div>
-        <div id="cv-trend"></div>
-      </div>
+      
 
       <div class="au-sec">
         <h3>What is holding work up</h3>
@@ -2185,14 +2124,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div id="cv-quality"></div>
       </div>
 
-      <div class="au-sec">
-        <h3>Full register — <span id="cv-reg-n">0</span> works</h3>
-        <div class="sub">Overdue first, then oldest. Click any row for the whole record.</div>
-        <div style="max-height:640px;overflow:auto"><div id="cv-register"></div></div>
-      </div>
+      
 
     </div>
   </div>
+</div>
+
+
 </div>
 
 <div class="au-modal" id="cv-modal">
@@ -4598,10 +4536,13 @@ function renderAdmin(){
     setHtml('admin-overdue-tbody',overdueQuickHtml(overdueRows));
   }
 
+  /* Done is left out on purpose: this chart is read to find what is still
+     outstanding, and the completed bar — usually the largest — squashed the two
+     that need attention into a sliver at the top. The Done count is still on
+     the KPI strip and one click away from the branch scorecard. */
   mkChart('admin-br',{type:'bar',data:{
     labels,
     datasets:[
-      {label:'Done',       data:done,  backgroundColor:'#059669',borderRadius:4,stack:'s'},
       {label:'In Progress',data:inprog,backgroundColor:'#3B82F6',borderRadius:4,stack:'s'},
       {label:'Hold/Open',  data:hold,  backgroundColor:'#F59E0B',borderRadius:4,stack:'s'},
     ]
@@ -4609,7 +4550,7 @@ function renderAdmin(){
     onClick:(evt,elements)=>{
       if(!elements||!elements.length)return;
       const branch=BRANCHES[elements[0].index];
-      const statusMap=['Done','In Progress','Hold/Open'];
+      const statusMap=['In Progress','Hold/Open'];
       viewAdminByBranchStatus(branch,statusMap[elements[0].datasetIndex]);
     },
     plugins:{legend:{display:true},tooltip:{mode:'index',intersect:false},
@@ -8853,7 +8794,10 @@ function renderITMonthly(){
     return '<div style="padding:14px 18px 0"><div style="font-weight:800;color:#1B5E34;font-size:13px;' +
       'background:#EAF4EE;border-left:4px solid #1B5E34;padding:7px 12px;border-radius:6px">' +
       itMonthLabel(mk) + '</div></div>' +
-      '<div style="overflow-x:auto;padding:10px 18px 18px"><table class="dt" style="min-width:640px">' +
+      /* The branch column is pinned. With a system per column the table scrolls
+         sideways, and once the branch name left the screen a reader could not
+         tell which row they were on. */
+      '<div style="overflow-x:auto;padding:10px 18px 18px"><table class="dt itfreeze" style="min-width:640px">' +
       '<thead><tr><th style="text-align:left">Branch</th>' +
       systems.map(sy => '<th>' + sy + '</th>').join('') + '</tr></thead><tbody>' + rows +
       '<tr style="background:#F8FAFF;border-top:2px solid #E0E8FF">' +
@@ -16304,17 +16248,46 @@ const CG_DAY = 86400000;
 
 /* One object per branch holding every count the tab needs. Each entry keeps the
    ROWS behind it so a cell can open them. */
+/* The header's Month dropdown holds a month NAME ("August"). Records carry it
+   in three different shapes depending on the tracker: a Month field, a month
+   key like "Aug-2026", or only a date. All three are matched, and a record with
+   no date at all stays in view rather than vanishing when a month is picked —
+   dropping undated work would quietly shrink the backlog. */
+const CG_MONTHS = ['January','February','March','April','May','June',
+                   'July','August','September','October','November','December'];
+function cgInMonth(r, dateFields){
+  if (typeof fMonth === 'undefined' || fMonth === 'ALL') return true;
+  const want = String(fMonth).trim().toLowerCase();
+  const mi = CG_MONTHS.findIndex(m => m.toLowerCase() === want);
+
+  const direct = String(r.Month || '').trim().toLowerCase();
+  if (direct) {
+    if (direct === want) return true;
+    if (mi >= 0 && direct.slice(0, 3) === want.slice(0, 3)) return true;   // "Aug-2026"
+    return false;
+  }
+  for (const f of (dateFields || [])) {
+    const v = String(r[f] || '');
+    const m = v.match(/^(\d{4})-(\d{2})/);
+    if (m) return (+m[2] - 1) === mi;
+    const t = Date.parse(v);
+    if (!isNaN(t)) return new Date(t).getMonth() === mi;
+  }
+  return true;               // no date to judge by — keep it
+}
+
 function cgCollect(){
   const today = Date.now();
   const out = {};
+  const M = (arr, fields) => (arr || []).filter(r => cgInMonth(r, fields));
   cgBranches().forEach(b => {
-    const care  = (CARE_DATA || []).filter(r => r.Branch === b);
-    const griev = (GRIEVANCE_DATA || []).filter(r => r.Branch === b);
-    const admin = (ADMIN_DATA || []).filter(r => r.Branch === b);
-    const vig   = (VIG_DATA || []).filter(r => r.Branch === b);
-    const obs   = (OBS_DATA || []).filter(r => r.Branch === b);
+    const care  = M(CARE_DATA, ['Date']).filter(r => r.Branch === b);
+    const griev = M(GRIEVANCE_DATA, ['Date']).filter(r => r.Branch === b);
+    const admin = M(ADMIN_DATA, ['Deadline','StartDate']).filter(r => r.Branch === b);
+    const vig   = M(VIG_DATA, ['VisitDate']).filter(r => r.Branch === b);
+    const obs   = M(OBS_DATA, ['Date']).filter(r => r.Branch === b);
     const pur   = (PUR_DATA || []).filter(r => r.Branch === b);
-    const hr    = (HR_RECORDS || []).filter(r => r.Branch === b);
+    const hr    = M(HR_RECORDS, ['PostDate']).filter(r => r.Branch === b);
 
     const careRes = care.filter(r => /resolved|no concern/i.test(String(r.Status || '')));
     const grOpen  = griev.filter(r => !cgIsClosed(r.Status));
@@ -16380,6 +16353,9 @@ function cgCollect(){
     const grSevere = grOpen.filter(r => /high|critical|severe|major/i.test(String(r.Severity || '')));
     const admHigh  = admOpen.filter(r => /high|urgent|critical/i.test(String(r.Priority || '')));
     const careProg = care.filter(r => /progress/i.test(String(r.Status || '')));
+    const carePend = (typeof window._careIsOpenConcern === 'function')
+      ? care.filter(window._careIsOpenConcern)
+      : care.filter(r => !/resolved|no concern/i.test(String(r.Status || '')));
     const obsWeak  = (ALL_TEACHER || []).filter(r => r.Branch === b &&
       !isNaN(parseFloat(r.GrandAvg)) && parseFloat(r.GrandAvg) < 3);
     const trExpired = tr.filter(r => {
@@ -16388,10 +16364,23 @@ function cgCollect(){
     });
     const hrStale = hrOpen.filter(r => { const t = cgDate(r.PostDate); return t && (today - t) / CG_DAY > 30; });
 
+    /* The vigilance CHECKLIST is a separate feed from the vigilance tracker and
+       loads with its own tab, so it is reported as unavailable rather than as
+       zero until that tab has been opened once. */
+    const chkAll = (window._VCHK_ROWS || []).filter(r => r && r.branch === b);
+    const chkOpen = chkAll.filter(r =>
+      !/^(closed|verified|resolved|rejected|not valid)/i.test(String(r.status || '').trim()));
+
     out[b] = {
       branch: b,
+      chk: { total: chkAll.length, open: chkOpen.length, rows: chkAll, openRows: chkOpen },
+      /* "Pending to be addressed" is the Care Calls tab's own measure — an OPEN
+         concern, not simply a call that is not yet marked resolved. Using the
+         same function means the two tabs cannot report different numbers for
+         the same thing. */
       care: { made: care.length, resolved: careRes.length, progress: careProg.length,
-              rows: care, resRows: careRes, progRows: careProg },
+              pending: carePend.length,
+              rows: care, resRows: careRes, progRows: careProg, pendRows: carePend },
       griev: { total: griev.length, open: grOpen.length, over: grOver.length,
                severe: grSevere.length, oldest: ageOf(grOpen, 'Date'),
                rows: griev, openRows: grOpen, overRows: grOver, severeRows: grSevere },
@@ -16625,7 +16614,7 @@ function cgRenderBlocks(D, branches){
 /* The icon carries the department, the label carries the state, so a column can
    be found at a glance in a meeting without reading every heading. */
 const CG_OPEN_COLS = [
-  { i:'📞', l:'Care calls<br>pending',    get: d => d.care.made - d.care.resolved, k:'care-pending' },
+  { i:'📞', l:'Pending to be<br>addressed', get: d => d.care.pending,             k:'care-pending' },
   { i:'📣', l:'Grievance<br>open',        get: d => d.griev.open,  k:'griev-open' },
   { i:'⏳', l:'Grievance<br>overdue',     get: d => d.griev.over,  k:'griev-over' },
   { i:'🗂️', l:'Admin tasks<br>open',      get: d => d.admin.open,  k:'admin-open' },
@@ -16633,6 +16622,7 @@ const CG_OPEN_COLS = [
   { i:'🛡️', l:'Vigilance<br>open',        get: d => d.vig.open,    k:'vig-open' },
   { i:'⏳', l:'Vigilance<br>overdue',     get: d => d.vig.over,    k:'vig-over' },
   { i:'🔥', l:'Critical<br>still open',   get: d => d.vig.crit,    k:'vig-crit' },
+  { i:'📋', l:'Checklist<br>open',        get: d => d.chk.open,    k:'chk-open' },
   { i:'💻', l:'IT assets<br>down',        get: d => d.it.down,     k:'it-down' },
   { i:'🚌', l:'Vehicle docs<br>due ≤30d', get: d => d.tr.expiring, k:'tr-exp' },
   { i:'🛒', l:'Purchase<br>pending',      get: d => d.pur.open,    k:'pur-open' },
@@ -16759,9 +16749,11 @@ function cgCell(key, branch){
         work: '(' + d.tr.vehicles + ' − ' + d.tr.expiring + ') ÷ ' + d.tr.vehicles + ' × 100 = ' + fxPct(d.tr.vehicles - d.tr.expiring, d.tr.vehicles),
         note: 'A vehicle with no expiry date recorded counts as non-compliant, not as unknown.' });
 
-    case 'care-pending': return T('Care calls not yet resolved', (d.care.made - d.care.resolved) + ' pending',
-      d.care.rows.filter(r => !/resolved|no concern/i.test(String(r.Status || ''))), CG_COLS.care,
-      { expr: 'pending = calls made − calls Resolved or No Concern', work: d.care.made + ' − ' + d.care.resolved + ' = ' + (d.care.made - d.care.resolved) });
+    case 'care-pending': return T('Pending to be addressed', d.care.pending + ' open concerns',
+      d.care.pendRows, CG_COLS.care,
+      { expr: 'calls carrying a concern that is still open — the same measure the Care Calls tab uses',
+        work: d.care.pending + ' of ' + d.care.made + ' calls',
+        note: 'A call marked resolved, or one carrying no concern in the first place, is not counted.' });
     case 'griev-open': return T('Grievance open', d.griev.open + ' open', d.griev.openRows, CG_COLS.griev,
       { expr: 'open = cases whose status is not Resolved or Closed', work: d.griev.open + ' of ' + d.griev.total });
     case 'griev-over': return T('Grievance past target date', d.griev.over + ' overdue', d.griev.overRows, CG_COLS.griev,
@@ -16779,11 +16771,16 @@ function cgCell(key, branch){
     case 'vig-crit': return T('Open critical issues', d.vig.crit + ' critical', d.vig.critRows, CG_COLS.vig,
       { expr: 'open AND risk level Critical or High', work: d.vig.crit + ' of ' + d.vig.open + ' open',
         note: 'These are the rows a safety review should start from.' });
-    case 'it-down': return T('IT assets not working', d.it.down + ' down', d.it.rows, CG_COLS.it,
-      { expr: 'sum of the Not Working column across systems', work: d.it.down + ' of ' + d.it.total + ' assets' });
-    case 'tr-exp': return T('Vehicle documents due or missing', d.tr.expiring + ' vehicles', d.tr.expRows, CG_COLS.tr,
-      { expr: 'vehicles with any document expiring within 30 days, or with no expiry recorded',
-        work: d.tr.expiring + ' of ' + d.tr.vehicles + ' vehicles' });
+    case 'it-down': {
+      /* Only the systems with something actually down. Listing every system,
+         most of them fully working, buried the two lines that mattered. */
+      const bad = d.it.rows.filter(r => cgNum(r.NotWorking) > 0);
+      return T('IT assets not working', d.it.down + ' down across ' + bad.length + ' system(s)',
+        bad, CG_COLS.it,
+        { expr: 'sum of the Not Working column, over systems reporting at least one',
+          work: d.it.down + ' of ' + d.it.total + ' assets' });
+    }
+    case 'tr-exp': return cgVehicleDocs(branch, d, 'due');
     case 'pur-open': return T('Purchase pending', d.pur.open + ' pending', d.pur.openRows, CG_COLS.pur,
       { expr: 'not Delivered, Completed, Closed or Rejected', work: d.pur.open + ' of ' + d.pur.total });
     case 'griev-severe': return T('Severe cases still open', d.griev.severe + ' open', d.griev.severeRows, CG_COLS.griev,
@@ -16797,14 +16794,70 @@ function cgCell(key, branch){
        {key:'Subject',label:'Subject'},{key:'GrandAvg',label:'Grand avg',score:true}],
       { expr: 'grand average score below 3 across all observations of that teacher',
         work: d.obs.weak + ' teacher(s)', note: 'Teachers with no scored observation are not counted here.' });
-    case 'tr-expired': return T('Vehicle documents already expired', d.tr.expired + ' vehicles', d.tr.expiredRows,
-      CG_COLS.tr, { expr: 'days to expiry at or below zero', work: d.tr.expired + ' of ' + d.tr.vehicles + ' vehicles',
-        note: 'A vehicle running on an expired document is a legal exposure, not a housekeeping item.' });
+    case 'tr-expired': return cgVehicleDocs(branch, d, 'expired');
     case 'hr-stale': return T('Positions open beyond 30 days', d.hr.stale + ' positions', d.hr.staleRows, CG_COLS.hr,
       { expr: 'open AND posted more than 30 days ago', work: d.hr.stale + ' of ' + d.hr.open + ' open' });
+    case 'chk-open': return T('Checklist issues still open', d.chk.open + ' open', d.chk.openRows,
+      [{key:'branch',label:'Branch'},{key:'raised',label:'Raised',date:true},{key:'area',label:'Area'},
+       {key:'point',label:'Checklist point',maxW:'260px'},{key:'severity',label:'Severity',pill:true},
+       {key:'assigned',label:'Assigned to'},{key:'target',label:'Target',date:true},
+       {key:'status',label:'Status',pill:true}],
+      { expr: 'checklist rows whose status is not closed, verified or resolved',
+        work: d.chk.open + ' of ' + d.chk.total,
+        note: d.chk.total ? '"Work done \u2014 verification pending" counts as open here, matching the Vigilance tab.'
+                          : 'Open the Vigilance tab once to load the checklist feed.' });
     case 'hr-open': return T('Positions open', d.hr.open + ' open', d.hr.openRows, CG_COLS.hr,
       { expr: 'positions whose status is not Closed or Filled', work: d.hr.open + ' of ' + d.hr.total });
   }
+}
+
+/* Vehicle documents, showing ONLY the ones that are a problem.
+
+   The list used to print every date on every vehicle — insurance, fitness,
+   permit and PUC all sitting in 2027 — so the reader had to scan four columns
+   of fine dates to find the one that had lapsed. Each vehicle now carries just
+   its failing documents, with how overdue or how close each one is. */
+function cgVehicleDocs(branch, d, mode){
+  const DOCS = [
+    { k: 'InsuranceExp', l: 'Insurance' }, { k: 'FitnessExp', l: 'Fitness' },
+    { k: 'PermitExp', l: 'Permit' }, { k: 'PucExp', l: 'PUC' },
+    { k: 'TaxExp', l: 'Road tax' }, { k: 'LicenceExp', l: 'Driver licence' }
+  ];
+  const today = Date.now();
+  const rows = (mode === 'expired' ? d.tr.expiredRows : d.tr.expRows).map(v => {
+    const bad = [];
+    DOCS.forEach(doc => {
+      if (!(doc.k in v)) return;
+      const raw = v[doc.k];
+      const t = cgDate(raw);
+      if (!raw || String(raw).trim() === '' || String(raw).trim() === '\u2013') {
+        bad.push({ l: doc.l, txt: 'no date recorded', days: -9999 }); return;
+      }
+      if (t === null) { bad.push({ l: doc.l, txt: 'unreadable date', days: -9999 }); return; }
+      const days = Math.round((t - today) / CG_DAY);
+      if (days <= 0) bad.push({ l: doc.l, txt: 'EXPIRED ' + Math.abs(days) + 'd ago', days: days });
+      else if (days <= 30) bad.push({ l: doc.l, txt: 'due in ' + days + 'd', days: days });
+    });
+    bad.sort((a, b) => a.days - b.days);
+    return {
+      Branch: v.Branch, VehicleNo: v.VehicleNo, RouteNo: v.RouteNo, Driver: v.Driver,
+      Problems: bad.length,
+      Detail: bad.length ? bad.map(x => x.l + ' \u2014 ' + x.txt).join('  ·  ') : 'no document issue found',
+      Worst: bad.length ? bad[0].days : null
+    };
+  }).sort((a, b) => (a.Worst === null ? 1 : b.Worst === null ? -1 : a.Worst - b.Worst));
+
+  openModal('\uD83D\uDE8C ' + branch + ' \u2014 ' +
+    (mode === 'expired' ? 'Vehicle documents already expired' : 'Vehicle documents due or missing'),
+    rows.length + ' vehicle' + (rows.length === 1 ? '' : 's') + ' \u00b7 only the failing documents are listed',
+    rows,
+    [{key:'VehicleNo',label:'Vehicle'},{key:'RouteNo',label:'Route'},{key:'Driver',label:'Driver'},
+     {key:'Problems',label:'Issues'},{key:'Detail',label:'What is wrong',maxW:'420px'}],
+    { expr: mode === 'expired'
+        ? 'documents whose expiry date has already passed'
+        : 'documents expiring within 30 days, already expired, or with no date recorded',
+      work: rows.length + ' of ' + d.tr.vehicles + ' vehicles at this branch',
+      note: 'A document with no date recorded counts as a problem, not as unknown \u2014 an unrecorded expiry is the one most likely to have lapsed.' });
 }
 
 /* The index, spelled out — every department that fed it and its weight. */
@@ -17124,13 +17177,17 @@ function nlpCluster(i){
 }
 
 function renderConsolidated(){
-  const branches = cgBranches();
+  /* The header's Branch dropdown narrows the table to that campus, the same way
+     it does on every other tab. It used to be ignored here entirely. */
+  let branches = cgBranches();
+  if (typeof fBranch !== 'undefined' && fBranch !== 'ALL') {
+    const only = branches.filter(b => b === fBranch);
+    if (only.length) branches = only;
+  }
   if (!branches.length) return;
   const D = cgCollect();
   cgRenderOpen(D, branches);
   cgRenderBlocks(D, branches);
-  cgRenderFlags(D, branches);
-  try { cgRenderText(branches); } catch(e){ console.error('text analysis:', e && e.message); }
   const meta = document.getElementById('cg-meta');
   if (meta) meta.textContent = branches.length + ' branches · ' +
     CG_DEPTS.filter(dep => branches.some(b => dep.score(D[b]) !== null)).length + ' departments with data';
@@ -19277,7 +19334,7 @@ window.VCHK = (function () {
       if(!force){
         try{ var c=await idbGet('pbes_vchk');
           if(c&&c.data&&c.data.vchk&&(Date.now()-c.t)<24*3600*1000){
-            RAW=c.data; ROWS=VCHK.toRows(RAW.vchk); loaded=true; safe();
+            RAW=c.data; ROWS=VCHK.toRows(RAW.vchk); window._VCHK_ROWS=ROWS; loaded=true; safe();
             if(st) st.textContent='Cached · refreshing in background';
           }
         }catch(e){}
@@ -19294,7 +19351,7 @@ window.VCHK = (function () {
       if(!raw||!raw.vchk||!raw.vchk.rows||!raw.vchk.rows.length)
         throw new Error('No rows returned. Check the "Vigilance Checklist" tab exists and that '+
                         '/api/data forwards ?section=vchk');
-      RAW=raw; ROWS=VCHK.toRows(raw.vchk); loaded=true;
+      RAW=raw; ROWS=VCHK.toRows(raw.vchk); window._VCHK_ROWS=ROWS; loaded=true;
       try{ idbSet('pbes_vchk',{t:Date.now(),data:raw}); }catch(e){}
       safe();
       if(st) st.textContent = raw.generatedAt ? ('Updated '+String(raw.generatedAt).replace('T',' ').slice(0,16)) : '';
