@@ -14506,7 +14506,19 @@ window.CIVIL = (function () {
   var D = null;
   var V = { branch: '', status: '', prio: '', cat: '', q: '' };
 
-  function $(id) { return document.getElementById(id); }
+  /* Cards get removed from this tab from time to time. Rather than guard every
+     single write — and miss one, which blanks the whole tab with "Could not
+     build the civil work view" — a missing element returns an inert stub. The
+     section that was removed simply draws nothing; every other section still
+     renders. Anything that genuinely needs to know can still test
+     document.getElementById directly. */
+  var _cvNull = { innerHTML: '', textContent: '', value: '', style: {}, dataset: {},
+    classList: { add: function () {}, remove: function () {}, toggle: function () {}, contains: function () { return false; } },
+    addEventListener: function () {}, removeEventListener: function () {},
+    appendChild: function () {}, querySelectorAll: function () { return []; },
+    querySelector: function () { return null; }, focus: function () {}, remove: function () {},
+    getAttribute: function () { return null; }, setAttribute: function () {} };
+  function $(id) { return document.getElementById(id) || _cvNull; }
   var esc = C.esc, fmt = C.fmt;
   function pc(v, dp) { return v === null || v === undefined ? '\u2014' : v.toFixed(dp === undefined ? 0 : dp) + '%'; }
   function nv(v) { return v === null || v === undefined ? '\u2014' : v; }
@@ -14577,6 +14589,10 @@ window.CIVIL = (function () {
       { v: s.noTarget, k: 'No target date set', c: s.noTarget ? '#D97706' : '#059669',
         d: 'Work without a date cannot be late, so it never appears on any overdue list.' }
     ];
+    /* The KPI strip was removed from this tab on request. Skip it rather than
+       throw — this ran before every section below, so its absence blanked the
+       whole tab with "Could not build the civil work view". */
+    if (!$('cv-kpis')) return;
     $('cv-kpis').innerHTML = K.map(function (k) {
       return '<div class="au-kpi"><div class="v" style="color:' + k.c + '">' + k.v + '</div>' +
         '<div class="k">' + esc(k.k) + '</div><div class="d">' + esc(k.d) + '</div></div>';
@@ -14619,6 +14635,8 @@ window.CIVIL = (function () {
 
   /* ══════════ 3. STATUS BY BRANCH ══════════ */
   function renderStatus() {
+    /* Its card ("Priority against progress") was removed from this tab. */
+    if (!$('cv-status-chart')) return;
     var rs = scope();
     var bs = branches().filter(function (b) { return rs.some(function (r) { return r.branch === b; }); });
     $('cv-status-chart').innerHTML =
@@ -14770,6 +14788,9 @@ window.CIVIL = (function () {
 
   /* ══════════ 7. TREND ══════════ */
   function renderTrend() {
+    /* The month-trend card was removed from this tab. Return quietly rather
+       than throwing — an absent card must not stop the rest of the tab. */
+    if (!$('cv-trend')) return;
     var rs = scope();
     var ms = D.months.filter(function (m) { return rs.some(function (r) { return r.month === m; }); });
     if (ms.length < 2) { $('cv-trend').innerHTML = '<p class="au-empty">Not enough dated months to draw a trend.</p>'; return; }
@@ -14869,7 +14890,9 @@ window.CIVIL = (function () {
       if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
       return (b.age || 0) - (a.age || 0);
     });
-    $('cv-reg-n').textContent = rs.length;
+    /* The full register was removed from this tab; skip it if it is not there. */
+    if (!$('cv-register')) return;
+    if ($('cv-reg-n')) $('cv-reg-n').textContent = rs.length;
     $('cv-register').innerHTML = rs.length
       ? '<table class="au-tbl"><thead><tr><th>Branch</th><th>Work</th><th>Category</th><th>Priority</th>' +
         '<th>Status</th><th class="n">Requested</th><th class="n">Target</th><th class="n">Age</th><th>Owner</th></tr></thead><tbody>' +
