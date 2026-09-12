@@ -1833,6 +1833,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="kc blue" onclick="viewPurchaseRecords('Ordered')" style="cursor:pointer;" title="Click to view ordered items"><div class="kc-ico">📦</div><div class="kc-lbl">Ordered</div><div class="kc-val" id="pur-ordered">–</div><div class="kc-sub" id="pur-ordered-s">Click to view</div></div>
     <div class="kc red" onclick="viewPurchaseRecords('Rejected')" style="cursor:pointer;" title="Click to view rejected items"><div class="kc-ico">❌</div><div class="kc-lbl">Rejected</div><div class="kc-val" id="pur-rejected">–</div><div class="kc-sub" id="pur-rejected-s">Click to view</div></div>
     <div class="kc amber" onclick="viewPurchaseRecords('In Progress')" style="cursor:pointer;" title="Click to view in-progress items"><div class="kc-ico">🔄</div><div class="kc-lbl">In Progress</div><div class="kc-val" id="pur-inprog">–</div><div class="kc-sub" id="pur-inprog-s">Click to view</div></div>
+    <div class="kc red" onclick="viewPurchaseRecords('Pending')" style="cursor:pointer;" title="Click to view pending requests"><div class="kc-ico">⏳</div><div class="kc-lbl">Pending</div><div class="kc-val" id="pur-pending">–</div><div class="kc-sub" id="pur-pending-s">Click to view</div></div>
   </div>
 
   <!-- Quick View: Purchase Pending & In Progress/Order Placed, live-filtered by branch -->
@@ -1958,9 +1959,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="kc teal clickable" onclick="viewTransport('students')" title="Click to view transport students"><div class="kc-ico">🎒</div><div class="kc-lbl">Transport Students</div><div class="kc-val" id="tr-stu">–</div><div class="kc-sub" id="tr-stu-s">Riders · click to view</div></div>
     <div class="kc green"><div class="kc-ico">🪑</div><div class="kc-lbl">Fleet Occupancy</div><div class="kc-val" id="tr-occ">–</div><div class="kc-sub" id="tr-occ-s">Riders ÷ seats</div></div>
     <div class="kc amber clickable" onclick="viewTransport('spare')" title="Click to view spare/extra vehicles"><div class="kc-ico">🔄</div><div class="kc-lbl">Spare Vehicles</div><div class="kc-val" id="tr-spare">–</div><div class="kc-sub" id="tr-spare-s">Extra / standby · click to view</div></div>
-    <div class="kc red clickable" onclick="viewTransport('expiring')" title="Click to view expiring documents"><div class="kc-ico">⚠️</div><div class="kc-lbl">Docs Expiring/Expired</div><div class="kc-val" id="tr-exp">–</div><div class="kc-sub" id="tr-exp-s">Compliance risk · click to view</div></div>
+    <div class="kc red clickable" onclick="viewTransport('expiring')" title="Click to view expiring documents"><div class="kc-ico">⚠️</div><div class="kc-lbl">Docs Expiring/Expired</div><!-- Docs Expiring KPI removed on request --><div class="kc-sub" id="tr-exp-s">Compliance risk · click to view</div></div>
     <div class="kc purple"><div class="kc-ico">⛽</div><div class="kc-lbl">Avg Mileage</div><div class="kc-val" id="tr-mil">–</div><div class="kc-sub" id="tr-mil-s">KM / litre</div></div>
   </div>
+
+<div class="card" style="margin-bottom:16px;">
+    <div class="ch"><h3>🚍 Fleet Register</h3><span class="fnote">Branch-wise vehicle list · click a row for full detail</span></div>
+    <div class="cb" style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:760px;">
+      <thead><tr style="background:#EEF2FF;">
+        <th style="padding:8px 10px;text-align:left;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Branch</th>
+        <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Vehicles</th>
+        <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Seats</th>
+        <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Riders</th>
+        <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Occupancy %</th>
+        <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Students</th><th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Teachers / staff</th>
+      </tr></thead><tbody id="tr-fleet-tbody"></tbody></table></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <div class="ch"><h3>&#9888;&#65039; Documents expired or falling due</h3>
+      <span class="fnote">Only the documents with a problem &mdash; expired first, then due within 30 days.
+        A vehicle with every document valid does not appear. Click a row for that vehicle's full record.</span></div>
+    <div class="cb-0" style="overflow-x:auto"><table class="dt" id="tr-docs"></table></div>
+  </div>
+
 
   <div class="row r2">
 <!-- removed on request: Branch Occupancy -->
@@ -1970,18 +1992,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 <!-- removed on request: Fleet Compliance -->
 <!-- removed on request: Maintenance Cost by Branch -->
   </div>
-  <div class="card" style="margin-bottom:16px;">
-    <div class="ch"><h3>🚍 Fleet Register</h3><span class="fnote">Branch-wise vehicle list · click a row for full detail</span></div>
-    <div class="cb" style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:760px;">
-      <thead><tr style="background:#EEF2FF;">
-        <th style="padding:8px 10px;text-align:left;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Branch</th>
-        <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Vehicles</th>
-        <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Seats</th>
-        <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Riders</th>
-        <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Occupancy %</th>
-        <th style="padding:8px 10px;text-align:center;font-size:10px;font-weight:700;color:#1E4FD8;text-transform:uppercase;border-bottom:2px solid #E0E8FF;">Docs Expiring</th>
-      </tr></thead><tbody id="tr-fleet-tbody"></tbody></table></div>
-  </div>
+  
 
   <div class="card" style="margin-bottom:16px;">
     <div class="ch"><h3>🗺️ Route-wise Complete Report</h3><span class="fnote">Select a route to view vehicle, driver &amp; attender, documents, and all riders</span></div>
@@ -2042,17 +2053,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     table.itfreeze thead th:first-child{ z-index:3; background:#F8FAFF; }
     table.itfreeze tr[style*="F8FAFF"] td:first-child{ background:#F8FAFF; }
   </style>
-  <div class="card" style="margin-bottom:16px;">
+  <div class="row r2">
+    <div class="card"><div class="ch"><h3>🏫 Assets by Branch</h3><span class="fnote">Click a bar to view that branch's assets</span></div><div class="cb"><div class="cw tall"><canvas id="it-branch"></canvas></div></div></div>
+    <div class="card"><div class="ch"><h3>🩺 System Health — Working vs Down vs Pending</h3><span class="fnote">Top systems by asset count</span></div><div class="cb"><div class="cw tall"><canvas id="it-system"></canvas></div></div></div>
+  </div>
+
+<div class="card" style="margin-bottom:16px;">
     <div class="ch"><h3>&#128197; Monthly asset check &mdash; branch &times; system</h3>
       <span class="fnote">One table per month, newest first. Rows are branches, columns are systems, and each cell
         reads <b>working / total</b>. The total comes from the IT Assets master, so it stays the same from month to
         month &mdash; only the working figure moves. Click any cell for that month's records.</span></div>
     <div class="cb-0" id="it-monthly"></div>
-  </div>
-
-  <div class="row r2">
-    <div class="card"><div class="ch"><h3>🏫 Assets by Branch</h3><span class="fnote">Click a bar to view that branch's assets</span></div><div class="cb"><div class="cw tall"><canvas id="it-branch"></canvas></div></div></div>
-    <div class="card"><div class="ch"><h3>🩺 System Health — Working vs Down vs Pending</h3><span class="fnote">Top systems by asset count</span></div><div class="cb"><div class="cw tall"><canvas id="it-system"></canvas></div></div></div>
   </div>
 </div>
 
@@ -5592,12 +5603,25 @@ function viewHRByRecruiter(hr,status){
     {key:'Position',label:'Position',maxW:'180px'},{key:'Branch',label:'Branch'},{key:'Status',label:'Status',pill:true},
     {key:'ClosedDate',label:'Closed',date:true},{key:'DaysToClose',label:'Days'},
     {key:'CandidateName',label:'Candidate',maxW:'150px'},{key:'Notes',label:'Notes',maxW:'220px'}];
+  /* Closed positions read newest-first: when someone opens this they want to see
+     what has just been filled, not what was filled in November. Rows with no
+     closure date sort to the bottom rather than to the top, where an empty
+     value would otherwise land. */
+  if(status==='Closed'){
+    rows=rows.slice().sort((a,b)=>{
+      const ta=Date.parse(String(a.ClosedDate||'')), tb=Date.parse(String(b.ClosedDate||''));
+      if(isNaN(ta)&&isNaN(tb)) return 0;
+      if(isNaN(ta)) return 1;
+      if(isNaN(tb)) return -1;
+      return tb-ta;
+    });
+  }
   const st=(window._HR_UNIFIED||{})[hr];
-  const fx = st ? unifiedFx(st.u, {assigned:st.assigned, closed:st.closed, maxAssigned:st.maxAssigned,
-      targetTAT:st.targetTAT, actualTAT:st.actualTAT, overdueDays:st.odDays},
-      {item:'roles', assigned:'assigned', closed:'closed'}) : null;
+  /* No formula strip here: this view is asked for to read the RECORDS. The
+     score's working is still on the scorecard row itself. */
   openModal(`👥 ${hr} — ${status==='ALL'?'All Positions':status}`,
-    `${rows.length} positions`+(st?` · score ${st.score}`:''),rows,cols,fx);
+    `${rows.length} positions`+(st?` · score ${st.score}`:'')+
+    (status==='Closed'?' · latest closed first':''),rows,cols,null);
 }
 
 function viewHRRecords(filter){
@@ -8462,7 +8486,13 @@ function renderTransport(){
     fb.innerHTML=boLabels.map(b=>{
       const bv=(T.vehicles||[]).filter(v=>v.Branch===b);
       const s=bSeats[b], r=bRiders[b]; const o=s>0?Math.round(r/s*100):0;
-      const exp=bv.filter(_trExpiring).length;
+      /* Riders split by type. RiderType is the only field that tells a pupil
+         from a member of staff, so a blank one is counted as a student — the
+         larger and safer assumption for a school bus. */
+      const bs=(T.students||[]).filter(x=>x.Branch===b);
+      const isStaff=x=>/staff|teacher|employee|faculty/i.test(String(x.RiderType||''));
+      const nStaff=bs.filter(isStaff).length;
+      const nStud=bs.length-nStaff;
       const oc=o>100?'#DC2626':o>=85?'#059669':o>=60?'#D97706':'#64748B';
       return `<tr style="cursor:pointer" onclick="viewTransport('vehicles','${b}')">
         <td style="padding:8px 10px;border-bottom:1px solid #F1F5F9;"><span class="bd b${b}"></span> <strong>${b}</strong></td>
@@ -8470,8 +8500,61 @@ function renderTransport(){
         <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${fi(s)}</td>
         <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${fi(r)}</td>
         <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;font-weight:700;color:${oc}">${o}%</td>
-        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${exp>0?'<span style="color:#DC2626;font-weight:700;">'+exp+'</span>':'0'}</td></tr>`;
-    }).join('')||'<tr><td colspan="6" class="no-data">No data</td></tr>';
+        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${fi(nStud)}</td>
+        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${fi(nStaff)}</td></tr>`;
+    }).join('')||'<tr><td colspan="7" class="no-data">No data</td></tr>';
+  }
+
+  /* ── Documents expired or falling due ──
+     Only the failing documents. A vehicle whose papers are all valid does not
+     appear at all, and one that does appear shows just the documents that are a
+     problem rather than four columns of dates to scan. A document with no date
+     recorded counts as a problem: an unrecorded expiry is the one most likely
+     to have lapsed. */
+  {
+    const DOCS=[['Insurance','InsuranceExp'],['Fitness','FitnessExp'],['Permit','PermitExp'],
+                ['PUC','PucExp'],['Road tax','TaxExp'],['Driver licence','LicenceExp']];
+    const nowT=Date.now(), DAY=86400000;
+    const probs=[];
+    (vehicles||[]).forEach(v=>{
+      const bad=[];
+      DOCS.forEach(d=>{
+        const label=d[0], key=d[1];
+        if(!(key in v)) return;
+        const txt=String(v[key]==null?'':v[key]).trim();
+        /* Sort key, not a real number of days: expired documents rank first
+           (most overdue first), then missing dates, then those falling due.
+           A missing date used to outrank a document expired six weeks ago,
+           which is the wrong way round for a fleet check. */
+        if(!txt||txt==='\u2013'){ bad.push({label:label,days:0.5,txt:'no date recorded'}); return; }
+        const t=Date.parse(txt);
+        if(isNaN(t)){ bad.push({label:label,days:0.5,txt:'unreadable date'}); return; }
+        const dd=Math.round((t-nowT)/DAY);
+        if(dd<=0) bad.push({label:label,days:dd,txt:'expired '+Math.abs(dd)+'d ago'});
+        else if(dd<=30) bad.push({label:label,days:dd,txt:'due in '+dd+'d'});
+      });
+      if(bad.length){ bad.sort((a,b)=>a.days-b.days); probs.push({v:v,bad:bad,worst:bad[0].days}); }
+    });
+    probs.sort((a,b)=>a.worst-b.worst);
+    const dEl=document.getElementById('tr-docs');
+    if(dEl){
+      dEl.innerHTML = probs.length
+        ? '<thead><tr><th style="text-align:left">Branch</th><th>Vehicle</th><th>Route</th>'+
+          '<th style="text-align:left">Driver</th><th>Issues</th><th style="text-align:left">What is wrong</th></tr></thead><tbody>'+
+          probs.map(x=>{
+            const v=x.v;
+            const detail=x.bad.map(d=>'<span style="color:'+(d.days<=0?'#DC2626':'#D97706')+';font-weight:600">'+
+              d.label+' \u2014 '+d.txt+'</span>').join('<span style="color:#CBD5E1"> \u00b7 </span>');
+            return '<tr style="cursor:pointer" onclick="viewTransport(\'vehicles\',\''+String(v.Branch||'').replace(/'/g,"\\'")+'\')">'+
+              '<td style="text-align:left"><span class="bd b'+(v.Branch||'')+'"></span> '+(v.Branch||'\u2013')+'</td>'+
+              '<td style="font-weight:700">'+(v.VehicleNo||'\u2013')+'</td>'+
+              '<td>'+(v.RouteNo||'\u2013')+'</td>'+
+              '<td style="text-align:left">'+(v.Driver||'\u2013')+'</td>'+
+              '<td style="font-weight:700;color:'+(x.worst<=0?'#DC2626':'#D97706')+'">'+x.bad.length+'</td>'+
+              '<td style="text-align:left;font-size:11.5px">'+detail+'</td></tr>';
+          }).join('')+'</tbody>'
+        : '<tbody><tr><td class="no-data">Every vehicle in this selection has valid documents.</td></tr></tbody>';
+    }
   }
 
   // Populate the Route-wise dropdown (respects branch filter)
@@ -8734,6 +8817,24 @@ function itMonthLabel(k){
   return (IT_MONTHS[+p[1] - 1] || k) + ' ' + p[0];
 }
 
+/* An icon per system, so a column can be found at a glance instead of read.
+   Matched on keywords rather than exact names, because the sheet spells them
+   differently from one branch to the next ("CCTV", "CCTV Cameras", "cctv"). */
+const IT_SYS_ICONS = [
+  [/cctv|camera|surveill/i, '📹'], [/desktop|laptop|computer|\bpc\b/i, '💻'],
+  [/smart ?board|projector|display|tv\b/i, '📽️'], [/printer|scanner|xerox|copier/i, '🖨️'],
+  [/network|wi-?fi|internet|router|switch|lan/i, '📶'], [/server|backup|storage|nas/i, '🗄️'],
+  [/biometric|access control|attendance/i, '🔐'], [/\bpa\b|intercom|announce|speaker|audio/i, '🔊'],
+  [/erp|digital ?campus/i, '🏫'], [/crm|extraaedge|lead/i, '📈'],
+  [/website|email|domain|digital asset/i, '🌐'], [/ups|inverter|power|battery/i, '🔋'],
+  [/tab|ipad/i, '📱'], [/software|licen[cs]e|antivirus/i, '🧩'], [/phone|mobile|telephone/i, '☎️']
+];
+function itSysIcon(name){
+  const t = String(name || '');
+  for (const [re, ic] of IT_SYS_ICONS) if (re.test(t)) return '<span style="font-size:17px">' + ic + '</span>';
+  return '<span style="font-size:17px">🖥️</span>';          // anything unrecognised
+}
+
 function renderITMonthly(){
   const host = document.getElementById('it-monthly');
   if (!host) return;
@@ -8808,7 +8909,8 @@ function renderITMonthly(){
          tell which row they were on. */
       '<div style="overflow-x:auto;padding:10px 18px 18px"><table class="dt itfreeze" style="min-width:640px">' +
       '<thead><tr><th style="text-align:left">Branch</th>' +
-      systems.map(sy => '<th>' + sy + '</th>').join('') + '</tr></thead><tbody>' + rows +
+      systems.map(sy => '<th>' + itSysIcon(sy) + '<br><span style="font-size:10.5px">' + sy + '</span></th>').join('') +
+      '</tr></thead><tbody>' + rows +
       '<tr style="background:#F8FAFF;border-top:2px solid #E0E8FF">' +
       '<td style="text-align:left;font-weight:800">All branches</td>' + foot + '</tr>' +
       '</tbody></table></div>';
@@ -8918,7 +9020,7 @@ function renderIT(){
         <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;color:#059669;">${fi(+r.Working||0)}</td>
         <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;color:#DC2626;">${fi(+r.NotWorking||0)}</td>
         <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;font-weight:700;color:${hc}">${r.hp}%</td></tr>`;
-    }).join('')||'<tr><td colspan="6" class="no-data">No data</td></tr>';
+    }).join('')||'<tr><td colspan="7" class="no-data">No data</td></tr>';
   }
 }
 function viewIT(kind,branch,system){
@@ -9905,6 +10007,14 @@ function viewPurchaseRecords(filterType) {
   else if (filterType === 'In Progress') { rows = rows.filter(r => /^in progress/i.test(st(r)));             titleSuffix = ' — In Progress'; }
   else if (filterType === 'Rejected')    { rows = rows.filter(r => /rejected|cancel/i.test(st(r)));          titleSuffix = ' — Rejected'; }
   else if (filterType === 'InProgressOrdered') { rows = rows.filter(r => /^in progress|^order/i.test(st(r))); titleSuffix = ' — In Progress / Ordered'; }
+  /* Pending is defined by exclusion: anything that is not delivered, ordered,
+     rejected or in progress. Matching on the word "pending" alone would miss
+     the blank and mis-spelled statuses, which are exactly the requests nobody
+     has actioned. */
+  else if (filterType === 'Pending') {
+    rows = rows.filter(r => !/^delivered|^order|^in progress|rejected|cancel/i.test(st(r)));
+    titleSuffix = ' — Pending';
+  }
   // no/unknown filter → all records
   const cols = [
     {key:'Branch', label:'Branch'}, {key:'Date', label:'Date', date:true},
@@ -15741,6 +15851,12 @@ function renderPurchase(){
   setTxt('pur-rejected-s',nRejected>0?'Click to view':'None rejected');
   setTxt('pur-inprog',fi(nInProg));
   setTxt('pur-inprog-s',nInProg>0?fi(nInProg)+' ongoing — click to view':'–');
+  /* Pending is everything not yet resolved: not delivered, not ordered, not
+     rejected and not in progress. Counting it as its own KPI stops requests
+     that were never actioned from hiding between the other four. */
+  const nPending=_pRows.filter(r=>!isDelivered(r)&&!isOrdered(r)&&!isRejected(r)&&!isInProg(r)).length;
+  setTxt('pur-pending',fi(nPending));
+  setTxt('pur-pending-s',nPending>0?'Not yet actioned — click to view':'Nothing pending');
 
   // ── Quick View: In Progress & Delivered ──
   {
@@ -16862,10 +16978,11 @@ function cgVehicleDocs(branch, d, mode){
       if (!(doc.k in v)) return;
       const raw = v[doc.k];
       const t = cgDate(raw);
+      /* Expired ranks above missing, which ranks above falling due. */
       if (!raw || String(raw).trim() === '' || String(raw).trim() === '\u2013') {
-        bad.push({ l: doc.l, txt: 'no date recorded', days: -9999 }); return;
+        bad.push({ l: doc.l, txt: 'no date recorded', days: 0.5 }); return;
       }
-      if (t === null) { bad.push({ l: doc.l, txt: 'unreadable date', days: -9999 }); return; }
+      if (t === null) { bad.push({ l: doc.l, txt: 'unreadable date', days: 0.5 }); return; }
       const days = Math.round((t - today) / CG_DAY);
       if (days <= 0) bad.push({ l: doc.l, txt: 'EXPIRED ' + Math.abs(days) + 'd ago', days: days });
       else if (days <= 30) bad.push({ l: doc.l, txt: 'due in ' + days + 'd', days: days });
