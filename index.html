@@ -1101,6 +1101,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="sn-scroll">
     <div class="sn-grp">Overview</div>
     <button class="tb active" onclick="showTab('overview',this)" title="Executive Overview"><span class="ic">📊</span><span class="lb">Executive Overview</span></button>
+    <button class="tb" onclick="showTab('activity',this)" title="Team Activity"><span class="ic">🧭</span><span class="lb">Team Activity</span></button>
     <button class="tb" onclick="showTab('glance',this)" title="Consolidated Glance"><span class="ic">🗂️</span><span class="lb">Consolidated Glance</span></button>
     <button class="tb" onclick="showTab('meet',this)" title="Meeting Actions"><span class="ic">🎙️</span><span class="lb">Meeting Actions</span></button>
     <div class="sn-grp">Academics</div>
@@ -1763,6 +1764,41 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="cb-0" style="overflow-x:auto"><table class="dt" id="admin-matrix"></table></div>
   </div>
 </div>
+<div id="pane-activity" class="pane">
+  <div class="exm-head">
+    <h2 style="margin:0;font-size:20px;font-weight:800">Team Activity</h2>
+    <span class="exm-sub" id="ta-meta"></span>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;"><div class="ch">
+      <h3>&#129517; Who is working the dashboard</h3>
+      <span class="fnote">Entries submitted from each tab, by person. This counts what people have WRITTEN DOWN,
+        which is not the same as what they have read &mdash; someone can study a tab closely and record nothing.
+        Read it as a record of follow-up, not of attention.</span></div>
+    <div class="cb-0" style="overflow-x:auto"><table class="dt" id="ta-people"></table></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;"><div class="ch">
+      <h3>&#128202; Which tabs are being acted on</h3>
+      <span class="fnote">Entries per tab. A tab nobody writes about is either fine, or not being looked at
+        &mdash; the count alone cannot tell you which.</span></div>
+    <div class="cb-0" style="overflow-x:auto"><table class="dt" id="ta-tabs"></table></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;"><div class="ch">
+      <h3>&#9203; Still open</h3>
+      <span class="fnote">Observations with an action recorded but not yet closed, oldest first. Click a row
+        to mark it closed.</span></div>
+    <div class="cb-0" id="ta-open"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;"><div class="ch">
+      <h3>&#128220; Everything recorded</h3>
+      <span class="fnote">The full log, newest first.</span></div>
+    <div class="cb-0" id="ta-all"></div>
+  </div>
+</div>
+
 <div id="pane-glance" class="pane">
   <div class="exm-head">
     <h2 style="margin:0;font-size:20px;font-weight:800">Consolidated Glance</h2>
@@ -9055,6 +9091,278 @@ function viewIT(kind,branch,system){
    changed since they were last drawn. The work is the same; it is just no
    longer done for things nobody is looking at.
    ══════════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════════
+   DASHBOARD OBSERVATION LOG
+
+   The dashboard was circulated to every department and principal, and until now
+   nobody could tell whether it was being read. This adds a short form to the
+   bottom of every tab: what you saw here, what you did about it, what happens
+   next. Management then has the Team Activity tab.
+
+   Two things this deliberately does NOT do:
+
+   • It does not claim to measure "usage". It measures SUBMISSIONS. Someone can
+     read the dashboard carefully every morning and file nothing; someone else
+     can file a line a day that says nothing. The Team Activity tab is worded to
+     keep that distinction visible rather than let a submission count stand in
+     for attention.
+   • It does not take the submitter's name from this page. The browser sends
+     only the text and the tab; the name, role and branch come from the signed-in
+     session on the server. Otherwise an entry could be filed as anyone.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+const OBS_TABS = {
+  overview:'Executive Overview', glance:'Consolidated Glance', meet:'Meeting Actions',
+  pt1:'PT-1 Academic Review', observations:'Teacher Observations', audit:'School Audit',
+  syl:'Syllabus & Notebook', ptm:'PTM Feedback', kptm:'K-Innovative PTM', care:'Care Calls',
+  grievance:'Grievance', admissions:'Admissions', dm:'Digital Marketing', admin:'Admin Tracker',
+  civil:'Civil Work', vigilance:'Vigilance', purchase:'Purchase', transport:'Transport',
+  it:'IT Report', hr:'HR Analytics'
+};
+
+function obsLog(){ return (typeof OBS_LOG!=='undefined' && Array.isArray(OBS_LOG)) ? OBS_LOG : []; }
+function obsMe(){ return (window._ME_EMAIL || ''); }
+
+/* The form, appended once to each pane. */
+function obsMountForm(tabId){
+  const pane = document.getElementById('pane-' + tabId);
+  if (!pane || pane.dataset.obsForm) return;
+  if (!OBS_TABS[tabId]) return;
+  pane.dataset.obsForm = '1';
+
+  const mine = obsLog().filter(r => r.tab === OBS_TABS[tabId]);
+  const box = document.createElement('div');
+  box.className = 'card';
+  box.style.cssText = 'margin:18px 0 26px;border:1px solid #CFE3D6';
+  box.innerHTML =
+    '<div class="ch" style="background:#EAF4EE"><h3 style="color:#1B5E34">&#128221; Your observation on this tab</h3>' +
+    '<span class="fnote">What you saw here, and what you did about it. Submitted under your own login and ' +
+    'visible to management in Team Activity.</span></div>' +
+    '<div class="cb" style="display:grid;gap:10px">' +
+      '<textarea id="obs-t-' + tabId + '" rows="2" placeholder="What did this tab show you? e.g. 4 vehicles at Keesara have insurance expiring this month" ' +
+        'style="width:100%;padding:9px 11px;border:1px solid #E0E8FF;border-radius:8px;font:inherit;font-size:13px"></textarea>' +
+      '<textarea id="obs-a-' + tabId + '" rows="2" placeholder="What action did you take? e.g. spoke to transport incharge, renewal started for 3 of them" ' +
+        'style="width:100%;padding:9px 11px;border:1px solid #E0E8FF;border-radius:8px;font:inherit;font-size:13px"></textarea>' +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">' +
+        '<input id="obs-n-' + tabId + '" placeholder="Next step (optional)" ' +
+          'style="flex:1;min-width:220px;padding:9px 11px;border:1px solid #E0E8FF;border-radius:8px;font:inherit;font-size:13px">' +
+        '<label style="font-size:12px;color:#64748B">by <input type="date" id="obs-d-' + tabId + '" ' +
+          'style="padding:7px 9px;border:1px solid #E0E8FF;border-radius:8px;font:inherit;font-size:12.5px"></label>' +
+        '<button id="obs-b-' + tabId + '" style="padding:9px 18px;border:0;border-radius:8px;background:#1B5E34;' +
+          'color:#fff;font-weight:700;font-size:13px;cursor:pointer">Submit</button>' +
+        '<span id="obs-s-' + tabId + '" style="font-size:12px;color:#64748B"></span>' +
+      '</div>' +
+      '<div id="obs-l-' + tabId + '" style="border-top:1px solid #EEF2FF;padding-top:8px"></div>' +
+    '</div>';
+  pane.appendChild(box);
+  document.getElementById('obs-b-' + tabId).addEventListener('click', () => obsSubmit(tabId));
+  obsRenderRecent(tabId);
+}
+
+function obsRenderRecent(tabId){
+  const el = document.getElementById('obs-l-' + tabId);
+  if (!el) return;
+  const rows = obsLog().filter(r => r.tab === OBS_TABS[tabId])
+    .sort((a, b) => String(b.ts).localeCompare(String(a.ts))).slice(0, 5);
+  if (!rows.length){
+    el.innerHTML = '<div style="font-size:12px;color:#94A3B8">Nothing recorded on this tab yet.</div>';
+    return;
+  }
+  const esc = v => String(v == null ? '' : v).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  el.innerHTML = '<div style="font-size:11px;font-weight:700;color:#94A3B8;text-transform:uppercase;margin-bottom:6px">' +
+    'Recent entries on this tab</div>' + rows.map(r =>
+    '<div style="padding:7px 0;border-bottom:1px solid #F6F8FF;font-size:12.5px">' +
+      '<span style="font-weight:700;color:#1B5E34">' + esc(r.user) + '</span>' +
+      '<span style="color:#94A3B8;font-size:11px"> · ' + esc(String(r.ts).replace('T', ' ').slice(0, 16)) +
+      (r.branch ? ' · ' + esc(r.branch) : '') + '</span><br>' +
+      '<span style="color:#1F2937">' + esc(r.observation) + '</span>' +
+      (r.action ? '<br><span style="color:#475569;font-size:12px">↳ ' + esc(r.action) + '</span>' : '') +
+    '</div>').join('');
+}
+
+async function obsSubmit(tabId){
+  const t = document.getElementById('obs-t-' + tabId);
+  const a = document.getElementById('obs-a-' + tabId);
+  const n = document.getElementById('obs-n-' + tabId);
+  const d = document.getElementById('obs-d-' + tabId);
+  const btn = document.getElementById('obs-b-' + tabId);
+  const st = document.getElementById('obs-s-' + tabId);
+  const say = (m, bad) => { if (st){ st.textContent = m; st.style.color = bad ? '#B3402F' : '#059669'; } };
+
+  if (!t || t.value.trim().length < 5){ say('Write what you saw before submitting.', true); if (t) t.focus(); return; }
+  btn.disabled = true; say('Saving…');
+  try {
+    const ss = await sb.auth.getSession();
+    const tok = ss && ss.data && ss.data.session && ss.data.session.access_token;
+    if (!tok) throw new Error('Not signed in');
+    const r = await fetch('/api/observe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+      body: JSON.stringify({ tab: OBS_TABS[tabId] || tabId, observation: t.value.trim(),
+                             action: a ? a.value.trim() : '', next: n ? n.value.trim() : '',
+                             due: d ? d.value : '' })
+    });
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j || j.error) throw new Error((j && j.message) || ('HTTP ' + r.status));
+
+    /* Show it immediately rather than waiting for the next payload — the entry
+       is saved; a reader should not have to wonder. */
+    obsLog().push({ ts: new Date().toISOString().slice(0, 19), user: j.savedAs || 'you',
+      role: '', branch: j.branch || '', tab: OBS_TABS[tabId] || tabId,
+      observation: t.value.trim(), action: a ? a.value.trim() : '',
+      next: n ? n.value.trim() : '', due: d ? d.value : '', status: 'Open' });
+    t.value = ''; if (a) a.value = ''; if (n) n.value = ''; if (d) d.value = '';
+    say('Saved as ' + (j.savedAs || 'you'));
+    obsRenderRecent(tabId);
+  } catch (e){
+    say('Not saved: ' + (e && e.message || e), true);
+  } finally { btn.disabled = false; }
+}
+
+/* ── Team Activity ── */
+function taEsc(v){ return String(v==null?'':v).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function taDate(v){ return String(v||'').replace('T',' ').slice(0,16); }
+function taDaysAgo(v){
+  const t = Date.parse(String(v||'')); if (isNaN(t)) return null;
+  return Math.floor((Date.now()-t)/86400000);
+}
+
+function renderActivity(){
+  const rows = obsLog();
+  const meta = document.getElementById('ta-meta');
+  if (meta) meta.textContent = rows.length + ' entries · ' +
+    new Set(rows.map(r=>r.user)).size + ' people · ' +
+    rows.filter(r=>!/closed/i.test(r.status)).length + ' still open';
+
+  /* ── by person ── */
+  const people = {};
+  rows.forEach(r => {
+    const p = people[r.user] || (people[r.user] = { n:0, open:0, tabs:new Set(), last:'', branch:r.branch, withAction:0 });
+    p.n++;
+    if (!/closed/i.test(r.status)) p.open++;
+    if (String(r.action||'').trim()) p.withAction++;
+    p.tabs.add(r.tab);
+    if (String(r.ts) > p.last) p.last = String(r.ts);
+  });
+  const pEl = document.getElementById('ta-people');
+  if (pEl){
+    const list = Object.keys(people).sort((a,b)=>people[b].n-people[a].n);
+    pEl.innerHTML = list.length
+      ? '<thead><tr><th style="text-align:left">Person</th><th style="text-align:left">Branch</th>' +
+        '<th>Entries</th><th>Tabs covered</th><th>With an action</th><th>Still open</th>' +
+        '<th style="text-align:left">Last entry</th></tr></thead><tbody>' +
+        list.map(u => {
+          const p = people[u], ago = taDaysAgo(p.last);
+          /* Silence is the thing worth seeing, so it is coloured, not the count. */
+          const col = ago===null ? '#94A3B8' : ago<=2 ? '#059669' : ago<=7 ? '#D97706' : '#DC2626';
+          return '<tr style="cursor:pointer" onclick="taPerson(\'' + String(u).replace(/'/g,"\\'") + '\')">' +
+            '<td style="text-align:left;font-weight:700">' + taEsc(u) + '</td>' +
+            '<td style="text-align:left;color:#64748B">' + taEsc(p.branch||'all branches') + '</td>' +
+            '<td style="font-weight:700">' + p.n + '</td>' +
+            '<td>' + p.tabs.size + '</td>' +
+            '<td>' + p.withAction + '</td>' +
+            '<td style="color:' + (p.open?'#B3402F':'#059669') + ';font-weight:700">' + p.open + '</td>' +
+            '<td style="text-align:left;color:' + col + ';font-weight:600">' + taDate(p.last) +
+            (ago===null?'':' <span style="font-weight:400;font-size:11px">(' + (ago===0?'today':ago+'d ago') + ')</span>') +
+            '</td></tr>';
+        }).join('') + '</tbody>'
+      : '<tbody><tr><td class="no-data">Nobody has submitted an observation yet. The form is at the bottom of every tab.</td></tr></tbody>';
+  }
+
+  /* ── by tab, including the tabs with nothing ── */
+  const tEl = document.getElementById('ta-tabs');
+  if (tEl){
+    const byTab = {};
+    Object.values(OBS_TABS).forEach(t => byTab[t] = { n:0, people:new Set(), last:'' });
+    rows.forEach(r => {
+      const e = byTab[r.tab] || (byTab[r.tab] = { n:0, people:new Set(), last:'' });
+      e.n++; e.people.add(r.user);
+      if (String(r.ts) > e.last) e.last = String(r.ts);
+    });
+    const names = Object.keys(byTab).sort((a,b)=>byTab[b].n-byTab[a].n || a.localeCompare(b));
+    tEl.innerHTML = '<thead><tr><th style="text-align:left">Tab</th><th>Entries</th><th>People</th>' +
+      '<th style="text-align:left">Last entry</th></tr></thead><tbody>' +
+      names.map(t => {
+        const e = byTab[t];
+        return '<tr' + (e.n?' style="cursor:pointer" onclick="taTab(\'' + t.replace(/'/g,"\\'") + '\')"':'') + '>' +
+          '<td style="text-align:left">' + taEsc(t) + '</td>' +
+          '<td style="font-weight:700;color:' + (e.n?'#1F2937':'#CBD5E1') + '">' + e.n + '</td>' +
+          '<td>' + (e.people.size||'–') + '</td>' +
+          '<td style="text-align:left;color:#64748B">' + (e.last?taDate(e.last):'—') + '</td></tr>';
+      }).join('') + '</tbody>';
+  }
+
+  /* ── still open, oldest first ── */
+  const oEl = document.getElementById('ta-open');
+  if (oEl){
+    const open = rows.filter(r => !/closed/i.test(r.status))
+      .sort((a,b)=>String(a.ts).localeCompare(String(b.ts)));
+    oEl.innerHTML = open.length ? open.map(r => taEntry(r, true)).join('')
+      : '<div style="padding:18px;color:#64748B;font-size:13px">Nothing is outstanding.</div>';
+  }
+
+  /* ── the whole log ── */
+  const aEl = document.getElementById('ta-all');
+  if (aEl){
+    const all = rows.slice().sort((a,b)=>String(b.ts).localeCompare(String(a.ts))).slice(0,200);
+    aEl.innerHTML = all.length ? all.map(r => taEntry(r, false)).join('')
+      : '<div style="padding:18px;color:#64748B;font-size:13px">The log is empty.</div>';
+  }
+}
+
+function taEntry(r, showClose){
+  const ago = taDaysAgo(r.ts);
+  const closed = /closed/i.test(r.status);
+  return '<div style="padding:11px 14px;border-bottom:1px solid #EEF2FF">' +
+    '<div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">' +
+      '<span style="font-weight:800;color:#1B5E34">' + taEsc(r.user) + '</span>' +
+      '<span style="font-size:11px;color:#94A3B8">' + taDate(r.ts) +
+        (ago===null?'':' · ' + (ago===0?'today':ago + 'd ago')) +
+        (r.branch?' · ' + taEsc(r.branch):'') + '</span>' +
+      '<span style="font-size:11px;background:#EEF2FF;border-radius:10px;padding:2px 9px;color:#1E4FD8">' +
+        taEsc(r.tab) + '</span>' +
+      (closed?'<span style="font-size:11px;color:#059669;font-weight:700">closed</span>':'') +
+    '</div>' +
+    '<div style="margin-top:4px;font-size:13px;color:#1F2937">' + taEsc(r.observation) + '</div>' +
+    (r.action?'<div style="margin-top:3px;font-size:12.5px;color:#475569">↳ ' + taEsc(r.action) + '</div>':
+      '<div style="margin-top:3px;font-size:12px;color:#B3402F">No action recorded against this.</div>') +
+    (r.next?'<div style="margin-top:3px;font-size:12px;color:#64748B">Next: ' + taEsc(r.next) +
+      (r.due?' (by ' + taEsc(r.due) + ')':'') + '</div>':'') +
+    (showClose && !closed ? '<button onclick="taClose(\'' + String(r.ts).replace(/'/g,"\\'") +
+      '\')" style="margin-top:7px;padding:5px 12px;border:1px solid #CFE3D6;background:#fff;' +
+      'border-radius:7px;font-size:12px;cursor:pointer;color:#1B5E34;font-weight:700">Mark closed</button>':'') +
+  '</div>';
+}
+
+function taPerson(user){
+  const rows = obsLog().filter(r => r.user === user)
+    .sort((a,b)=>String(b.ts).localeCompare(String(a.ts)));
+  openHTMLModal('🧭 ' + user, rows.length + ' entries',
+    '<div>' + rows.map(r => taEntry(r, false)).join('') + '</div>', null);
+}
+function taTab(tab){
+  const rows = obsLog().filter(r => r.tab === tab)
+    .sort((a,b)=>String(b.ts).localeCompare(String(a.ts)));
+  openHTMLModal('📊 ' + tab, rows.length + ' entries',
+    '<div>' + rows.map(r => taEntry(r, false)).join('') + '</div>', null);
+}
+
+async function taClose(ts){
+  try{
+    const ss = await sb.auth.getSession();
+    const tok = ss && ss.data && ss.data.session && ss.data.session.access_token;
+    if (!tok) throw new Error('Not signed in');
+    const r = await fetch('/api/observe', { method:'POST',
+      headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + tok },
+      body: JSON.stringify({ mode:'close', ts: ts }) });
+    const j = await r.json().catch(()=>null);
+    if (!r.ok || !j || j.error) throw new Error((j && j.message) || ('HTTP ' + r.status));
+    const hit = obsLog().find(x => String(x.ts) === String(ts));
+    if (hit) hit.status = 'Closed';
+    renderActivity();
+  }catch(e){ alert('Could not close this entry: ' + (e && e.message || e)); }
+}
+
 var _RENDERERS = {
   overview:      ['Overview', function(){ renderOverview(); renderRankings(); renderInsights(); }],
   care:          ['Care', function(){ renderCare(); }],
@@ -9068,7 +9376,8 @@ var _RENDERERS = {
   it:            ['IT', function(){ renderIT(); }],
   hr:            ['HR', function(){ renderHR(); }],
   dm:            ['Digital Marketing', function(){ renderDm(); }],
-  glance:        ['Consolidated Glance', function(){ renderConsolidated(); }]
+  glance:        ['Consolidated Glance', function(){ renderConsolidated(); }],
+  activity:      ['Team Activity', function(){ renderActivity(); }]
 };
 var _stale = {};
 function _currentTab(){
