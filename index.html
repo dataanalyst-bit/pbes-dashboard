@@ -17169,7 +17169,7 @@ const CG_BLOCKS = [
       {l:'Required',           g:d=>d.obs.required,                                  k:'obs-required'},
       {l:'Done',               g:d=>d.obs.done,                                      k:'obs-done'},
       {l:'Shortfall',          g:d=>Math.max(0,d.obs.required-d.obs.done),           k:'obs', bad:true},
-      {l:'Avg score',          g:d=>d.obs.avg===null?null:Math.round(d.obs.avg*10)/10, k:'obs-scored'},
+      {l:'Completion %',       g:d=>d.obs.required?Math.min(100,Math.round(d.obs.done/d.obs.required*100)):null, k:'obs-completion'},
       {l:'Scoring below 3',    g:d=>d.obs.weak,                                      k:'obs-weak', bad:true}
     ]},
   { icon:'📗', name:'Syllabus & notebooks', cols:[
@@ -17554,6 +17554,13 @@ function cgCell(key, branch){
     case 'hr': return T('All positions', d.hr.total + ' positions', d.hr.rows, CG_COLS.hr,
       { expr: 'every position posted for this branch in the current selection',
         work: d.hr.total + ' posted · ' + d.hr.open + ' still open' });
+    /* Completion month by month, each month expandable to the observer roles
+       that make up its target. The single branch figure hides the shape of the
+       problem: a branch can look 47% complete overall because one role did
+       nothing while the rest kept up, and that is a different conversation
+       from everyone being half done. */
+    case 'obs-completion': return cgObsCompletion(branch, d);
+
     case 'chk-open': return T('Checklist issues still open', d.chk.open + ' open', d.chk.openRows,
       [{key:'branch',label:'Branch'},{key:'raised',label:'Raised',date:true},{key:'area',label:'Area'},
        {key:'point',label:'Checklist point',maxW:'260px'},{key:'severity',label:'Severity',pill:true},
@@ -17566,6 +17573,108 @@ function cgCell(key, branch){
     case 'hr-open': return T('Positions open', d.hr.open + ' open', d.hr.openRows, CG_COLS.hr,
       { expr: 'positions whose status is not Closed or Filled', work: d.hr.open + ' of ' + d.hr.total });
   }
+}
+
+/* Observation completion for one branch, month by month, with each month
+   openable to the observer roles behind it.
+
+   Required is never a flat number: it is that role's working days in that month
+   multiplied by its own daily quota — 2 for leadership, 1 for a subject HOD —
+   and only for roles the branch actually uses. A role with no working days
+   configured for a month contributes nothing rather than a zero target. */
+function cgObsCompletion(branch, d){
+  const OBSM = { 'Mar-2026':'March','Apr-2026':'April','May-2026':'May','Jun-2026':'June',
+    'Jul-2026':'July','Aug-2026':'August','Sep-2026':'September','Oct-2026':'October',
+    'Nov-2026':'November','Dec-2026':'December','Jan-2027':'January','Feb-2027':'February' };
+  const ORDER = Object.keys(OBSM);
+  const cfg = (MONTH_CONFIG || {})[branch] || {};
+  const obs = d.obs.rows;
+  const quotaOf = t => /hod|head of dep/i.test(String(t || '')) ? 1 : 2;
+
+  /* Only roles this branch has actually used. */
+  const roles = [];
+  obs.forEach(r => { const t = String(r.ObsType || '').trim();
+    if (t && t !== '\u2013' && !/^nan$/i.test(t) && roles.indexOf(t) < 0) roles.push(t); });
+  Object.keys(cfg).forEach(mk => Object.keys(cfg[mk] || {}).forEach(t => {
+    if (t && roles.indexOf(t) < 0 && obs.some(r => String(r.ObsType || '').trim() === t)) roles.push(t);
+  }));
+
+  const months = ORDER.filter(mk => cfg[mk] || obs.some(r => r.Month === mk));
+  if (!months.length){
+    return openHTMLModal('\uD83D\uDC41\uFE0F ' + branch + ' \u2014 observation completion',
+      'no months configured',
+      '<div style="padding:20px;color:#64748B;font-size:13px">No working days are configured for this branch ' +
+      'in Month_Config, and no observations carry a month \u2014 so there is nothing to measure completion against.</div>', null);
+  }
+
+  const esc = v => String(v == null ? '' : v).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const col = p => p === null ? '#94A3B8' : p >= 80 ? '#059669' : p >= 50 ? '#D97706' : '#DC2626';
+
+  let gReq = 0, gDone = 0, body = '';
+  months.forEach((mk, i) => {
+    const mObs = obs.filter(r => r.Month === mk);
+    let req = 0, wdShown = 0;
+    const perRole = roles.map(t => {
+      const wd = (typeof mcRoleWD === 'function') ? mcRoleWD(cfg, mk, t) : 0;
+      const q = quotaOf(t);
+      const need = wd > 0 ? wd * q : 0;
+      const did = mObs.filter(r => String(r.ObsType || '').trim() === t).length;
+      req += need;
+      wdShown = Math.max(wdShown, wd);
+      return { role: t, wd: wd, quota: q, need: need, did: did };
+    }).filter(x => x.need > 0 || x.did > 0);
+
+    const did = mObs.length;
+    gReq += req; gDone += did;
+    const pct = req ? Math.min(100, Math.round(did / req * 100)) : null;
+
+    const roleRows = perRole.length
+      ? perRole.map(x => '<tr>' +
+          '<td style="padding:5px 10px;text-align:left">' + esc(x.role) + '</td>' +
+          '<td style="padding:5px 10px;text-align:center">' + x.wd + '</td>' +
+          '<td style="padding:5px 10px;text-align:center">' + x.quota + '/day</td>' +
+          '<td style="padding:5px 10px;text-align:center">' + x.need + '</td>' +
+          '<td style="padding:5px 10px;text-align:center;font-weight:700">' + x.did + '</td>' +
+          '<td style="padding:5px 10px;text-align:center;font-weight:700;color:' +
+            col(x.need ? Math.min(100, Math.round(x.did / x.need * 100)) : null) + '">' +
+            (x.need ? Math.min(100, Math.round(x.did / x.need * 100)) + '%' : '\u2013') + '</td></tr>').join('')
+      : '<tr><td colspan="6" style="padding:8px 10px;color:#94A3B8">No observer roles configured for this month.</td></tr>';
+
+    body +=
+      '<details style="border:1px solid #E0E8FF;border-radius:8px;margin:6px 0;background:#fff">' +
+        '<summary style="cursor:pointer;padding:9px 12px;display:flex;gap:14px;align-items:center;list-style:none">' +
+          '<span style="font-weight:800;min-width:110px">' + OBSM[mk] + '</span>' +
+          '<span style="color:#64748B;font-size:12px;min-width:110px">' + wdShown + ' working days</span>' +
+          '<span style="color:#64748B;font-size:12px;min-width:150px">' + did + ' done of ' + req + '</span>' +
+          '<span style="font-weight:800;color:' + col(pct) + '">' + (pct === null ? '\u2013' : pct + '%') + '</span>' +
+          '<span style="margin-left:auto;color:#1E4FD8;font-size:11.5px">tap to expand</span>' +
+        '</summary>' +
+        '<div style="padding:0 12px 10px"><table style="width:100%;border-collapse:collapse;font-size:12px">' +
+        '<thead><tr style="background:#F8FAFF">' +
+          '<th style="padding:5px 10px;text-align:left">Observer role</th>' +
+          '<th style="padding:5px 10px">Working days</th><th style="padding:5px 10px">Quota</th>' +
+          '<th style="padding:5px 10px">Required</th><th style="padding:5px 10px">Done</th>' +
+          '<th style="padding:5px 10px">Completion</th></tr></thead><tbody>' + roleRows + '</tbody></table></div>' +
+      '</details>';
+  });
+
+  const gPct = gReq ? Math.min(100, Math.round(gDone / gReq * 100)) : null;
+  const html =
+    '<div style="padding:14px 16px">' +
+      '<div style="font-family:\'JetBrains Mono\',ui-monospace,monospace;font-size:12px;background:#F8FAFF;' +
+        'border:1px solid #E0E8FF;border-radius:8px;padding:10px 12px;margin-bottom:12px">' +
+        'completion % = observations done \u00f7 required \u00d7 100<br>' +
+        'required = \u03a3 per role (working days \u00d7 daily quota)<br>' +
+        '<b>' + gDone + ' \u00f7 ' + gReq + ' \u00d7 100 = ' + (gPct === null ? '\u2013' : gPct + '%') + '</b> across all months' +
+      '</div>' + body +
+      '<p style="color:#64748B;font-size:11.5px;line-height:1.6;margin-top:10px">' +
+      'Quota is 2 observations per working day for Principal, VP, HM, Incharges and Coordinators, ' +
+      'and 1 for each subject HOD. Only roles this branch has actually used are counted, so a branch ' +
+      'without a separate HM is not marked down for a post it does not have. Capped at 100% per month.</p>' +
+    '</div>';
+
+  openHTMLModal('\uD83D\uDC41\uFE0F ' + branch + ' \u2014 observation completion',
+    gDone + ' of ' + gReq + ' required \u00b7 ' + months.length + ' month(s)', html, null);
 }
 
 /* Vehicle documents, showing ONLY the ones that are a problem.
