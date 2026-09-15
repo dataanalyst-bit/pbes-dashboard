@@ -16792,7 +16792,12 @@ function cgCollect(){
     const admOver = admOpen.filter(r => { const t = cgDate(r.Deadline); return t && t < today; });
     const vigOpen = vig.filter(r => !cgIsClosed(r.Status));
     const vigOver = vigOpen.filter(r => { const t = cgDate(r.TargetDate); return t && t < today; });
-    const vigCrit = vigOpen.filter(r => /critical|high/i.test(String(r.RiskLevel || '')));
+    /* Critical and High are different severities and were being added together
+       under a column labelled "Critical", so a branch with no critical issues
+       still showed a critical count. They are now counted separately. */
+    const vigCrit = vigOpen.filter(r => /critical/i.test(String(r.RiskLevel || '')));
+    const vigHigh = vigOpen.filter(r => /\bhigh\b/i.test(String(r.RiskLevel || '')) &&
+                                        !/critical/i.test(String(r.RiskLevel || '')));
     const purOpen = pur.filter(r => !/delivered|completed|closed|rejected/i.test(String(r.PurchaseStatus || '')));
     const hrOpen  = hr.filter(r => !/closed|filled/i.test(String(r.Status || '')));
 
@@ -16879,22 +16884,29 @@ function cgCollect(){
               rows: care, resRows: careRes, progRows: careProg, pendRows: carePend },
       griev: { total: griev.length, open: grOpen.length, over: grOver.length,
                severe: grSevere.length, oldest: ageOf(grOpen, 'Date'),
-               rows: griev, openRows: grOpen, overRows: grOver, severeRows: grSevere },
+               rows: griev, openRows: grOpen, overRows: grOver, severeRows: grSevere,
+               closedRows: griev.filter(r => cgIsClosed(r.Status)) },
       admin: { total: admin.length, open: admOpen.length, over: admOver.length,
                high: admHigh.length, oldest: ageOf(admOver, 'Deadline'),
-               rows: admin, openRows: admOpen, overRows: admOver, highRows: admHigh },
-      vig: { total: vig.length, open: vigOpen.length, over: vigOver.length, crit: vigCrit.length,
+               rows: admin, openRows: admOpen, overRows: admOver, highRows: admHigh,
+               doneRows: admin.filter(r => cgIsClosed(r.Status)) },
+      vig: { total: vig.length, open: vigOpen.length, over: vigOver.length,
+             crit: vigCrit.length, high: vigHigh.length,
              oldest: ageOf(vigOpen, 'VisitDate'),
-             rows: vig, openRows: vigOpen, overRows: vigOver, critRows: vigCrit },
+             rows: vig, openRows: vigOpen, overRows: vigOver,
+             critRows: vigCrit, highRows: vigHigh,
+             closedRows: vig.filter(r => cgIsClosed(r.Status)) },
       obs: { done: obs.length, required: obsReq, avg: obsAvg, weak: obsWeak.length,
              rows: obs, weakRows: obsWeak },
       syl: syl,
       it: { total: itTot, down: itDown, rows: it },
       tr: { vehicles: tr.length, expiring: trExp.length, expired: trExpired.length,
             rows: tr, expRows: trExp, expiredRows: trExpired },
-      pur: { total: pur.length, open: purOpen.length, rows: pur, openRows: purOpen },
+      pur: { total: pur.length, open: purOpen.length, rows: pur, openRows: purOpen,
+             doneRows: pur.filter(r => !purOpen.includes(r)) },
       hr:  { total: hr.length, open: hrOpen.length, stale: hrStale.length,
-             rows: hr, openRows: hrOpen, staleRows: hrStale }
+             rows: hr, openRows: hrOpen, staleRows: hrStale,
+             filledRows: hr.filter(r => !hrOpen.includes(r)) }
     };
   });
   return out;
@@ -16996,64 +17008,65 @@ const CG_BLOCKS = [
       {l:'Still open',         g:d=>d.vig.open,              k:'vig-open',  bad:true},
       {l:'Past target date',   g:d=>d.vig.over,              k:'vig-over',  bad:true},
       {l:'Critical still open',g:d=>d.vig.crit,              k:'vig-crit',  bad:true},
-      {l:'Oldest open (days)', g:d=>d.vig.oldest,            k:'vig-open',  bad:true},
-      {l:'Closed',             g:d=>d.vig.total-d.vig.open,  k:'vig'}
+      {l:'High still open',    g:d=>d.vig.high,              k:'vig-high',  bad:true},
+      {l:'Oldest open (days)', g:d=>d.vig.oldest,            k:'vig-oldest',bad:true},
+      {l:'Closed',             g:d=>d.vig.total-d.vig.open,  k:'vig-closed'}
     ]},
   { icon:'📣', name:'Grievance', cols:[
       {l:'Cases raised',       g:d=>d.griev.total,               k:'griev'},
       {l:'Still open',         g:d=>d.griev.open,                k:'griev-open', bad:true},
       {l:'Past target date',   g:d=>d.griev.over,                k:'griev-over', bad:true},
       {l:'Severe still open',  g:d=>d.griev.severe,              k:'griev-severe', bad:true},
-      {l:'Oldest open (days)', g:d=>d.griev.oldest,              k:'griev-open', bad:true},
-      {l:'Resolved',           g:d=>d.griev.total-d.griev.open,  k:'griev'}
+      {l:'Oldest open (days)', g:d=>d.griev.oldest,              k:'griev-oldest', bad:true},
+      {l:'Resolved',           g:d=>d.griev.total-d.griev.open,  k:'griev-closed'}
     ]},
   { icon:'🗂️', name:'Admin tasks', cols:[
       {l:'Tasks',              g:d=>d.admin.total,               k:'admin'},
       {l:'Still open',         g:d=>d.admin.open,                k:'admin-open', bad:true},
       {l:'Past deadline',      g:d=>d.admin.over,                k:'admin-over', bad:true},
       {l:'High priority open', g:d=>d.admin.high,                k:'admin-high', bad:true},
-      {l:'Oldest overdue (days)',g:d=>d.admin.oldest,            k:'admin-over', bad:true},
-      {l:'Completed',          g:d=>d.admin.total-d.admin.open,  k:'admin'}
+      {l:'Oldest overdue (days)',g:d=>d.admin.oldest,            k:'admin-oldest', bad:true},
+      {l:'Completed',          g:d=>d.admin.total-d.admin.open,  k:'admin-done'}
     ]},
   { icon:'📞', name:'Care calls', cols:[
       {l:'Calls made',         g:d=>d.care.made,                       k:'care'},
       {l:'Not resolved',       g:d=>d.care.made-d.care.resolved,       k:'care-pending', bad:true},
       {l:'In progress',        g:d=>d.care.progress,                   k:'care-progress', bad:true},
-      {l:'Resolved',           g:d=>d.care.resolved,                   k:'care'}
+      {l:'Resolved',           g:d=>d.care.resolved,                   k:'care-resolved'}
     ]},
   { icon:'👁️', name:'Teacher observations', cols:[
-      {l:'Required',           g:d=>d.obs.required,                                  k:'obs'},
-      {l:'Done',               g:d=>d.obs.done,                                      k:'obs'},
+      {l:'Required',           g:d=>d.obs.required,                                  k:'obs-required'},
+      {l:'Done',               g:d=>d.obs.done,                                      k:'obs-done'},
       {l:'Shortfall',          g:d=>Math.max(0,d.obs.required-d.obs.done),           k:'obs', bad:true},
-      {l:'Avg score',          g:d=>d.obs.avg===null?null:Math.round(d.obs.avg*10)/10, k:'obs'},
+      {l:'Avg score',          g:d=>d.obs.avg===null?null:Math.round(d.obs.avg*10)/10, k:'obs-scored'},
       {l:'Scoring below 3',    g:d=>d.obs.weak,                                      k:'obs-weak', bad:true}
     ]},
   { icon:'📗', name:'Syllabus & notebooks', cols:[
       {l:'Units due',          g:d=>d.syl?d.syl.due:null,            k:'syl'},
-      {l:'Not done on time',   g:d=>d.syl?(d.syl.due-d.syl.done):null,k:'syl', bad:true},
-      {l:'Done on time',       g:d=>d.syl?d.syl.done:null,           k:'syl'}
+      {l:'Not done on time',   g:d=>d.syl?(d.syl.due-d.syl.done):null,k:'syl-late', bad:true},
+      {l:'Done on time',       g:d=>d.syl?d.syl.done:null,           k:'syl-done'}
     ]},
   { icon:'💻', name:'IT', cols:[
       {l:'Assets',             g:d=>d.it.total,             k:'it'},
       {l:'Not working',        g:d=>d.it.down,              k:'it-down', bad:true},
-      {l:'Working',            g:d=>d.it.total-d.it.down,   k:'it'}
+      {l:'Working',            g:d=>d.it.total-d.it.down,   k:'it-working'}
     ]},
   { icon:'🚌', name:'Transport', cols:[
       {l:'Vehicles',           g:d=>d.tr.vehicles,                    k:'tr'},
       {l:'Docs expired',       g:d=>d.tr.expired,                     k:'tr-expired', bad:true},
       {l:'Docs due ≤30 days',  g:d=>d.tr.expiring,                    k:'tr-exp', bad:true},
-      {l:'Compliant',          g:d=>d.tr.vehicles-d.tr.expiring,      k:'tr'}
+      {l:'Compliant',          g:d=>d.tr.vehicles-d.tr.expiring,      k:'tr-ok'}
     ]},
   { icon:'🛒', name:'Purchase', cols:[
       {l:'Indents',            g:d=>d.pur.total,               k:'pur'},
       {l:'Pending',            g:d=>d.pur.open,                k:'pur-open', bad:true},
-      {l:'Completed',          g:d=>d.pur.total-d.pur.open,    k:'pur'}
+      {l:'Completed',          g:d=>d.pur.total-d.pur.open,    k:'pur-done'}
     ]},
   { icon:'👥', name:'Human resources', cols:[
       {l:'Positions posted',   g:d=>d.hr.total,              k:'hr'},
       {l:'Still open',         g:d=>d.hr.open,               k:'hr-open', bad:true},
       {l:'Open > 30 days',     g:d=>d.hr.stale,              k:'hr-stale', bad:true},
-      {l:'Filled',             g:d=>d.hr.total-d.hr.open,    k:'hr'}
+      {l:'Filled',             g:d=>d.hr.total-d.hr.open,    k:'hr-filled'}
     ]}
 ];
 
@@ -17265,8 +17278,9 @@ function cgCell(key, branch){
     case 'vig-over': return T('Vigilance overdue', d.vig.over + ' overdue', d.vig.overRows, CG_COLS.vig,
       { expr: 'overdue = open AND target date earlier than today', work: d.vig.over + ' of ' + d.vig.open + ' open' });
     case 'vig-crit': return T('Open critical issues', d.vig.crit + ' critical', d.vig.critRows, CG_COLS.vig,
-      { expr: 'open AND risk level Critical or High', work: d.vig.crit + ' of ' + d.vig.open + ' open',
-        note: 'These are the rows a safety review should start from.' });
+      { expr: 'open AND risk level Critical',
+        work: d.vig.crit + ' of ' + d.vig.open + ' open · High risk is counted in its own column',
+        note: 'Critical and High used to be added together under this heading, so a branch with no critical issues still showed a critical count. They are separate now.' });
     case 'it-down': {
       /* Only the systems with something actually down. Listing every system,
          most of them fully working, buried the two lines that mattered. */
@@ -17293,6 +17307,114 @@ function cgCell(key, branch){
     case 'tr-expired': return cgVehicleDocs(branch, d, 'expired');
     case 'hr-stale': return T('Positions open beyond 30 days', d.hr.stale + ' positions', d.hr.staleRows, CG_COLS.hr,
       { expr: 'open AND posted more than 30 days ago', work: d.hr.stale + ' of ' + d.hr.open + ' open' });
+    /* ── every field opens exactly the rows behind its own number ──
+       These used to share a handler with a neighbouring field, so clicking
+       "Closed" listed every issue and "Oldest open" listed all open ones. A
+       figure whose drill-down shows a different set than the figure is worse
+       than no drill-down at all. */
+    case 'vig-high': return T('High-risk issues still open', d.vig.high + ' high risk',
+      d.vig.highRows, CG_COLS.vig,
+      { expr: 'open AND risk level High (Critical is counted separately)',
+        work: d.vig.high + ' of ' + d.vig.open + ' open' });
+    case 'vig-oldest': {
+      const rows = d.vig.openRows.slice().sort((a, b) =>
+        (cgDate(a.VisitDate) || Infinity) - (cgDate(b.VisitDate) || Infinity));
+      return T('Open issues, oldest first', d.vig.oldest + ' days since the oldest was raised',
+        rows, CG_COLS.vig,
+        { expr: 'days between today and the visit date of the oldest STILL-OPEN issue',
+          work: rows.length ? d.vig.oldest + ' days — ' + (rows[0].Area || 'first row below') : 'nothing open',
+          note: 'The number on the card is the first row here. The rest are listed oldest first so the queue behind it is visible.' });
+    }
+    case 'vig-closed': return T('Issues closed', (d.vig.total - d.vig.open) + ' closed',
+      d.vig.closedRows, CG_COLS.vig,
+      { expr: 'issues whose status is Closed, Verified or Resolved',
+        work: (d.vig.total - d.vig.open) + ' of ' + d.vig.total });
+
+    case 'griev-oldest': {
+      const rows = d.griev.openRows.slice().sort((a, b) =>
+        (cgDate(a.Date) || Infinity) - (cgDate(b.Date) || Infinity));
+      return T('Open cases, oldest first', d.griev.oldest + ' days since the oldest was raised',
+        rows, CG_COLS.griev,
+        { expr: 'days between today and the raised date of the oldest STILL-OPEN case',
+          work: rows.length ? d.griev.oldest + ' days — ' + (rows[0].Student || 'first row below') : 'nothing open',
+          note: 'The number on the card is the first row here; the rest follow oldest first.' });
+    }
+    case 'griev-closed': return T('Cases resolved', (d.griev.total - d.griev.open) + ' resolved',
+      d.griev.closedRows, CG_COLS.griev,
+      { expr: 'cases whose status is Resolved or Closed',
+        work: (d.griev.total - d.griev.open) + ' of ' + d.griev.total });
+
+    case 'admin-oldest': {
+      const rows = d.admin.overRows.slice().sort((a, b) =>
+        (cgDate(a.Deadline) || Infinity) - (cgDate(b.Deadline) || Infinity));
+      return T('Overdue tasks, longest overdue first', d.admin.oldest + ' days past the earliest deadline',
+        rows, CG_COLS.admin,
+        { expr: 'days between today and the earliest missed deadline still open',
+          work: rows.length ? d.admin.oldest + ' days — ' + (rows[0].Task || 'first row below') : 'nothing overdue' });
+    }
+    case 'admin-done': return T('Tasks completed', (d.admin.total - d.admin.open) + ' completed',
+      d.admin.doneRows, CG_COLS.admin,
+      { expr: 'tasks marked Done or Completed', work: (d.admin.total - d.admin.open) + ' of ' + d.admin.total });
+
+    case 'care-resolved': return T('Calls resolved', d.care.resolved + ' resolved',
+      d.care.resRows, CG_COLS.care,
+      { expr: 'calls whose status is Resolved or No Concern',
+        work: d.care.resolved + ' of ' + d.care.made });
+
+    case 'obs-required': return T('Observations required', d.obs.required + ' required', [], [],
+      { expr: 'Σ over each observer role at the branch of (that role\'s working days × its daily quota)',
+        work: d.obs.required + ' required against ' + d.obs.done + ' done',
+        note: 'This is a calculated target, not a set of records — there is nothing to list. Quota is 2 a day for leadership roles and 1 a day for each subject HOD.' });
+    case 'obs-done': return T('Observations done', d.obs.done + ' recorded', d.obs.rows, CG_COLS.obs,
+      { expr: 'every observation recorded at this branch in the current selection',
+        work: d.obs.done + ' against ' + d.obs.required + ' required' });
+    case 'obs-scored': {
+      const scored = d.obs.rows.filter(r => !isNaN(parseFloat(r.Score)));
+      return T('Scored observations', scored.length + ' carry a score', scored, CG_COLS.obs,
+        { expr: 'average score = Σ scores ÷ scored observations',
+          work: scored.length ? (d.obs.avg === null ? '–' : d.obs.avg.toFixed(2)) + ' over ' + scored.length + ' scored' : 'none scored',
+          note: 'Observations with no score are excluded from the average rather than counted as zero, so this list is shorter than the Done count.' });
+    }
+
+    case 'syl-late': return d.syl
+      ? T('Units not done on time', (d.syl.due - d.syl.done) + ' of ' + d.syl.due, [], [],
+          { expr: 'units due − units marked Done on time',
+            work: d.syl.due + ' − ' + d.syl.done + ' = ' + (d.syl.due - d.syl.done),
+            note: 'Unit-level records live on the Syllabus & Notebook tab.' })
+      : T('Units not done on time', 'not loaded', [], [], { expr: 'units due − units done' });
+    case 'syl-done': return d.syl
+      ? T('Units done on time', d.syl.done + ' of ' + d.syl.due, [], [],
+          { expr: 'units marked Done in the month they were due',
+            work: d.syl.done + ' of ' + d.syl.due })
+      : T('Units done on time', 'not loaded', [], [], { expr: 'units marked Done' });
+
+    case 'it-working': {
+      const ok = d.it.rows.filter(r => cgNum(r.Total) - cgNum(r.NotWorking) > 0);
+      return T('Assets working', (d.it.total - d.it.down) + ' working', ok, CG_COLS.it,
+        { expr: 'total assets − assets not working',
+          work: d.it.total + ' − ' + d.it.down + ' = ' + (d.it.total - d.it.down) });
+    }
+    case 'tr-ok': {
+      const ok = d.tr.rows.filter(r => !d.tr.expRows.includes(r));
+      return T('Vehicles with valid documents', ok.length + ' compliant', ok, CG_COLS.tr,
+        { expr: 'vehicles with no document expired, due within 30 days, or missing a date',
+          work: ok.length + ' of ' + d.tr.vehicles });
+    }
+    case 'pur-done': return T('Requests completed', (d.pur.total - d.pur.open) + ' completed',
+      d.pur.doneRows, CG_COLS.pur,
+      { expr: 'requests Delivered, Completed, Closed or Rejected',
+        work: (d.pur.total - d.pur.open) + ' of ' + d.pur.total });
+    case 'hr-filled': return T('Positions filled', (d.hr.total - d.hr.open) + ' filled',
+      d.hr.filledRows, CG_COLS.hr,
+      { expr: 'positions whose status is Closed or Filled',
+        work: (d.hr.total - d.hr.open) + ' of ' + d.hr.total });
+
+    case 'pur': return T('All purchase requests', d.pur.total + ' requests', d.pur.rows, CG_COLS.pur,
+      { expr: 'every request raised at this branch in the current selection',
+        work: d.pur.total + ' requests · ' + d.pur.open + ' still pending' });
+    case 'hr': return T('All positions', d.hr.total + ' positions', d.hr.rows, CG_COLS.hr,
+      { expr: 'every position posted for this branch in the current selection',
+        work: d.hr.total + ' posted · ' + d.hr.open + ' still open' });
     case 'chk-open': return T('Checklist issues still open', d.chk.open + ' open', d.chk.openRows,
       [{key:'branch',label:'Branch'},{key:'raised',label:'Raised',date:true},{key:'area',label:'Area'},
        {key:'point',label:'Checklist point',maxW:'260px'},{key:'severity',label:'Severity',pill:true},
