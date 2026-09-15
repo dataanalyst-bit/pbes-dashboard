@@ -16851,6 +16851,14 @@ function cgCollect(){
       rows.forEach(r => { const t = cgDate(r[field]); if (t) worst = Math.max(worst, Math.round((today - t) / CG_DAY)); });
       return worst;
     };
+    /* Overdue by more than ten days. A target date that has merely passed can be
+       yesterday's; ten days is long enough that nobody can call it in hand. The
+       cut-off is one constant, so it can be moved in one place. */
+    const OVERDUE_GRACE = 10;
+    const badlyOverdue = (rows, field) => rows.filter(r => {
+      const t = cgDate(r[field]);
+      return t !== null && (today - t) / CG_DAY > OVERDUE_GRACE;
+    });
     const grSevere = grOpen.filter(r => /high|critical|severe|major/i.test(String(r.Severity || '')));
     const admHigh  = admOpen.filter(r => /high|urgent|critical/i.test(String(r.Priority || '')));
     const careProg = care.filter(r => /progress/i.test(String(r.Status || '')));
@@ -16884,15 +16892,21 @@ function cgCollect(){
               rows: care, resRows: careRes, progRows: careProg, pendRows: carePend },
       griev: { total: griev.length, open: grOpen.length, over: grOver.length,
                severe: grSevere.length, oldest: ageOf(grOpen, 'Date'),
+               late10: badlyOverdue(grOpen, 'TargetDate').length,
+               late10Rows: badlyOverdue(grOpen, 'TargetDate'),
                rows: griev, openRows: grOpen, overRows: grOver, severeRows: grSevere,
                closedRows: griev.filter(r => cgIsClosed(r.Status)) },
       admin: { total: admin.length, open: admOpen.length, over: admOver.length,
                high: admHigh.length, oldest: ageOf(admOver, 'Deadline'),
+               late10: badlyOverdue(admOpen, 'Deadline').length,
+               late10Rows: badlyOverdue(admOpen, 'Deadline'),
                rows: admin, openRows: admOpen, overRows: admOver, highRows: admHigh,
                doneRows: admin.filter(r => cgIsClosed(r.Status)) },
       vig: { total: vig.length, open: vigOpen.length, over: vigOver.length,
              crit: vigCrit.length, high: vigHigh.length,
              oldest: ageOf(vigOpen, 'VisitDate'),
+             late10: badlyOverdue(vigOpen, 'TargetDate').length,
+             late10Rows: badlyOverdue(vigOpen, 'TargetDate'),
              rows: vig, openRows: vigOpen, overRows: vigOver,
              critRows: vigCrit, highRows: vigHigh,
              closedRows: vig.filter(r => cgIsClosed(r.Status)) },
@@ -17009,7 +17023,7 @@ const CG_BLOCKS = [
       {l:'Past target date',   g:d=>d.vig.over,              k:'vig-over',  bad:true},
       {l:'Critical still open',g:d=>d.vig.crit,              k:'vig-crit',  bad:true},
       {l:'High still open',    g:d=>d.vig.high,              k:'vig-high',  bad:true},
-      {l:'Oldest open (days)', g:d=>d.vig.oldest,            k:'vig-oldest',bad:true},
+      {l:'Overdue &gt; 10 days',g:d=>d.vig.late10,           k:'vig-late10',bad:true},
       {l:'Closed',             g:d=>d.vig.total-d.vig.open,  k:'vig-closed'}
     ]},
   { icon:'📣', name:'Grievance', cols:[
@@ -17017,7 +17031,7 @@ const CG_BLOCKS = [
       {l:'Still open',         g:d=>d.griev.open,                k:'griev-open', bad:true},
       {l:'Past target date',   g:d=>d.griev.over,                k:'griev-over', bad:true},
       {l:'Severe still open',  g:d=>d.griev.severe,              k:'griev-severe', bad:true},
-      {l:'Oldest open (days)', g:d=>d.griev.oldest,              k:'griev-oldest', bad:true},
+      {l:'Overdue &gt; 10 days',g:d=>d.griev.late10,             k:'griev-late10', bad:true},
       {l:'Resolved',           g:d=>d.griev.total-d.griev.open,  k:'griev-closed'}
     ]},
   { icon:'🗂️', name:'Admin tasks', cols:[
@@ -17025,7 +17039,7 @@ const CG_BLOCKS = [
       {l:'Still open',         g:d=>d.admin.open,                k:'admin-open', bad:true},
       {l:'Past deadline',      g:d=>d.admin.over,                k:'admin-over', bad:true},
       {l:'High priority open', g:d=>d.admin.high,                k:'admin-high', bad:true},
-      {l:'Oldest overdue (days)',g:d=>d.admin.oldest,            k:'admin-oldest', bad:true},
+      {l:'Overdue &gt; 10 days',g:d=>d.admin.late10,             k:'admin-late10', bad:true},
       {l:'Completed',          g:d=>d.admin.total-d.admin.open,  k:'admin-done'}
     ]},
   { icon:'📞', name:'Care calls', cols:[
@@ -17316,41 +17330,49 @@ function cgCell(key, branch){
       d.vig.highRows, CG_COLS.vig,
       { expr: 'open AND risk level High (Critical is counted separately)',
         work: d.vig.high + ' of ' + d.vig.open + ' open' });
-    case 'vig-oldest': {
-      const rows = d.vig.openRows.slice().sort((a, b) =>
-        (cgDate(a.VisitDate) || Infinity) - (cgDate(b.VisitDate) || Infinity));
-      return T('Open issues, oldest first', d.vig.oldest + ' days since the oldest was raised',
-        rows, CG_COLS.vig,
-        { expr: 'days between today and the visit date of the oldest STILL-OPEN issue',
-          work: rows.length ? d.vig.oldest + ' days — ' + (rows[0].Area || 'first row below') : 'nothing open',
-          note: 'The number on the card is the first row here. The rest are listed oldest first so the queue behind it is visible.' });
+    /* Overdue by more than ten days, longest first. A target date that has just
+       passed is still recoverable; ten days past is a queue nobody is working.
+       Items with no target date cannot be judged and are left out rather than
+       assumed late — they show up under "Still open" instead. */
+    case 'vig-late10': {
+      const rows = d.vig.late10Rows.slice().sort((x, y) =>
+        (cgDate(x.TargetDate) || Infinity) - (cgDate(y.TargetDate) || Infinity));
+      const worst = rows.length ? Math.round((Date.now() - cgDate(rows[0].TargetDate)) / CG_DAY) : 0;
+      return T('Open more than 10 days past target', d.vig.late10 + ' issue(s)', rows, CG_COLS.vig,
+        { expr: 'still open AND target date more than 10 days before today',
+          work: d.vig.late10 + ' of ' + d.vig.open + ' open' +
+                (rows.length ? ' · worst is ' + worst + ' days past target' : ''),
+          note: 'Issues with no target date recorded are not counted here — they cannot be judged late. Sorted longest overdue first.' });
     }
     case 'vig-closed': return T('Issues closed', (d.vig.total - d.vig.open) + ' closed',
       d.vig.closedRows, CG_COLS.vig,
       { expr: 'issues whose status is Closed, Verified or Resolved',
         work: (d.vig.total - d.vig.open) + ' of ' + d.vig.total });
 
-    case 'griev-oldest': {
-      const rows = d.griev.openRows.slice().sort((a, b) =>
-        (cgDate(a.Date) || Infinity) - (cgDate(b.Date) || Infinity));
-      return T('Open cases, oldest first', d.griev.oldest + ' days since the oldest was raised',
-        rows, CG_COLS.griev,
-        { expr: 'days between today and the raised date of the oldest STILL-OPEN case',
-          work: rows.length ? d.griev.oldest + ' days — ' + (rows[0].Student || 'first row below') : 'nothing open',
-          note: 'The number on the card is the first row here; the rest follow oldest first.' });
+    case 'griev-late10': {
+      const rows = d.griev.late10Rows.slice().sort((x, y) =>
+        (cgDate(x.TargetDate) || Infinity) - (cgDate(y.TargetDate) || Infinity));
+      const worst = rows.length ? Math.round((Date.now() - cgDate(rows[0].TargetDate)) / CG_DAY) : 0;
+      return T('Open more than 10 days past target', d.griev.late10 + ' case(s)', rows, CG_COLS.griev,
+        { expr: 'still open AND target closure date more than 10 days before today',
+          work: d.griev.late10 + ' of ' + d.griev.open + ' open' +
+                (rows.length ? ' · worst is ' + worst + ' days past target' : ''),
+          note: 'Cases with no target date are not counted — they cannot be judged late. Sorted longest overdue first.' });
     }
     case 'griev-closed': return T('Cases resolved', (d.griev.total - d.griev.open) + ' resolved',
       d.griev.closedRows, CG_COLS.griev,
       { expr: 'cases whose status is Resolved or Closed',
         work: (d.griev.total - d.griev.open) + ' of ' + d.griev.total });
 
-    case 'admin-oldest': {
-      const rows = d.admin.overRows.slice().sort((a, b) =>
-        (cgDate(a.Deadline) || Infinity) - (cgDate(b.Deadline) || Infinity));
-      return T('Overdue tasks, longest overdue first', d.admin.oldest + ' days past the earliest deadline',
-        rows, CG_COLS.admin,
-        { expr: 'days between today and the earliest missed deadline still open',
-          work: rows.length ? d.admin.oldest + ' days — ' + (rows[0].Task || 'first row below') : 'nothing overdue' });
+    case 'admin-late10': {
+      const rows = d.admin.late10Rows.slice().sort((x, y) =>
+        (cgDate(x.Deadline) || Infinity) - (cgDate(y.Deadline) || Infinity));
+      const worst = rows.length ? Math.round((Date.now() - cgDate(rows[0].Deadline)) / CG_DAY) : 0;
+      return T('Open more than 10 days past deadline', d.admin.late10 + ' task(s)', rows, CG_COLS.admin,
+        { expr: 'still open AND deadline more than 10 days before today',
+          work: d.admin.late10 + ' of ' + d.admin.open + ' open' +
+                (rows.length ? ' · worst is ' + worst + ' days past deadline' : ''),
+          note: 'Tasks with no deadline are not counted — they cannot be judged late. A task finished after its deadline is late but closed, and is not here either.' });
     }
     case 'admin-done': return T('Tasks completed', (d.admin.total - d.admin.open) + ' completed',
       d.admin.doneRows, CG_COLS.admin,
