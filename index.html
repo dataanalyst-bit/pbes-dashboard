@@ -3901,7 +3901,12 @@ function renderObservations(){
   }});
 
   // ── Branch × Month Comparison Table (computed live from OBS_DATA) ──
-  const MONTHS_OBS=['March','April','May','June'];
+  /* The month list was fixed at March–June, so every observation from July
+     onward was dropped from this table however much data existed. It now comes
+     from the records themselves, in academic-year order, so a new month appears
+     the first time an observation is recorded in it. */
+  const MONTHS_OBS=Object.keys(MO_MAP).filter(name =>
+    ALLOBS.some(r => r.Month === MO_MAP[name]));
   const tableBranches=fBranch==='ALL'?bBranches:[fBranch];
   const tableMonths=fMonth==='ALL'?MONTHS_OBS:[fMonth];
   let tR=[];
