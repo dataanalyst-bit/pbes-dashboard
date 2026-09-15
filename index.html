@@ -740,7 +740,7 @@ const DATA_API = '/api/data';   // server-side proxy — no Apps Script URL in t
 const AUTO_REFRESH_SECONDS = 120;
 
 // ---- Global data arrays (populated by fetch, read by renderAll) ----
-let GO_DATA = [], GRIEVANCE_DATA = [], ADM_TRENDS = [], MONTH_CONFIG = {}, ALL_TEACHER = [], CARE_DATA = [], OBS_DATA = [], ADMIN_DATA = [], PUR_DATA = [], DM_DATA = [],
+let OBS_LOG = [], SCORE_SLIM = null, GO_DATA = [], GRIEVANCE_DATA = [], ADM_TRENDS = [], MONTH_CONFIG = {}, ALL_TEACHER = [], CARE_DATA = [], OBS_DATA = [], ADMIN_DATA = [], PUR_DATA = [], DM_DATA = [],
     HR_RECORDS = [], VIG_DATA = [], TRACKER = [],
     ADM1_DATA = [], ADM2_DATA = [], LEAD_DATES = [],
     LEAD_SUMMARY = {}, OWNER_STATS = [], COMBINED_ADM = [],
@@ -884,6 +884,9 @@ function applyLiveData(data){
     if (data.HR_RECORDS)       HR_RECORDS       = data.HR_RECORDS;
     if (data.VIG_DATA)         VIG_DATA         = data.VIG_DATA;
     if (data.DM_DATA)          DM_DATA          = data.DM_DATA;
+    if (data.OBS_LOG)          OBS_LOG          = data.OBS_LOG;
+    /* Head-to-head feed for every branch, names and free text already stripped. */
+    if (data.SCORE_SLIM)       SCORE_SLIM       = data.SCORE_SLIM;
     if (data.ADM1_DATA)        ADM1_DATA        = data.ADM1_DATA;
     if (data.ADM2_DATA)        ADM2_DATA        = data.ADM2_DATA;
     if (data.LEAD_DATES)       LEAD_DATES       = data.LEAD_DATES;
@@ -935,7 +938,11 @@ const ROLE_TABS = {
      carry staff salaries, disciplinary matters and vendor pricing that a
      coordinator has no reason to see. */
   coordinator:       ['care','pt1','ptm','grievance','syl','kptm'],
-  principal:         ['overview','care','observations','admissions','grievance','transport','it','pt1','audit','ptm','civil','syl','meet','kptm']
+  /* 'glance' and 'activity' were added after this table was written, so they
+     were invisible to principals — including the Team Activity tab they are
+     expected to file their own observations into. Both are branch-filtered
+     server-side, so a principal sees only their own campus. */
+  principal:         ['overview','glance','activity','care','observations','admissions','grievance','transport','it','pt1','audit','ptm','civil','syl','meet','kptm']
 };
 // Roles that span every campus. Everyone else with a branch on their account is
 // pinned to it, and the payload is filtered to that branch server-side.
@@ -1005,6 +1012,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!session) { window.location.href = 'login.html'; return; }
   // ── Lock the branch selector for principals (branch-restricted accounts) ──
   const userBranch = session.user?.app_metadata?.branch || null;
+  /* Exposed so panels rendered later can tell a branch account from a
+     group-wide one without re-reading the session. */
+  window._USER_BRANCH = userBranch;
+  window._ME_EMAIL = session.user?.email || '';
   if (userBranch) {
     const sel = document.getElementById('sel-branch');
     if (sel) {
@@ -1177,6 +1188,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       <span style="font-size:11px;background:#FFFBEB;border:1px solid rgba(217,119,6,.25);color:#D97706;padding:3px 10px;border-radius:6px;font-weight:600;" id="rank-tag">🥇 Rankings &amp; Awards — Current / Latest Month Per Branch</span>
     </div>
     <div class="cb" style="overflow-x:auto;">
+      <div id="scorecard-note"></div>
       <table style="width:100%;border-collapse:collapse;min-width:900px;">
         <thead>
           <tr style="background:#F8FAFF;">
@@ -10788,17 +10800,39 @@ function renderRankings(){
   const HRA=(typeof HR_RECORDS!=='undefined'?HR_RECORDS:[]);
   const GRA=(typeof GRIEVANCE_DATA!=='undefined'?GRIEVANCE_DATA:[]);
   const hrMax =Math.max(1,...ALLB.map(b=>HRA.filter(r=>r.Branch===b).length));
-  const grMax =Math.max(1,...ALLB.map(b=>GRA.filter(r=>r.Branch===b).length));
-  const admMax=Math.max(1,...ALLB.map(b=>(typeof ADMIN_DATA!=='undefined'?ADMIN_DATA:[]).filter(r=>r.Branch===b).length));
-  const vigMax=Math.max(1,...ALLB.map(b=>(typeof VIG_DATA!=='undefined'?VIG_DATA:[]).filter(r=>r.Branch===b).length));
+  const grMax0=Math.max(1,...ALLB.map(b=>GRA.filter(r=>r.Branch===b).length));
+  /* A principal's ADMIN_DATA, VIG_DATA and GRIEVANCE_DATA arrive filtered to
+     their own campus, so every other branch read "No data" on this scorecard —
+     which is the one table on the dashboard whose whole purpose is comparison.
+     SCORE_SLIM carries all branches with no names and no free text, so it is
+     used here when it is present and the full arrays are used otherwise. */
+  const _SLIM=(typeof SCORE_SLIM!=='undefined'&&SCORE_SLIM)?SCORE_SLIM:null;
+  /* If the payload carries no SCORE_SLIM, a branch user sees only their own
+     campus on these three rows and every other branch reads "No data" — which
+     looks like missing data rather than a missing deployment. Say which it is,
+     once, above the table. */
+  if(!_SLIM && window._USER_BRANCH){
+    const _sc=document.getElementById('scorecard-note');
+    if(_sc) _sc.innerHTML='<div style="padding:9px 13px;background:#FFF7ED;border:1px solid #FED7AA;'+
+      'border-radius:8px;color:#9A3412;font-size:12px;margin-bottom:10px">'+
+      'Admin, Vigilance and Grievance can only be compared across branches once Code.gs has been '+
+      'redeployed \u2014 the cross-branch summary it sends is not in this payload. Your own branch '+
+      'is accurate.</div>';
+  }
+  const ADMA=(_SLIM&&_SLIM.admin&&_SLIM.admin.length)?_SLIM.admin:(typeof ADMIN_DATA!=='undefined'?ADMIN_DATA:[]);
+  const VIGA=(_SLIM&&_SLIM.vig&&_SLIM.vig.length)?_SLIM.vig:(typeof VIG_DATA!=='undefined'?VIG_DATA:[]);
+  const GRVA=(_SLIM&&_SLIM.griev&&_SLIM.griev.length)?_SLIM.griev:GRA;
+  const admMax=Math.max(1,...ALLB.map(b=>ADMA.filter(r=>r.Branch===b).length));
+  const vigMax=Math.max(1,...ALLB.map(b=>VIGA.filter(r=>r.Branch===b).length));
   window._ADMIN_MAX_ASSIGNED=admMax; window._VIG_MAX_ASSIGNED=vigMax;
 
+  const grMax=Math.max(1,...ALLB.map(b=>GRVA.filter(r=>r.Branch===b).length), grMax0);
   const hrStats={},adminStats={},vigStats={},grievStats={};
   ALLB.forEach(b=>{
     hrStats[b]   =hrUnifiedStats(HRA.filter(r=>r.Branch===b), hrMax);
-    adminStats[b]=adminSpeedStats((typeof ADMIN_DATA!=='undefined'?ADMIN_DATA:[]).filter(r=>r.Branch===b));
-    vigStats[b]  =vigSafetyStats((typeof VIG_DATA!=='undefined'?VIG_DATA:[]).filter(r=>r.Branch===b));
-    grievStats[b]=grievUnifiedStats(GRA.filter(r=>r.Branch===b), grMax);
+    adminStats[b]=adminSpeedStats(ADMA.filter(r=>r.Branch===b));
+    vigStats[b]  =vigSafetyStats(VIGA.filter(r=>r.Branch===b));
+    grievStats[b]=grievUnifiedStats(GRVA.filter(r=>r.Branch===b), grMax);
   });
   const examStats=examBranchStats();
   if(!examStats) _examEnsureForScorecard();
@@ -10948,20 +10982,9 @@ function renderRankings(){
     html+=r.html; contrib.push(r.valMap);
   }
 
-  // Examination Analytics
-  {
-    const r=scoreRow('📝','Exam Performance Score',(examStats||{}),d=>{
-      if(!d||!d.assessed) return {value:null};
-      return {value:d.score,html:`<span style="font-weight:800;color:${scoreColor(d.score)};font-size:15px;">${d.avg.toFixed(1)}%</span>`+
-        `<small style="color:#94A3B8;display:block;font-size:10px;">average of ${fi(d.assessed)} students assessed</small>`+
-        `<small style="color:#94A3B8;display:block;font-size:9.5px;margin-top:2px;">`+
-        `${d.passPct.toFixed(0)}% pass \u00b7 ${d.coverage.toFixed(0)}% of roll assessed</small>`};
-    },false,'Exam Performance',(d)=>d&&d.assessed?{
-      expr:'average % = \u03a3 student marks \u00f7 students assessed   \u00b7   pass % = students at or above the pass mark \u00f7 assessed \u00d7 100   \u00b7   coverage % = assessed \u00f7 roll \u00d7 100',
-      work:`average ${d.avg.toFixed(1)}% over ${fi(d.assessed)} assessed \u00b7 pass ${d.passPct.toFixed(0)}% \u00b7 coverage ${d.coverage.toFixed(0)}% of roll`,
-      note:'The ranked figure is the AVERAGE mark, not the pass rate. Coverage matters when reading it: a branch that assessed a third of its roll is being averaged over that third only, so a high average with low coverage is not comparable to a high average with full coverage.'}:null);
-    html+=r.html; contrib.push(r.valMap);
-  }
+  /* Exam Performance row removed on request: PT-1 covers assessment in full,
+     and a single average here invited comparison between branches that had
+     assessed very different shares of their roll. */
 
   // ── Overall Ranking: mean of every category score a branch actually has ──
   const avgScore={};
@@ -16700,7 +16723,18 @@ function cgBranches(){
     if (!CG_NOT_A_BRANCH.test(b) && (MONTH_CONFIG || {})[b]) seen[b] = 1;
   });
 
-  return order.filter(b => seen[b]).concat(Object.keys(seen).filter(b => order.indexOf(b) < 0).sort());
+  const all = order.filter(b => seen[b]).concat(Object.keys(seen).filter(b => order.indexOf(b) < 0).sort());
+
+  /* A branch account's payload carries only its own records, but Month_Config
+     arrives whole (the head-to-head scorecard needs it), so every campus turned
+     up here — four of them as rows of zeros. Zero open issues and no data are
+     very different statements, and the second must never be shown as the first.
+     A branch user therefore sees only their own row. */
+  if (window._USER_BRANCH) {
+    const mine = all.filter(b => b === window._USER_BRANCH);
+    if (mine.length) return mine;
+  }
+  return all;
 }
 
 const cgIsClosed = s => /closed|verified|resolved|completed|done|filled/i.test(String(s || ''));
