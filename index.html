@@ -2078,6 +2078,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="kc green"><div class="kc-ico">✅</div><div class="kc-lbl">Avg Health</div><div class="kc-val" id="it-health">–</div><div class="kc-sub" id="it-health-s">Working ÷ total</div></div>
     <div class="kc red clickable" onclick="viewIT('down')" title="Click to view not-working assets"><div class="kc-ico">🔴</div><div class="kc-lbl">Not Working</div><div class="kc-val" id="it-down">–</div><div class="kc-sub">Needs repair · click to view</div></div>
     <div class="kc amber clickable" onclick="viewIT('pending')" title="Click to view pending assets"><div class="kc-ico">⏳</div><div class="kc-lbl">Pending</div><div class="kc-val" id="it-pend">–</div><div class="kc-sub">Awaiting action · click to view</div></div>
+    <div class="kc green clickable" onclick="viewITMoved('added')" title="Click to view what was added"><div class="kc-ico">➕</div><div class="kc-lbl">Added</div><div class="kc-val" id="it-added">–</div><div class="kc-sub" id="it-added-s">Against last check</div></div>
+    <div class="kc red clickable" onclick="viewITMoved('removed')" title="Click to view what was retired"><div class="kc-ico">➖</div><div class="kc-lbl">Retired</div><div class="kc-val" id="it-removed">–</div><div class="kc-sub" id="it-removed-s">Against last check</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <div class="ch"><h3>&#128260; What changed since the previous check</h3>
+      <span class="fnote">Each branch and system compared against its own previous month. A rise means equipment
+        was added, a fall means it was retired. Systems whose count did not move are not listed.</span></div>
+    <div class="cb-0" style="overflow-x:auto"><table class="dt" id="it-moved"></table></div>
   </div>
 
   <div class="card" style="margin-bottom:16px;">
@@ -8888,6 +8897,46 @@ function itSysIcon(name){
   return '<span style="font-size:17px">🖥️</span>';          // anything unrecognised
 }
 
+/* The month-on-month movement table, and its drill-through. */
+function renderITMoved(){
+  const el = document.getElementById('it-moved');
+  if (!el) return;
+  const rows = window._IT_MOVED || [];
+  if (!rows.length){
+    el.innerHTML = '<tbody><tr><td class="no-data">No change against the previous check. ' +
+      'Either nothing was added or retired, or only one month has been recorded so far.</td></tr></tbody>';
+    return;
+  }
+  el.innerHTML = '<thead><tr><th style="text-align:left">Branch</th><th style="text-align:left">System</th>' +
+    '<th>Previous</th><th>Now</th><th>Change</th><th style="text-align:left">Between</th></tr></thead><tbody>' +
+    rows.map(r => {
+      const up = String(r.Change).startsWith('+');
+      return '<tr><td style="text-align:left"><span class="bd b' + r.Branch + '"></span> ' + r.Branch + '</td>' +
+        '<td style="text-align:left">' + itSysIcon(r.System) + ' ' + r.System + '</td>' +
+        '<td>' + r.Previous + '</td><td style="font-weight:700">' + r.Current + '</td>' +
+        '<td style="font-weight:800;color:' + (up ? '#059669' : '#DC2626') + '">' + r.Change + '</td>' +
+        '<td style="text-align:left;color:#64748B;font-size:11.5px">' +
+        itMonthLabel(r.From) + ' → ' + itMonthLabel(r.To) + '</td></tr>';
+    }).join('') + '</tbody>';
+}
+
+function viewITMoved(which){
+  const rows = (window._IT_MOVED || []).filter(r =>
+    which === 'added' ? String(r.Change).startsWith('+') : String(r.Change).startsWith('-'));
+  const n = rows.reduce((t, r) => t + Math.abs(+r.Change), 0);
+  openModal(which === 'added' ? '➕ Assets added since the previous check'
+                              : '➖ Assets retired since the previous check',
+    n + ' asset(s) across ' + rows.length + ' system(s)', rows,
+    [{key:'Branch',label:'Branch'},{key:'System',label:'System'},
+     {key:'Previous',label:'Previous count'},{key:'Current',label:'Now'},
+     {key:'Change',label:'Change'},{key:'From',label:'From'},{key:'To',label:'To'}],
+    { expr: which === 'added'
+        ? 'Σ of increases between each branch-and-system\'s previous check and its latest'
+        : 'Σ of decreases between each branch-and-system\'s previous check and its latest',
+      work: n + ' across ' + rows.length + ' system(s)',
+      note: 'A monthly check records the standing count, not what was bought — so this is the DIFFERENCE between two checks. A branch and system being checked for the first time shows no change, because there is nothing to compare it against.' });
+}
+
 function renderITMonthly(){
   const host = document.getElementById('it-monthly');
   if (!host) return;
@@ -9025,10 +9074,78 @@ function renderIT(){
     const su=document.getElementById('it-sys-summary'); if(su)su.textContent='';
     return;
   }
-  const total=src.reduce((s,r)=>s+(+r.Total||0),0);
-  const working=health.reduce((s,r)=>s+(+r.Working||0),0);
-  const down=health.reduce((s,r)=>s+(+r.NotWorking||0),0);
-  const pend=health.reduce((s,r)=>s+(+r.Pending||0),0);
+  /* ── A MONTHLY CHECK IS A SNAPSHOT, NOT AN ADDITION ──
+     IT records the same branch and system every month: 120 CCTV cameras in
+     July, 120 again in August. Adding those rows together reported 5,898
+     assets for an estate of a few hundred — roughly the true figure multiplied
+     by the number of months on file.
+
+     Each branch-and-system pair is therefore reduced to its LATEST check, and
+     that is the estate. The month before it gives the movement: where the
+     count rose, equipment was added; where it fell, equipment was retired. */
+  const latestBy = rows => {
+    const best = {};
+    rows.forEach(r => {
+      const k = (r.Branch||'') + '|' + (r.System||'');
+      const mk = itMonthKey(r.Date);
+      if (!mk) return;
+      if (!best[k] || mk > best[k].mk) best[k] = { mk: mk, r: r };
+    });
+    return best;
+  };
+  const priorTo = (rows, cutoff) => {
+    const best = {};
+    rows.forEach(r => {
+      const k = (r.Branch||'') + '|' + (r.System||'');
+      const mk = itMonthKey(r.Date);
+      if (!mk || (cutoff[k] && mk >= cutoff[k].mk)) return;
+      if (!best[k] || mk > best[k].mk) best[k] = { mk: mk, r: r };
+    });
+    return best;
+  };
+
+  const curMap = latestBy(health);
+  const prvMap = priorTo(health, curMap);
+  const curRows = Object.keys(curMap).map(k => curMap[k].r);
+  /* No dated checks at all: fall back to the asset master so the tab still
+     reports something, and say so below. */
+  const useSnapshot = curRows.length > 0;
+  const basis = useSnapshot ? curRows : src;
+
+  const total=basis.reduce((s,r)=>s+(+r.Total||0),0);
+  const working=basis.reduce((s,r)=>s+(+r.Working||0),0);
+  const down=basis.reduce((s,r)=>s+(+r.NotWorking||0),0);
+  const pend=basis.reduce((s,r)=>s+(+r.Pending||0),0);
+
+  /* Movement against the previous check for the same branch and system. */
+  let added=0, removed=0, movedRows=[];
+  Object.keys(curMap).forEach(k => {
+    const cur=+curMap[k].r.Total||0;
+    const prv=prvMap[k]?(+prvMap[k].r.Total||0):null;
+    if (prv===null) return;                 // first ever check: not a change
+    const diff=cur-prv;
+    if (diff>0) added+=diff; else if (diff<0) removed+=-diff;
+    if (diff!==0) movedRows.push({ Branch:curMap[k].r.Branch, System:curMap[k].r.System,
+      Previous:prv, Current:cur, Change:(diff>0?'+':'')+diff,
+      From:prvMap[k].mk, To:curMap[k].mk });
+  });
+  movedRows.sort((a,b)=>Math.abs(+b.Change)-Math.abs(+a.Change));
+  window._IT_MOVED=movedRows;
+  window._IT_CURROWS=curRows;
+  /* Drawn here, not at the top of renderIT: the table reads _IT_MOVED, which
+     does not exist until the comparison above has run. */
+  try { renderITMoved(); } catch(e){ console.error('IT movement:', e && e.message); }
+  setTxt('it-added', added?('+'+fi(added)):'0');
+  setTxt('it-removed', removed?('−'+fi(removed)):'0');
+  {
+    const months=[...new Set(Object.keys(curMap).map(k=>curMap[k].mk))].sort();
+    const label=months.length?itMonthLabel(months[months.length-1]):'';
+    setTxt('it-added-s', label?('added in '+label+' · click to view'):'no dated checks');
+    setTxt('it-removed-s', label?('retired in '+label+' · click to view'):'no dated checks');
+    setTxt('it-total-s', useSnapshot
+      ? ('as at ' + label + ' · click to view')
+      : 'from the asset master — no dated checks found');
+  }
   const healthPct=total>0?Math.round(working/total*100):(health.length?Math.round(health.reduce((s,r)=>s+(+r.Health||0),0)/health.length):0);
   setTxt('it-total',fi(total)); setTxt('it-health',healthPct+'%'); setTxt('it-down',fi(down)); setTxt('it-pend',fi(pend));
   const su=document.getElementById('it-sys-summary');
