@@ -1841,6 +1841,13 @@ document.addEventListener('DOMContentLoaded', async () => {
          background, like Care Calls and Teacher Observations. -->
     <span class="exm-status" id="dm-status"></span>
   </div>
+  <div class="card" style="margin-bottom:16px;">
+    <div class="ch"><h3>&#128202; Spend, leads and admissions by branch and platform</h3>
+      <span class="fnote">Amount spent and leads come from the ad platform; admissions are counted from
+        enquiry records whose source names that platform. Click any figure for the records behind it.</span></div>
+    <div class="cb-0" style="overflow-x:auto"><table class="dt" id="dm-summary"></table></div>
+  </div>
+
   <div id="dm-mount" style="width:100%"></div>
 </div>
 
@@ -18149,9 +18156,158 @@ function _dmPost(){
 
 /* Called on every render pass, so a branch or month change reaches the panel
    the same way it reaches every other tab. */
+/* ── Spend · leads · CPL · admissions · CPA, by branch and platform ──
+
+   Three different systems have to agree for a row to be complete:
+     • spend and leads come from the ad export (Meta today, Google if ever added)
+     • admissions come from the enquiry tracker, counted where the lead's own
+       source names the platform
+   Where a system holds nothing, the cell says so rather than showing zero —
+   "₹0 spent" and "no Google data in the system" are very different claims, and
+   only one of them is true. */
+const DM_PLATFORMS = ['Meta', 'Google'];
+
+function dmPlatformOf(v){
+  const t = String(v || '');
+  if (/meta|facebook|\bfb\b|instagram|\binsta\b/i.test(t)) return 'Meta';
+  if (/google|adwords|\bgads\b|youtube|\bsem\b|search ?ads/i.test(t)) return 'Google';
+  return '';
+}
+
+/* Admissions attributed to a platform, from whichever enquiry feed carries a
+   source. Counted once per record. */
+function dmAdmissions(branch, platform){
+  const out = [];
+  const seen = new Set();
+  const take = (arr, srcKeys, isAdmitted) => {
+    (arr || []).forEach(r => {
+      if (r.Branch !== branch) return;
+      if (isAdmitted && !isAdmitted(r)) return;
+      const src = srcKeys.map(k => r[k]).find(v => v);
+      if (dmPlatformOf(src) !== platform) return;
+      const id = (r.Student || '') + '|' + (r.Date || r.AdmissionDate || '');
+      if (seen.has(id)) return;
+      seen.add(id);
+      out.push(r);
+    });
+  };
+  take(typeof ADM1_DATA !== 'undefined' ? ADM1_DATA : [], ['Source', 'Channel', 'ChannelRaw']);
+  take(typeof ADM2_DATA !== 'undefined' ? ADM2_DATA : [], ['Source', 'Channel', 'ChannelRaw']);
+  /* Leads that reached an admitted stage, where the platform is on the lead. */
+  take(typeof LEAD_DATES !== 'undefined' ? LEAD_DATES : [], ['ChannelRaw', 'Platform'],
+       r => /admit|enrol|won|joined|confirm/i.test(String(r.Stage || '')));
+  return out;
+}
+
+function renderDmSummary(){
+  const el = document.getElementById('dm-summary');
+  if (!el) return;
+  const recs = dmRecords();
+
+  /* Branches from the ad data and the group list together. */
+  const order = ['Bachupally', 'Boduppal', 'Gowdavalli', 'Keesara', 'Pocharam'];
+  const seen = {};
+  recs.forEach(r => (r.servedList || [r.served]).forEach(b => { if (b) seen[b] = 1; }));
+  Object.keys(MONTH_CONFIG || {}).forEach(b => { if (b) seen[b] = 1; });
+  let branches = order.filter(b => seen[b]).concat(Object.keys(seen).filter(b => order.indexOf(b) < 0).sort());
+  if (window._USER_BRANCH) branches = branches.filter(b => b === window._USER_BRANCH);
+  if (typeof fBranch !== 'undefined' && fBranch !== 'ALL') branches = branches.filter(b => b === fBranch);
+  if (!branches.length) branches = order;
+
+  const inr = v => '\u20b9' + Math.round(v).toLocaleString('en-IN');
+  const cell = (html, click, col) =>
+    '<td style="text-align:right;font-weight:600' + (col ? ';color:' + col : '') +
+    (click ? ';cursor:pointer' : '') + '"' + (click ? ' onclick="' + click + '"' : '') + '>' + html + '</td>';
+
+  let body = '', tSpend = 0, tLeads = 0, tAdm = 0;
+  branches.forEach(b => {
+    DM_PLATFORMS.forEach((plat, pi) => {
+      /* Ad-set level is the spend basis: campaign rows would double-count. */
+      const mine = plat === 'Meta'
+        ? recs.filter(r => r.level === 'Ad set' && (r.servedList || [r.served]).indexOf(b) >= 0)
+        : [];
+      const spend = mine.reduce((t, r) => t + (r.spend || 0), 0);
+      const leads = mine.filter(r => r.isLead).reduce((t, r) => t + (r.results || 0), 0);
+      const adm = dmAdmissions(b, plat);
+      const hasAds = mine.length > 0;
+
+      tSpend += spend; tLeads += leads; tAdm += adm.length;
+
+      const q = "'" + b.replace(/'/g, "\\'") + "','" + plat + "'";
+      body += '<tr>' +
+        (pi === 0
+          ? '<td rowspan="' + DM_PLATFORMS.length + '" style="text-align:left;font-weight:700;vertical-align:middle">' +
+            '<span class="bd b' + b + '"></span> ' + b + '</td>'
+          : '') +
+        '<td style="text-align:left">' + plat + '</td>' +
+        (hasAds
+          ? cell(inr(spend), 'dmSumOpen(' + q + ",'spend')") +
+            cell(leads ? leads.toLocaleString('en-IN') : '0', 'dmSumOpen(' + q + ",'leads')") +
+            cell(leads ? inr(spend / leads) : '\u2013', '', leads ? '' : '#94A3B8')
+          : '<td colspan="3" style="text-align:center;color:#94A3B8;font-size:11.5px">' +
+            'no ' + plat + ' spend in the system</td>') +
+        cell(adm.length ? adm.length : '0', 'dmSumOpen(' + q + ",'adm')",
+             adm.length ? '' : '#94A3B8') +
+        cell(adm.length && spend ? inr(spend / adm.length) : '\u2013', '',
+             adm.length && spend ? '' : '#94A3B8') +
+        '</tr>';
+    });
+  });
+
+  el.innerHTML =
+    '<thead><tr><th style="text-align:left">Branch</th><th style="text-align:left">Platform</th>' +
+    '<th style="text-align:right">Amount spent</th><th style="text-align:right">Leads</th>' +
+    '<th style="text-align:right">CPL</th><th style="text-align:right">Admissions</th>' +
+    '<th style="text-align:right">CPA</th></tr></thead><tbody>' + body +
+    '<tr style="background:#F8FAFF;border-top:2px solid #E0E8FF;font-weight:800">' +
+    '<td colspan="2" style="text-align:left">All branches</td>' +
+    '<td style="text-align:right">' + inr(tSpend) + '</td>' +
+    '<td style="text-align:right">' + tLeads.toLocaleString('en-IN') + '</td>' +
+    '<td style="text-align:right">' + (tLeads ? inr(tSpend / tLeads) : '\u2013') + '</td>' +
+    '<td style="text-align:right">' + tAdm + '</td>' +
+    '<td style="text-align:right">' + (tAdm ? inr(tSpend / tAdm) : '\u2013') + '</td>' +
+    '</tr></tbody>' +
+    (tAdm === 0
+      ? '<tfoot><tr><td colspan="7" style="text-align:left;color:#B3402F;font-size:11.5px;padding:8px 10px">' +
+        'No admission has a source naming Meta or Google, so CPA cannot be calculated. The enquiry tracker ' +
+        'records a channel per lead \u2014 until those name the platform, spend cannot be tied to admissions.' +
+        '</td></tr></tfoot>'
+      : '');
+}
+
+function dmSumOpen(branch, platform, what){
+  if (what === 'adm'){
+    const rows = dmAdmissions(branch, platform);
+    return openModal('\uD83C\uDF93 ' + branch + ' \u2014 admissions from ' + platform,
+      rows.length + ' admission(s)', rows,
+      [{key:'Branch',label:'Branch'},{key:'Student',label:'Student'},{key:'Date',label:'Date',date:true},
+       {key:'Class',label:'Class'},{key:'Source',label:'Source'},{key:'ChannelRaw',label:'Channel'},
+       {key:'Stage',label:'Stage'}],
+      { expr: 'admissions whose recorded source names ' + platform,
+        work: rows.length + ' of the admissions at this branch',
+        note: 'Counted from the enquiry tracker, not from the ad platform. An admission with no source recorded cannot be attributed and is not counted here.' });
+  }
+  const recs = dmRecords().filter(r => r.level === 'Ad set' &&
+    (r.servedList || [r.served]).indexOf(branch) >= 0);
+  const rows = platform === 'Meta' ? recs : [];
+  const spend = rows.reduce((t, r) => t + (r.spend || 0), 0);
+  const leads = rows.filter(r => r.isLead).reduce((t, r) => t + (r.results || 0), 0);
+  openModal('\uD83D\uDCCA ' + branch + ' \u2014 ' + platform + ' ad sets',
+    rows.length + ' ad set(s)', rows,
+    [{key:'served',label:'Branch'},{key:'name',label:'Ad set'},{key:'segment',label:'Programme'},
+     {key:'delivery',label:'Delivery'},{key:'spend',label:'Spent'},{key:'results',label:'Results'},
+     {key:'cpr',label:'Cost per result'}],
+    { expr: what === 'leads'
+        ? 'leads = Σ results on ad sets whose result type is a lead form or website lead'
+        : 'amount spent = Σ spend across the branch\'s ad sets',
+      work: what === 'leads' ? leads + ' leads' : '\u20b9' + Math.round(spend).toLocaleString('en-IN'),
+      note: 'Ad-set level is used so campaign rows do not double-count the same spend.' });
+}
+
 function renderDm(){
   _dmMount();
   _dmPost();
+  try { renderDmSummary(); } catch(e){ console.error('dm summary:', e && e.message); }
 }
 
 var _sylRetried = false, _sylStaleRetried = false;
