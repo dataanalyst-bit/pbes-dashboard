@@ -97,6 +97,18 @@ export async function verifyPhotoToken(token, secret) {
   return claims;
 }
 
+/* The configured Apps Script URL with its query string removed, so a failure
+   message can name the endpoint it called without printing the shared key into
+   a browser. The deployment id is the part that actually needs comparing. */
+function safeUrl(u) {
+  try {
+    const x = new URL(String(u));
+    return x.origin + x.pathname;
+  } catch (err) {
+    return "(APPS_SCRIPT_URL is not a valid URL: " + String(u).slice(0, 60) + ")";
+  }
+}
+
 export async function onRequestGet({ request, env }) {
   const json = (obj, status = 200) =>
     new Response(JSON.stringify(obj), {
@@ -197,10 +209,16 @@ export async function onRequestGet({ request, env }) {
             "Apps Script returned non-JSON (HTTP " + resp.status + ")" +
             (section ? " for ?section=" + section : " for the main payload") + ". " +
             (resp.status === 404
-              ? "A 404 means the APPS_SCRIPT_URL this Function is configured with no longer exists. " +
-                "In Apps Script use Deploy \u2192 Manage deployments \u2192 edit the EXISTING deployment " +
-                "\u2192 New version (creating a NEW deployment changes the /exec id, and the old one 404s). " +
-                "Then check the URL in the Cloudflare Pages environment variables matches."
+              ? "A 404 means the deployment id in APPS_SCRIPT_URL does not exist. " +
+                "This Function is calling: " + safeUrl(base) + " \u2014 compare the id in that URL " +
+                "against Deploy \u2192 Manage deployments in Apps Script. If they differ, paste the " +
+                "current /exec URL into the APPS_SCRIPT_URL variable in Cloudflare Pages and REDEPLOY " +
+                "the Pages project (an environment variable change does not take effect until you do). " +
+                "If they match, the deployment was deleted \u2014 edit the existing deployment and " +
+                "publish a New version rather than creating a new deployment."
+              : resp.status === 401 || resp.status === 403
+              ? "Apps Script refused the request. The deployment's access must be \"Anyone\", not " +
+                "\"Anyone with a Google account\" \u2014 this Function calls it without a signed-in user."
               : "Check the deployment is the latest version with access = Anyone.") +
             " First bytes: " + head,
         },
@@ -334,12 +352,23 @@ function filterTablesByBranch(data, branch, wrapper) {
 //   MONTH_CONFIG (working days per branch). These are aggregate/operational, not student PII.
 function filterByBranch(data, branch) {
   const out = { ...data };
-  const KEEP_FULL = { TRACKER: 1, OBS_DATA: 1, HR_RECORDS: 1 };
+  // SCORE_SLIM is deliberately kept whole: it carries no names and no free text,
+  // only the statuses and dates the head-to-head scorecard needs, so every
+  // branch can be compared without any campus seeing another's detail.
+  const KEEP_FULL = { TRACKER: 1, OBS_DATA: 1, HR_RECORDS: 1, SCORE_SLIM: 1 };
   const arrayKeys = [
     "CARE_DATA", "GO_DATA", "GRIEVANCE_DATA", "ADM_TRENDS", "ALL_TEACHER",
     "ADMIN_DATA", "PUR_DATA", "VIG_DATA", "OWNER_STATS",
     "COMBINED_ADM", "ADM1_DATA", "ADM2_DATA", "LEAD_DATES", "AVIS_DATA",
   ];
+  /* The observation log: a branch account sees its own branch's entries plus
+     anything filed by a group-wide account (which carries no branch), since
+     those are usually instructions that concern them. It does not see other
+     branches' internal notes. */
+  if (Array.isArray(out.OBS_LOG)) {
+    out.OBS_LOG = out.OBS_LOG.filter((r) => !r.branch || sameBranch(r.branch, branch));
+  }
+
   // Digital marketing is filtered on the campus the ads were run FOR, not the
   // account that paid — a Boduppal account runs Bachupally hiring ads.
   if (Array.isArray(out.DM_DATA)) {
