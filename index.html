@@ -18229,80 +18229,134 @@ function dmAdmissions(branch, platform){
   return out;
 }
 
+/* ── Branch × platform summary ──
+   Meta figures are taken at CAMPAIGN level: campaign, ad set and ad rows repeat
+   the same spend, and only the campaign row can be summed without double
+   counting. Recruitment campaigns, video views, reach and profile visits are
+   excluded — only genuine admission-lead campaigns count.
+
+   One exception is flagged rather than hidden. DDC files Pocharam's and
+   Gowdavalli's advertising inside a single campaign named
+   "PIS_TeacherRecruitment_Jul26" that holds BOTH admission and hiring ad sets.
+   At campaign level those branches therefore look like they ran no admissions
+   advertising at all, which is false — the leads are real and are the cheapest
+   in the group. Where that happens the row falls back to ad-set level and is
+   marked, so the number is right and the reader knows it came from a different
+   level. */
+
+function dmIsHiringName(n){ return /hiring|recruit|vacancy/i.test(String(n || '')); }
+function dmIsBrandName(n){ return /awareness|follower|chess|brand|engagement|thruplay|traffic/i.test(String(n || '')); }
+
+/* Admission spend and leads for one branch, campaign level first. */
+function dmAdmissionFigures(branch){
+  const recs = dmRecords();
+  const inBranch = r => ((r.servedList && r.servedList.length) ? r.servedList : [r.served]).indexOf(branch) >= 0;
+  const share = r => (((r.servedList && r.servedList.length) ? r.servedList.length : 1) || 1);
+
+  const camps = recs.filter(r => r.level === 'Campaign' && inBranch(r) &&
+    r.isLead && !dmIsHiringName(r.name) && !dmIsBrandName(r.name));
+  if (camps.length){
+    return {
+      level: 'campaign',
+      spend: camps.reduce((t, r) => t + (r.spend || 0) / share(r), 0),
+      leads: camps.reduce((t, r) => t + (r.results || 0) / share(r), 0),
+      rows: camps
+    };
+  }
+  /* Nothing identifiable at campaign level — look one level down. */
+  const sets = recs.filter(r => r.level === 'Ad set' && inBranch(r) &&
+    r.isLead && !dmIsHiringName(r.name) && !dmIsBrandName(r.name));
+  if (!sets.length) return { level: 'none', spend: 0, leads: 0, rows: [] };
+  return {
+    level: 'adset',
+    spend: sets.reduce((t, r) => t + (r.spend || 0) / share(r), 0),
+    leads: sets.reduce((t, r) => t + (r.results || 0) / share(r), 0),
+    rows: sets
+  };
+}
+
 function renderDmSummary(){
   const el = document.getElementById('dm-summary');
   if (!el) return;
-  const recs = dmRecords();
-
-  /* Branches from the ad data and the group list together. */
-  const order = ['Bachupally', 'Boduppal', 'Gowdavalli', 'Keesara', 'Pocharam'];
-  const seen = {};
-  recs.forEach(r => (r.servedList || [r.served]).forEach(b => { if (b) seen[b] = 1; }));
-  Object.keys(MONTH_CONFIG || {}).forEach(b => { if (b) seen[b] = 1; });
-  let branches = order.filter(b => seen[b]).concat(Object.keys(seen).filter(b => order.indexOf(b) < 0).sort());
+  const GROUP = ['Boduppal', 'Keesara', 'Bachupally', 'Pocharam', 'Gowdavalli'];
+  let branches = GROUP.slice();
   if (window._USER_BRANCH) branches = branches.filter(b => b === window._USER_BRANCH);
   if (typeof fBranch !== 'undefined' && fBranch !== 'ALL') branches = branches.filter(b => b === fBranch);
-  if (!branches.length) branches = order;
+  if (!branches.length) branches = GROUP.slice();
 
   const inr = v => '\u20b9' + Math.round(v).toLocaleString('en-IN');
-  const cell = (html, click, col) =>
-    '<td style="text-align:right;font-weight:600' + (col ? ';color:' + col : '') +
-    (click ? ';cursor:pointer' : '') + '"' + (click ? ' onclick="' + click + '"' : '') + '>' + html + '</td>';
+  const NA  = '<span style="color:#94A3B8">N/A</span>';
 
-  let body = '', tSpend = 0, tLeads = 0, tAdm = 0;
+  let body = '', tSpend = 0, tLeads = 0, anyFallback = false;
+
   branches.forEach(b => {
-    DM_PLATFORMS.forEach((plat, pi) => {
-      /* Ad-set level is the spend basis: campaign rows would double-count. */
-      const mine = plat === 'Meta'
-        ? recs.filter(r => r.level === 'Ad set' && (r.servedList || [r.served]).indexOf(b) >= 0)
-        : [];
-      const spend = mine.reduce((t, r) => t + (r.spend || 0), 0);
-      const leads = mine.filter(r => r.isLead).reduce((t, r) => t + (r.results || 0), 0);
-      const adm = dmAdmissions(b, plat);
-      const hasAds = mine.length > 0;
+    ['Google', 'Meta'].forEach((plat, pi) => {
+      const first = pi === 0
+        ? '<td rowspan="2" style="text-align:left;font-weight:700;vertical-align:middle">' +
+          '<span class="bd b' + b + '"></span> ' + b + '</td>'
+        : '';
 
-      tSpend += spend; tLeads += leads; tAdm += adm.length;
+      if (plat === 'Google'){
+        /* No Google export exists in the workbook. Not zero — absent. */
+        body += '<tr>' + first + '<td style="text-align:left">Google</td>' +
+          '<td colspan="5" style="text-align:center;color:#94A3B8;font-size:11.5px">' +
+          'no Google Ads data in the system</td></tr>';
+        return;
+      }
 
-      const q = "'" + b.replace(/'/g, "\\'") + "','" + plat + "'";
+      const f = dmAdmissionFigures(b);
+      if (f.level === 'none'){
+        body += '<tr><td style="text-align:left">Meta</td>' +
+          '<td colspan="5" style="text-align:center;color:#94A3B8;font-size:11.5px">' +
+          'no admission campaign in this export</td></tr>';
+        return;
+      }
+      if (f.level === 'adset') anyFallback = true;
+      tSpend += f.spend; tLeads += f.leads;
+
+      const mark = f.level === 'adset'
+        ? '<sup style="color:#B3402F;font-weight:800" title="Taken at ad-set level — see the note below">&dagger;</sup>'
+        : '';
+      const cpl = f.leads ? f.spend / f.leads : null;
+      const q = "'" + b.replace(/'/g, "\\'") + "'";
+
       body += '<tr>' +
-        (pi === 0
-          ? '<td rowspan="' + DM_PLATFORMS.length + '" style="text-align:left;font-weight:700;vertical-align:middle">' +
-            '<span class="bd b' + b + '"></span> ' + b + '</td>'
-          : '') +
-        '<td style="text-align:left">' + plat + '</td>' +
-        (hasAds
-          ? cell(inr(spend), 'dmSumOpen(' + q + ",'spend')") +
-            cell(leads ? leads.toLocaleString('en-IN') : '0', 'dmSumOpen(' + q + ",'leads')") +
-            cell(leads ? inr(spend / leads) : '\u2013', '', leads ? '' : '#94A3B8')
-          : '<td colspan="3" style="text-align:center;color:#94A3B8;font-size:11.5px">' +
-            'no ' + plat + ' spend in the system</td>') +
-        cell(adm.length ? adm.length : '0', 'dmSumOpen(' + q + ",'adm')",
-             adm.length ? '' : '#94A3B8') +
-        cell(adm.length && spend ? inr(spend / adm.length) : '\u2013', '',
-             adm.length && spend ? '' : '#94A3B8') +
-        '</tr>';
+        '<td style="text-align:left">Meta' + mark + '</td>' +
+        '<td style="text-align:right;cursor:pointer" onclick="dmSumOpen(' + q + ",'Meta','spend')\">" + inr(f.spend) + '</td>' +
+        '<td style="text-align:right;cursor:pointer;font-weight:600" onclick="dmSumOpen(' + q + ",'Meta','leads')\">" +
+          Math.round(f.leads).toLocaleString('en-IN') + '</td>' +
+        '<td style="text-align:right;font-weight:700;color:' +
+          (cpl === null ? '#94A3B8' : cpl > 200 ? '#DC2626' : cpl > 120 ? '#D97706' : '#059669') + '">' +
+          (cpl === null ? NA : inr(cpl)) + '</td>' +
+        '<td style="text-align:right">' + NA + '</td>' +
+        '<td style="text-align:right">' + NA + '</td></tr>';
     });
   });
 
   el.innerHTML =
-    '<thead><tr><th style="text-align:left">Branch</th><th style="text-align:left">Platform</th>' +
+    '<thead><tr><th style="text-align:left">Branch</th><th style="text-align:left">Digital marketing</th>' +
     '<th style="text-align:right">Amount spent</th><th style="text-align:right">Leads</th>' +
     '<th style="text-align:right">CPL</th><th style="text-align:right">Admissions</th>' +
     '<th style="text-align:right">CPA</th></tr></thead><tbody>' + body +
     '<tr style="background:#F8FAFF;border-top:2px solid #E0E8FF;font-weight:800">' +
     '<td colspan="2" style="text-align:left">All branches</td>' +
     '<td style="text-align:right">' + inr(tSpend) + '</td>' +
-    '<td style="text-align:right">' + tLeads.toLocaleString('en-IN') + '</td>' +
-    '<td style="text-align:right">' + (tLeads ? inr(tSpend / tLeads) : '\u2013') + '</td>' +
-    '<td style="text-align:right">' + tAdm + '</td>' +
-    '<td style="text-align:right">' + (tAdm ? inr(tSpend / tAdm) : '\u2013') + '</td>' +
+    '<td style="text-align:right">' + Math.round(tLeads).toLocaleString('en-IN') + '</td>' +
+    '<td style="text-align:right">' + (tLeads ? inr(tSpend / tLeads) : NA) + '</td>' +
+    '<td style="text-align:right">' + NA + '</td><td style="text-align:right">' + NA + '</td>' +
     '</tr></tbody>' +
-    (tAdm === 0
-      ? '<tfoot><tr><td colspan="7" style="text-align:left;color:#B3402F;font-size:11.5px;padding:8px 10px">' +
-        'No admission has a source naming Meta or Google, so CPA cannot be calculated. The enquiry tracker ' +
-        'records a channel per lead \u2014 until those name the platform, spend cannot be tied to admissions.' +
-        '</td></tr></tfoot>'
-      : '');
+    '<tfoot><tr><td colspan="7" style="text-align:left;font-size:11.5px;color:#475569;padding:9px 10px;line-height:1.65">' +
+      '<b>Admissions and CPA read N/A on purpose.</b> The enquiry tracker records a lead\'s channel as ' +
+      '"Digital", never as Meta or Google, so no admission can be traced back to a platform. Nothing here is ' +
+      'estimated.' +
+      (anyFallback
+        ? '<br><b>&dagger; Taken at ad-set level.</b> DDC files Pocharam\'s and Gowdavalli\'s advertising inside ' +
+          'one campaign named "PIS_TeacherRecruitment_Jul26" holding both admission and hiring ad sets. At ' +
+          'campaign level those branches look as though they ran no admissions advertising, which is false \u2014 ' +
+          'the leads are real and the cheapest in the group. Asking both agencies to name campaigns ' +
+          'Branch_Purpose_Month, and never mix purposes in one campaign, removes the need for this footnote.'
+        : '') +
+    '</td></tr></tfoot>';
 }
 
 function dmSumOpen(branch, platform, what){
