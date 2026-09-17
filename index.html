@@ -1064,9 +1064,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="hdr-right">
       <div id="role-badge" class="role-badge"></div>
       <div class="live-pill"><span class="ldot"></span> Active</div>
-      <!-- Every percentage on the dashboard, with the calculation behind it -->
-      <a class="hdr-link" href="#" onclick="openFormulaBook();return false;"
-         title="How every percentage on this dashboard is calculated">&fnof;x Formulas</a>
+      <!-- Staff Operations Portal. Open to every employee at every branch, so it
+           sits outside the role gating that governs the tabs. rel="noopener"
+           because target="_blank" otherwise hands the opened page a handle back
+           to this one. -->
+      <a class="hdr-link" href="https://pbes-staff-portal.pages.dev" target="_blank" rel="noopener noreferrer"
+         title="Open the Staff Operations Portal in a new tab">&#128188; Staff Portal &#8599;</a>
       <a href="reset-password.html" class="hdr-link">Change Password</a>
       <!-- the student, call and observation counters live on the Executive
            Overview, where they can be read against their own context -->
