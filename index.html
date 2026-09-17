@@ -18109,8 +18109,29 @@ function renderConsolidated(){
    to it the moment the frame is ready. No loading text, no refresh. */
 var _dmReady=false, _dmSent=false;
 
+/* Which result types are an ADMISSION ENQUIRY.
+
+   This is the definition everything on this tab rests on, so it lives in one
+   place. Meta reports whatever the ad set was optimised for in a single
+   "Results" column, and only some of those are a lead: a video play, a reach
+   figure or a profile visit is attention, not an enquiry.
+
+   This used to be computed inside the embedded panel only. The tables on this
+   page read the same records but never had the flag set, so every campaign
+   failed the test and the table reported "no admission campaign in this
+   export" for all five branches while the data was sitting right there. */
+const DM_LEAD_TYPES = /instant form lead|website lead|lead form|leadgen|fb_pixel_lead|offsite_lead/i;
+function dmIsLead(r){
+  if (!r) return false;
+  if (typeof r.isLead === 'boolean') return r.isLead;
+  return DM_LEAD_TYPES.test(String(r.resultType || ''));
+}
+
 function dmRecords(){
-  return (typeof DM_DATA !== 'undefined' && Array.isArray(DM_DATA)) ? DM_DATA : [];
+  const rows = (typeof DM_DATA !== 'undefined' && Array.isArray(DM_DATA)) ? DM_DATA : [];
+  /* Set once, so every table on this page and the panel below agree. */
+  rows.forEach(r => { if (typeof r.isLead !== 'boolean') r.isLead = dmIsLead(r); });
+  return rows;
 }
 
 function _dmMount(){
@@ -18734,6 +18755,11 @@ function dmRenderActions(){
 }
 
 function renderDm(){
+  const recs = dmRecords();
+  const meta = document.getElementById('dm-meta');
+  if (meta) meta.textContent = recs.length
+    ? recs.length + ' rows · ' + recs.filter(r => r.level === 'Campaign').length + ' campaigns'
+    : 'no Meta data in this payload';
   try { renderDmSummary(); } catch(e){ console.error('dm summary:', e && e.message); }
   try { dmRenderPast(); }     catch(e){ console.error('dm past:', e && e.message); }
   try { dmRenderMedia(); }    catch(e){ console.error('dm media:', e && e.message); }
