@@ -1851,7 +1851,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="cb-0" style="overflow-x:auto"><table class="dt" id="dm-summary"></table></div>
   </div>
 
-  <div id="dm-mount" style="width:100%"></div>
+  <div class="card" style="margin-bottom:16px;"><div class="ch">
+      <h3>&#128202; What happened</h3>
+      <span class="fnote">The reporting window as exported. Admissions and hiring are separated: they buy
+        different things and cost different amounts, and averaging them together hides both.</span></div>
+    <div class="cb-0" id="dm-past"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;"><div class="ch">
+      <h3>&#128200; What this projects</h3>
+      <span class="fnote">Forward figures are arithmetic on what the period actually delivered, not a model.
+        Every assumption is stated so you can change it and see what moves.</span></div>
+    <div class="cb-0" id="dm-forecast"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;"><div class="ch">
+      <h3>&#9989; Decisions this data supports</h3>
+      <span class="fnote">Each one names the figure it rests on and what it is worth. Ordered by money at stake.</span></div>
+    <div class="cb-0" id="dm-actions"></div>
+  </div>
+
+  <div id="dm-mount" style="width:100%;display:none"></div>
 </div>
 
 <div id="pane-vigilance" class="pane">
@@ -18307,10 +18327,241 @@ function dmSumOpen(branch, platform, what){
       note: 'Ad-set level is used so campaign rows do not double-count the same spend.' });
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   DIGITAL MARKETING REPORT — what happened, what it projects, what to do.
+   Everything below is computed from the export in the payload. Admissions and
+   hiring are kept apart throughout: pooling them halves the apparent cost of
+   admissions leads and hides an expensive hiring problem.               */
+
+const DM_LEADS_PER_ADMISSION = 8;   // stated assumption, not a measured rate
+
+function dmPurposeOf(name){
+  const t = String(name || '').toLowerCase();
+  if (/hiring|recruit|vacancy/.test(t)) return 'Hiring';
+  if (/awareness|follower|chess|brand|engagement/.test(t)) return 'Brand';
+  return 'Admissions';
+}
+
+/* Ad-set level only: campaign rows repeat the same spend. A row serving two
+   campuses is split evenly, because the money bought advertising for both. */
+function dmSplit(){
+  const out = [];
+  dmRecords().filter(r => r.level === 'Ad set').forEach(r => {
+    const bl = (r.servedList && r.servedList.length) ? r.servedList : [r.served];
+    const n = bl.length || 1;
+    bl.forEach(b => out.push({
+      branch: b, agency: r.agency || '–', purpose: dmPurposeOf(r.name),
+      spend: (r.spend || 0) / n,
+      leads: r.isLead ? (r.results || 0) / n : 0,
+      impr: (r.impr || 0) / n, reach: (r.reach || 0) / n,
+      isLead: !!r.isLead, name: r.name, delivery: r.delivery, rec: r
+    }));
+  });
+  return out;
+}
+
+const dmINR = v => '\u20b9' + Math.round(v).toLocaleString('en-IN');
+
+function dmRenderPast(){
+  const el = document.getElementById('dm-past'); if (!el) return;
+  const A = dmSplit();
+  if (!A.length){ el.innerHTML = '<div style="padding:18px;color:#64748B">No ad data loaded.</div>'; return; }
+
+  const sum = rows => ({
+    spend: rows.reduce((t, r) => t + r.spend, 0),
+    leads: rows.reduce((t, r) => t + r.leads, 0)
+  });
+  const purposes = ['Admissions', 'Hiring', 'Brand'];
+  let pr = '';
+  purposes.forEach(p => {
+    const g = sum(A.filter(r => r.purpose === p));
+    if (!g.spend) return;
+    const cpl = g.leads ? g.spend / g.leads : null;
+    pr += '<tr><td style="text-align:left;font-weight:700">' + p + '</td>' +
+      '<td style="text-align:right">' + dmINR(g.spend) + '</td>' +
+      '<td style="text-align:right">' + Math.round(g.leads).toLocaleString('en-IN') + '</td>' +
+      '<td style="text-align:right;font-weight:700;color:' +
+        (cpl === null ? '#DC2626' : cpl > 200 ? '#DC2626' : cpl > 120 ? '#D97706' : '#059669') + '">' +
+        (cpl === null ? 'no leads' : dmINR(cpl)) + '</td></tr>';
+  });
+
+  /* Admissions only, by agency and by branch — the comparison that decides budget. */
+  const adm = A.filter(r => r.purpose === 'Admissions');
+  const byKey = (rows, key) => {
+    const m = {};
+    rows.forEach(r => { const k = r[key]; (m[k] = m[k] || { spend: 0, leads: 0 }); m[k].spend += r.spend; m[k].leads += r.leads; });
+    return Object.keys(m).map(k => ({ k: k, spend: m[k].spend, leads: m[k].leads,
+      cpl: m[k].leads ? m[k].spend / m[k].leads : null })).sort((x, y) => (x.cpl ?? 9e9) - (y.cpl ?? 9e9));
+  };
+  const agRows = byKey(adm, 'agency'), brRows = byKey(adm, 'branch');
+  const tbl = (title, rows, label) =>
+    '<div style="flex:1;min-width:280px"><div style="font-weight:800;color:#1B5E34;font-size:12.5px;margin-bottom:6px">' +
+    title + '</div><table class="dt"><thead><tr><th style="text-align:left">' + label + '</th>' +
+    '<th style="text-align:right">Spent</th><th style="text-align:right">Leads</th>' +
+    '<th style="text-align:right">Cost per lead</th></tr></thead><tbody>' +
+    rows.map(r => '<tr><td style="text-align:left">' + r.k + '</td>' +
+      '<td style="text-align:right">' + dmINR(r.spend) + '</td>' +
+      '<td style="text-align:right">' + Math.round(r.leads) + '</td>' +
+      '<td style="text-align:right;font-weight:700;color:' +
+      (r.cpl === null ? '#94A3B8' : r.cpl > 200 ? '#DC2626' : r.cpl > 120 ? '#D97706' : '#059669') + '">' +
+      (r.cpl === null ? '\u2013' : dmINR(r.cpl)) + '</td></tr>').join('') + '</tbody></table></div>';
+
+  const tot = sum(A);
+  const dead = A.filter(r => r.spend > 0 && !r.isLead);
+  const idle = dmRecords().filter(r => r.level === 'Ad set' && !(r.spend > 0)).length;
+
+  el.innerHTML =
+    '<div style="padding:14px 16px">' +
+      '<table class="dt" style="margin-bottom:14px"><thead><tr><th style="text-align:left">Spent on</th>' +
+      '<th style="text-align:right">Amount</th><th style="text-align:right">Leads</th>' +
+      '<th style="text-align:right">Cost per lead</th></tr></thead><tbody>' + pr +
+      '<tr style="background:#F8FAFF;font-weight:800"><td style="text-align:left">All</td>' +
+      '<td style="text-align:right">' + dmINR(tot.spend) + '</td>' +
+      '<td style="text-align:right">' + Math.round(tot.leads).toLocaleString('en-IN') + '</td>' +
+      '<td style="text-align:right">' + (tot.leads ? dmINR(tot.spend / tot.leads) : '\u2013') + '</td></tr>' +
+      '</tbody></table>' +
+      '<div style="display:flex;gap:18px;flex-wrap:wrap">' + tbl('Admissions leads by agency', agRows, 'Agency') +
+      tbl('Admissions leads by branch', brRows, 'Branch') + '</div>' +
+      (dead.length ? '<p style="margin-top:12px;color:#B3402F;font-size:12.5px">' +
+        dmINR(dead.reduce((t, r) => t + r.spend, 0)) + ' went to ' + dead.length +
+        ' ad sets not optimised for leads at all (video views, reach, profile visits). They bought attention, not enquiries.</p>' : '') +
+      (idle ? '<p style="margin-top:6px;color:#64748B;font-size:12px">' + idle +
+        ' ad sets carry no spend in this period and are not counted anywhere above.</p>' : '') +
+    '</div>';
+  window._DM_A = A;
+}
+
+function dmRenderForecast(){
+  const el = document.getElementById('dm-forecast'); if (!el) return;
+  const A = window._DM_A || dmSplit();
+  const adm = A.filter(r => r.purpose === 'Admissions');
+  if (!adm.length){ el.innerHTML = '<div style="padding:18px;color:#64748B">No admissions spend to project from.</div>'; return; }
+
+  const TARGETS = { Gowdavalli: 600, Bachupally: 800, Boduppal: 650, Pocharam: 800, Keesara: 500 };
+  const m = {};
+  adm.forEach(r => { (m[r.branch] = m[r.branch] || { spend: 0, leads: 0 }); m[r.branch].spend += r.spend; m[r.branch].leads += r.leads; });
+  const cpls = Object.keys(m).filter(b => m[b].leads).map(b => m[b].spend / m[b].leads);
+  const best = cpls.length ? Math.min.apply(null, cpls) : null;
+
+  let rows = '', totNow = 0, totBest = 0;
+  Object.keys(TARGETS).forEach(b => {
+    const e = m[b];
+    const cpl = (e && e.leads) ? e.spend / e.leads : null;
+    const need = TARGETS[b] * DM_LEADS_PER_ADMISSION;
+    const costNow = cpl === null ? null : need * cpl;
+    const costBest = best === null ? null : need * best;
+    if (costNow !== null) totNow += costNow;
+    if (costBest !== null) totBest += costBest;
+    rows += '<tr><td style="text-align:left;font-weight:700"><span class="bd b' + b + '"></span> ' + b + '</td>' +
+      '<td style="text-align:right">' + TARGETS[b] + '</td>' +
+      '<td style="text-align:right">' + (cpl === null ? '\u2013' : dmINR(cpl)) + '</td>' +
+      '<td style="text-align:right">' + need.toLocaleString('en-IN') + '</td>' +
+      '<td style="text-align:right;font-weight:700">' + (costNow === null ? 'no basis' : dmINR(costNow)) + '</td>' +
+      '<td style="text-align:right;color:#059669">' + (costBest === null ? '\u2013' : dmINR(costBest)) + '</td></tr>';
+  });
+
+  el.innerHTML =
+    '<div style="padding:14px 16px">' +
+      '<div style="background:#FFFBEA;border:1px solid #F2E4B8;border-radius:8px;padding:10px 12px;' +
+        'font-size:12.5px;color:#5A4B1E;margin-bottom:12px">' +
+        '<b>Assumptions, stated.</b> Leads needed per admission is set at <b>' + DM_LEADS_PER_ADMISSION +
+        '</b> — the enquiry tracker does not yet record which platform an admission came from, so the true ' +
+        'lead-to-admission rate is unknown. Cost per lead is held at what each branch actually paid this period. ' +
+        'Change either and the totals move proportionally; this is arithmetic, not a forecast model.' +
+      '</div>' +
+      '<table class="dt"><thead><tr><th style="text-align:left">Branch</th>' +
+      '<th style="text-align:right">AY 27-28 target</th><th style="text-align:right">Its cost per lead</th>' +
+      '<th style="text-align:right">Leads needed</th><th style="text-align:right">Spend at its own rate</th>' +
+      '<th style="text-align:right">At the best rate</th></tr></thead><tbody>' + rows +
+      '<tr style="background:#F8FAFF;font-weight:800"><td colspan="4" style="text-align:left">Group</td>' +
+      '<td style="text-align:right">' + dmINR(totNow) + '</td>' +
+      '<td style="text-align:right;color:#059669">' + dmINR(totBest) + '</td></tr></tbody></table>' +
+      '<p style="margin-top:10px;font-size:12.5px;color:#1F2937">' +
+      'If every branch bought leads at the cheapest rate already being achieved inside this group — ' +
+      dmINR(best) + ' — the same admission targets would cost <b>' + dmINR(totNow - totBest) +
+      ' less</b>. That gap is the whole argument for looking at what the cheaper branches do differently.</p>' +
+    '</div>';
+  window._DM_FC = { best: best, totNow: totNow, totBest: totBest, byBranch: m, TARGETS: TARGETS };
+}
+
+function dmRenderActions(){
+  const el = document.getElementById('dm-actions'); if (!el) return;
+  const A = window._DM_A || dmSplit();
+  const fc = window._DM_FC || {};
+  const acts = [];
+
+  /* 1. hiring spend that produced almost nothing */
+  const hire = A.filter(r => r.purpose === 'Hiring');
+  const hByAg = {};
+  hire.forEach(r => { (hByAg[r.agency] = hByAg[r.agency] || { spend: 0, leads: 0 }); hByAg[r.agency].spend += r.spend; hByAg[r.agency].leads += r.leads; });
+  Object.keys(hByAg).forEach(ag => {
+    const e = hByAg[ag];
+    if (e.spend > 5000 && (!e.leads || e.spend / e.leads > 1000))
+      acts.push({ worth: e.spend,
+        head: 'Stop ' + ag + '\'s hiring campaigns until they are rebuilt',
+        body: dmINR(e.spend) + ' produced ' + Math.round(e.leads) + ' hiring lead(s) — ' +
+          (e.leads ? dmINR(e.spend / e.leads) + ' each' : 'none at all') +
+          '. Another agency in this same group is delivering hiring leads far cheaper, so the money is not the problem.' });
+  });
+
+  /* 2. spend on ad sets that cannot produce a lead */
+  const dead = A.filter(r => r.spend > 0 && !r.isLead);
+  const deadSpend = dead.reduce((t, r) => t + r.spend, 0);
+  if (deadSpend > 2000)
+    acts.push({ worth: deadSpend,
+      head: 'Re-point ' + dmINR(deadSpend) + ' of brand spend at lead forms',
+      body: dead.length + ' ad sets are optimised for video views, reach or profile visits. They cannot return an ' +
+        'enquiry however well they perform. If awareness is the intent, say so and budget it separately; if not, ' +
+        'switch the objective.' });
+
+  /* 3. the branch cost gap */
+  if (fc.best && fc.totNow && fc.totBest && (fc.totNow - fc.totBest) > 0){
+    const byB = fc.byBranch || {};
+    const worst = Object.keys(byB).filter(b => byB[b].leads)
+      .map(b => ({ b: b, cpl: byB[b].spend / byB[b].leads })).sort((x, y) => y.cpl - x.cpl)[0];
+    if (worst && worst.cpl > fc.best * 1.5)
+      acts.push({ worth: fc.totNow - fc.totBest,
+        head: 'Find out what the cheap branches do differently, before adding budget',
+        body: worst.b + ' pays ' + dmINR(worst.cpl) + ' a lead against ' + dmINR(fc.best) +
+          ' at the best branch — the same group, the same product. Closing that gap is worth ' +
+          dmINR(fc.totNow - fc.totBest) + ' against the AY 27-28 targets. Adding budget at the current rate ' +
+          'buys the gap at scale instead of closing it.' });
+  }
+
+  /* 4. the measurement gap that blocks everything else */
+  acts.push({ worth: 0,
+    head: 'Record the platform on every enquiry, starting this week',
+    body: 'Cost per lead is measurable today; cost per admission is not, because the enquiry tracker collapses ' +
+      'every digital source to "Digital". Until a lead carries "Meta" or "Google", nobody can say which spend ' +
+      'produced students rather than enquiries — and every budget decision here rests on a lead count instead ' +
+      'of an admission count.' });
+
+  /* 5. nothing running */
+  const live = dmRecords().filter(r => r.level === 'Ad set' &&
+    !/inactive|not_delivering|completed|archived|paused/i.test(String(r.delivery || '')));
+  if (!live.length)
+    acts.push({ worth: 0,
+      head: 'Nothing is delivering right now',
+      body: 'Every ad set in this export is off, completed or archived. If admissions are open, no money is ' +
+        'working for the group today.' });
+
+  acts.sort((x, y) => y.worth - x.worth);
+  el.innerHTML = '<div style="padding:6px 0">' + acts.map((a, i) =>
+    '<div style="padding:12px 16px;border-bottom:1px solid #EEF2FF">' +
+      '<div style="display:flex;gap:10px;align-items:baseline">' +
+        '<span style="font-weight:800;color:#1B5E34;font-size:13.5px">' + (i + 1) + '. ' + a.head + '</span>' +
+        (a.worth ? '<span style="margin-left:auto;font-weight:800;color:#B3402F;white-space:nowrap">' +
+          dmINR(a.worth) + ' at stake</span>' : '') +
+      '</div>' +
+      '<div style="margin-top:5px;font-size:12.5px;color:#334155;line-height:1.6">' + a.body + '</div>' +
+    '</div>').join('') + '</div>';
+}
+
 function renderDm(){
-  _dmMount();
-  _dmPost();
   try { renderDmSummary(); } catch(e){ console.error('dm summary:', e && e.message); }
+  try { dmRenderPast(); }     catch(e){ console.error('dm past:', e && e.message); }
+  try { dmRenderForecast(); } catch(e){ console.error('dm forecast:', e && e.message); }
+  try { dmRenderActions(); }  catch(e){ console.error('dm actions:', e && e.message); }
 }
 
 var _sylRetried = false, _sylStaleRetried = false;
