@@ -18260,17 +18260,19 @@ function dmAdmissionFigures(branch){
       level: 'campaign',
       spend: camps.reduce((t, r) => t + (r.spend || 0) / share(r), 0),
       leads: camps.reduce((t, r) => t + (r.results || 0) / share(r), 0),
+      impr:  camps.reduce((t, r) => t + (r.impr || 0) / share(r), 0),
       rows: camps
     };
   }
   /* Nothing identifiable at campaign level — look one level down. */
   const sets = recs.filter(r => r.level === 'Ad set' && inBranch(r) &&
     r.isLead && !dmIsHiringName(r.name) && !dmIsBrandName(r.name));
-  if (!sets.length) return { level: 'none', spend: 0, leads: 0, rows: [] };
+  if (!sets.length) return { level: 'none', spend: 0, leads: 0, impr: 0, rows: [] };
   return {
     level: 'adset',
     spend: sets.reduce((t, r) => t + (r.spend || 0) / share(r), 0),
     leads: sets.reduce((t, r) => t + (r.results || 0) / share(r), 0),
+    impr:  sets.reduce((t, r) => t + (r.impr || 0) / share(r), 0),
     rows: sets
   };
 }
@@ -18287,7 +18289,7 @@ function renderDmSummary(){
   const inr = v => '\u20b9' + Math.round(v).toLocaleString('en-IN');
   const NA  = '<span style="color:#94A3B8">N/A</span>';
 
-  let body = '', tSpend = 0, tLeads = 0, anyFallback = false;
+  let body = '', tSpend = 0, tLeads = 0, tImpr = 0, anyFallback = false;
 
   branches.forEach(b => {
     ['Google', 'Meta'].forEach((plat, pi) => {
@@ -18299,7 +18301,7 @@ function renderDmSummary(){
       if (plat === 'Google'){
         /* No Google export exists in the workbook. Not zero — absent. */
         body += '<tr>' + first + '<td style="text-align:left">Google</td>' +
-          '<td colspan="5" style="text-align:center;color:#94A3B8;font-size:11.5px">' +
+          '<td colspan="6" style="text-align:center;color:#94A3B8;font-size:11.5px">' +
           'no Google Ads data in the system</td></tr>';
         return;
       }
@@ -18307,12 +18309,12 @@ function renderDmSummary(){
       const f = dmAdmissionFigures(b);
       if (f.level === 'none'){
         body += '<tr><td style="text-align:left">Meta</td>' +
-          '<td colspan="5" style="text-align:center;color:#94A3B8;font-size:11.5px">' +
+          '<td colspan="6" style="text-align:center;color:#94A3B8;font-size:11.5px">' +
           'no admission campaign in this export</td></tr>';
         return;
       }
       if (f.level === 'adset') anyFallback = true;
-      tSpend += f.spend; tLeads += f.leads;
+      tSpend += f.spend; tLeads += f.leads; tImpr += (f.impr || 0);
 
       const mark = f.level === 'adset'
         ? '<sup style="color:#B3402F;font-weight:800" title="Taken at ad-set level — see the note below">&dagger;</sup>'
@@ -18328,26 +18330,40 @@ function renderDmSummary(){
         '<td style="text-align:right;font-weight:700;color:' +
           (cpl === null ? '#94A3B8' : cpl > 200 ? '#DC2626' : cpl > 120 ? '#D97706' : '#059669') + '">' +
           (cpl === null ? NA : inr(cpl)) + '</td>' +
+        '<td style="text-align:right;color:#64748B">' + Math.round(f.impr || 0).toLocaleString('en-IN') + '</td>' +
         '<td style="text-align:right">' + NA + '</td>' +
         '<td style="text-align:right">' + NA + '</td></tr>';
     });
   });
 
   el.innerHTML =
+    /* "Admission leads", not "Admissions". What the platform returns is an
+       ENQUIRY — a parent who filled the form. An admission is a child who
+       enrolled and paid. Labelling the first as the second overstates what the
+       advertising achieved by whatever the conversion rate happens to be, and
+       that rate is currently unknown. The two are separate columns. */
     '<thead><tr><th style="text-align:left">Branch</th><th style="text-align:left">Digital marketing</th>' +
-    '<th style="text-align:right">Amount spent</th><th style="text-align:right">Leads</th>' +
-    '<th style="text-align:right">CPL</th><th style="text-align:right">Admissions</th>' +
-    '<th style="text-align:right">CPA</th></tr></thead><tbody>' + body +
+    '<th style="text-align:right">Amount spent</th>' +
+    '<th style="text-align:right" title="Enquiries from admission campaigns — a parent who filled the lead form. Not an enrolment.">Admission leads</th>' +
+    '<th style="text-align:right" title="Amount spent \u00f7 admission leads">CPL</th>' +
+    '<th style="text-align:right">Impressions</th>' +
+    '<th style="text-align:right" title="Children actually enrolled from these campaigns">Admissions (enrolled)</th>' +
+    '<th style="text-align:right" title="Amount spent \u00f7 admissions enrolled">CPA</th></tr></thead><tbody>' + body +
     '<tr style="background:#F8FAFF;border-top:2px solid #E0E8FF;font-weight:800">' +
     '<td colspan="2" style="text-align:left">All branches</td>' +
     '<td style="text-align:right">' + inr(tSpend) + '</td>' +
     '<td style="text-align:right">' + Math.round(tLeads).toLocaleString('en-IN') + '</td>' +
     '<td style="text-align:right">' + (tLeads ? inr(tSpend / tLeads) : NA) + '</td>' +
+    '<td style="text-align:right">' + Math.round(tImpr).toLocaleString('en-IN') + '</td>' +
     '<td style="text-align:right">' + NA + '</td><td style="text-align:right">' + NA + '</td>' +
     '</tr></tbody>' +
-    '<tfoot><tr><td colspan="7" style="text-align:left;font-size:11.5px;color:#475569;padding:9px 10px;line-height:1.65">' +
+    '<tfoot><tr><td colspan="8" style="text-align:left;font-size:11.5px;color:#475569;padding:9px 10px;line-height:1.65">' +
+      '<b>Admission leads are enquiries, not enrolments.</b> A lead is a parent who filled the form; an ' +
+      'admission is a child who joined. The two are different numbers and are kept in separate columns \u2014 ' +
+      'calling leads "admissions" would overstate what the advertising achieved by whatever the conversion ' +
+      'rate turns out to be.<br>' +
       '<b>Admissions and CPA read N/A on purpose.</b> The enquiry tracker records a lead\'s channel as ' +
-      '"Digital", never as Meta or Google, so no admission can be traced back to a platform. Nothing here is ' +
+      '"Digital", never as Meta or Google, so no enrolment can be traced back to a platform. Nothing here is ' +
       'estimated.' +
       (anyFallback
         ? '<br><b>&dagger; Taken at ad-set level.</b> DDC files Pocharam\'s and Gowdavalli\'s advertising inside ' +
