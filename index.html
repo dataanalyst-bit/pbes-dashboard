@@ -740,7 +740,7 @@ const DATA_API = '/api/data';   // server-side proxy — no Apps Script URL in t
 const AUTO_REFRESH_SECONDS = 120;
 
 // ---- Global data arrays (populated by fetch, read by renderAll) ----
-let OBS_LOG = [], SCORE_SLIM = null, GO_DATA = [], GRIEVANCE_DATA = [], ADM_TRENDS = [], MONTH_CONFIG = {}, ALL_TEACHER = [], CARE_DATA = [], OBS_DATA = [], ADMIN_DATA = [], PUR_DATA = [], DM_DATA = [],
+let OBS_LOG = [], ADMP_DATA = [], SCORE_SLIM = null, GO_DATA = [], GRIEVANCE_DATA = [], ADM_TRENDS = [], MONTH_CONFIG = {}, ALL_TEACHER = [], CARE_DATA = [], OBS_DATA = [], ADMIN_DATA = [], PUR_DATA = [], DM_DATA = [],
     HR_RECORDS = [], VIG_DATA = [], TRACKER = [],
     ADM1_DATA = [], ADM2_DATA = [], LEAD_DATES = [],
     LEAD_SUMMARY = {}, OWNER_STATS = [], COMBINED_ADM = [],
@@ -885,6 +885,7 @@ function applyLiveData(data){
     if (data.VIG_DATA)         VIG_DATA         = data.VIG_DATA;
     if (data.DM_DATA)          DM_DATA          = data.DM_DATA;
     if (data.OBS_LOG)          OBS_LOG          = data.OBS_LOG;
+    if (data.ADMP_DATA)        ADMP_DATA        = data.ADMP_DATA;
     /* Head-to-head feed for every branch, names and free text already stripped. */
     if (data.SCORE_SLIM)       SCORE_SLIM       = data.SCORE_SLIM;
     if (data.ADM1_DATA)        ADM1_DATA        = data.ADM1_DATA;
@@ -942,7 +943,7 @@ const ROLE_TABS = {
      were invisible to principals — including the Team Activity tab they are
      expected to file their own observations into. Both are branch-filtered
      server-side, so a principal sees only their own campus. */
-  principal:         ['overview','glance','activity','care','observations','admissions','grievance',
+  principal:         ['overview','glance','admp','care','observations','admissions','grievance',
                       'transport','it','pt1','audit','ptm','civil','syl','meet','kptm',
                       /* A principal is accountable for admin tasks, safety issues and vacancies at
                          their own campus, so they need these three. All are branch-filtered
@@ -1120,7 +1121,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="sn-scroll">
     <div class="sn-grp">Overview</div>
     <button class="tb active" onclick="showTab('overview',this)" title="Executive Overview"><span class="ic">📊</span><span class="lb">Executive Overview</span></button>
-    <button class="tb" onclick="showTab('activity',this)" title="Team Activity"><span class="ic">🧭</span><span class="lb">Team Activity</span></button>
+    <button class="tb" onclick="showTab('admp',this)" title="Admission Process"><span class="ic">🧾</span><span class="lb">Admission Process</span></button>
     <button class="tb" onclick="showTab('glance',this)" title="Consolidated Glance"><span class="ic">🗂️</span><span class="lb">Consolidated Glance</span></button>
     <button class="tb" onclick="showTab('meet',this)" title="Meeting Actions"><span class="ic">🎙️</span><span class="lb">Meeting Actions</span></button>
     <div class="sn-grp">Academics</div>
@@ -1784,38 +1785,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="cb-0" style="overflow-x:auto"><table class="dt" id="admin-matrix"></table></div>
   </div>
 </div>
-<div id="pane-activity" class="pane">
+<div id="pane-admp" class="pane">
   <div class="exm-head">
-    <h2 style="margin:0;font-size:20px;font-weight:800">Team Activity</h2>
-    <span class="exm-sub" id="ta-meta"></span>
+    <h2 style="margin:0;font-size:20px;font-weight:800">Admission Process</h2>
+    <span class="exm-sub" id="admp-meta"></span>
   </div>
 
   <div class="card" style="margin-bottom:16px;"><div class="ch">
-      <h3>&#129517; Who is working the dashboard</h3>
-      <span class="fnote">Entries submitted from each tab, by person. This counts what people have WRITTEN DOWN,
-        which is not the same as what they have read &mdash; someone can study a tab closely and record nothing.
-        Read it as a record of follow-up, not of attention.</span></div>
-    <div class="cb-0" style="overflow-x:auto"><table class="dt" id="ta-people"></table></div>
+      <h3>&#128203; 17-point readiness &mdash; branch by branch</h3>
+      <span class="fnote">Every monitoring point for every branch. The colour is the status; the dot marks a point
+        that carries a next action or a remark. Click any cell for what was written against it.</span></div>
+    <div class="cb-0" style="overflow-x:auto"><table class="dt" id="admp-matrix"></table></div>
   </div>
 
   <div class="card" style="margin-bottom:16px;"><div class="ch">
-      <h3>&#128202; Which tabs are being acted on</h3>
-      <span class="fnote">Entries per tab. A tab nobody writes about is either fine, or not being looked at
-        &mdash; the count alone cannot tell you which.</span></div>
-    <div class="cb-0" style="overflow-x:auto"><table class="dt" id="ta-tabs"></table></div>
-  </div>
-
-  <div class="card" style="margin-bottom:16px;"><div class="ch">
-      <h3>&#9203; Still open</h3>
-      <span class="fnote">Observations with an action recorded but not yet closed, oldest first. Click a row
-        to mark it closed.</span></div>
-    <div class="cb-0" id="ta-open"></div>
-  </div>
-
-  <div class="card" style="margin-bottom:16px;"><div class="ch">
-      <h3>&#128220; Everything recorded</h3>
-      <span class="fnote">The full log, newest first.</span></div>
-    <div class="cb-0" id="ta-all"></div>
+      <h3>&#128221; What each branch says it is doing</h3>
+      <span class="fnote">The next actions and remarks, which is where this sheet actually holds its information &mdash;
+        the counts are still zero almost everywhere. Points with nothing written are listed at the end.</span></div>
+    <div class="cb-0" id="admp-notes"></div>
   </div>
 </div>
 
@@ -9627,6 +9614,159 @@ async function taClose(ts){
   }catch(e){ alert('Could not close this entry: ' + (e && e.message || e)); }
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   ADMISSION PROCESS — 17-point readiness, branch by branch.
+
+   The counts on this sheet are almost all zero, so a progress-percentage view
+   would report 0% everywhere and say nothing. What the sheet actually carries
+   is WRITTEN: a status, a next action, a remark. The matrix therefore shows
+   status, and marks which cells have something written behind them.          */
+
+const ADMP_STATUS = {
+  'completed':   { c: '#059669', bg: '#ECFDF5', s: 'Done' },
+  'in progress': { c: '#D97706', bg: '#FFFBEB', s: 'WIP' },
+  'not started': { c: '#DC2626', bg: '#FEF2F2', s: '—' }
+};
+function admpStatus(v){
+  const t = String(v || '').trim().toLowerCase();
+  return ADMP_STATUS[t] || { c: '#64748B', bg: '#F8FAFC', s: (v || '?') };
+}
+function admpRows(){
+  const rows = (typeof ADMP_DATA !== 'undefined' && Array.isArray(ADMP_DATA)) ? ADMP_DATA : [];
+  if (typeof fBranch !== 'undefined' && fBranch !== 'ALL') return rows.filter(r => r.Branch === fBranch);
+  return rows;
+}
+function admpEsc(v){ return String(v == null ? '' : v).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+function renderAdmProcess(){
+  const rows = admpRows();
+  const host = document.getElementById('admp-matrix');
+  const meta = document.getElementById('admp-meta');
+  if (!host) return;
+
+  if (!rows.length){
+    host.innerHTML = '<tbody><tr><td class="no-data">No rows from the Admission Process sheet. ' +
+      'Run testAdmProcess() in the Apps Script editor to see what it found.</td></tr></tbody>';
+    if (meta) meta.textContent = '';
+    const nh = document.getElementById('admp-notes'); if (nh) nh.innerHTML = '';
+    return;
+  }
+
+  /* Points in their sheet order, keyed by S.No so the columns stay stable even
+     if one branch is missing a row. */
+  const points = [];
+  rows.forEach(r => {
+    const n = parseInt(r.SNo, 10);
+    const key = isNaN(n) ? r.Point : n;
+    if (!points.some(p => p.key === key)) points.push({ key: key, no: isNaN(n) ? 99 : n, name: r.Point });
+  });
+  points.sort((a, b) => a.no - b.no);
+
+  const order = ['Bachupally', 'Boduppal', 'Gowdavalli', 'Keesara', 'Pocharam'];
+  const seen = {};
+  rows.forEach(r => seen[r.Branch] = 1);
+  const branches = order.filter(b => seen[b]).concat(Object.keys(seen).filter(b => order.indexOf(b) < 0).sort());
+
+  const find = (b, p) => rows.find(r => r.Branch === b &&
+    ((parseInt(r.SNo, 10) === p.key) || r.Point === p.name));
+
+  let body = '';
+  branches.forEach(b => {
+    let done = 0, wip = 0;
+    const tds = points.map(p => {
+      const r = find(b, p);
+      if (!r) return '<td style="background:#FAFAFA;color:#CBD5E1">–</td>';
+      const st = admpStatus(r.Status);
+      if (st.s === 'Done') done++; else if (st.s === 'WIP') wip++;
+      const hasText = !!(String(r.Next || '').trim() || String(r.Remarks || '').trim());
+      return '<td style="background:' + st.bg + ';color:' + st.c + ';font-weight:700;cursor:pointer" ' +
+        'title="' + admpEsc(r.Point + ' — ' + r.Status) + '" ' +
+        'onclick="admpCell(\'' + String(b).replace(/'/g, "\\'") + '\',' + JSON.stringify(p.key) + ')">' +
+        st.s + (hasText ? '<sup style="color:#1E4FD8">&bull;</sup>' : '') + '</td>';
+    }).join('');
+    body += '<tr><td style="text-align:left;font-weight:700;white-space:nowrap">' +
+      '<span class="bd b' + b + '"></span> ' + b + '</td>' + tds +
+      '<td style="border-left:2px solid #E0E8FF;font-weight:800;color:#059669">' + done + '</td>' +
+      '<td style="font-weight:700;color:#D97706">' + wip + '</td>' +
+      '<td style="font-weight:700;color:#DC2626">' + (points.length - done - wip) + '</td></tr>';
+  });
+
+  host.innerHTML =
+    '<thead><tr><th style="text-align:left">Branch</th>' +
+    points.map(p => '<th style="font-size:10px;line-height:1.3;min-width:74px" title="' + admpEsc(p.name) + '">' +
+      (p.no === 99 ? '' : p.no + '. ') + admpEsc(p.name) + '</th>').join('') +
+    '<th style="border-left:2px solid #E0E8FF">Done</th><th>WIP</th><th>Not started</th>' +
+    '</tr></thead><tbody>' + body + '</tbody>';
+
+  if (meta) meta.textContent = branches.length + ' branches · ' + points.length + ' monitoring points · ' +
+    rows.filter(r => String(r.Next || '').trim() || String(r.Remarks || '').trim()).length + ' carry a written update';
+
+  renderAdmpNotes(rows, branches, points);
+}
+
+function renderAdmpNotes(rows, branches, points){
+  const host = document.getElementById('admp-notes');
+  if (!host) return;
+  let html = '';
+  branches.forEach(b => {
+    const mine = rows.filter(r => r.Branch === b);
+    const withText = mine.filter(r => String(r.Next || '').trim() || String(r.Remarks || '').trim());
+    const silent = mine.filter(r => !(String(r.Next || '').trim() || String(r.Remarks || '').trim()));
+    html += '<div style="padding:12px 16px;border-bottom:1px solid #EEF2FF">' +
+      '<div style="font-weight:800;color:#1B5E34;font-size:13.5px;margin-bottom:6px">' +
+        '<span class="bd b' + b + '"></span> ' + b +
+        '<span style="font-weight:400;color:#94A3B8;font-size:11.5px"> · ' + withText.length +
+        ' of ' + mine.length + ' points have something written</span></div>' +
+      (withText.length
+        ? withText.map(r => {
+            const st = admpStatus(r.Status);
+            return '<div style="margin:5px 0 5px 4px;font-size:12.5px;line-height:1.6">' +
+              '<span style="font-weight:700">' + admpEsc(r.Point) + '</span> ' +
+              '<span style="color:' + st.c + ';font-size:11px;font-weight:700">' + admpEsc(r.Status) + '</span>' +
+              (r.Owner ? '<span style="color:#94A3B8;font-size:11px"> · ' + admpEsc(r.Owner) + '</span>' : '') +
+              (r.Due ? '<span style="color:#94A3B8;font-size:11px"> · due ' + admpEsc(r.Due) + '</span>' : '') +
+              (r.Next ? '<br><span style="color:#334155">' + admpEsc(r.Next) + '</span>' : '') +
+              (r.Remarks ? '<br><span style="color:#64748B;font-size:12px">' + admpEsc(r.Remarks) + '</span>' : '') +
+              '</div>';
+          }).join('')
+        : '<div style="color:#B3402F;font-size:12.5px">Nothing written against any of its ' + mine.length +
+          ' points. The sheet cannot say whether the work has not started or simply has not been recorded.</div>') +
+      (silent.length && withText.length
+        ? '<div style="margin-top:7px;color:#94A3B8;font-size:11.5px">Nothing written against: ' +
+          silent.map(r => admpEsc(r.Point)).join(', ') + '</div>'
+        : '') +
+      '</div>';
+  });
+  host.innerHTML = html;
+}
+
+function admpCell(branch, key){
+  const r = admpRows().find(x => x.Branch === branch &&
+    ((parseInt(x.SNo, 10) === key) || x.Point === key));
+  if (!r) return;
+  const st = admpStatus(r.Status);
+  const line = (label, val, col) => val
+    ? '<tr><td style="padding:6px 10px;color:#64748B;white-space:nowrap;vertical-align:top">' + label +
+      '</td><td style="padding:6px 10px;color:' + (col || '#1F2937') + '">' + admpEsc(val) + '</td></tr>'
+    : '';
+  openHTMLModal('\uD83E\uDDFE ' + branch + ' \u2014 ' + r.Point,
+    r.Status + (r.Owner ? ' \u00b7 ' + r.Owner : ''),
+    '<div style="padding:14px 16px">' +
+      '<div style="font-size:12.5px;color:#475569;margin-bottom:10px">' + admpEsc(r.What) + '</div>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:12.5px">' +
+        line('Status', r.Status, st.c) + line('Owner', r.Owner) +
+        line('Target', r.Target) + line('Actual', r.Actual) +
+        line('Due date', r.Due) + line('Priority', r.Priority) +
+        line('Next action', r.Next) + line('Remarks', r.Remarks) +
+        line('Support needed', r.Support, '#B3402F') +
+        line('Last updated', r.Updated) +
+      '</table>' +
+      (!(String(r.Next || '').trim() || String(r.Remarks || '').trim())
+        ? '<div style="margin-top:10px;color:#B3402F;font-size:12px">Nothing has been written against this point.</div>'
+        : '') +
+    '</div>', null);
+}
+
 var _RENDERERS = {
   overview:      ['Overview', function(){ renderOverview(); renderRankings(); renderInsights(); }],
   care:          ['Care', function(){ renderCare(); }],
@@ -9641,7 +9781,7 @@ var _RENDERERS = {
   hr:            ['HR', function(){ renderHR(); }],
   dm:            ['Digital Marketing', function(){ renderDm(); }],
   glance:        ['Consolidated Glance', function(){ renderConsolidated(); }],
-  activity:      ['Team Activity', function(){ renderActivity(); }]
+  admp:          ['Admission Process', function(){ renderAdmProcess(); }]
 };
 var _stale = {};
 function _currentTab(){
