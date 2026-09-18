@@ -9010,18 +9010,57 @@ function renderITMonthly(){
   const cellHtml = (b, sys, mk) => {
     const rows = health.filter(r => r.Branch === b && r.System === sys && itMonthKey(r.Date) === mk);
     if (!rows.length) return '<td style="color:#CBD5E1" title="not checked this month">–</td>';
-    const work = rows.reduce((a, r) => a + (r.Working || 0), 0);
-    const own  = master[b + '|' + sys];
-    const tot  = (own !== undefined && own !== null) ? own
-                                                     : rows.reduce((a, r) => a + (r.Total || 0), 0);
+    const work  = rows.reduce((a, r) => a + (r.Working || 0), 0);
+    const check = rows.reduce((a, r) => a + (r.Total || 0), 0);   // what the month's own check says
+    const own   = master[b + '|' + sys];                          // what the asset master says
+
+    /* THE MONTH'S OWN CHECK IS THE DENOMINATOR.
+
+       It used to be the asset master, which is a different sheet maintained at a
+       different time. Where the two disagreed the cell read things like
+       "203/195" — more computers working than the school owns, which is not a
+       state the world can be in. A count of working machines and the count they
+       were drawn from have to come from the same observation.
+
+       The master is still used when the check records no total of its own, and
+       a disagreement between the two is reported below rather than hidden: it
+       means one of the two sheets is out of date, and IT needs to know which. */
+    let tot = check > 0 ? check : ((own !== undefined && own !== null) ? own : 0);
+    let note = '';
+    if (check > 0 && own !== undefined && own !== null && own !== check){
+      note = ' · asset master says ' + own + ' — the two sheets disagree';
+      mismatches.push({ Branch: b, System: sys, Month: itMonthLabel(mk),
+        Checked: check, Master: own, Difference: check - own, Working: work });
+    }
+    /* Everything the check physically accounted for. Flooring at `work` alone
+       lost the machines it recorded as broken — a check reporting 84 working
+       and 2 down against a stale total of 50 came out as "84 of 84", quietly
+       dropping the two faults and showing a perfect 100%. The floor has to
+       include them. */
+    const down = rows.reduce((a, r) => a + (r.NotWorking || 0), 0);
+    const pend = rows.reduce((a, r) => a + (r.Pending || 0), 0);
+    const counted = work + down + pend;
+    if (counted > tot){
+      /* The check contradicts itself, or the total it carried is stale. Report
+         it rather than quietly capping: a row where the parts exceed the whole
+         is something somebody must correct at source. */
+      note += ' · the check accounted for ' + counted + ' units against a recorded total of ' + tot;
+      mismatches.push({ Branch: b, System: sys, Month: itMonthLabel(mk),
+        Checked: tot, Master: (own === undefined ? '–' : own), Difference: counted - tot,
+        Working: work, Issue: 'parts exceed the recorded total' });
+      tot = counted;
+    }
     const pct = tot ? work / tot * 100 : null;
     const col = pct === null ? '#64748B' : pct >= 95 ? '#059669' : pct >= 80 ? '#D97706' : '#DC2626';
-    const src = (own !== undefined && own !== null) ? '' : ' · total from this month\'s check, not the asset master';
+    const src = note || ((check > 0) ? '' : ' · total from the asset master; this check recorded none');
     return '<td style="font-weight:700;color:' + col + ';cursor:pointer" ' +
       'title="' + work + ' working of ' + tot + (pct === null ? '' : ' · ' + Math.round(pct) + '%') + src + '" ' +
       'onclick="viewITMonth(\'' + b.replace(/'/g, "\\'") + '\',\'' + sys.replace(/'/g, "\\'") + '\',\'' + mk + '\')">' +
       work + '/' + tot + '</td>';
   };
+
+  /* Collected while the cells are drawn, reported underneath. */
+  const mismatches = [];
 
   host.innerHTML = months.map(mk => {
     let rows = '';
@@ -9038,9 +9077,20 @@ function renderITMonthly(){
         const rs = health.filter(r => r.Branch === b && r.System === sys && itMonthKey(r.Date) === mk);
         if (!rs.length) return;
         seen = true;
-        w += rs.reduce((a, r) => a + (r.Working || 0), 0);
+        const bw = rs.reduce((a, r) => a + (r.Working || 0), 0);
+        const bd = rs.reduce((a, r) => a + (r.NotWorking || 0), 0);
+        const bp = rs.reduce((a, r) => a + (r.Pending || 0), 0);
+        const bc = rs.reduce((a, r) => a + (r.Total || 0), 0);
         const own = master[b + '|' + sys];
-        t += (own !== undefined && own !== null) ? own : rs.reduce((a, r) => a + (r.Total || 0), 0);
+        /* Exactly the rule the cells use — largest of the register, the check's
+           own total, and what was physically counted — so this row can never
+           contradict the rows it totals. */
+        /* Same rule as the cells: the check's own total, the master only when
+           the check carried none, and never less than what was accounted for. */
+        let bt = bc > 0 ? bc : ((own !== undefined && own !== null) ? own : 0);
+        const bcount = bw + bd + bp;
+        if (bcount > bt) bt = bcount;
+        w += bw; t += bt;
       });
       foot += '<td style="font-weight:800">' + (seen ? w + '/' + t : '–') + '</td>';
     });
@@ -9059,6 +9109,44 @@ function renderITMonthly(){
       '<td style="text-align:left;font-weight:800">All branches</td>' + foot + '</tr>' +
       '</tbody></table></div>';
   }).join('');
+
+  /* A disagreement between the monthly check and the asset master is a data
+     problem, not a display problem — it means one of the two sheets is out of
+     date. Naming the rows is what lets IT fix it; hiding it just moves the
+     wrong number somewhere else. */
+  if (mismatches.length){
+    const seen = {}, uniq = [];
+    mismatches.forEach(m => {
+      const k = m.Branch + '|' + m.System + '|' + m.Month;
+      if (!seen[k]) { seen[k] = 1; uniq.push(m); }
+    });
+    host.innerHTML +=
+      '<div style="margin:6px 18px 18px;padding:11px 14px;background:#FFF7ED;border:1px solid #FED7AA;' +
+        'border-radius:8px;color:#9A3412;font-size:12.5px;line-height:1.6;cursor:pointer" ' +
+        'onclick="viewITMismatch()">' +
+        '<b>' + uniq.length + ' asset count' + (uniq.length === 1 ? '' : 's') +
+        ' disagree between the monthly check and the IT Assets master.</b> ' +
+        'Where they disagree the larger count is used, so a cell can never read more working than it has ' +
+        'assets. A register smaller than the check usually means equipment was added and never registered. ' +
+        'Click to see which branches and systems, and reconcile the two sheets.' +
+      '</div>';
+    window._IT_MISMATCH = uniq;
+  } else {
+    window._IT_MISMATCH = [];
+  }
+}
+
+function viewITMismatch(){
+  const rows = window._IT_MISMATCH || [];
+  openModal('\u26a0\ufe0f Asset counts that disagree between sheets',
+    rows.length + ' branch/system combination(s)', rows,
+    [{key:'Branch',label:'Branch'},{key:'System',label:'System'},{key:'Month',label:'Month'},
+     {key:'Working',label:'Working'},{key:'Checked',label:'Total in the check'},
+     {key:'Master',label:'Total in asset master'},{key:'Difference',label:'Difference'},
+     {key:'Issue',label:'Note'}],
+    { expr: 'rows where the monthly check\'s total differs from the IT Assets master, or where working exceeds the total recorded',
+      work: rows.length + ' combination(s) affected',
+      note: 'The matrix uses the month\'s own check, because the working count comes from the same observation. Where the master is the more current figure, update the check; where the check is right, update the master.' });
 }
 
 function viewITMonth(branch, system, mk){
