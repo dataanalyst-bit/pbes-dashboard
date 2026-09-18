@@ -9645,10 +9645,30 @@ function renderAdmProcess(){
   if (!host) return;
 
   if (!rows.length){
-    host.innerHTML = '<tbody><tr><td class="no-data">No rows from the Admission Process sheet. ' +
-      'Run testAdmProcess() in the Apps Script editor to see what it found.</td></tr></tbody>';
-    if (meta) meta.textContent = '';
-    const nh = document.getElementById('admp-notes'); if (nh) nh.innerHTML = '';
+    /* Three different causes, three different fixes — say which one this is
+       rather than leaving the reader to guess. */
+    const present = (typeof ADMP_DATA !== 'undefined') && Array.isArray(ADMP_DATA);
+    const anyRows = present && ADMP_DATA.length > 0;
+    let why;
+    if (!present || !anyRows){
+      why = '<b>The payload carries no Admission Process rows.</b><br><br>' +
+        'The rest of the dashboard has loaded, so the connection is fine \u2014 this feed is simply not in ' +
+        'the reply. Apps Script has almost certainly not been redeployed since this tab was added: use ' +
+        '<b>Deploy \u2192 Manage deployments \u2192 edit the existing deployment \u2192 New version</b>, then ' +
+        'press Refresh here.<br><br>' +
+        'If it has been redeployed, run <code>testAdmProcess()</code> in the editor. It prints the row count ' +
+        'and the branches it found, which will show whether the sheet name still matches ' +
+        '<b>&ldquo;Admission Process&rdquo;</b>.';
+    } else {
+      why = '<b>No rows for this selection.</b> The sheet has ' + ADMP_DATA.length +
+        ' rows, but none for the branch currently chosen in the header. Switch to All Branches to see them.';
+    }
+    host.innerHTML = '<tbody><tr><td style="padding:20px;color:#B3402F;font-size:13px;line-height:1.7;text-align:left">' +
+      why + '</td></tr></tbody>';
+    if (meta) meta.textContent = present ? ADMP_DATA.length + ' rows in the payload' : 'feed not in this payload';
+    const nh = document.getElementById('admp-notes');
+    if (nh) nh.innerHTML = '<div style="padding:18px;color:#64748B;font-size:12.5px">' +
+      'Nothing to show until the feed arrives.</div>';
     return;
   }
 
