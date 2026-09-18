@@ -360,6 +360,7 @@ function filterByBranch(data, branch) {
     "CARE_DATA", "GO_DATA", "GRIEVANCE_DATA", "ADM_TRENDS", "ALL_TEACHER",
     "ADMIN_DATA", "PUR_DATA", "VIG_DATA", "OWNER_STATS",
     "COMBINED_ADM", "ADM1_DATA", "ADM2_DATA", "LEAD_DATES", "AVIS_DATA",
+    "ADMP_DATA",
   ];
   /* The observation log: a branch account sees its own branch's entries plus
      anything filed by a group-wide account (which carries no branch), since
