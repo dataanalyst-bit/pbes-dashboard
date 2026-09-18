@@ -1785,6 +1785,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="cb-0" style="overflow-x:auto"><table class="dt" id="admin-matrix"></table></div>
   </div>
 </div>
+<style>
+  /* The branch column stays put while the 17 point columns scroll sideways.
+     Without it the branch name slides off and a reader cannot tell which row
+     they are reading. */
+  table.admpfreeze th:first-child, table.admpfreeze td:first-child{
+    position:sticky; left:0; z-index:2; background:#fff; box-shadow:1px 0 0 #E0E8FF;
+  }
+  table.admpfreeze thead th:first-child{ z-index:3; background:#F8FAFF; }
+</style>
 <div id="pane-admp" class="pane">
   <div class="exm-head">
     <h2 style="margin:0;font-size:20px;font-weight:800">Admission Process</h2>
@@ -1795,7 +1804,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       <h3>&#128203; 17-point readiness &mdash; branch by branch</h3>
       <span class="fnote">Every monitoring point for every branch. The colour is the status; the dot marks a point
         that carries a next action or a remark. Click any cell for what was written against it.</span></div>
-    <div class="cb-0" style="overflow-x:auto"><table class="dt" id="admp-matrix"></table></div>
+    <div class="cb-0" style="overflow-x:auto"><table class="dt admpfreeze" id="admp-matrix"></table></div>
   </div>
 
   <div class="card" style="margin-bottom:16px;"><div class="ch">
@@ -9622,14 +9631,22 @@ async function taClose(ts){
    is WRITTEN: a status, a next action, a remark. The matrix therefore shows
    status, and marks which cells have something written behind them.          */
 
+/* The status is shown as the sheet writes it. It used to be abbreviated to
+   "WIP" and "—", which saved a little width and cost the reader the actual
+   word — and "—" for Not Started was indistinguishable from the dash used for
+   a missing row. */
 const ADMP_STATUS = {
-  'completed':   { c: '#059669', bg: '#ECFDF5', s: 'Done' },
-  'in progress': { c: '#D97706', bg: '#FFFBEB', s: 'WIP' },
-  'not started': { c: '#DC2626', bg: '#FEF2F2', s: '—' }
+  'completed':   { c: '#059669', bg: '#ECFDF5' },
+  'in progress': { c: '#D97706', bg: '#FFFBEB' },
+  'not started': { c: '#DC2626', bg: '#FEF2F2' },
+  'on hold':     { c: '#7C3AED', bg: '#F5F3FF' },
+  'blocked':     { c: '#B3402F', bg: '#FEF2F2' }
 };
 function admpStatus(v){
-  const t = String(v || '').trim().toLowerCase();
-  return ADMP_STATUS[t] || { c: '#64748B', bg: '#F8FAFC', s: (v || '?') };
+  const raw = String(v || '').trim();
+  const hit = ADMP_STATUS[raw.toLowerCase()];
+  return { c: hit ? hit.c : '#64748B', bg: hit ? hit.bg : '#F8FAFC',
+           s: raw || 'Not recorded', done: /completed/i.test(raw), wip: /in progress/i.test(raw) };
 }
 function admpRows(){
   const rows = (typeof ADMP_DATA !== 'undefined' && Array.isArray(ADMP_DATA)) ? ADMP_DATA : [];
@@ -9697,12 +9714,14 @@ function renderAdmProcess(){
       const r = find(b, p);
       if (!r) return '<td style="background:#FAFAFA;color:#CBD5E1">–</td>';
       const st = admpStatus(r.Status);
-      if (st.s === 'Done') done++; else if (st.s === 'WIP') wip++;
+      if (st.done) done++; else if (st.wip) wip++;
       const hasText = !!(String(r.Next || '').trim() || String(r.Remarks || '').trim());
-      return '<td style="background:' + st.bg + ';color:' + st.c + ';font-weight:700;cursor:pointer" ' +
-        'title="' + admpEsc(r.Point + ' — ' + r.Status) + '" ' +
+      return '<td style="background:' + st.bg + ';color:' + st.c + ';font-weight:700;font-size:11.5px;' +
+        'white-space:nowrap;cursor:pointer" ' +
+        'title="' + admpEsc(r.Point + ' \u2014 ' + r.Status +
+          (r.Owner ? ' \u00b7 ' + r.Owner : '') + ' \u00b7 click for the full record') + '" ' +
         'onclick="admpCell(\'' + String(b).replace(/'/g, "\\'") + '\',' + JSON.stringify(p.key) + ')">' +
-        st.s + (hasText ? '<sup style="color:#1E4FD8">&bull;</sup>' : '') + '</td>';
+        admpEsc(st.s) + (hasText ? '<sup style="color:#1E4FD8">&bull;</sup>' : '') + '</td>';
     }).join('');
     body += '<tr><td style="text-align:left;font-weight:700;white-space:nowrap">' +
       '<span class="bd b' + b + '"></span> ' + b + '</td>' + tds +
@@ -9761,29 +9780,71 @@ function renderAdmpNotes(rows, branches, points){
 }
 
 function admpCell(branch, key){
-  const r = admpRows().find(x => x.Branch === branch &&
+  const rows = admpRows();
+  const r = rows.find(x => x.Branch === branch &&
     ((parseInt(x.SNo, 10) === key) || x.Point === key));
   if (!r) return;
   const st = admpStatus(r.Status);
-  const line = (label, val, col) => val
-    ? '<tr><td style="padding:6px 10px;color:#64748B;white-space:nowrap;vertical-align:top">' + label +
-      '</td><td style="padding:6px 10px;color:' + (col || '#1F2937') + '">' + admpEsc(val) + '</td></tr>'
+
+  /* Every column on the sheet is listed, including the empty ones. A blank
+     owner or a missing due date is itself the finding on a readiness tracker —
+     hiding empty fields would make an unassigned point look complete. */
+  const FIELDS = [
+    ['What to update',      r.What],
+    ['Current status',      r.Status,   st.c],
+    ['Owner / counsellor',  r.Owner],
+    ['Target',              r.Target],
+    ['Actual / count',      r.Actual],
+    ['Progress %',          r.Progress],
+    ['Next action / follow-up', r.Next],
+    ['Due date',            r.Due],
+    ['Priority',            r.Priority],
+    ['Remarks / evidence',  r.Remarks],
+    ['Management support required', r.Support, '#B3402F'],
+    ['Last updated',        r.Updated]
+  ];
+  const missing = [];
+  const body = FIELDS.map(f => {
+    const val = String(f[1] == null ? '' : f[1]).trim();
+    if (!val) missing.push(f[0]);
+    return '<tr>' +
+      '<td style="padding:7px 12px;color:#64748B;white-space:nowrap;vertical-align:top;width:190px;' +
+        'border-bottom:1px solid #F1F5F9">' + f[0] + '</td>' +
+      '<td style="padding:7px 12px;vertical-align:top;border-bottom:1px solid #F1F5F9;' +
+        'color:' + (val ? (f[2] || '#1F2937') : '#CBD5E1') + ';' +
+        (f[2] && val ? 'font-weight:700;' : '') + 'white-space:pre-wrap">' +
+        (val ? admpEsc(val) : 'not filled in') + '</td></tr>';
+  }).join('');
+
+  /* Where this point stands at the other branches — the comparison a reader
+     reaches for the moment they open one. */
+  const peers = rows.filter(x => x.Branch !== branch &&
+    ((parseInt(x.SNo, 10) === key) || x.Point === key));
+  const peerHtml = peers.length
+    ? '<div style="margin-top:14px"><div style="font-weight:800;color:#1B5E34;font-size:12px;' +
+        'text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Same point, other branches</div>' +
+      peers.map(x => {
+        const ps = admpStatus(x.Status);
+        return '<div style="display:flex;gap:10px;align-items:baseline;padding:4px 0;font-size:12.5px">' +
+          '<span style="min-width:110px;font-weight:700">' + admpEsc(x.Branch) + '</span>' +
+          '<span style="color:' + ps.c + ';font-weight:700;min-width:100px">' + admpEsc(ps.s) + '</span>' +
+          '<span style="color:#64748B">' + admpEsc(x.Next || x.Remarks || 'nothing written') + '</span></div>';
+      }).join('') + '</div>'
     : '';
-  openHTMLModal('\uD83E\uDDFE ' + branch + ' \u2014 ' + r.Point,
-    r.Status + (r.Owner ? ' \u00b7 ' + r.Owner : ''),
+
+  openHTMLModal('\uD83E\uDDFE ' + branch + ' \u2014 ' + (r.SNo ? r.SNo + '. ' : '') + r.Point,
+    st.s + (r.Owner ? ' \u00b7 ' + r.Owner : ' \u00b7 no owner named') +
+    (r.Due ? ' \u00b7 due ' + r.Due : ''),
     '<div style="padding:14px 16px">' +
-      '<div style="font-size:12.5px;color:#475569;margin-bottom:10px">' + admpEsc(r.What) + '</div>' +
-      '<table style="width:100%;border-collapse:collapse;font-size:12.5px">' +
-        line('Status', r.Status, st.c) + line('Owner', r.Owner) +
-        line('Target', r.Target) + line('Actual', r.Actual) +
-        line('Due date', r.Due) + line('Priority', r.Priority) +
-        line('Next action', r.Next) + line('Remarks', r.Remarks) +
-        line('Support needed', r.Support, '#B3402F') +
-        line('Last updated', r.Updated) +
-      '</table>' +
-      (!(String(r.Next || '').trim() || String(r.Remarks || '').trim())
-        ? '<div style="margin-top:10px;color:#B3402F;font-size:12px">Nothing has been written against this point.</div>'
+      '<table style="width:100%;border-collapse:collapse;font-size:12.5px">' + body + '</table>' +
+      (missing.length
+        ? '<div style="margin-top:12px;padding:9px 12px;background:#FFF7ED;border:1px solid #FED7AA;' +
+          'border-radius:8px;color:#9A3412;font-size:12px;line-height:1.6">' +
+          missing.length + ' of the ' + FIELDS.length + ' fields on this row are empty: <b>' +
+          missing.join(', ') + '</b>. On a readiness tracker an unfilled owner or due date is a finding ' +
+          'in itself, not a blank to skip past.</div>'
         : '') +
+      peerHtml +
     '</div>', null);
 }
 
