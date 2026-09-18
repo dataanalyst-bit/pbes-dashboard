@@ -17286,9 +17286,38 @@ function cgCollect(){
     const obsAvg = scored.length ? scored.reduce((a, r) => a + parseFloat(r.Score), 0) / scored.length : null;
 
     /* IT and transport are nested objects rather than flat arrays. */
-    const it = (window._IT && window._IT.health) ? window._IT.health.filter(r => r.Branch === b) : [];
-    const itTot = it.reduce((a, r) => a + cgNum(r.Total), 0);
+    /* IT records the same branch and system every month, so these rows are
+       SNAPSHOTS, not additions: 120 cameras in July and 120 in August is the
+       same 120 cameras. Adding every month together reported an estate several
+       times its real size. Each branch-and-system pair is reduced to its most
+       recent dated check, and that is the estate.
+
+       A row with no usable date cannot be placed in time; it is kept only when
+       the branch and system have no dated check at all, so a sheet without
+       dates still reports something rather than nothing. */
+    const itAll = (window._IT && window._IT.health) ? window._IT.health.filter(r => r.Branch === b) : [];
+    const itLatest = {};
+    itAll.forEach(r => {
+      const k = String(r.System || '');
+      const t = cgDate(r.Date);
+      const cur = itLatest[k];
+      if (!cur) { itLatest[k] = { t: t, r: r }; return; }
+      if (t !== null && (cur.t === null || t > cur.t)) itLatest[k] = { t: t, r: r };
+    });
+    const it = Object.keys(itLatest).map(k => itLatest[k].r);
+    const itTot = it.reduce((a, r) => {
+      /* Never fewer than the check itself accounted for, or a branch can show
+         more working assets than it owns. */
+      const counted = cgNum(r.Working) + cgNum(r.NotWorking) + cgNum(r.Pending);
+      return a + Math.max(cgNum(r.Total), counted);
+    }, 0);
     const itDown = it.reduce((a, r) => a + cgNum(r.NotWorking), 0);
+    const itMonth = (() => {
+      const ts = it.map(r => cgDate(r.Date)).filter(t => t !== null);
+      if (!ts.length) return '';
+      const d = new Date(Math.max.apply(null, ts));
+      return CG_MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+    })();
 
     const tr = (window._TRANSPORT && window._TRANSPORT.vehicles)
       ? window._TRANSPORT.vehicles.filter(r => r.Branch === b) : [];
@@ -17381,7 +17410,7 @@ function cgCollect(){
       obs: { done: obs.length, required: obsReq, avg: obsAvg, weak: obsWeak.length,
              rows: obs, weakRows: obsWeak },
       syl: syl,
-      it: { total: itTot, down: itDown, rows: it },
+      it: { total: itTot, down: itDown, rows: it, month: itMonth, allRows: itAll },
       tr: { vehicles: tr.length, expiring: trExp.length, expired: trExpired.length,
             rows: tr, expRows: trExp, expiredRows: trExpired },
       pur: { total: pur.length, open: purOpen.length, rows: pur, openRows: purOpen,
@@ -17763,14 +17792,22 @@ function cgCell(key, branch){
       { expr: 'open AND risk level Critical',
         work: d.vig.crit + ' of ' + d.vig.open + ' open · High risk is counted in its own column',
         note: 'Critical and High used to be added together under this heading, so a branch with no critical issues still showed a critical count. They are separate now.' });
+    case 'it': return T('IT assets', d.it.total + ' assets' + (d.it.month ? ' as at ' + d.it.month : ''),
+      d.it.rows, CG_COLS.it,
+      { expr: 'the most recent dated check for each system at this branch',
+        work: d.it.total + ' assets · ' + d.it.down + ' not working' + (d.it.month ? ' · ' + d.it.month : ''),
+        note: 'A monthly check records the standing count, not new purchases, so only the latest check counts. ' +
+              'Earlier months are history, not additions.' });
     case 'it-down': {
       /* Only the systems with something actually down. Listing every system,
          most of them fully working, buried the two lines that mattered. */
       const bad = d.it.rows.filter(r => cgNum(r.NotWorking) > 0);
-      return T('IT assets not working', d.it.down + ' down across ' + bad.length + ' system(s)',
+      return T('IT assets not working',
+        d.it.down + ' down across ' + bad.length + ' system(s)' + (d.it.month ? ' · ' + d.it.month : ''),
         bad, CG_COLS.it,
-        { expr: 'sum of the Not Working column, over systems reporting at least one',
-          work: d.it.down + ' of ' + d.it.total + ' assets' });
+        { expr: 'Not Working on the most recent dated check for each system',
+          work: d.it.down + ' of ' + d.it.total + ' assets' + (d.it.month ? ' as at ' + d.it.month : ''),
+          note: 'Only the latest check counts. Earlier months are the same equipment counted again, not more of it.' });
     }
     case 'tr-exp': return cgVehicleDocs(branch, d, 'due');
     case 'pur-open': return T('Purchase pending', d.pur.open + ' pending', d.pur.openRows, CG_COLS.pur,
