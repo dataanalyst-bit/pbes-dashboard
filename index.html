@@ -1511,7 +1511,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   <!-- Counsellor-wise Walk-In % -->
   <div class="card" style="margin-bottom:16px;">
-    <div class="ch"><h3>🚶 Walk-In Admission % by Lead Owner / Counsellor</h3><span class="fnote">Of each counsellor's confirmed admissions, % that came via Walk-In/Offline</span></div>
+    <div class="ch"><h3>🚶 Walk-In Admission % by Lead Owner / Counsellor</h3><span class="fnote">Handover and legacy accounts are left out of this ranking; they still appear in the Counsellor-Wise Report below</span><span class="fnote">Of each counsellor's confirmed admissions, % that came via Walk-In/Offline</span></div>
     <div class="cb"><div class="cw tall" style="height:340px;"><canvas id="adm-walkin-chart"></canvas></div></div>
   </div>
 
@@ -6058,8 +6058,15 @@ function renderAdmissions(){
   }});
 
   // ── Walk-In Admission % by Counsellor (= Walk-In Admissions ÷ Walk-In Leads, per counsellor) ──
-  // Narmada (Bachupally) is a legacy/handover owner with no active pipeline — excluded from ranking.
-  const activeOwners=OS.filter(o=>activeBranches.includes(o.branch) && !/^narmada$/i.test(String(o.owner||'').trim())).sort((a,b)=>b.walkin_pct-a.walkin_pct);
+  /* This chart RANKS people, so owners who are not working a live pipeline are
+     left out of it: a handover or legacy account scores a rate on a handful of
+     inherited leads and lands above counsellors carrying real load. They still
+     appear in the Counsellor-Wise Report below, which is a record rather than a
+     ranking — being excluded from a league table is not the same as being
+     hidden from the report. */
+  const RANK_EXCLUDE=/^(narmada|durga devi)$/i;
+  const activeOwners=OS.filter(o=>activeBranches.includes(o.branch) &&
+    !RANK_EXCLUDE.test(String(o.owner||'').trim())).sort((a,b)=>b.walkin_pct-a.walkin_pct);
   const _medals=['🥇','🥈','🥉'];
   mkChart('adm-walkin-chart',{type:'bar',data:{
     labels:activeOwners.map((o,i)=>`${_medals[i]||(i+1)+'.'} ${o.owner} (${o.branch})`),
@@ -6084,7 +6091,10 @@ function renderAdmissions(){
   const ctbody=document.getElementById('adm-counsellor-tbody');
   let ctHTML='';
   activeBranches.forEach(b=>{
-    const owners=OS.filter(o=>o.branch===b && !/^narmada$/i.test(String(o.owner||'').trim()));
+    /* Everyone assigned leads at this branch, including handover and legacy
+       owners. This table is the record of who holds what — leaving somebody out
+       makes the branch totals disagree with the leads actually assigned. */
+    const owners=OS.filter(o=>o.branch===b);
     if(owners.length===0)return;
     const bTotal={leads:0,adm:0,walkin:0,digital:0,digitalLeads:0,walkinLeads:0};
     owners.forEach(o=>{
