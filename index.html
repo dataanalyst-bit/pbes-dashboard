@@ -12808,10 +12808,20 @@ window.AUDIT = (function () {
     }
   }
   /* section × one grade column, which the pre-computed tallies do not cover */
+  /* The pre-computed tallies file a row with no section under "Uncategorised",
+     so the live tallies have to do the same. They did not: a blank category
+     matched nothing here, so those rows counted towards a section's Overall
+     column (built from the pre-computed table) but not towards its per-grade
+     cells (built here) — which is why the heatmap and the stage comparison
+     disagreed on the same section. */
+  function auCatOf(r){
+    var R = D.raw;
+    return (R.iC >= 0 ? A.str(r[R.iC]) : '') || 'Uncategorised';
+  }
   function catGradeT(cat, gi, branch){
     var R = D.raw, ms = months(), t = A.blank();
     R.rows.forEach(function (r) {
-      if ((R.iC >= 0 ? A.str(r[R.iC]) : '') !== cat) return;
+      if (auCatOf(r) !== cat) return;
       if (branch && A.str(r[R.iB]) !== branch) return;
       if (ms.indexOf(A.str(r[R.iM])) < 0) return;
       addRowLocal(t, r, [R.cols[gi]]);
@@ -12878,7 +12888,7 @@ window.AUDIT = (function () {
 
       var items = {};
       R.rows.forEach(function (r) {
-        if (A.str(r[R.iC]) !== row.c) return;
+        if (auCatOf(r) !== row.c) return;
         if (scope && A.str(r[R.iB]) !== scope) return;
         if (ms.indexOf(A.str(r[R.iM])) < 0) return;
         var p = A.str(r[R.iP]); if (!p) return;
@@ -12979,7 +12989,7 @@ window.AUDIT = (function () {
       return R.rows.filter(function (r) {
         if (ms.indexOf(A.str(r[R.iM])) < 0) return false;
         if (branch && A.str(r[R.iB]) !== branch) return false;
-        if (cat && A.str(r[R.iC]) !== cat) return false;
+        if (cat && auCatOf(r) !== cat) return false;
         if (param && A.str(r[R.iP]) !== param) return false;
         return true;
       });
@@ -13386,7 +13396,9 @@ window.AUDIT = (function () {
       R.rows.forEach(function (r) {
         if (ms.indexOf(A.str(r[R.iM])) < 0) return;
         if (branch && A.str(r[R.iB]) !== branch) return;
-        if (cat && A.str(r[R.iC]) !== cat) return;
+        /* Same "Uncategorised" fallback the pre-computed tallies use, so this
+           table and the heatmap count exactly the same rows. */
+        if (cat && auCatOf(r) !== cat) return;
         addRowLocal(t, r, gi === null ? R.cols : [R.cols[gi]]);
       });
       return t;
@@ -13464,7 +13476,7 @@ window.AUDIT = (function () {
   function sectionModal(cat){
     var R = D.raw, ms = months();
     var items = R.rows.filter(function (r) {
-      return A.str(r[R.iC]) === cat && ms.indexOf(A.str(r[R.iM])) >= 0;
+      return auCatOf(r) === cat && ms.indexOf(A.str(r[R.iM])) >= 0;
     });
     modal(auSecIcon(cat) + '  All branches \u00b7 ' + cat, items.length + ' checklist lines',
       '<table class="au-tbl"><thead><tr><th>Branch</th><th>Month</th><th>Checklist item</th>' +
@@ -13487,7 +13499,7 @@ window.AUDIT = (function () {
   function gradeModal(cat, gi, branch){
     var R = D.raw, ms = months(), ci = R.cols[gi];
     var items = R.rows.filter(function (r) {
-      if (A.str(r[R.iC]) !== cat) return false;
+      if (auCatOf(r) !== cat) return false;
       if (branch && A.str(r[R.iB]) !== branch) return false;
       return ms.indexOf(A.str(r[R.iM])) >= 0;
     });
@@ -13509,7 +13521,7 @@ window.AUDIT = (function () {
   function itemModal(cat, param, gi, branch){
     var R = D.raw, ms = months();
     var items = R.rows.filter(function (r) {
-      if (A.str(r[R.iC]) !== cat || A.str(r[R.iP]) !== param) return false;
+      if (auCatOf(r) !== cat || A.str(r[R.iP]) !== param) return false;
       if (branch && A.str(r[R.iB]) !== branch) return false;
       return ms.indexOf(A.str(r[R.iM])) >= 0;
     });
