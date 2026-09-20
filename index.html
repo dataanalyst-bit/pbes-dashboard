@@ -12930,26 +12930,36 @@ window.AUDIT = (function () {
        counting only sections actually audited at that stage — an unaudited
        section is absent, not zero, and averaging zeros in would drag every
        column down and make a thinly-audited stage look like a failing one. */
+    /* The checks are POOLED, not the percentages averaged.
+       Averaging percentages gives every section equal weight, so a section with
+       four checks counts as heavily as one with fifty — which is why this row
+       disagreed with the Overall column and with the stage table. Summing the
+       underlying yes/no/in-progress counts and scoring once makes all three
+       agree, because they are then the same calculation over the same checks. */
     var avgRow = (function () {
+      function pooled(gi) {
+        var t = A.blank();
+        ordered.forEach(function (row) {
+          var x = (gi === null) ? row.t : catGradeT(row.c, gi, scope);
+          if (!x) return;
+          t.yes += x.yes; t.no += x.no; t.ip += x.ip;
+          t.na += x.na; t.nr += x.nr; t.none += x.none;
+        });
+        return t;
+      }
       var cells = G.map(function (g, gi) {
-        var vals = ordered.map(function (row) {
-          var t = catGradeT(row.c, gi, scope);
-          return A.scored(t) ? A.score(t) : null;
-        }).filter(function (v) { return v !== null; });
-        if (!vals.length) return auAvgCell(null, 'nothing audited at ' + G[gi]);
-        var m = vals.reduce(function (a, b) { return a + b; }, 0) / vals.length;
-        return auAvgCell(m, 'Average of ' + vals.length + ' audited section(s) at ' + G[gi]);
+        var t = pooled(gi);
+        return A.scored(t)
+          ? auAvgCell(A.score(t), 'All sections at ' + G[gi] + ' \u2014 ' + A.scored(t) + ' checks pooled')
+          : auAvgCell(null, 'nothing audited at ' + G[gi]);
       }).join('');
-      var allVals = ordered.map(function (row) {
-        return A.scored(row.t) ? A.score(row.t) : null;
-      }).filter(function (v) { return v !== null; });
-      var overall = allVals.length
-        ? auAvgCell(allVals.reduce(function (a, b) { return a + b; }, 0) / allVals.length,
-            'Average of ' + allVals.length + ' audited section(s)')
+      var tAll = pooled(null);
+      var overall = A.scored(tAll)
+        ? auAvgCell(A.score(tAll), 'Every section \u2014 ' + A.scored(tAll) + ' checks pooled')
         : auAvgCell(null, 'nothing audited');
       return '<tr class="au-secrow au-avg">' +
         '<td class="nm" style="background:#1E293B;color:#fff;font-weight:800;border-top:2px solid #0F172A">' +
-        '\u03a3 Average across sections</td>' + cells + overall + '</tr>';
+        '\u03a3 All sections pooled</td>' + cells + overall + '</tr>';
     })();
 
     return '<div class="au-heat-scroll"><table class="audt auhm"><thead><tr>' +
@@ -13445,20 +13455,23 @@ window.AUDIT = (function () {
        mean of the STAGE scores that were actually audited at that branch — an
        unaudited stage is left out rather than counted as zero, which would
        punish a branch for a stage it does not run. */
+    /* Pooled across every stage, for the same reason as the heatmap row: a mean
+       of stage percentages weights a lightly-audited stage as heavily as a
+       thoroughly-audited one, and then disagrees with every other total on the
+       tab. tally(branch, null, null) already pools every stage, so this is the
+       identical calculation the branch's own cells are built from. */
     var avgRow = (function () {
-      function mean(branch) {
-        var vals = G.map(function (g, gi) {
-          var t = tally(branch, null, gi);
-          return A.scored(t) ? A.score(t) : null;
-        }).filter(function (v) { return v !== null; });
-        return vals.length ? vals.reduce(function (a, b2) { return a + b2; }, 0) / vals.length : null;
+      function cellFor(branch, label) {
+        var t = tally(branch, null, null);
+        return A.scored(t)
+          ? auAvgCell(A.score(t), label + ' \u2014 ' + A.scored(t) + ' checks pooled across every stage')
+          : auAvgCell(null, label + ' \u2014 nothing audited');
       }
-      function cell(v, title) { return auAvgCell(v, title); }
       return '<tr class="lvl-b au-avg">' +
         '<td class="nm" style="background:#1E293B;color:#fff;font-weight:800;border-top:2px solid #0F172A">' +
-        '\u03a3 Average across stages</td>' +
-        bs.map(function (b) { return cell(mean(b), b + ' \u2014 mean of its audited stages'); }).join('') +
-        cell(mean(null), 'All branches \u2014 mean of audited stages') + '</tr>';
+        '\u03a3 All stages pooled</td>' +
+        bs.map(function (b) { return cellFor(b, b); }).join('') +
+        cellFor(null, 'All branches') + '</tr>';
     })();
 
     el.innerHTML = '<div class="au-heat-scroll"><table class="audt auhm"><thead><tr>' +
