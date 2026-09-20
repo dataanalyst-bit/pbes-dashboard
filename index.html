@@ -1193,7 +1193,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="card" style="margin-bottom:16px;">
     <div class="ch">
       <h3>🏆 Branch Performance Scorecard — Head-to-Head Comparison</h3>
-      <span class="fnote">Care Call &amp; Observation rows use PREVIOUS month · HR Overall Score pulled from the HR Analytics scorecard</span>
+      <span class="fnote">Every row is the same percentage its own department tab shows, so the two always agree.
+        Composite scores, where a department has one, are printed underneath. Care Call &amp; Observation rows use
+        the PREVIOUS month; HR is the score from the HR Analytics tab.</span>
       <span style="font-size:11px;background:#FFFBEB;border:1px solid rgba(217,119,6,.25);color:#D97706;padding:3px 10px;border-radius:6px;font-weight:600;" id="rank-tag">🥇 Rankings &amp; Awards — Current / Latest Month Per Branch</span>
     </div>
     <div class="cb" style="overflow-x:auto;">
@@ -11723,25 +11725,35 @@ function renderRankings(){
 
   // Admin
   {
-    const r=scoreRow('🏗️','Admin Closing Speed',adminStats,d=>{
+    /* The headline is the COMPLETION PERCENTAGE, the same figure the Admin
+       Tracker tab shows. It used to be the weighted score, which is a different
+       measure built from four components — so a branch could read 64 here and
+       88% on its own tab and both were right, which is worse than either being
+       wrong. The score is still here, underneath, where it ranks without
+       pretending to be the same number. */
+    const r=scoreRow('🏗️','Admin tasks completed %',adminStats,d=>{
       if(!d||!d.total) return {value:null};
-      return {value:d.score,html:`<span style="font-weight:800;color:${scoreColor(d.score)};font-size:15px;">${d.score}</span>`+
+      const pct=Math.round(d.done/d.total*100);
+      return {value:pct,html:`<span style="font-weight:800;color:${scoreColor(pct)};font-size:15px;">${pct}%</span>`+
         `<small style="color:#94A3B8;display:block;font-size:10px;">${d.done}/${d.total} done · ${d.overdue} overdue${d.overdue>0?' (~'+d.avgOd+'d)':''}</small>`+
-        ucomp(d.u,['Load','Done','Speed','OD'])};
-    },true,'Admin Closing Speed',(d)=>d&&d.total&&d.fxIn?unifiedFx(d.u,d.fxIn,
+        `<small style="color:#94A3B8;display:block;font-size:10px;">closing-speed score ${d.score}</small>`};
+    },true,'Admin tasks completed %',(d)=>d&&d.total&&d.fxIn?unifiedFx(d.u,d.fxIn,
       {item:'tasks',assigned:'assigned',closed:'completed'}):null);
     html+=r.html; contrib.push(r.valMap);
   }
 
   // Vigilance & Safety
   {
-    const r=scoreRow('🛡️','Vigilance &amp; Safety Score',vigStats,d=>{
+    /* Headline is the closure percentage the Vigilance tab shows; the composite
+       score sits beneath it. */
+    const r=scoreRow('🛡️','Vigilance issues closed %',vigStats,d=>{
       if(!d||!d.total) return {value:null};
-      return {value:d.score,html:`<span style="font-weight:800;color:${scoreColor(d.score)};font-size:15px;">${d.score}</span>`+
-        `<small style="color:#94A3B8;display:block;font-size:10px;">${d.closurePct}% closed \u00b7 ${d.onTimePct}% on time</small>`+
+      const pct=Math.round(d.closurePct);
+      return {value:pct,html:`<span style="font-weight:800;color:${scoreColor(pct)};font-size:15px;">${pct}%</span>`+
+        `<small style="color:#94A3B8;display:block;font-size:10px;">${d.onTimePct}% on time \u00b7 safety score ${d.score}</small>`+
         `<small style="color:#94A3B8;display:block;font-size:9.5px;margin-top:2px;">`+
         `${fi(d.total)} raised \u00b7 ${d.open} open \u00b7 admin verified ${d.adminPct}%</small>`};
-    },false,'Vigilance & Safety',(d)=>d&&d.total?(d.fxIn?unifiedFx(d.u,d.fxIn,
+    },false,'Vigilance issues closed %',(d)=>d&&d.total?(d.fxIn?unifiedFx(d.u,d.fxIn,
       {item:'issues',assigned:'raised',closed:'closed'}):{
         expr:'score = WH\u00d70.35 + CE\u00d70.25 + CS\u00d70.20 + OC\u00d70.20',
         work:`closure ${d.closurePct}% \u00b7 on time ${d.onTimePct}% \u00b7 ${fi(d.total)} raised \u00b7 ${d.open} open \u00b7 admin verified ${d.adminPct}%`,
@@ -11751,13 +11763,15 @@ function renderRankings(){
 
   // Grievance
   {
-    const r=scoreRow('📣','Grievance Handling Score',grievStats,d=>{
+    /* Headline is the resolved percentage the Grievance tab shows. */
+    const r=scoreRow('📣','Grievance cases resolved %',grievStats,d=>{
       if(!d||!d.total) return {value:null};
       const sd=d.closedN?Math.round(d.sameDay/d.closedN*100):0;
-      return {value:d.score,html:`<span style="font-weight:800;color:${scoreColor(d.score)};font-size:15px;">${d.score}</span>`+
+      const pct=Math.round(d.resolved/d.total*100);
+      return {value:pct,html:`<span style="font-weight:800;color:${scoreColor(pct)};font-size:15px;">${pct}%</span>`+
         `<small style="color:#94A3B8;display:block;font-size:10px;">${d.resolved}/${d.total} resolved · ${sd}% same-day</small>`+
-        ucomp(d.u,['Load','Closed','Speed','OD'])};
-    },true,'Grievance Handling',(d)=>d&&d.total?(d.fxIn?unifiedFx(d.u,d.fxIn,
+        `<small style="color:#94A3B8;display:block;font-size:10px;">handling score ${d.score}</small>`};
+    },true,'Grievance cases resolved %',(d)=>d&&d.total?(d.fxIn?unifiedFx(d.u,d.fxIn,
       {item:'cases',assigned:'raised',closed:'resolved'}):{
         expr:'score = WH\u00d70.35 + CE\u00d70.25 + CS\u00d70.20 + OC\u00d70.20',
         work:`${d.resolved} of ${d.total} resolved \u00b7 same-day ${d.closedN?Math.round(d.sameDay/d.closedN*100):0}% of ${d.closedN} closed`,
@@ -12902,11 +12916,39 @@ window.AUDIT = (function () {
       }).join('');
     }).join('');
 
+    /* Column averages. Each is the mean of the SECTION scores in that column,
+       counting only sections actually audited at that stage — an unaudited
+       section is absent, not zero, and averaging zeros in would drag every
+       column down and make a thinly-audited stage look like a failing one. */
+    var avgRow = (function () {
+      var cells = G.map(function (g, gi) {
+        var vals = ordered.map(function (row) {
+          var t = catGradeT(row.c, gi, scope);
+          return A.scored(t) ? A.score(t) : null;
+        }).filter(function (v) { return v !== null; });
+        if (!vals.length) return '<td class="au-t" style="background:#F8FAFC;color:#CBD5E1">\u00b7</td>';
+        var m = vals.reduce(function (a, b) { return a + b; }, 0) / vals.length;
+        return '<td class="au-t" style="background:' + A.colorFor(m) + ';color:#fff;font-weight:800" ' +
+          'title="Average of ' + vals.length + ' audited section(s) at ' + esc(G[gi]) + '">' +
+          Math.round(m) + '</td>';
+      }).join('');
+      var allVals = ordered.map(function (row) {
+        return A.scored(row.t) ? A.score(row.t) : null;
+      }).filter(function (v) { return v !== null; });
+      var overall = allVals.length
+        ? '<td class="au-t" style="background:' + A.colorFor(allVals.reduce(function (a, b) { return a + b; }, 0) / allVals.length) +
+          ';color:#fff;font-weight:800" title="Average of ' + allVals.length + ' audited section(s)">' +
+          Math.round(allVals.reduce(function (a, b) { return a + b; }, 0) / allVals.length) + '</td>'
+        : '<td class="au-t" style="background:#F8FAFC;color:#CBD5E1">\u00b7</td>';
+      return '<tr class="au-secrow" style="border-top:2px solid #E0E8FF">' +
+        '<td class="nm" style="font-weight:800">Average across sections</td>' + cells + overall + '</tr>';
+    })();
+
     return '<div class="au-heat-scroll"><table class="audt auhm"><thead><tr>' +
       '<th class="nm">Audit section <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--txm)">' +
       '\u00b7 tap to open its checklist</span></th>' +
       G.map(function (g) { return '<th>' + esc(g) + '</th>'; }).join('') +
-      '<th>Overall</th></tr></thead><tbody>' + out + '</tbody></table></div>' +
+      '<th>Overall</th></tr></thead><tbody>' + out + avgRow + '</tbody></table></div>' +
       auLegend() +
       '<p class="au-note">Branch is chosen on the left; the columns are grade and stage, so a row reads as ' +
       '\u201cwhere in the school this section is weak\u201d. Sections are ordered weakest first. <b>Tap a section</b> ' +
@@ -13375,10 +13417,33 @@ window.AUDIT = (function () {
       });
     });
 
+    /* Branch averages across every stage, and the network average. Each is the
+       mean of the STAGE scores that were actually audited at that branch — an
+       unaudited stage is left out rather than counted as zero, which would
+       punish a branch for a stage it does not run. */
+    var avgRow = (function () {
+      function mean(branch) {
+        var vals = G.map(function (g, gi) {
+          var t = tally(branch, null, gi);
+          return A.scored(t) ? A.score(t) : null;
+        }).filter(function (v) { return v !== null; });
+        return vals.length ? vals.reduce(function (a, b2) { return a + b2; }, 0) / vals.length : null;
+      }
+      function cell(v, title) {
+        if (v === null) return '<td class="au-t" style="background:#F8FAFC;color:#CBD5E1">\u00b7</td>';
+        return '<td class="au-t" style="background:' + A.colorFor(v) + ';color:#fff;font-weight:800" title="' +
+          esc(title) + '">' + Math.round(v) + '</td>';
+      }
+      return '<tr class="lvl-b" style="border-top:2px solid #E0E8FF">' +
+        '<td class="nm" style="font-weight:800">Average across stages</td>' +
+        bs.map(function (b) { return cell(mean(b), b + ' \u2014 mean of its audited stages'); }).join('') +
+        cell(mean(null), 'All branches \u2014 mean of audited stages') + '</tr>';
+    })();
+
     el.innerHTML = '<div class="au-heat-scroll"><table class="audt auhm"><thead><tr>' +
       '<th class="nm">Grade &amp; stage \u203a audit section</th>' +
       bs.map(function (b) { return '<th>' + esc(b) + '</th>'; }).join('') +
-      '<th>Network</th></tr></thead><tbody>' + out + '</tbody></table></div>' +
+      '<th>Network</th></tr></thead><tbody>' + out + avgRow + '</tbody></table></div>' +
       '<p class="au-note">Each stage line shows where every branch stands at that stage. <b>Open it</b> and the ' +
       'thirteen sections appear as rows, weakest first, so you can read <b>down a branch column</b> to see what is ' +
       'failing there, or <b>across a section row</b> to see whether it is one branch or all of them. Every cell shows ' +
