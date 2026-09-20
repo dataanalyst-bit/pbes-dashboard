@@ -12936,22 +12936,20 @@ window.AUDIT = (function () {
           var t = catGradeT(row.c, gi, scope);
           return A.scored(t) ? A.score(t) : null;
         }).filter(function (v) { return v !== null; });
-        if (!vals.length) return '<td class="au-t" style="background:#F8FAFC;color:#CBD5E1">\u00b7</td>';
+        if (!vals.length) return auAvgCell(null, 'nothing audited at ' + G[gi]);
         var m = vals.reduce(function (a, b) { return a + b; }, 0) / vals.length;
-        return '<td class="au-t" style="background:' + A.colorFor(m) + ';color:#fff;font-weight:800" ' +
-          'title="Average of ' + vals.length + ' audited section(s) at ' + esc(G[gi]) + '">' +
-          Math.round(m) + '</td>';
+        return auAvgCell(m, 'Average of ' + vals.length + ' audited section(s) at ' + G[gi]);
       }).join('');
       var allVals = ordered.map(function (row) {
         return A.scored(row.t) ? A.score(row.t) : null;
       }).filter(function (v) { return v !== null; });
       var overall = allVals.length
-        ? '<td class="au-t" style="background:' + A.colorFor(allVals.reduce(function (a, b) { return a + b; }, 0) / allVals.length) +
-          ';color:#fff;font-weight:800" title="Average of ' + allVals.length + ' audited section(s)">' +
-          Math.round(allVals.reduce(function (a, b) { return a + b; }, 0) / allVals.length) + '</td>'
-        : '<td class="au-t" style="background:#F8FAFC;color:#CBD5E1">\u00b7</td>';
-      return '<tr class="au-secrow" style="border-top:2px solid #E0E8FF">' +
-        '<td class="nm" style="font-weight:800">Average across sections</td>' + cells + overall + '</tr>';
+        ? auAvgCell(allVals.reduce(function (a, b) { return a + b; }, 0) / allVals.length,
+            'Average of ' + allVals.length + ' audited section(s)')
+        : auAvgCell(null, 'nothing audited');
+      return '<tr class="au-secrow au-avg">' +
+        '<td class="nm" style="background:#1E293B;color:#fff;font-weight:800;border-top:2px solid #0F172A">' +
+        '\u03a3 Average across sections</td>' + cells + overall + '</tr>';
     })();
 
     return '<div class="au-heat-scroll"><table class="audt auhm"><thead><tr>' +
@@ -12965,6 +12963,20 @@ window.AUDIT = (function () {
       'to open its checklist items, each shown at every stage and ordered weakest first. A section strong overall but ' +
       'red in one column is a stage problem, not a branch one. Every cell opens the lines behind it.</p>';
   }
+  /* Summary rows are styled differently from data cells on purpose: they are a
+     different KIND of number. Using the same red/amber/green fill made them
+     read as just another branch or section, and a reader scanning the grid
+     could mistake the total for data. Dark band, lighter traffic-light text —
+     still legible as on-track or critical, but unmistakably a summary. */
+  function auAvgCell(v, title){
+    if (v === null || v === undefined)
+      return '<td class="au-t" style="background:#334155;color:#94A3B8">\u00b7</td>';
+    var ink = v >= A.ON_TRACK ? '#4ADE80' : v >= A.REVIEW ? '#FBBF24' : '#FCA5A5';
+    return '<td class="au-t" style="background:#1E293B;color:' + ink +
+      ';font-weight:800;border-top:2px solid #0F172A" title="' + esc(title) + '">' +
+      Math.round(v) + '</td>';
+  }
+
   function auLegend(){
     return '<div class="au-legend">' +
       '<span><i style="background:#059669"></i>' + A.ON_TRACK + '%+ on track</span>' +
@@ -13441,13 +13453,10 @@ window.AUDIT = (function () {
         }).filter(function (v) { return v !== null; });
         return vals.length ? vals.reduce(function (a, b2) { return a + b2; }, 0) / vals.length : null;
       }
-      function cell(v, title) {
-        if (v === null) return '<td class="au-t" style="background:#F8FAFC;color:#CBD5E1">\u00b7</td>';
-        return '<td class="au-t" style="background:' + A.colorFor(v) + ';color:#fff;font-weight:800" title="' +
-          esc(title) + '">' + Math.round(v) + '</td>';
-      }
-      return '<tr class="lvl-b" style="border-top:2px solid #E0E8FF">' +
-        '<td class="nm" style="font-weight:800">Average across stages</td>' +
+      function cell(v, title) { return auAvgCell(v, title); }
+      return '<tr class="lvl-b au-avg">' +
+        '<td class="nm" style="background:#1E293B;color:#fff;font-weight:800;border-top:2px solid #0F172A">' +
+        '\u03a3 Average across stages</td>' +
         bs.map(function (b) { return cell(mean(b), b + ' \u2014 mean of its audited stages'); }).join('') +
         cell(mean(null), 'All branches \u2014 mean of audited stages') + '</tr>';
     })();
