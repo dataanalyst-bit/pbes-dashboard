@@ -1899,47 +1899,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   </div>
 
   <!-- Quick View: Purchase Pending & In Progress/Order Placed, live-filtered by branch -->
-  <div class="card" style="margin-bottom:16px;">
-    <div class="ch"><h3>⚡ Quick View — In Progress &amp; Delivered</h3><span class="fnote" id="pur-quick-fn">All Branches</span></div>
-    <div class="row r2" style="margin:0;padding:0 14px 14px;">
-      <div>
-        <div style="font-size:11px;font-weight:700;color:#3B82F6;text-transform:uppercase;margin-bottom:6px;">🔄 In Progress — <span id="pur-ip-count">0</span></div>
-        <div style="overflow-x:auto;max-height:260px;overflow-y:auto;border:1px solid #E0E8FF;border-radius:8px;">
-          <table style="width:100%;border-collapse:collapse;font-size:11.5px;">
-            <thead><tr style="background:#EFF6FF;position:sticky;top:0;">
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#3B82F6;text-transform:uppercase;">Branch</th>
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#3B82F6;text-transform:uppercase;">Item</th>
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#3B82F6;text-transform:uppercase;">Dept</th>
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#3B82F6;text-transform:uppercase;">Priority</th>
-            </tr></thead>
-            <tbody id="pur-ip-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-      <div>
-        <div style="font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;margin-bottom:6px;">✅ Delivered — <span id="pur-delivered-count">0</span></div>
-        <div style="overflow-x:auto;max-height:260px;overflow-y:auto;border:1px solid #E0E8FF;border-radius:8px;">
-          <table style="width:100%;border-collapse:collapse;font-size:11.5px;">
-            <thead><tr style="background:#ECFDF5;position:sticky;top:0;">
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#059669;text-transform:uppercase;">Branch</th>
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#059669;text-transform:uppercase;">Item</th>
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#059669;text-transform:uppercase;">Dept</th>
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#059669;text-transform:uppercase;">Priority</th>
-            </tr></thead>
-            <tbody id="pur-delivered-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
+  
 
   <div style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <button onclick="viewPurchaseRecords()" style="padding:8px 18px;background:#1E4FD8;color:#fff;border:none;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">🛒 View All Purchase Records →</button>
       <span style="font-size:12px;color:#64748B;">Click any record to see full details including specs, amount, and work status</span>
     </div>
     <div class="row r2">
-    <div class="card"><div class="ch"><h3>📦 Purchase Status by Branch</h3></div><div class="cb"><div class="cw tall"><canvas id="pur-st"></canvas></div></div></div>
-    <div class="card">
+    
+    <div class="card" style="margin-bottom:16px;">
+    <div class="ch"><h3>&#127979; Requests by branch</h3>
+      <span class="fnote">Raised, still moving, ordered and completed. Click any number for those requests.</span></div>
+    <div class="cb-0" style="overflow-x:auto"><table class="dt" id="pur-brtbl"></table></div>
+  </div>
+
+  <div class="card">
     <div class="ch"><h3>🏆 Purchase Manager Performance by Branch</h3><span class="fnote">Status 50% · Timeliness (Target Date / Date / Due) 40% · Documentation 10% · click a branch to drill in</span></div>
     <div class="cb" style="padding:0;"><div id="pur-mgr-perf"></div></div>
   </div>
@@ -2046,17 +2020,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="cb-0" style="overflow-x:auto"><table class="dt" id="tr-docreg"></table></div>
   </div>
 
-  <div class="card" style="margin-bottom:16px;">
-    <div class="ch"><h3>&#9888;&#65039; Documents expired or falling due</h3>
-      <span class="fnote">Only the documents with a problem &mdash; expired first, then due within 30 days.
-        A vehicle with every document valid does not appear. Click a row for that vehicle's full record.</span></div>
-    <div class="cb-0" style="overflow-x:auto"><table class="dt" id="tr-docs"></table></div>
-  </div>
+  
 
 
   <div class="row r2">
 <!-- removed on request: Branch Occupancy -->
-    <div class="card"><div class="ch"><h3>🚦 Route Occupancy (Top / Overloaded)</h3><span class="fnote">Occupancy % per route · red &gt; 100% (over capacity)</span></div><div class="cb"><div class="cw tall"><canvas id="tr-route-occ"></canvas></div></div></div>
+    
   </div>
   <div class="row r2">
 <!-- removed on request: Fleet Compliance -->
@@ -4663,7 +4632,16 @@ function renderAdmin(){
 
   // ── Quick View: In Progress & Over Due tasks ──
   {
-    document.getElementById('admin-quick-fn').textContent=bl;
+    /* This card was replaced by the branch table above. The block is left in
+       place because other tabs still call into it, but it now returns quietly
+       when its elements are absent: the unguarded write below threw, and it
+       threw BEFORE the three charts further down were drawn, which is why Task
+       Status by Branch, Branch Completion Rate and the Closing Speed scorecard
+       all came up empty. */
+    const _qfn=document.getElementById('admin-quick-fn');
+    if(!_qfn){ /* card removed — nothing to populate */ }
+    else {
+    _qfn.textContent=bl;
     const ipRows=_aRows.filter(isIP);
     setTxt('admin-ip-count',fi(ipRows.length));
     setTxt('admin-overdue-count',fi(overdueRows.length));
@@ -4698,6 +4676,7 @@ function renderAdmin(){
     }
     setHtml('admin-ip-tbody',ipQuickHtml(ipRows));
     setHtml('admin-overdue-tbody',overdueQuickHtml(overdueRows));
+    }
   }
 
   /* Done is left out on purpose: this chart is read to find what is still
@@ -4838,8 +4817,12 @@ function viewVigBranch(branch, kind){
   const today=Date.now();
   let rows, title, expr;
   if(kind==='chk'){
-    rows=(window._VCHK_ROWS||[]).filter(r=>r.branch===branch &&
-      !/^(closed|verified|resolved|rejected|not valid)/i.test(String(r.status||'').trim()))
+    rows=(window._VCHK_ROWS||[]).filter(r=>{
+      if(r.branch!==branch) return false;
+      const st=String(r.status||'').trim();
+      if(/verification pending/i.test(st)) return false;   // done, awaiting sign-off
+      return !/^(closed|verified|resolved|rejected|not valid|work done)/i.test(st);
+    })
       .slice().sort((a,b)=>(Date.parse(b.raised||'')||0)-(Date.parse(a.raised||'')||0));
     return openModal('\uD83D\uDCCB '+branch+' \u2014 checklist issues still open',
       rows.length+' open \u00b7 newest first', rows,
@@ -4847,8 +4830,9 @@ function viewVigBranch(branch, kind){
        {key:'point',label:'Checklist point',maxW:'260px'},{key:'severity',label:'Severity',pill:true},
        {key:'assigned',label:'Assigned to'},{key:'target',label:'Target',date:true},
        {key:'status',label:'Status',pill:true}],
-      { expr:'checklist rows whose status is not closed, verified or resolved',
-        work:rows.length+' still open at '+branch });
+      { expr:'checklist rows still to be worked \u2014 Open, Unassigned, Assigned, In Progress or Re-opened',
+        work:rows.length+' still open at '+branch,
+        note:'"Work Done \u2014 Verification Pending" is not counted here: the work is finished and only the sign-off is outstanding.' });
   }
   const all=VIG_DATA.filter(r=>r.Branch===branch);
   if(kind==='open'){ rows=all.filter(isOpenV); title='issues still open';
@@ -4981,8 +4965,18 @@ function renderVigilance(){
             const rows=VIG_DATA.filter(r=>r.Branch===b);
             const open=rows.filter(isOpenV);
             const past=open.filter(r=>{const t=Date.parse(String(r.TargetDate||'')); return !isNaN(t)&&t<today;});
-            const co=chk.filter(r=>r.branch===b &&
-              !/^(closed|verified|resolved|rejected|not valid)/i.test(String(r.status||'').trim()));
+            /* Work still to be DONE. "Work Done - Verification Pending" is
+               excluded: the work is finished and only the sign-off is
+               outstanding, so counting it here overstates the backlog and
+               makes a branch look as though it is sitting on work it has
+               already completed. */
+            const chkOpen=r=>{
+              const st=String(r.status||'').trim();
+              if(/verification pending/i.test(st)) return false;
+              return /^(open|assigned|in progress|re-?opened|unassigned)/i.test(st) ||
+                     !/^(closed|verified|resolved|rejected|not valid|work done)/i.test(st);
+            };
+            const co=chk.filter(r=>r.branch===b && chkOpen(r));
             const pct=rows.length?Math.round(open.length/rows.length*100):null;
             T.t+=rows.length; T.o+=open.length; T.p+=past.length; T.c+=co.length;
             return '<tr><td style="text-align:left;font-weight:700"><span class="bd b'+b+'"></span> '+b+'</td>'+
@@ -9016,12 +9010,28 @@ function viewTransport(kind,branch){
     const cols=[{key:'VehicleNo',label:'Vehicle'},{key:'RouteNo',label:'Route'},
       {key:'Driver',label:'Driver'},{key:'Seats',label:'Seats'},{key:'Riders',label:'Riders'},
       {key:'Occupancy',label:'Occupancy'},{key:'Spare',label:'Free seats'}];
+    /* Route numbers are written differently in the three sheets — "1", "01",
+       "Route 1", "R-1" — so a string comparison matched almost nothing and
+       every bus reported zero riders. Normalising to digits-and-letters only
+       makes the join work; the same for vehicle numbers, which carry stray
+       spaces. Where the route sheet already holds ActiveRiders and Capacity,
+       those are used in preference: they are the school's own figures. */
+    const rkey=v=>String(v==null?'':v).toUpperCase().replace(/[^A-Z0-9]/g,'')
+      /* "ROUTE12", "RT12", "R12" and "12" are the same route. Only strip the
+         prefix when digits follow it, so a vehicle number beginning with R is
+         left alone. */
+      .replace(/^(ROUTE|RTE|RT|R)(?=\d)/,'')
+      .replace(/^0+/,'');
     const groups=scope.map(b=>{
+      const routes=(T.routes||[]).filter(r=>r.Branch===b);
       const rows=(T.vehicles||[]).filter(r=>r.Branch===b).map(v=>{
-        const riders=(T.students||[]).filter(x=>x.Branch===b &&
-          (String(x.Route)===String(v.RouteNo) ||
-           (v.VehicleNo && String(x.VehicleNo).trim()===String(v.VehicleNo).trim()))).length;
-        const seats=+v.Seats||0;
+        const rt=routes.find(r=>rkey(r.Route)===rkey(v.RouteNo) && rkey(v.RouteNo)!=='');
+        const counted=(T.students||[]).filter(x=>x.Branch===b && (
+          (rkey(x.Route)!=='' && rkey(x.Route)===rkey(v.RouteNo)) ||
+          (rkey(x.VehicleNo)!=='' && rkey(x.VehicleNo)===rkey(v.VehicleNo))
+        )).length;
+        const riders=(rt && +rt.ActiveRiders>0) ? +rt.ActiveRiders : counted;
+        const seats=(+v.Seats>0) ? +v.Seats : ((rt && +rt.Capacity>0) ? +rt.Capacity : 0);
         const pct=seats?Math.round(riders/seats*100):null;
         return { Branch:b, VehicleNo:v.VehicleNo||'–', RouteNo:v.RouteNo||'–', Driver:v.Driver||'–',
           Seats:seats||'–', Riders:riders,
@@ -11071,6 +11081,28 @@ function viewAdminByBranch(branch){
 // ═══════════════════════════════════════════════════════
 // PURCHASE TRACKER — Updated KPIs + Full Table
 // ═══════════════════════════════════════════════════════
+
+/* Purchase requests behind one cell of the branch table, newest first. */
+function viewPurBranch(branch, kind){
+  const st=r=>String(r.PurchaseStatus||'').trim();
+  const all=PUR_DATA.filter(r=>r.Branch===branch);
+  let rows,title,expr;
+  if(kind==='moving'){ rows=all.filter(r=>!/^delivered|completed|closed|rejected|cancel|^order/i.test(st(r)));
+    title='in progress and pending'; expr='not ordered, delivered, completed, closed or rejected'; }
+  else if(kind==='ordered'){ rows=all.filter(r=>/^order/i.test(st(r)));
+    title='ordered'; expr='status begins with Order'; }
+  else if(kind==='done'){ rows=all.filter(r=>/^delivered|completed|closed|rejected|cancel/i.test(st(r)));
+    title='completed'; expr='delivered, completed, closed or rejected'; }
+  else { rows=all; title='all requests'; expr='every request raised at this branch'; }
+  rows=rows.slice().sort((a,b)=>(Date.parse(String(b.Date||''))||0)-(Date.parse(String(a.Date||''))||0));
+  openModal('\uD83D\uDED2 '+branch+' \u2014 '+title, rows.length+' request(s) \u00b7 newest first', rows,
+    [{key:'Branch',label:'Branch'},{key:'Date',label:'Raised',date:true},
+     {key:'Item',label:'Item / particulars',maxW:'240px'},{key:'Dept',label:'Dept'},
+     {key:'Qty',label:'Qty'},{key:'Amount',label:'Amount'},
+     {key:'Priority',label:'Priority',pill:true},{key:'PurchaseStatus',label:'Status',pill:true},
+     {key:'Remarks',label:'Remarks',maxW:'200px'}],
+    { expr:expr, work:rows.length+' of '+all.length+' at '+branch });
+}
 
 function viewPurchaseRecords(filterType) {
   // KPI click-to-view — shows ONLY the records matching the clicked KPI status.
@@ -16946,6 +16978,44 @@ function renderPurchase(){
   setTxt('pur-pending',fi(nPending));
   setTxt('pur-pending-s',nPending>0?'Not yet actioned — click to view':'Nothing pending');
 
+  /* ── Requests by branch ── */
+  {
+    const el=document.getElementById('pur-brtbl');
+    if(el){
+      const brs=(fBranch==='ALL')?[...new Set(PUR_DATA.map(r=>r.Branch).filter(Boolean))].sort():[fBranch];
+      let T={t:0,m:0,o:0,c:0};
+      const cell=(n,col,kind,b)=>'<td style="text-align:right;font-weight:700;color:'+col+';cursor:pointer" '+
+        'onclick="viewPurBranch(\''+String(b).replace(/'/g,"\\'")+'\',\''+kind+'\')">'+fi(n)+'</td>';
+      el.innerHTML = brs.length
+        ? '<thead><tr><th style="text-align:left">Branch</th><th style="text-align:right">Total requests</th>'+
+          '<th style="text-align:right">In progress &amp; pending</th><th style="text-align:right">Ordered</th>'+
+          '<th style="text-align:right">Completed</th><th style="text-align:right">Outstanding %</th></tr></thead><tbody>'+
+          brs.map(b=>{
+            const rows=PUR_DATA.filter(r=>r.Branch===b);
+            const st=r=>String(r.PurchaseStatus||'').trim();
+            const comp=rows.filter(r=>/^delivered|completed|closed|rejected|cancel/i.test(st(r)));
+            const ord=rows.filter(r=>/^order/i.test(st(r)));
+            /* Everything not ordered and not finished: in progress, pending,
+               blank and misspelt statuses alike. Those last are exactly the
+               requests nobody has actioned, so a word-match would miss them. */
+            const mov=rows.filter(r=>!/^delivered|completed|closed|rejected|cancel|^order/i.test(st(r)));
+            const pct=rows.length?Math.round((mov.length+ord.length)/rows.length*100):null;
+            T.t+=rows.length; T.m+=mov.length; T.o+=ord.length; T.c+=comp.length;
+            return '<tr><td style="text-align:left;font-weight:700"><span class="bd b'+b+'"></span> '+b+'</td>'+
+              cell(rows.length,'#1F2937','all',b)+cell(mov.length,'#B3402F','moving',b)+
+              cell(ord.length,'#D97706','ordered',b)+cell(comp.length,'#059669','done',b)+
+              '<td style="text-align:right;font-weight:800;color:'+
+                (pct===null?'#94A3B8':pct<=20?'#059669':pct<=45?'#D97706':'#DC2626')+'">'+
+                (pct===null?'\u2013':pct+'%')+'</td></tr>';
+          }).join('')+
+          '<tr style="background:#F8FAFF;font-weight:800"><td style="text-align:left">All branches</td>'+
+          '<td style="text-align:right">'+fi(T.t)+'</td><td style="text-align:right">'+fi(T.m)+'</td>'+
+          '<td style="text-align:right">'+fi(T.o)+'</td><td style="text-align:right">'+fi(T.c)+'</td>'+
+          '<td style="text-align:right">'+(T.t?Math.round((T.m+T.o)/T.t*100)+'%':'\u2013')+'</td></tr></tbody>'
+        : '<tbody><tr><td class="no-data">No purchase requests.</td></tr></tbody>';
+    }
+  }
+
   // ── Quick View: In Progress & Delivered ──
   {
     setTxt('pur-quick-fn',bl);
@@ -21221,8 +21291,13 @@ window.VCHK = (function () {
 
     var now=new Date(), today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
     var D=86400000;
-    function dOf(r){ return VCHK.dt(r.raised); }
-    function closedOf(r){ return VCHK.dt(r.closed); }
+    /* Dates are compared against whole days, so the TIME has to go. A row
+       stamped "19-Sep-26 11:40" parses to 11:40 on the 19th, which is greater
+       than midnight on the 19th — so a single-day range like Today or Yesterday
+       never matched it, and the newest inspections silently read as zero. */
+    function _day(v){ var d=VCHK.dt(v); return d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null; }
+    function dOf(r){ return _day(r.raised); }
+    function closedOf(r){ return _day(r.closed); }
     function ago(n){ return new Date(today.getTime()-n*D); }
     /* the week runs Monday to today, which is how a round is actually planned */
     var dow=(today.getDay()+6)%7;
@@ -21275,13 +21350,20 @@ window.VCHK = (function () {
       {k:'This month', sub:fmtD(monthStart)+' – '+fmtD(today), a:monthStart, b:today},
       {k:'Last month', sub:fmtD(lastMonthStart)+' – '+fmtD(lastMonthEnd), a:lastMonthStart, b:lastMonthEnd}
     ];
+    /* Newest inspection first everywhere: a review reads what just came in. */
+    function _newest(list){
+      return list.slice().sort(function(a,b){
+        var da=dOf(a), db=dOf(b);
+        return (db?db.getTime():0)-(da?da.getTime():0);
+      });
+    }
     window._VCK_PER=PER.map(function(P){
-      var raised=rows.filter(function(r){ return inRange(dOf(r),P.a,P.b); });
+      var raised=_newest(rows.filter(function(r){ return inRange(dOf(r),P.a,P.b); }));
       return { P:P, raised:raised,
-        closed: rows.filter(function(r){ return inRange(closedOf(r),P.a,P.b); }),
-        still:  raised.filter(VCHK.isOpen),
-        over:   raised.filter(overdue),
-        red:    raised.filter(VCHK.isRed) };
+        closed: _newest(rows.filter(function(r){ return inRange(closedOf(r),P.a,P.b); })),
+        still:  _newest(raised.filter(VCHK.isOpen)),
+        over:   _newest(raised.filter(overdue)),
+        red:    _newest(raised.filter(VCHK.isRed)) };
     });
     html+='<div class="vck-h" style="margin-top:20px">📈 Issues raised and closed'+
       '<span style="font-weight:500;color:var(--txm);margin-left:8px;font-size:10.5px">tap any number to see the issues behind it</span></div>'+
