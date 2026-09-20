@@ -1681,39 +1681,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="kc red" onclick="viewAdminRecords('Hold/Open')" style="cursor:pointer;" title="Click to view Hold/Open tasks"><div class="kc-ico">⏸️</div><div class="kc-lbl">Hold / Open</div><div class="kc-val" id="admin-hold">–</div><div class="kc-sub" id="admin-hold-s">Click to view</div></div>
   </div>
 
-  <!-- Quick View: In Progress & Hold/Open tasks, live-filtered by branch -->
+  <!-- Branch table replacing the quick-view chart -->
   <div class="card" style="margin-bottom:16px;">
-    <div class="ch"><h3>⚡ Quick View — In Progress &amp; Hold/Open Tasks</h3><span class="fnote" id="admin-quick-fn">All Branches</span></div>
-    <div class="row r2" style="margin:0;padding:0 14px 14px;">
-      <div>
-        <div style="font-size:11px;font-weight:700;color:#3B82F6;text-transform:uppercase;margin-bottom:6px;">🔄 In Progress — <span id="admin-ip-count">0</span></div>
-        <div style="overflow-x:auto;max-height:260px;overflow-y:auto;border:1px solid #E0E8FF;border-radius:8px;">
-          <table style="width:100%;border-collapse:collapse;font-size:11.5px;">
-            <thead><tr style="background:#EFF6FF;position:sticky;top:0;">
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#3B82F6;text-transform:uppercase;">Branch</th>
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#3B82F6;text-transform:uppercase;">Task</th>
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#3B82F6;text-transform:uppercase;">Priority</th>
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#3B82F6;text-transform:uppercase;">Deadline</th>
-            </tr></thead>
-            <tbody id="admin-ip-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-      <div>
-        <div style="font-size:11px;font-weight:700;color:#DC2626;text-transform:uppercase;margin-bottom:6px;">⚠️ Over Due Tasks — <span id="admin-overdue-count">0</span> &nbsp;<span style="font-weight:500;color:#94A3B8;text-transform:none;cursor:pointer;text-decoration:underline;" onclick="viewAdminRecords('Overdue')">view all</span></div>
-        <div style="overflow-x:auto;max-height:260px;overflow-y:auto;border:1px solid #E0E8FF;border-radius:8px;">
-          <table style="width:100%;border-collapse:collapse;font-size:11.5px;">
-            <thead><tr style="background:#FEF2F2;position:sticky;top:0;">
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#DC2626;text-transform:uppercase;">Branch</th>
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#DC2626;text-transform:uppercase;">Task</th>
-              <th style="padding:6px 10px;text-align:center;font-size:9.5px;font-weight:700;color:#DC2626;text-transform:uppercase;">Days Due</th>
-              <th style="padding:6px 10px;text-align:left;font-size:9.5px;font-weight:700;color:#DC2626;text-transform:uppercase;">Deadline</th>
-            </tr></thead>
-            <tbody id="admin-overdue-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+    <div class="ch"><h3>&#127979; Tasks by branch</h3>
+      <span class="fnote">Assigned, still open, past deadline and the open share, with completed alongside.
+        Click any number for those tasks, showing start date and deadline, newest first.</span></div>
+    <div class="cb-0" style="overflow-x:auto"><table class="dt" id="admin-brtbl"></table></div>
   </div>
   <div class="row r2">
     <div class="card"><div class="ch"><h3>🏗️ Task Status by Branch</h3><span class="fnote">Open work only — completed tasks are excluded so the outstanding bars stay readable</span></div><div class="cb"><div class="cw tall"><canvas id="admin-br"></canvas></div></div></div>
@@ -1889,7 +1862,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="kc amber" onclick="viewVigilanceRecords('AwaitingAdmin')" style="cursor:pointer;" title="Vigilance closed but Admin Status not yet updated"><div class="kc-ico">🧑‍💼</div><div class="kc-lbl">Awaiting Admin Update</div><div class="kc-val" id="vig-awaiting">–</div><div class="kc-sub" id="vig-awaiting-s">Admin Status pending — click to view</div></div>
   </div>
   <div class="row r2">
-    <div class="card"><div class="ch"><h3>🏫 Issue Status by Branch</h3><span class="fnote">Click a segment to view those issues</span></div><div class="cb"><div class="cw tall"><canvas id="vig-br"></canvas></div></div></div>
+    <div class="card"><div class="ch"><h3>&#127979; Issues by branch</h3>
+      <span class="fnote">Raised, still open, past target and the open share, plus checklist issues still open.
+        Click any number for those records, newest first.</span></div>
+      <div class="cb-0" style="overflow-x:auto"><table class="dt" id="vig-brtbl"></table></div></div>
     <div class="card"><div class="ch"><h3>🏆 Branch Safety Performance Score</h3><span class="fnote">Workload 35% + Closure 25% + Speed 20% + Overdue Control 20% · click a branch for records</span></div><div class="cb-0" id="vig-safety-perf"></div></div>
   </div>
   <!-- ═══ DAILY INSPECTION CHECKLIST ═══ -->
@@ -2063,6 +2039,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   </div>
 
   <div class="card" style="margin-bottom:16px;">
+    <div class="ch"><h3>&#128203; Document Register</h3>
+      <span class="fnote">Every vehicle document at every branch, counted three ways: valid, expired, or with no
+        date recorded at all. A missing date is its own column &mdash; it is not the same as valid, and it is the
+        one most likely to hide a lapse. Click any number for the vehicles behind it.</span></div>
+    <div class="cb-0" style="overflow-x:auto"><table class="dt" id="tr-docreg"></table></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
     <div class="ch"><h3>&#9888;&#65039; Documents expired or falling due</h3>
       <span class="fnote">Only the documents with a problem &mdash; expired first, then due within 30 days.
         A vehicle with every document valid does not appear. Click a row for that vehicle's full record.</span></div>
@@ -2120,6 +2104,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="kc red clickable" onclick="viewITMoved('removed')" title="Click to view what was retired"><div class="kc-ico">➖</div><div class="kc-lbl">Retired</div><div class="kc-val" id="it-removed">–</div><div class="kc-sub" id="it-removed-s">Against last check</div></div>
   </div>
 
+<div class="card" style="margin-bottom:16px;">
+    <div class="ch"><h3>&#128197; Monthly asset check &mdash; branch &times; system</h3>
+      <span class="fnote">One table per month, newest first. Rows are branches, columns are systems, and each cell
+        reads <b>working / total</b>. The total comes from the IT Assets master, so it stays the same from month to
+        month &mdash; only the working figure moves. Click any cell for that month's records.</span></div>
+    <div class="cb-0" id="it-monthly"></div>
+  </div>
+
+
   <div class="card" style="margin-bottom:16px;">
     <div class="ch"><h3>&#128260; What changed since the previous check</h3>
       <span class="fnote">Each branch and system compared against its own previous month. A rise means equipment
@@ -2151,14 +2144,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="row r2">
     <div class="card"><div class="ch"><h3>🏫 Assets by Branch</h3><span class="fnote">Click a bar to view that branch's assets</span></div><div class="cb"><div class="cw tall"><canvas id="it-branch"></canvas></div></div></div>
     <div class="card"><div class="ch"><h3>🩺 System Health — Working vs Down vs Pending</h3><span class="fnote">Top systems by asset count</span></div><div class="cb"><div class="cw tall"><canvas id="it-system"></canvas></div></div></div>
-  </div>
-
-<div class="card" style="margin-bottom:16px;">
-    <div class="ch"><h3>&#128197; Monthly asset check &mdash; branch &times; system</h3>
-      <span class="fnote">One table per month, newest first. Rows are branches, columns are systems, and each cell
-        reads <b>working / total</b>. The total comes from the IT Assets master, so it stays the same from month to
-        month &mdash; only the working figure moves. Click any cell for that month's records.</span></div>
-    <div class="cb-0" id="it-monthly"></div>
   </div>
 </div>
 
@@ -4532,6 +4517,36 @@ function viewTeacherGrandAvg(bandKey){
 // ════════════════════════════════════════════
 // ADMIN
 // ════════════════════════════════════════════
+/* Admin tasks behind one cell, newest first by start date, always showing both
+   the start date and the deadline — a task three days old and one three months
+   old read the same without them. */
+function viewAdminBranch(branch, kind){
+  const done=r=>/done|complete/i.test(String(r.Status||''));
+  const today=Date.now();
+  const all=ADMIN_DATA.filter(r=>r.Branch===branch);
+  let rows, title, expr;
+  if(kind==='open'){ rows=all.filter(r=>!done(r)); title='tasks still open';
+    expr='tasks not marked Done or Completed'; }
+  else if(kind==='past'){ rows=all.filter(r=>!done(r) &&
+      (()=>{const t=Date.parse(String(r.Deadline||'')); return !isNaN(t)&&t<today;})());
+    title='tasks past their deadline'; expr='still open AND deadline earlier than today'; }
+  else if(kind==='done'){ rows=all.filter(done); title='tasks completed';
+    expr='tasks marked Done or Completed'; }
+  else { rows=all; title='all tasks'; expr='every task recorded at this branch'; }
+
+  rows=rows.slice().sort((a,b)=>{
+    const ta=Date.parse(String(a.StartDate||a.Deadline||''))||0;
+    const tb=Date.parse(String(b.StartDate||b.Deadline||''))||0;
+    return tb-ta;
+  });
+  openModal('\uD83D\uDDC2\uFE0F '+branch+' \u2014 '+title, rows.length+' task(s) \u00b7 newest first', rows,
+    [{key:'Branch',label:'Branch'},{key:'TaskID',label:'ID'},{key:'Task',label:'Task',maxW:'260px'},
+     {key:'StartDate',label:'Start date',date:true},{key:'Deadline',label:'Deadline',date:true},
+     {key:'Priority',label:'Priority',pill:true},{key:'Status',label:'Status',pill:true},
+     {key:'CompletionDate',label:'Completed on',date:true},{key:'Remarks',label:'Remarks',maxW:'200px'}],
+    { expr:expr, work:rows.length+' of '+all.length+' tasks at '+branch });
+}
+
 function renderAdmin(){
   renderAdminMatrix();
   const BRANCHES=['Boduppal','Keesara','Pocharam','Bachupally','Gowdavalli'];
@@ -4606,6 +4621,45 @@ function renderAdmin(){
   document.getElementById('admin-ip').textContent=fi(ipTasks);
   document.getElementById('admin-hold').textContent=fi(holdTasks);
   setTxt('admin-hold-s',`${holdCount} Hold · ${openCount} Open`);
+
+  /* ── Tasks by branch ──
+     Open share is what ranks branches here: 6 open of 8 is a worse position
+     than 4 open of 40, and the raw counts say the reverse. */
+  {
+    const el=document.getElementById('admin-brtbl');
+    if(el){
+      const brs=(fBranch==='ALL')?[...new Set(ADMIN_DATA.map(r=>r.Branch).filter(Boolean))].sort():[fBranch];
+      const done=r=>/done|complete/i.test(String(r.Status||''));
+      const today=Date.now();
+      let T={t:0,o:0,p:0,c:0};
+      const cell=(n,col,kind,b)=>'<td style="text-align:right;font-weight:700;color:'+col+';cursor:pointer" '+
+        'onclick="viewAdminBranch(\''+String(b).replace(/'/g,"\\'")+'\',\''+kind+'\')">'+fi(n)+'</td>';
+      el.innerHTML = brs.length
+        ? '<thead><tr><th style="text-align:left">Branch</th><th style="text-align:right">Tasks assigned</th>'+
+          '<th style="text-align:right">Still open</th><th style="text-align:right">Past deadline</th>'+
+          '<th style="text-align:right">Open %</th><th style="text-align:right">Completed</th></tr></thead><tbody>'+
+          brs.map(b=>{
+            const rows=ADMIN_DATA.filter(r=>r.Branch===b);
+            const open=rows.filter(r=>!done(r));
+            const past=open.filter(r=>{const t=Date.parse(String(r.Deadline||'')); return !isNaN(t)&&t<today;});
+            const comp=rows.filter(done);
+            const pct=rows.length?Math.round(open.length/rows.length*100):null;
+            T.t+=rows.length; T.o+=open.length; T.p+=past.length; T.c+=comp.length;
+            return '<tr><td style="text-align:left;font-weight:700"><span class="bd b'+b+'"></span> '+b+'</td>'+
+              cell(rows.length,'#1F2937','all',b)+cell(open.length,'#B3402F','open',b)+
+              cell(past.length,'#DC2626','past',b)+
+              '<td style="text-align:right;font-weight:800;color:'+
+                (pct===null?'#94A3B8':pct<=15?'#059669':pct<=35?'#D97706':'#DC2626')+'">'+
+                (pct===null?'\u2013':pct+'%')+'</td>'+
+              cell(comp.length,'#059669','done',b)+'</tr>';
+          }).join('')+
+          '<tr style="background:#F8FAFF;font-weight:800"><td style="text-align:left">All branches</td>'+
+          '<td style="text-align:right">'+fi(T.t)+'</td><td style="text-align:right">'+fi(T.o)+'</td>'+
+          '<td style="text-align:right">'+fi(T.p)+'</td><td style="text-align:right">'+
+          (T.t?Math.round(T.o/T.t*100)+'%':'\u2013')+'</td><td style="text-align:right">'+fi(T.c)+'</td></tr></tbody>'
+        : '<tbody><tr><td class="no-data">No admin tasks.</td></tr></tbody>';
+    }
+  }
 
   // ── Quick View: In Progress & Over Due tasks ──
   {
@@ -4776,6 +4830,47 @@ function viewAdminByBranchStatus(branch,statusBand){
 // ════════════════════════════════════════════
 // VIGILANCE
 // ════════════════════════════════════════════
+/* Vigilance records behind one cell, newest first by the date the issue was
+   raised — a review reads the latest first, and an old list buries what just
+   came in. Rows with no date sort last rather than to the top. */
+function viewVigBranch(branch, kind){
+  const isOpenV=r=>!/^(closed|verified|resolved|rejected|not valid)/i.test(String(r.Status||'').trim());
+  const today=Date.now();
+  let rows, title, expr;
+  if(kind==='chk'){
+    rows=(window._VCHK_ROWS||[]).filter(r=>r.branch===branch &&
+      !/^(closed|verified|resolved|rejected|not valid)/i.test(String(r.status||'').trim()))
+      .slice().sort((a,b)=>(Date.parse(b.raised||'')||0)-(Date.parse(a.raised||'')||0));
+    return openModal('\uD83D\uDCCB '+branch+' \u2014 checklist issues still open',
+      rows.length+' open \u00b7 newest first', rows,
+      [{key:'branch',label:'Branch'},{key:'raised',label:'Raised',date:true},{key:'area',label:'Area'},
+       {key:'point',label:'Checklist point',maxW:'260px'},{key:'severity',label:'Severity',pill:true},
+       {key:'assigned',label:'Assigned to'},{key:'target',label:'Target',date:true},
+       {key:'status',label:'Status',pill:true}],
+      { expr:'checklist rows whose status is not closed, verified or resolved',
+        work:rows.length+' still open at '+branch });
+  }
+  const all=VIG_DATA.filter(r=>r.Branch===branch);
+  if(kind==='open'){ rows=all.filter(isOpenV); title='issues still open';
+    expr='issues whose status is not Closed, Verified or Resolved'; }
+  else if(kind==='past'){ rows=all.filter(r=>isOpenV(r) &&
+      (()=>{const t=Date.parse(String(r.TargetDate||'')); return !isNaN(t)&&t<today;})());
+    title='issues past their target date'; expr='still open AND target date earlier than today'; }
+  else { rows=all; title='all issues raised'; expr='every issue recorded at this branch'; }
+
+  rows=rows.slice().sort((a,b)=>{
+    const ta=Date.parse(String(a.VisitDate||a.Date||''))||0;
+    const tb=Date.parse(String(b.VisitDate||b.Date||''))||0;
+    return tb-ta;
+  });
+  openModal('\uD83D\uDEE1\uFE0F '+branch+' \u2014 '+title, rows.length+' record(s) \u00b7 newest first', rows,
+    [{key:'Branch',label:'Branch'},{key:'VisitDate',label:'Raised',date:true},{key:'Area',label:'Area'},
+     {key:'Issue',label:'Issue',maxW:'280px'},{key:'RiskLevel',label:'Risk',pill:true},
+     {key:'Owner',label:'Owner'},{key:'TargetDate',label:'Target',date:true},
+     {key:'Status',label:'Status',pill:true}],
+    { expr:expr, work:rows.length+' of '+all.length+' raised at '+branch });
+}
+
 function renderVigilance(){
   renderVigMatrix();
   const bl=fBranch==='ALL'?'All Branches':fBranch, ml=fMonth==='ALL'?'All Months':fMonth+' 2026';
@@ -4861,6 +4956,48 @@ function renderVigilance(){
           <div style="text-align:center;"><div style="background:${scBg};color:${sc};font-weight:800;font-size:15px;padding:5px 12px;border-radius:10px;">${s.score}</div><div style="font-size:9px;color:#94A3B8;margin-top:2px;">SCORE</div></div>
         </div>`;
       }).join('')||'<div style="padding:20px;text-align:center;color:#94A3B8;">No vigilance data</div>';
+    }
+  }
+
+  /* ── Issues by branch ──
+     Replaces the stacked chart. Open share is the column that ranks branches:
+     a branch with 40 issues and 4 open is in better shape than one with 8 and
+     6, and the raw counts alone say the opposite. */
+  {
+    const el=document.getElementById('vig-brtbl');
+    if(el){
+      const brs=(fBranch==='ALL')?[...new Set(VIG_DATA.map(r=>r.Branch).filter(Boolean))].sort():[fBranch];
+      const chk=(window._VCHK_ROWS||[]);
+      const isOpenV=r=>!/^(closed|verified|resolved|rejected|not valid)/i.test(String(r.Status||'').trim());
+      const today=Date.now();
+      let T={t:0,o:0,p:0,c:0};
+      const cell=(n,col,kind,b)=>'<td style="text-align:right;font-weight:700;color:'+col+';cursor:pointer" '+
+        'onclick="viewVigBranch(\''+String(b).replace(/'/g,"\\'")+'\',\''+kind+'\')">'+fi(n)+'</td>';
+      el.innerHTML = brs.length
+        ? '<thead><tr><th style="text-align:left">Branch</th><th style="text-align:right">Issues raised</th>'+
+          '<th style="text-align:right">Still open</th><th style="text-align:right">Past target date</th>'+
+          '<th style="text-align:right">Open %</th><th style="text-align:right">Checklist open</th></tr></thead><tbody>'+
+          brs.map(b=>{
+            const rows=VIG_DATA.filter(r=>r.Branch===b);
+            const open=rows.filter(isOpenV);
+            const past=open.filter(r=>{const t=Date.parse(String(r.TargetDate||'')); return !isNaN(t)&&t<today;});
+            const co=chk.filter(r=>r.branch===b &&
+              !/^(closed|verified|resolved|rejected|not valid)/i.test(String(r.status||'').trim()));
+            const pct=rows.length?Math.round(open.length/rows.length*100):null;
+            T.t+=rows.length; T.o+=open.length; T.p+=past.length; T.c+=co.length;
+            return '<tr><td style="text-align:left;font-weight:700"><span class="bd b'+b+'"></span> '+b+'</td>'+
+              cell(rows.length,'#1F2937','all',b)+cell(open.length,'#B3402F','open',b)+
+              cell(past.length,'#DC2626','past',b)+
+              '<td style="text-align:right;font-weight:800;color:'+
+                (pct===null?'#94A3B8':pct<=15?'#059669':pct<=35?'#D97706':'#DC2626')+'">'+
+                (pct===null?'\u2013':pct+'%')+'</td>'+
+              cell(co.length,'#B3402F','chk',b)+'</tr>';
+          }).join('')+
+          '<tr style="background:#F8FAFF;font-weight:800"><td style="text-align:left">All branches</td>'+
+          '<td style="text-align:right">'+fi(T.t)+'</td><td style="text-align:right">'+fi(T.o)+'</td>'+
+          '<td style="text-align:right">'+fi(T.p)+'</td><td style="text-align:right">'+
+          (T.t?Math.round(T.o/T.t*100)+'%':'\u2013')+'</td><td style="text-align:right">'+fi(T.c)+'</td></tr></tbody>'
+        : '<tbody><tr><td class="no-data">No vigilance records.</td></tr></tbody>';
     }
   }
 
@@ -8604,7 +8741,9 @@ function renderTransport(){
       const nStaff=bs.filter(isStaff).length;
       const nStud=bs.length-nStaff;
       const oc=o>100?'#DC2626':o>=85?'#059669':o>=60?'#D97706':'#64748B';
-      return `<tr style="cursor:pointer" onclick="viewTransport('vehicles','${b}')">
+      /* Opens each bus at this branch with the occupancy it is running at,
+         which is what the row's single percentage is averaging over. */
+      return `<tr style="cursor:pointer" onclick="viewTransport('occupancy','${b}')">
         <td style="padding:8px 10px;border-bottom:1px solid #F1F5F9;"><span class="bd b${b}"></span> <strong>${b}</strong></td>
         <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${fi(bv.length)}</td>
         <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${fi(s)}</td>
@@ -8613,6 +8752,64 @@ function renderTransport(){
         <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${fi(nStud)}</td>
         <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${fi(nStaff)}</td></tr>`;
     }).join('')||'<tr><td colspan="7" class="no-data">No data</td></tr>';
+  }
+
+  /* ── Document Register ──
+     Three states per document, kept apart on purpose: valid, expired, and no
+     date recorded. Pooling the last two would let a branch that simply never
+     entered its expiry dates look identical to one whose papers are in order. */
+  {
+    const DOCS=[['Insurance','InsuranceExp'],['Fitness','FitnessExp'],['Permit','PermitExp'],
+                ['PUC','PucExp'],['Road tax','TaxExp'],['Driver licence','LicenceExp']];
+    const nowT=Date.now(), DAY=86400000;
+    const scope=(fBranch==='ALL')?TR_BRANCHES:[fBranch];
+    const stats={};
+    scope.forEach(b=>stats[b]={ok:0,exp:0,none:0,due:0,veh:0});
+    (vehicles||[]).forEach(v=>{
+      const b=v.Branch; if(!stats[b]) return;
+      stats[b].veh++;
+      DOCS.forEach(d=>{
+        if(!(d[1] in v)) return;
+        const txt=String(v[d[1]]==null?'':v[d[1]]).trim();
+        if(!txt||txt==='\u2013'){ stats[b].none++; return; }
+        const t=Date.parse(txt);
+        if(isNaN(t)){ stats[b].none++; return; }
+        const days=Math.round((t-nowT)/DAY);
+        if(days<=0) stats[b].exp++;
+        else { stats[b].ok++; if(days<=30) stats[b].due++; }
+      });
+    });
+    const el=document.getElementById('tr-docreg');
+    if(el){
+      const brs=scope.filter(b=>stats[b].veh>0);
+      const cell=(n,col,kind,b)=>'<td style="text-align:right;font-weight:700;color:'+col+';cursor:pointer" '+
+        'onclick="viewTrDocs(\''+String(b).replace(/'/g,"\\'")+'\',\''+kind+'\')">'+fi(n)+'</td>';
+      let tot={ok:0,exp:0,none:0,due:0,veh:0};
+      el.innerHTML = brs.length
+        ? '<thead><tr><th style="text-align:left">Branch</th><th style="text-align:right">Vehicles</th>'+
+          '<th style="text-align:right">Documents valid</th><th style="text-align:right">Due \u226430 days</th>'+
+          '<th style="text-align:right">Expired</th><th style="text-align:right">No date recorded</th>'+
+          '<th style="text-align:right">Compliant %</th></tr></thead><tbody>'+
+          brs.map(b=>{
+            const e=stats[b]; const all=e.ok+e.exp+e.none;
+            ['ok','exp','none','due','veh'].forEach(k=>tot[k]+=e[k]);
+            const pct=all?Math.round(e.ok/all*100):null;
+            return '<tr><td style="text-align:left;font-weight:700"><span class="bd b'+b+'"></span> '+b+'</td>'+
+              '<td style="text-align:right">'+fi(e.veh)+'</td>'+
+              cell(e.ok,'#059669','ok',b)+cell(e.due,'#D97706','due',b)+
+              cell(e.exp,'#DC2626','expired',b)+cell(e.none,'#B3402F','none',b)+
+              '<td style="text-align:right;font-weight:800;color:'+
+                (pct===null?'#94A3B8':pct>=95?'#059669':pct>=80?'#D97706':'#DC2626')+'">'+
+                (pct===null?'\u2013':pct+'%')+'</td></tr>';
+          }).join('')+
+          '<tr style="background:#F8FAFF;font-weight:800"><td style="text-align:left">All branches</td>'+
+          '<td style="text-align:right">'+fi(tot.veh)+'</td><td style="text-align:right">'+fi(tot.ok)+'</td>'+
+          '<td style="text-align:right">'+fi(tot.due)+'</td><td style="text-align:right">'+fi(tot.exp)+'</td>'+
+          '<td style="text-align:right">'+fi(tot.none)+'</td><td style="text-align:right">'+
+          ((tot.ok+tot.exp+tot.none)?Math.round(tot.ok/(tot.ok+tot.exp+tot.none)*100)+'%':'\u2013')+
+          '</td></tr></tbody>'
+        : '<tbody><tr><td class="no-data">No vehicles in this selection.</td></tr></tbody>';
+    }
   }
 
   /* ── Documents expired or falling due ──
@@ -8728,6 +8925,48 @@ function viewMileage(kind,key){
     {key:'KMRun',label:'KM Run'},{key:'Fuel',label:'Fuel (L)'},{key:'FuelCost',label:'Fuel ₹'},{key:'Mileage',label:'KM/L'},{key:'CostPerKM',label:'₹/KM'}];
   openModal('⛽ Mileage Logs — '+key,`${rows.length} log(s)`,rows,cols);
 }
+/* The vehicles behind one cell of the Document Register, listing only the
+   documents in that state so the reader is not scanning valid dates to find
+   the lapsed one. */
+function viewTrDocs(branch, kind){
+  const T=_trData();
+  const DOCS=[['Insurance','InsuranceExp'],['Fitness','FitnessExp'],['Permit','PermitExp'],
+              ['PUC','PucExp'],['Road tax','TaxExp'],['Driver licence','LicenceExp']];
+  const nowT=Date.now(), DAY=86400000;
+  const rows=[];
+  (T.vehicles||[]).filter(v=>v.Branch===branch).forEach(v=>{
+    const hits=[];
+    DOCS.forEach(d=>{
+      if(!(d[1] in v)) return;
+      const txt=String(v[d[1]]==null?'':v[d[1]]).trim();
+      const t=txt&&txt!=='\u2013'?Date.parse(txt):NaN;
+      const missing=!txt||txt==='\u2013'||isNaN(t);
+      const days=missing?null:Math.round((t-nowT)/DAY);
+      const state=missing?'none':(days<=0?'expired':(days<=30?'due':'ok'));
+      if(state===kind || (kind==='due'&&state==='due') )
+        hits.push(d[0]+' \u2014 '+(missing?'no date recorded'
+          :days<=0?('expired '+Math.abs(days)+'d ago'):('due in '+days+'d')));
+      if(kind==='ok'&&(state==='ok'||state==='due')&&!missing&&days>0)
+        hits.push(d[0]+' \u2014 valid, '+days+'d left');
+    });
+    if(hits.length) rows.push({ Branch:branch, VehicleNo:v.VehicleNo||'\u2013',
+      RouteNo:v.RouteNo||'\u2013', Driver:v.Driver||'\u2013',
+      Count:hits.length, Detail:hits.join('  \u00b7  ') });
+  });
+  const label={ok:'valid documents',due:'documents due within 30 days',
+               expired:'expired documents',none:'documents with no date recorded'}[kind]||kind;
+  openModal('\uD83D\uDCCB '+branch+' \u2014 '+label,
+    rows.reduce((t,r)=>t+r.Count,0)+' document(s) across '+rows.length+' vehicle(s)', rows,
+    [{key:'VehicleNo',label:'Vehicle'},{key:'RouteNo',label:'Route'},{key:'Driver',label:'Driver'},
+     {key:'Count',label:'Documents'},{key:'Detail',label:'Which',maxW:'420px'}],
+    { expr: kind==='none' ? 'documents with no expiry date recorded'
+          : kind==='expired' ? 'documents whose expiry date has passed'
+          : kind==='due' ? 'documents expiring within the next 30 days'
+          : 'documents with an expiry date still in the future',
+      work: rows.reduce((t,r)=>t+r.Count,0)+' of the branch\'s vehicle documents',
+      note: kind==='none' ? 'A document with no date cannot be checked. It is counted separately from expired because the two need different actions: one needs looking up, the other needs renewing.' : '' });
+}
+
 function viewTransportRoute(key){
   const box=document.getElementById('tr-route-report'); if(!box)return;
   if(!key){ box.innerHTML='<div class="no-data" style="padding:16px;">Choose a route above to see its full report.</div>'; return; }
@@ -8767,6 +9006,32 @@ function viewTransport(kind,branch){
     const cols=[{key:'Student',label:'Student',maxW:'180px'},{key:'Class',label:'Class'},{key:'Section',label:'Section'},{key:'Route',label:'Route'},{key:'VehicleNo',label:'Vehicle'},{key:'Distance',label:'Distance'},{key:'RiderType',label:'Rider Type'},{key:'Status',label:'Status'}];
     const groups=scope.map(b=>{const rows=(T.students||[]).filter(r=>r.Branch===b);return {key:b,count:rows.length,rows:rows};});
     openBranchAccordion('🎒 Transport Students — Branch-wise Riders','Riders per branch · expand to view all riders',groups,cols,'riders');
+    return;
+  }
+  if(kind==='occupancy'){
+    /* Every bus with the occupancy it is actually running at. Riders come from
+       the student list by route, since that is the only record of who travels;
+       seats come from the vehicle. A bus with no seat count cannot be given a
+       percentage and says so rather than showing 0%. */
+    const cols=[{key:'VehicleNo',label:'Vehicle'},{key:'RouteNo',label:'Route'},
+      {key:'Driver',label:'Driver'},{key:'Seats',label:'Seats'},{key:'Riders',label:'Riders'},
+      {key:'Occupancy',label:'Occupancy'},{key:'Spare',label:'Free seats'}];
+    const groups=scope.map(b=>{
+      const rows=(T.vehicles||[]).filter(r=>r.Branch===b).map(v=>{
+        const riders=(T.students||[]).filter(x=>x.Branch===b &&
+          (String(x.Route)===String(v.RouteNo) ||
+           (v.VehicleNo && String(x.VehicleNo).trim()===String(v.VehicleNo).trim()))).length;
+        const seats=+v.Seats||0;
+        const pct=seats?Math.round(riders/seats*100):null;
+        return { Branch:b, VehicleNo:v.VehicleNo||'–', RouteNo:v.RouteNo||'–', Driver:v.Driver||'–',
+          Seats:seats||'–', Riders:riders,
+          Occupancy: pct===null?'no seat count':pct+'%',
+          Spare: seats?Math.max(0,seats-riders):'–', _pct: pct===null?-1:pct };
+      }).sort((a,b2)=>b2._pct-a._pct);
+      return {key:b,count:rows.length,rows:rows};
+    }).filter(g=>g.count>0);
+    openBranchAccordion('\uD83D\uDE8C Bus occupancy \u2014 branch by branch',
+      'Each bus, fullest first \u00b7 riders \u00f7 seats', groups, cols, 'vehicles');
     return;
   }
   if(kind==='vehicles'||kind==='fleet'){
@@ -9265,7 +9530,15 @@ function renderIT(){
       Previous:prv, Current:cur, Change:(diff>0?'+':'')+diff,
       From:prvMap[k].mk, To:curMap[k].mk });
   });
-  movedRows.sort((a,b)=>Math.abs(+b.Change)-Math.abs(+a.Change));
+  /* Retirements first, largest first: equipment leaving the estate is the thing
+     that needs explaining, while additions are usually a purchase somebody
+     already approved. Within each group the biggest movement leads. */
+  movedRows.sort((a,b)=>{
+    const ca=+a.Change, cb=+b.Change;
+    const na=ca<0, nb=cb<0;
+    if(na!==nb) return na?-1:1;
+    return Math.abs(cb)-Math.abs(ca);
+  });
   window._IT_MOVED=movedRows;
   window._IT_CURROWS=curRows;
   /* Drawn here, not at the top of renderIT: the table reads _IT_MOVED, which
