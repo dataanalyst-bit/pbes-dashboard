@@ -17206,7 +17206,15 @@ var SYL_FIELDS = {
      those as notebooks would multiply every almanac class by six. studentsDone
      and studentsTotal are the same thing on both modules and are used first. */
   numerator:   ['studentsdone','numerator','covered','completed','done','num'],
-  denominator: ['studentstotal','denominator','total','strength','den','books'],
+  /* CLASS SIZE comes first. The export carries no studentsTotal column, so
+     this used to fall through to `denominator` — which on a notebook row is the
+     number of notebooks CHECKED, not the class. A floor in-charge who checked
+     7 notebooks of 40 and found all 7 corrected scored 7/7 = 100%, and the 33
+     unchecked students never entered the sum. Keesara read 97% when under half
+     its notebooks had been looked at. Against the whole class the group figure
+     is 63%, not 96%.                                                        */
+  denominator: ['classsize','studentstotal','strength','denominator','total','den','books'],
+  checked:     ['studentsmarked','denominator'],
   itemsDone:   ['numerator'],
   itemsTotal:  ['denominator'],
   incharge:    ['floorincharge','incharge','checkedby','owner','fi'],
@@ -17296,7 +17304,12 @@ function sylRowsFromSheet(tab){
     }
     var den = _sylNum(g(r,'denominator'));
     var num = _sylNum(g(r,'numerator'));
-    var pct = M.pct>=0 ? _sylNum(g(r,'pct')) : (den>0 ? num/den*100 : 0);
+    /* Notebook % is recomputed against the class, never taken from the sheet:
+       the sheet's completionPct is corrected ÷ checked, which is the very
+       figure that read 100% for a 7-of-40 check. Almanac keeps the sheet's
+       own value — its base is already the whole class times six items. */
+    var pct = (mod === 'N' && den > 0) ? Math.min(100, num / den * 100)
+            : (M.pct>=0 ? _sylNum(g(r,'pct')) : (den>0 ? num/den*100 : 0));
 
     return [
       mod,
