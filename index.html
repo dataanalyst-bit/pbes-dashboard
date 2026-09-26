@@ -16390,7 +16390,7 @@ async function loadCivil(force){
   try{
     if(!force){
       try{
-        var c=await idbGet('pbes_civil');
+        var c=await idbGet('pbes_civil_v2');
         if(c && c.data && c.data.civil && (Date.now()-c.t) < 24*3600*1000){
           _cvRaw=c.data; _cvLoaded=true; _cvPaint(); _cvStatus('Cached · refreshing in background');
         }
@@ -16415,7 +16415,7 @@ async function loadCivil(force){
                       '/api/data forwards ?section=civil');
 
     _cvRaw=raw; _cvLoaded=true;
-    try{ idbSet('pbes_civil',{ t:Date.now(), data:raw }); }catch(e){}
+    try{ idbSet('pbes_civil_v2',{ t:Date.now(), data:raw }); }catch(e){}
     _cvPaint();
     _cvStatus(raw.generatedAt ? ('Updated '+String(raw.generatedAt).replace('T',' ').slice(0,16)) : '');
   }catch(err){
