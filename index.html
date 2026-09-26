@@ -760,7 +760,26 @@ function _banner(msg, bg, color, autohide) {
 }
 function showLoadError(msg)  { _banner('⚠️ ' + msg, '#FEF2F2', '#DC2626', 0); }
 function showLoading()       { _banner('⏳ Loading live data from Google Sheet…', '#EFF6FF', '#1E4FD8', 0); }
+/* Syllabus & Notebook reads its own large ledger instead of riding in the main
+   payload, so it used to start downloading only when the tab was clicked — and
+   then sat on "Reading the monitoring ledger…" for up to a minute while every
+   other tab opened instantly. It is now fetched quietly in the background a few
+   seconds after the dashboard loads, so by the time anyone clicks the tab the
+   data is already there. Only for accounts that can see the tab, and only once. */
+var _sylPrefetched = false;
+function _sylPrefetch(){
+  if (_sylPrefetched) return;
+  _sylPrefetched = true;
+  try {
+    var btn = document.querySelector('[onclick*="showTab(\'syl\'"]');
+    if (!btn || btn.offsetParent === null) return;          // tab hidden for this role
+    if (typeof loadSyl !== 'function') return;
+    setTimeout(function(){ try { loadSyl(false); } catch(e){} }, 3000);
+  } catch (e) {}
+}
+
 function showLoadOk(genAt, ms) {
+  try { _sylPrefetch(); } catch (e) {}
   const t = genAt ? new Date(genAt).toLocaleString('en-IN') : 'just now';
   _banner('🟢 Live data loaded — ' + t + (ms ? ' (' + ms + 'ms)' : '') +
           ' &nbsp;|&nbsp; <a href="javascript:loadLiveData(true)" style="color:#059669;font-weight:700;text-decoration:underline;">Refresh now</a>',
@@ -4829,9 +4848,9 @@ function viewVigBranch(branch, kind){
     return openModal('\uD83D\uDCCB '+branch+' \u2014 checklist issues still open',
       rows.length+' open \u00b7 newest first', rows,
       [{key:'branch',label:'Branch'},{key:'raised',label:'Raised',date:true},{key:'area',label:'Area'},
-       {key:'point',label:'Checklist point',maxW:'260px'},{key:'severity',label:'Severity',pill:true},
+       {key:'wrong',label:'Issue',maxW:'240px'},{key:'visits',label:'Visits'},{key:'severity',label:'Severity',pill:true},
        {key:'assigned',label:'Assigned to'},{key:'target',label:'Target',date:true},
-       {key:'status',label:'Status',pill:true}],
+       {key:'status',label:'Latest status',pill:true},{key:'visitLog',label:'Every visit',maxW:'320px'}],
       { expr:'checklist rows still to be worked \u2014 Open, Unassigned, Assigned, In Progress or Re-opened',
         work:rows.length+' still open at '+branch,
         note:'"Work Done \u2014 Verification Pending" is not counted here: the work is finished and only the sign-off is outstanding.' });
@@ -18416,9 +18435,9 @@ function cgCell(key, branch){
 
     case 'chk-open': return T('Checklist issues still open', d.chk.open + ' open', d.chk.openRows,
       [{key:'branch',label:'Branch'},{key:'raised',label:'Raised',date:true},{key:'area',label:'Area'},
-       {key:'point',label:'Checklist point',maxW:'260px'},{key:'severity',label:'Severity',pill:true},
+       {key:'wrong',label:'Issue',maxW:'240px'},{key:'visits',label:'Visits'},{key:'severity',label:'Severity',pill:true},
        {key:'assigned',label:'Assigned to'},{key:'target',label:'Target',date:true},
-       {key:'status',label:'Status',pill:true}],
+       {key:'status',label:'Latest status',pill:true},{key:'visitLog',label:'Every visit',maxW:'320px'}],
       { expr: 'checklist rows whose status is not closed, verified or resolved',
         work: d.chk.open + ' of ' + d.chk.total,
         note: d.chk.total ? '"Work done \u2014 verification pending" counts as open here, matching the Vigilance tab.'
@@ -21158,7 +21177,7 @@ window.VCHK = (function () {
       throw new Error('The checklist sheet needs at least a Branch and a Status column. '+
         'It has: ' + hdr.filter(Boolean).join(' | '));
     var g = function(r,k){ return M[k]>=0 ? String(r[M[k]]==null?'':r[M[k]]).trim() : ''; };
-    return tab.rows.map(function(r){
+    var raw = tab.rows.map(function(r){
       return {
         id:g(r,'id'), flag:g(r,'flag'), why:g(r,'why'), branch:g(r,'branch'),
         areaCode:g(r,'areaCode'), area:g(r,'area'), location:g(r,'location'),
@@ -21170,6 +21189,56 @@ window.VCHK = (function () {
         photos: photosOf(r, M)
       };
     }).filter(function(x){ return x.branch; });
+    return dedupeVisits(raw);
+  }
+
+  /* ── One issue, many visits ──
+     A vigilance officer revisits a branch weekly and re-raises anything still
+     unfixed. Each re-raise was a new row, so one broken tap seen on four visits
+     counted as four open issues and the backlog read several times its real
+     size. Rows describing the same problem at the same place are now one issue.
+
+     "Same" means same branch, same area, same location and the same wording of
+     what is wrong, compared without case, spacing or punctuation. An issue
+     reworded between visits stays separate — merging on a guess would risk
+     hiding two genuinely different faults under one line.
+
+     The LATEST visit decides the current status, owner and remarks, because it
+     is the most recent word on the problem. The FIRST visit decides the raised
+     date, so ageing runs from when the school first knew — an issue first seen
+     a month ago and re-raised yesterday is a month old, not a day. Every visit
+     is kept in `history` for the drill-down.                               */
+  function dedupeVisits(rows){
+    var norm = function(v){ return String(v==null?'':v).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim(); };
+    var dayOf = function(v){ var t = Date.parse(String(v||'')); return isNaN(t) ? 0 : t; };
+    var groups = {}, order = [];
+    rows.forEach(function(r){
+      var k = [norm(r.branch), norm(r.areaCode || r.area), norm(r.location), norm(r.wrong)].join('|');
+      if (!norm(r.wrong)) k += '|' + (r.id || Math.random());     // nothing to match on — keep as is
+      if (!groups[k]) { groups[k] = []; order.push(k); }
+      groups[k].push(r);
+    });
+    return order.map(function(k){
+      var g = groups[k].slice().sort(function(a,b){ return dayOf(b.raised) - dayOf(a.raised); });
+      var latest = g[0], first = g[g.length - 1];
+      var rep = Object.assign({}, latest);
+      rep.visits = g.length;
+      rep.history = g;
+      rep.firstRaised = first.raised;
+      rep.lastRaised = latest.raised;
+      rep.raised = first.raised;
+      rep.visitLog = g.length > 1
+        ? g.length + ' visits: ' + g.map(function(v){
+            return (v.raised || '?') + ' ' + (v.status || '') + (v.note ? ' (' + v.note + ')' : '');
+          }).join(' \u00b7 ')
+        : '1 visit';
+      /* Photos from every visit, so the evidence of a recurring fault is not
+         lost when its rows are folded together. */
+      var ph = [];
+      g.forEach(function(v){ (v.photos || []).forEach(function(x){ if (ph.indexOf(x) < 0) ph.push(x); }); });
+      rep.photos = ph;
+      return rep;
+    });
   }
   /* "Work Done - Verification Pending" means the work HAS been done and only the
      sign-off is outstanding. Counting it as an open issue overstated the backlog
