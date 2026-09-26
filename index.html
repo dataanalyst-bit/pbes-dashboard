@@ -22636,8 +22636,16 @@ window.renderCivilTab = function (raw) {
 
   var tab = raw && raw.civil;
   if (!tab || !tab.hdr || !tab.rows) { host.innerHTML = '<div class="card"><div class="cb">No civil data in this reply.</div></div>'; return; }
-  var H = tab.hdr.map(function (h) { return String(h == null ? '' : h).trim().toLowerCase(); });
-  var col = function (name) { return H.indexOf(name.toLowerCase()); };
+  /* Headers are compared without case, spaces or punctuation, so "Project / Task",
+     "Project/Task" and "PROJECT TASK" are one column. Exact matching missed small
+     spelling differences and every project came up blank. */
+  var nh = function (v) { return String(v == null ? '' : v).toLowerCase().replace(/[^a-z0-9]/g, ''); };
+  var H = tab.hdr.map(nh);
+  var col = function (name) {
+    var k = nh(name), i = H.indexOf(k);
+    if (i < 0) for (var j = 0; j < H.length; j++) if (H[j] && (H[j].indexOf(k) === 0 || k.indexOf(H[j]) === 0)) { i = j; break; }
+    return i;
+  };
   var C = {
     id: col('Work ID'), branch: col('Branch'), cat: col('Work Category'), project: col('Project / Task'),
     sub: col('Subtask'), desc: col('Work Description'), loc: col('Location'), pri: col('Priority'),
@@ -22648,6 +22656,15 @@ window.renderCivilTab = function (raw) {
     remarks: col('Remarks'), delayDays: col('Delay Days'), health: col('Timeline Health'),
     check: col('Data Check'), req: col('Request Date')
   };
+  if (C.project < 0 || C.branch < 0) {
+    var got = (tab.hdr || []).filter(Boolean).slice(0, 20).join(' · ');
+    host.innerHTML = '<div class="card"><div class="cb" style="color:#B3402F;line-height:1.7">' +
+      '<b>The Civil sheet is not sending a ' + (C.project < 0 ? '"Project / Task"' : '"Branch"') + ' column.</b><br>' +
+      'Headers received: ' + (got || '(none)') + '<br><br>' +
+      'Redeploy Code.gs as a new version, then run <code>testCivil()</code> in the Apps Script editor — ' +
+      'it prints the header row it found and the column names, which shows whether the tab or the headers need fixing.</div></div>';
+    return;
+  }
   var esc = function (v) { return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
   var dt = function (v) {
     if (v == null || v === '') return '';
