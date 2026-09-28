@@ -124,6 +124,12 @@ export async function onRequestGet({ request, env }) {
   // cache would keep serving the old snapshot for its whole TTL and "Refresh" would
   // appear to do nothing after a redeploy.
   const bypassCache = reqUrl.searchParams.get("nocache") === "1";
+  // ?fresh=1 skips only the EDGE copy and reads Apps Script's own cache. The
+  // dashboard sends it right after a Refresh that outran its timeout: the
+  // rebuild keeps running in Apps Script and stores its result there, and this
+  // picks it up instead of being handed the edge's older copy or starting a
+  // second rebuild.
+  const freshOnly = reqUrl.searchParams.get("fresh") === "1";
 
   // ── 1. Authenticate the caller against Supabase ──
   const authHeader = request.headers.get("Authorization") || "";
@@ -177,7 +183,7 @@ export async function onRequestGet({ request, env }) {
     "https://pbes-dashboard-cache.internal/api/data" + (section ? "/" + section : "")
   );
 
-  let upstream = bypassCache ? undefined : await cache.match(cacheKey);
+  let upstream = (bypassCache || freshOnly) ? undefined : await cache.match(cacheKey);
 
   if (!upstream) {
     const base = env.APPS_SCRIPT_URL;
