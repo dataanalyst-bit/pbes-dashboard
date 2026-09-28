@@ -21311,48 +21311,79 @@ window.VCHK = (function () {
     return dedupeVisits(raw);
   }
 
-  /* ── One issue, many visits ──
-     A vigilance officer revisits a branch weekly and re-raises anything still
-     unfixed. Each re-raise was a new row, so one broken tap seen on four visits
-     counted as four open issues and the backlog read several times its real
-     size. Rows describing the same problem at the same place are now one issue.
+  /* ── One checkpoint, one issue, per branch ──
+     The vigilance officer revisits a branch and re-raises anything still
+     unfixed, so the same checkpoint arrives as a new row on every visit. These
+     used to be folded together only when branch, area code, location AND the
+     checkpoint wording all matched. Location is typed afresh on each visit and
+     area codes were renumbered, so one failing checkpoint seen on four visits
+     still showed as three or four open issues — the "81 open" was mostly
+     repeats.
 
-     "Same" means same branch, same area, same location and the same wording of
-     what is wrong, compared without case, spacing or punctuation. An issue
-     reworded between visits stays separate — merging on a guess would risk
-     hiding two genuinely different faults under one line.
+     Now the rule is the one the school works to: at a branch, a checkpoint is
+     ONE issue however many visits have raised it. It is compared without case,
+     spacing or punctuation. A row with no checkpoint text is left on its own —
+     there is nothing to match it on.
 
-     The LATEST visit decides the current status, owner and remarks, because it
-     is the most recent word on the problem. The FIRST visit decides the raised
-     date, so ageing runs from when the school first knew — an issue first seen
-     a month ago and re-raised yesterday is a month old, not a day. Every visit
-     is kept in `history` for the drill-down.                               */
+     • It counts as OPEN if any of its visits is still open. Otherwise it is
+       "work done · verification pending" if any visit is at that stage, and
+       closed only when every visit is closed — so folding rows together can
+       never hide an open one.
+     • Owner, status and remarks come from the newest visit in that state;
+       the owner is the newest one actually assigned, so a fresh re-raise does
+       not make an assigned checkpoint look unassigned.
+     • Ageing and the target date run from the FIRST visit: a checkpoint first
+       failed a month ago and re-raised yesterday is a month old.
+     • Every visit, every location and every photo is kept for the drill-down. */
   function dedupeVisits(rows){
-    var norm = function(v){ return String(v==null?'':v).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim(); };
+    /* "&" and "and" are the same checkpoint; so are trailing full stops and
+       doubled spaces */
+    var norm = function(v){ return String(v==null?'':v).toLowerCase().replace(/&/g,' and ')
+      .replace(/[^a-z0-9]+/g,' ').trim(); };
     var dayOf = function(v){ var t = Date.parse(String(v||'')); return isNaN(t) ? 0 : t; };
+    var uniq = function(a){ var o=[]; a.forEach(function(x){ x=String(x||'').trim(); if(x && o.indexOf(x)<0) o.push(x); }); return o; };
+    var stateOf = function(v){ return isOpen(v) ? 0 : toVerify(v) ? 1 : 2; };
     var groups = {}, order = [];
     rows.forEach(function(r){
-      var k = [norm(r.branch), norm(r.areaCode || r.area), norm(r.location), norm(r.wrong)].join('|');
-      if (!norm(r.wrong)) k += '|' + (r.id || Math.random());     // nothing to match on — keep as is
+      var cp = norm(r.wrong);
+      var k = norm(r.branch) + '|' + (cp || ('#' + (r.id || Math.random())));
       if (!groups[k]) { groups[k] = []; order.push(k); }
       groups[k].push(r);
     });
     return order.map(function(k){
-      var g = groups[k].slice().sort(function(a,b){ return dayOf(b.raised) - dayOf(a.raised); });
-      var latest = g[0], first = g[g.length - 1];
+      var g = groups[k].slice().sort(function(a,b){ return dayOf(b.raised) - dayOf(a.raised); });   // newest first
+      var worst = Math.min.apply(null, g.map(stateOf));
+      var live = g.filter(function(v){ return stateOf(v) === worst; });
+      var latest = live[0], first = g[g.length - 1], newest = g[0];
       var rep = Object.assign({}, latest);
+
+      /* the newest visit that has an owner — among the live visits first, then
+         any visit, so a checkpoint someone was given does not read as unassigned
+         just because an older duplicate row was never assigned */
+      var owner = live.filter(function(v){ return !unassigned(v); })[0] ||
+                  g.filter(function(v){ return !unassigned(v); })[0];
+      if (owner) { rep.assigned = owner.assigned; rep.assignedRole = owner.assignedRole; }
+      var targets = live.map(function(v){ return v.target; }).filter(function(t){ return dayOf(t); })
+        .sort(function(a,b){ return dayOf(a) - dayOf(b); });
+      if (targets.length) rep.target = targets[0];
+
       rep.visits = g.length;
+      rep.openVisits = g.filter(isOpen).length;
       rep.history = g;
       rep.firstRaised = first.raised;
-      rep.lastRaised = latest.raised;
+      rep.lastRaised = newest.raised;
       rep.raised = first.raised;
+      rep.ids = uniq(g.map(function(v){ return v.id; }));
+      var locs = uniq(g.map(function(v){ return v.location; }));
+      rep.locations = locs;
+      if (locs.length > 1) rep.location = locs.join(' \u00b7 ');
       rep.visitLog = g.length > 1
         ? g.length + ' visits: ' + g.map(function(v){
-            return (v.raised || '?') + ' ' + (v.status || '') + (v.note ? ' (' + v.note + ')' : '');
+            return (v.raised || '?') + ' ' + (v.status || '') + (v.location ? ' @ ' + v.location : '') +
+                   (v.note ? ' (' + v.note + ')' : '');
           }).join(' \u00b7 ')
         : '1 visit';
-      /* Photos from every visit, so the evidence of a recurring fault is not
-         lost when its rows are folded together. */
+      /* photos from every visit, so the evidence of a recurring fault is kept */
       var ph = [];
       g.forEach(function(v){ (v.photos || []).forEach(function(x){ if (ph.indexOf(x) < 0) ph.push(x); }); });
       rep.photos = ph;
@@ -21525,11 +21556,34 @@ window.VCHK = (function () {
   function median(a){ if(!a.length) return 0; var s=a.slice().sort(function(x,y){return x-y;}),m=s.length>>1;
     return s.length%2 ? s[m] : (s[m-1]+s[m])/2; }
 
-  var COLS = [{key:'id',label:'Issue'},{key:'branch',label:'Branch'},{key:'raised',label:'Raised',date:true},
+  /* One line per checkpoint per branch. "Visits" says how many rounds have
+     raised it and how many of those are still open; "Every visit" lists them. */
+  function _vckD(v){ var d=VCHK.dt(v); if(!d) return v||'?';
+    var M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return String(d.getDate()).padStart(2,'0')+'-'+M[d.getMonth()]; }
+  var COLS = [{key:'id',label:'Issue',render:function(v,r){
+      var ids=r.ids||[v]; return esc(v||'')+(ids.length>1?'<div style="font-size:10.5px;color:#94A3B8">+'+(ids.length-1)+' earlier ID'+(ids.length>2?'s':'')+'</div>':''); }},
+    {key:'branch',label:'Branch'},
+    {key:'wrong',label:'Checkpoint',maxW:'240px'},
+    {key:'visits',label:'Visits',render:function(v,r){
+      var n=v||1;
+      if(n<2) return '<span style="color:#64748B">1 visit</span>';
+      var still=VCHK.isOpen(r);
+      return '<b style="color:'+(still?'#B91C1C':'#0F172A')+'">'+n+' visits</b>'+
+        '<div style="font-size:10.5px;color:#64748B;white-space:nowrap">'+
+        (still?'still open':(VCHK.toVerify(r)?'verification pending':'closed'))+
+        ' \u00b7 '+_vckD(r.firstRaised)+' \u2192 '+_vckD(r.lastRaised)+'</div>'; }},
+    {key:'raised',label:'First raised',date:true},
     {key:'area',label:'Area'},{key:'location',label:'Location',maxW:'170px'},
-    {key:'wrong',label:'Checklist point',maxW:'220px'},{key:'detail',label:'Detail',maxW:'260px'},
+    {key:'detail',label:'Detail',maxW:'240px'},
     {key:'severity',label:'Severity',pill:true},{key:'assigned',label:'Assigned to'},
-    {key:'status',label:'Status',pill:true}];
+    {key:'status',label:'Status',pill:true},
+    {key:'visitLog',label:'Every visit',maxW:'300px',render:function(v,r){
+      var h=r.history||[];
+      if(h.length<2) return '<span style="color:#CBD5E1">\u2014</span>';
+      return h.map(function(x){
+        return '<div style="font-size:11px;line-height:1.45;white-space:nowrap">'+esc(_vckD(x.raised))+' \u00b7 '+
+          esc(x.status||'')+(x.id?' <span style="color:#94A3B8">'+esc(x.id)+'</span>':'')+'</div>'; }).join(''); }}];
 
   /* every drill-down carries the photo button, because a photograph is the
      only part of this record that shows what the officer actually saw */
@@ -21731,11 +21785,13 @@ window.VCHK = (function () {
     window._VCK_COV=BRS.map(function(b){
       var br=rows.filter(function(r){ return r.branch===b; });
       var last=null, days={};
-      br.forEach(function(r){
-        var d=dOf(r); if(!d) return;
+      /* every visit counts — a checkpoint re-raised today is a visit today even
+         though the checkpoint itself was first raised weeks ago */
+      br.forEach(function(r){ (r.history||[r]).forEach(function(v){
+        var d=_day(v.raised); if(!d) return;
         if(!last||d>last) last=d;
         if((today-d)/D<=30) days[d.toISOString().slice(0,10)]=1;
-      });
+      }); });
       return { b:b, rows:br, last:last, days: last?Math.round((today-last)/D):null,
                rounds:Object.keys(days).length };
     }).sort(function(a,b){ return (a.days===null?1e9:a.days)-(b.days===null?1e9:b.days); });
@@ -21754,27 +21810,35 @@ window.VCHK = (function () {
       'counts distinct days on which an issue was raised there, so it measures visits rather than volume.</p>';
 
     /* ═════ CHECKLIST POINTS ═════ */
+    /* Each checkpoint is now one line per branch, so "how often" is the number
+       of VISITS that raised it, and "open" is branches where it is still open. */
     var pts=group(rows,function(r){ return r.wrong; },'(no checklist point recorded)')
       .map(function(x){ var brs={}; x.rows.forEach(function(r){ brs[r.branch]=1; });
-        x.nbr=Object.keys(brs).length; x.open=x.rows.filter(VCHK.isOpen).length; return x; }).slice(0,10);
+        var ob={}; x.rows.forEach(function(r){ if(VCHK.isOpen(r)) ob[r.branch]=1; });
+        x.nbr=Object.keys(brs).length; x.open=Object.keys(ob).length;
+        x.n=x.rows.reduce(function(s,r){ return s+(r.visits||1); },0); return x; })
+      .sort(function(a,b){ return b.n-a.n; }).slice(0,10);
     window._VCK_PT=pts;
-    var maxP=Math.max.apply(null,pts.map(function(p){return p.rows.length;}).concat([1]));
+    var maxP=Math.max.apply(null,pts.map(function(p){return p.n;}).concat([1]));
     html+='<div class="vck-h" style="margin-top:20px">🔎 Checklist points failing most often</div>'+
       pts.map(function(p,i){
         var col=p.nbr>=3?'#DC2626':p.nbr===2?'#D97706':'#1E4FD8';
         return '<div class="vck-row vck-c" data-pt="'+i+'">'+
           '<div style="font-size:13px;text-align:center">'+(p.nbr>=3?'🌐':'📍')+'</div>'+
           '<div><div class="vck-nm">'+esc(p.k)+'</div>'+
-          '<div class="vck-bar"><i style="width:'+(p.rows.length/maxP*100)+'%;background:'+col+'"></i></div>'+
-          '<div class="vck-sub">'+p.open+' still open \u00b7 '+p.nbr+' branch'+(p.nbr===1?'':'es')+
+          '<div class="vck-bar"><i style="width:'+(p.n/maxP*100)+'%;background:'+col+'"></i></div>'+
+          '<div class="vck-sub">'+p.n+' visit'+(p.n===1?'':'s')+' \u00b7 still open at '+p.open+' branch'+(p.open===1?'':'es')+
+          ' \u00b7 raised at '+p.nbr+' branch'+(p.nbr===1?'':'es')+
           (p.nbr>=3?' \u2014 a standard nobody is meeting, not a branch problem':'')+'</div></div>'+
-          '<div class="vck-n" style="color:'+col+'">'+p.rows.length+'</div></div>';
+          '<div class="vck-n" style="color:'+col+'">'+p.n+'</div></div>';
       }).join('');
 
     el.innerHTML=html;
     var fn=$('vck-fn');
+    var _visits=rows.reduce(function(s,r){ return s+(r.visits||1); },0);
     if(fn) fn.textContent=((typeof fBranch!=='undefined'&&fBranch!=='ALL')?fBranch:'All branches')+
-      ' \u00b7 '+rows.length+' issues \u00b7 '+open.length+' open';
+      ' \u00b7 '+rows.length+' checkpoints raised ('+_visits+' visits) \u00b7 '+open.length+' open \u00b7 '+
+      'a checkpoint counts once per branch however many visits raised it';
 
     /* every number opens the issues behind it */
     var FL={raised:'raised',closed:'closed in this period',still:'raised and still open',
@@ -21782,7 +21846,8 @@ window.VCHK = (function () {
             open:'still open',unassd:'open with no owner'};
     el.querySelectorAll('.vck-k').forEach(function(n){
       n.addEventListener('click',function(){ var k=K[+n.dataset.k];
-        openIssues('🔎 '+k.l, k.v+' issue(s)', k.list); });
+        var _rep=k.list.filter(function(r){ return (r.visits||1)>1; }).length;
+        openIssues('🔎 '+k.l, k.v+' checkpoint(s)'+(_rep?' \u00b7 '+_rep+' raised on more than one visit':''), k.list); });
     });
     el.querySelectorAll('[data-per]').forEach(function(n){
       n.addEventListener('click',function(){ var x=window._VCK_PER[+n.dataset.per], f=n.dataset.f;
@@ -21809,7 +21874,7 @@ window.VCHK = (function () {
     });
     el.querySelectorAll('[data-pt]').forEach(function(n){
       n.addEventListener('click',function(){ var x=window._VCK_PT[+n.dataset.pt];
-        openIssues('🔎 '+x.k, x.rows.length+' issue(s) \u00b7 '+x.open+' still open \u00b7 '+x.nbr+' branch(es)', x.rows); });
+        openIssues('🔎 '+x.k, x.n+' visit(s) \u00b7 still open at '+x.open+' of '+x.nbr+' branch(es)', x.rows); });
     });
   }
 
