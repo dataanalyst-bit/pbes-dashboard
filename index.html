@@ -17224,8 +17224,19 @@ var SYL_FIELDS = {
      count the six ticked items per student, so a class of 26 shows 156. Reading
      those as notebooks would multiply every almanac class by six. studentsDone
      and studentsTotal are the same thing on both modules and are used first. */
-  numerator:   ['studentsdone','numerator','covered','completed','done','num'],
-  denominator: ['studentstotal','denominator','total','strength','den','books'],
+  /* The sheet computes numerator and denominator itself, per the definitions it
+     was built to: a NOTEBOOK row is Done ÷ Collected (Done + Not Done — absent
+     and not-applicable students excluded); an ALMANAC row is weightEarned ÷
+     weightAvailable (Homework 30, Classwork 30, Teacher Sign 25, Parent Sign 5,
+     Word 5, Thought 5 — 90 for EY). Those two columns are read FIRST.
+
+     They used to come second. studentsDone came first, so an almanac row's
+     numerator was a head-count while its denominator was a weight — students
+     divided by weight points, which is not a percentage of anything. Every
+     grouping on this tab is SUM(numerator) ÷ SUM(denominator), so reading the
+     right two columns is all it takes for every figure to be exact. */
+  numerator:   ['numerator','studentsdone','covered','completed','done','num'],
+  denominator: ['denominator','studentscollected','studentstotal','total','strength','den','books'],
   itemsDone:   ['numerator'],
   itemsTotal:  ['denominator'],
   incharge:    ['floorincharge','incharge','checkedby','owner','fi'],
@@ -17315,7 +17326,11 @@ function sylRowsFromSheet(tab){
     }
     var den = _sylNum(g(r,'denominator'));
     var num = _sylNum(g(r,'numerator'));
-    var pct = M.pct>=0 ? _sylNum(g(r,'pct')) : (den>0 ? num/den*100 : 0);
+    /* Always numerator ÷ denominator, so a single row agrees exactly with any
+       total built from it. The sheet's own completionPct is the same figure,
+       but recomputing it here means a rounded or hand-edited cell can never
+       make one row disagree with the branch total that includes it. */
+    var pct = den > 0 ? num / den * 100 : (M.pct>=0 ? _sylNum(g(r,'pct')) : 0);
 
     return [
       mod,
