@@ -17632,11 +17632,11 @@ window.addEventListener('message',function(ev){
    fetch" with no further detail is what the browser reports when the request is
    cut off, and it tells the reader nothing about which end was slow — so the
    timeout is explicit here and the message says what to do about it. */
-async function _lazyFetch(section, force, session, ms){
+async function _lazyFetch(section, force, session, ms, extra){
   var ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
   var timer = setTimeout(function(){ if(ctl) ctl.abort(); }, ms || 55000);
   try{
-    var res = await fetch(DATA_API+'?section='+section+(force?'&nocache=1':'')+'&_t='+Date.now(),
+    var res = await fetch(DATA_API+'?section='+section+(force?'&nocache=1':'')+(extra||'')+'&_t='+Date.now(),
       { headers:{ 'Authorization':'Bearer '+session.access_token }, signal: ctl?ctl.signal:undefined });
     return res;
   }catch(err){
@@ -19747,16 +19747,38 @@ async function _sylPaintCache(){
 /* Read the feed. force=true asks Apps Script to rebuild from the sheet instead
    of serving its warm cache; it is used only when the copy is clearly stale.
    Whenever a copy is already on screen this runs silently behind it. */
-async function _sylFetch(force, announce){
-  if(_sylLoading) return;
+/* What time a copy was read from the sheet, as a clock time plus its age. */
+function _sylReadAt(generatedAt){
+  var t = Date.parse(generatedAt||''); if(!t || isNaN(t)) return '';
+  var d = new Date(t), hm = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  var m = Math.max(0, Math.round((Date.now()-t)/60000));
+  return 'Read from the sheet at '+hm+' ('+(m<2?'just now':m<60?m+' min ago':Math.round(m/60)+' h ago')+')';
+}
+var _sylForceQueued=false, _sylForceAnnounce=false;
+var _sylFollow=0;   // follow-up reads left after a forced read outran its timeout
+async function _sylFetch(force, announce, fresh){
+  /* A Refresh pressed while the tab's own background check is running used to
+     be dropped without a word — and the background check then returned the old
+     cached copy, which looked exactly like Refresh not working. It is queued
+     now and runs the moment the current read finishes. */
+  if(_sylLoading){
+    if(force){ _sylForceQueued=true; _sylForceAnnounce=_sylForceAnnounce||!!announce;
+      if(announce) _sylStatus('Reading the sheet… (queued behind the check already running)'); }
+    return;
+  }
   _sylLoading=true;
+  /* every press of Refresh starts clean, whatever an earlier one left behind */
+  if(force && announce){ _sylRetried=false; _sylFollow=0; }
+  var before = _sylRaw && _sylRaw.generatedAt;
   if(!_sylLoaded) _sylStatus('Loading…');
-  else if(announce) _sylStatus('Reading the sheet…');
+  else if(announce) _sylStatus('Reading the sheet… this takes up to a minute');
   try{
     var session=await _sylSession();
     if(!session){ window.location.href='login.html'; return; }
 
-    var res=await _lazyFetch('syl', force, session, 55000);
+    /* a forced read rebuilds from the sheet, which can take longer than a
+       cached one — it is given the longer allowance */
+    var res=await _lazyFetch('syl', force, session, force ? 95000 : 55000, fresh ? '&fresh=1' : '');
     if(res.status===401){ await sb.auth.signOut(); window.location.href='login.html'; return; }
     if(!res.ok) throw new Error('HTTP '+res.status+' from /api/data. A 404 means the Apps Script '+
       'deployment URL is stale \u2014 in Apps Script use Deploy \u2192 Manage deployments \u2192 edit the '+
@@ -19772,13 +19794,28 @@ async function _sylFetch(force, announce){
     /* the saved copy is only ever REPLACED by a newer one, never cleared first */
     try{ idbSet('pbes_syl',{ t:Date.now(), uid:_sylUid, data:raw }); }catch(e){}
     _sylPost();                              // redraws only if the rows changed
-    _sylStatus(_sylAgeLabel(raw.generatedAt));
+    var newer = !before || Date.parse(raw.generatedAt||'') > Date.parse(before||'');
+    if(newer) _sylFollow = 0;
+    if(announce && !newer && _sylFollow > 0){
+      /* the rebuild started by Refresh is still finishing on the server — look
+         again shortly rather than report the old copy as the answer */
+      _sylFollow--;
+      _sylStatus('Still reading the sheet\u2026');
+      setTimeout(function(){ _sylFetch(false, true, true); }, 12000);
+    } else if(announce && !newer){
+      /* the request came back with the copy already on screen — say so rather
+         than leave the reader wondering whether anything happened */
+      _sylStatus('The data service returned the same copy \u2014 '+_sylReadAt(raw.generatedAt)+
+        '. Code.gs may be the older version: redeploy it, then press Refresh again.', true);
+    } else {
+      _sylStatus(announce ? 'Refreshed \u2014 '+_sylReadAt(raw.generatedAt).replace(/^Read/,'read') : _sylAgeLabel(raw.generatedAt));
+    }
 
-    /* The sheet is rebuilt into the cache every 15 minutes by refreshSylCache().
-       A copy older than 45 minutes means that trigger has stopped, so rebuild
-       once — silently, with the current copy left on screen meanwhile. */
+    /* The server keeps a copy for 20 minutes at most. Anything older means the
+       server is running an older Code.gs, so rebuild once — silently, with the
+       current copy left on screen meanwhile. */
     var age = _sylAgeMinutes(raw.generatedAt);
-    if(!force && age !== null && age > 45 && !_sylStaleForced){
+    if(!force && age !== null && age > 20 && !_sylStaleForced){
       _sylStaleForced = true;
       setTimeout(function(){ _sylFetch(true); }, 500);
     }
@@ -19786,14 +19823,29 @@ async function _sylFetch(force, announce){
     var msg = String(err && err.message || err);
     var coldStart = /did not answer within|Failed to fetch|Could not reach/i.test(msg);
     if(coldStart && !_sylRetried){
-      /* the second attempt is served from the cache the first one warmed */
+      /* The rebuild keeps running on the server after the browser stops
+         waiting, and stores its result. So the retry is an ordinary read a
+         little later, which picks that result up instead of starting another
+         rebuild. */
       _sylRetried=true;
-      setTimeout(function(){ _sylFetch(force); }, 1200);
+      if(announce) _sylStatus('Still reading the sheet\u2026');
+      /* after a forced read, look up to four times over the next minute, past
+         the edge copy, for the result the server is still storing */
+      if(force) _sylFollow = 3;
+      setTimeout(function(){ _sylFetch(false, announce, !!force); }, force ? 8000 : 1200);
       return;
     }
     if(!_sylLoaded) _sylFail(msg);
-    _sylStatus(_sylLoaded ? _sylAgeLabel(_sylRaw && _sylRaw.generatedAt) : msg, !_sylLoaded);
-  }finally{ _sylLoading=false; }
+    else if(announce) _sylStatus('Refresh did not complete \u2014 still showing the copy '+
+      (_sylReadAt(_sylRaw && _sylRaw.generatedAt).replace(/^Read/,'read')||'already on screen')+'. '+msg, true);
+    else _sylStatus(_sylAgeLabel(_sylRaw && _sylRaw.generatedAt));
+  }finally{
+    _sylLoading=false;
+    if(_sylForceQueued){
+      var ann=_sylForceAnnounce; _sylForceQueued=false; _sylForceAnnounce=false;
+      setTimeout(function(){ _sylFetch(true, ann); }, 50);
+    }
+  }
 }
 
 /* Opening the tab: paint from the saved copy at once, then check the feed —
