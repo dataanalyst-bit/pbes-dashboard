@@ -898,6 +898,107 @@ catch (e) {
   }
 }
 
+/* ══════════════════ ON HOLD — EXCLUDED EVERYWHERE ══════════════════
+   Work a department has put on hold is neither open nor late: it is paused by
+   decision. Counting it as open inflated every backlog, and counting it in a
+   completion rate marked branches down for a decision. So a row whose status
+   says Hold ("Hold", "On Hold", "On-hold", "Kept on hold") is taken out of the
+   data the moment it arrives — before any tab, the Consolidated Glance, the
+   Executive Overview or the head-to-head scorecard sees it — and kept in
+   window._HOLD so it can still be listed (the ⏸ chip in the filter bar).
+   The test reads every status-type field (Status, AdminStatus,
+   PurchaseStatus, …). "Removed from hold" / "not on hold" do not count. */
+window._HOLD = window._HOLD || {};
+function _isHoldVal(v){
+  var t = String(v == null ? '' : v);
+  return /\bhold\b/i.test(t) && !/\b(no|not|off|removed\s+from|released\s+from|out\s+of)\s+(on\s+)?hold\b/i.test(t);
+}
+function _isHoldRow(r){
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return false;
+  for (var k in r) if (/status/i.test(k) && !/raw$/i.test(k) && _isHoldVal(r[k])) return true;
+  return false;
+}
+/* take the held rows out of one array, remembering them under a department */
+function _dropHold(dept, arr){
+  if (!Array.isArray(arr)) return arr;
+  var keep = [], held = [];
+  arr.forEach(function(r){ (_isHoldRow(r) ? held : keep).push(r); });
+  window._HOLD[dept] = held;
+  return keep;
+}
+/* the same for a sheet-shaped table {hdr, rows}: any status column saying Hold */
+function _dropHoldTable(dept, tab){
+  if (!tab || !Array.isArray(tab.hdr) || !Array.isArray(tab.rows)) return tab;
+  var cols = [];
+  tab.hdr.forEach(function(h, i){ if (/status/i.test(String(h))) cols.push(i); });
+  if (!cols.length) return tab;
+  var keep = [], held = [];
+  tab.rows.forEach(function(r){
+    var h = cols.some(function(i){ return _isHoldVal(r[i]); });
+    if (!h) { keep.push(r); return; }
+    var o = {};
+    tab.hdr.forEach(function(k, i){ if (r[i] !== '' && r[i] != null && o[k] === undefined) o[k] = r[i]; });
+    held.push(o);
+  });
+  window._HOLD[dept] = held;
+  return Object.assign({}, tab, { rows: keep });
+}
+window._dropHold = _dropHold; window._dropHoldTable = _dropHoldTable; window._isHoldVal = _isHoldVal;
+
+/* One readable line per held item, whatever department it came from. */
+function _holdPick(r, names){
+  var keys = Object.keys(r || {});
+  for (var i = 0; i < names.length; i++){
+    var want = names[i].toLowerCase().replace(/[^a-z0-9]/g,'');
+    for (var j = 0; j < keys.length; j++){
+      if (keys[j].toLowerCase().replace(/[^a-z0-9]/g,'') === want){
+        var v = r[keys[j]];
+        if (v !== '' && v != null && v !== '\u2013' && v !== '-') return String(v);
+      }
+    }
+  }
+  return '';
+}
+function _holdRowsInScope(){
+  var out = [];
+  Object.keys(window._HOLD || {}).forEach(function(dept){
+    (window._HOLD[dept] || []).forEach(function(r){
+      var br = _holdPick(r, ['Branch','branch','Campus']);
+      if (typeof fBranch !== 'undefined' && fBranch !== 'ALL' && br && br !== fBranch) return;
+      var st = '';
+      Object.keys(r).forEach(function(k){ if (!st && /status/i.test(k) && _isHoldVal(r[k])) st = String(r[k]); });
+      out.push({ Department: dept, Branch: br || '\u2014',
+        Item: _holdPick(r, ['TaskName','Task Name','Task','Issue','Key Issues / Observations','Item','Position',
+                            'Description','Point','Monitoring Point','Area','Work','Work Description','Particulars',
+                            'What is wrong','Checklist point','Title','Student']) || '\u2014',
+        Status: st || 'Hold',
+        Date: _holdPick(r, ['Date','StartDate','Start Date','PostDate','Post Date','VisitDate','Visit Date',
+                            'Raised date','Deadline','TargetDate','Target Date']),
+        Owner: _holdPick(r, ['Owner','AssignedTo','Assigned To','HR','RaisedBy','Raised By','CreatedBy','Created By','Responsible Owner']),
+        Remarks: _holdPick(r, ['Remarks','Notes','BranchRemarks','Branch Remarks','Next','ActionTaken']) });
+    });
+  });
+  return out;
+}
+window._holdChip = function(){
+  var b = document.getElementById('hold-chip'), n = document.getElementById('hold-chip-n');
+  if (!b || !n) return;
+  var k = _holdRowsInScope().length;
+  n.textContent = k.toLocaleString('en-IN');
+  b.style.display = k ? '' : 'none';
+};
+window._holdList = function(){
+  var rows = _holdRowsInScope(), by = {};
+  rows.forEach(function(r){ by[r.Department] = (by[r.Department] || 0) + 1; });
+  var bl = (typeof fBranch === 'undefined' || fBranch === 'ALL') ? 'All Branches' : fBranch;
+  openModal('\u23f8 On hold \u2014 left out of every figure',
+    rows.length + ' item(s) \u00b7 ' + bl + ' \u00b7 ' + Object.keys(by).map(function(d){ return d + ' ' + by[d]; }).join(' \u00b7 ') +
+    ' \u00b7 not counted as open, done or late anywhere on the dashboard, including the Executive Overview',
+    rows, [{key:'Department',label:'Department',pill:true},{key:'Branch',label:'Branch'},{key:'Item',label:'Item',maxW:'280px'},
+           {key:'Status',label:'Status',pill:true},{key:'Date',label:'Date',date:true},{key:'Owner',label:'Owner'},
+           {key:'Remarks',label:'Remarks',maxW:'260px'}]);
+};
+
 // Assign every data array from a payload (used by both the live fetch and the instant cache)
 function applyLiveData(data){
     if (data.TOTAL_STUDENTS)    { document.getElementById('hv-students').textContent = data.TOTAL_STUDENTS.toLocaleString('en-IN');
@@ -933,6 +1034,37 @@ function applyLiveData(data){
     if (data.AVIS_DATA)        AVIS_DATA        = data.AVIS_DATA;
     if (data.TRANSPORT)        window._TRANSPORT = data.TRANSPORT;
     if (data.IT_DATA_ALL)      window._IT = data.IT_DATA_ALL;
+    /* On hold is taken out here, once, for every department (see _dropHold).
+       Only arrays this payload actually carried are touched, so a partial
+       payload cannot wipe the record of what is on hold. */
+    if (data.ADMIN_DATA)      ADMIN_DATA     = _dropHold('Admin Tracker', ADMIN_DATA);
+    if (data.VIG_DATA)        VIG_DATA       = _dropHold('Vigilance', VIG_DATA);
+    if (data.GRIEVANCE_DATA)  GRIEVANCE_DATA = _dropHold('Grievance', GRIEVANCE_DATA);
+    if (data.PUR_DATA)        PUR_DATA       = _dropHold('Purchase', PUR_DATA);
+    if (data.HR_RECORDS)      HR_RECORDS     = _dropHold('HR', HR_RECORDS);
+    if (data.CARE_DATA)       CARE_DATA      = _dropHold('Care Calls', CARE_DATA);
+    if (data.ADMP_DATA)       ADMP_DATA      = _dropHold('Admission Process', ADMP_DATA);
+    if (data.GO_DATA)         GO_DATA        = _dropHold('Grievance Officer', GO_DATA);
+    if (data.AVIS_DATA)       AVIS_DATA      = _dropHold('AVIS', AVIS_DATA);
+    /* the head-to-head feed carries the same admin / vigilance / grievance rows;
+       filtered the same way so the Overview scorecard agrees with the tabs */
+    if (data.SCORE_SLIM && SCORE_SLIM) {
+      ['admin','vig','griev'].forEach(function(k){
+        if (Array.isArray(SCORE_SLIM[k])) SCORE_SLIM[k] = SCORE_SLIM[k].filter(function(r){ return !_isHoldRow(r); });
+      });
+    }
+    /* transport and IT are objects of arrays */
+    [['TRANSPORT','_TRANSPORT','Transport'],['IT_DATA_ALL','_IT','IT']].forEach(function(t){
+      var o = window[t[1]]; if (!data[t[0]] || !o || typeof o !== 'object') return;
+      var n = {}, held = [];
+      Object.keys(o).forEach(function(k){
+        if (!Array.isArray(o[k])) { n[k] = o[k]; return; }
+        n[k] = _dropHold('_tmp', o[k]); held = held.concat(window._HOLD._tmp);
+      });
+      delete window._HOLD._tmp;
+      window[t[1]] = n; window._HOLD[t[2]] = held;
+    });
+    try { if (window._holdChip) window._holdChip(); } catch (e) {}
     if (data.DATE_WINDOWS)     DATE_WINDOWS     = data.DATE_WINDOWS;
 }
 
@@ -1147,6 +1279,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     </select>
     <div class="fsep"></div>
     <div class="fbadge"><span class="fbadge-dot"></span><span id="fbadge-txt">Showing: All Branches · All Months</span></div>
+    <button id="hold-chip" type="button" onclick="window._holdList()" title="Items on hold are left out of every figure on the dashboard — click to see them"
+      style="display:none;margin-left:8px;padding:5px 11px;border-radius:999px;border:1.5px solid #DDD6FE;background:#F5F3FF;color:#6D28D9;font:700 11.5px Inter,sans-serif;cursor:pointer;white-space:nowrap">⏸ <span id="hold-chip-n">0</span> on hold · not counted</button>
   </div>
 </div>
 
@@ -1718,7 +1852,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="kc blue clickable" onclick="viewAdminClosedWeek('this')" title="Click to view tasks closed this week"><div class="kc-ico">🗓️</div><div class="kc-lbl">Current Week Closed</div><div class="kc-val" id="admin-cwc">–</div><div class="kc-sub" id="admin-cwc-s">Sun–today · click to view</div></div>
     <div class="kc green"><div class="kc-ico">✅</div><div class="kc-lbl">Done</div><div class="kc-val" id="admin-done">–</div><div class="kc-sub" id="admin-pct-s">–</div></div>
     <div class="kc amber" onclick="viewAdminRecords('In Progress')" style="cursor:pointer;" title="Click to view In Progress tasks"><div class="kc-ico">🔄</div><div class="kc-lbl">In Progress</div><div class="kc-val" id="admin-ip">–</div><div class="kc-sub">Ongoing — click to view</div></div>
-    <div class="kc red" onclick="viewAdminRecords('Hold/Open')" style="cursor:pointer;" title="Click to view Hold/Open tasks"><div class="kc-ico">⏸️</div><div class="kc-lbl">Hold / Open</div><div class="kc-val" id="admin-hold">–</div><div class="kc-sub" id="admin-hold-s">Click to view</div></div>
+    <div class="kc red" onclick="viewAdminRecords('Hold/Open')" style="cursor:pointer;" title="Click to view Open tasks (on hold is not counted)"><div class="kc-ico">📌</div><div class="kc-lbl">Open</div><div class="kc-val" id="admin-hold">–</div><div class="kc-sub" id="admin-hold-s">Click to view</div></div>
   </div>
 
   <!-- Branch table replacing the quick-view chart -->
@@ -1762,7 +1896,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             <option value="ALL">All Statuses</option>
             <option value="Done">Done</option>
             <option value="In Progress">In Progress</option>
-            <option value="Hold">Hold</option>
             <option value="Open">Open</option>
           </select>
           <button onclick="closeAdminPanel()" style="padding:6px 12px;background:#FEF2F2;color:#DC2626;border:1.5px solid #FECACA;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">✕ Close</button>
@@ -2810,6 +2943,7 @@ function applyFilters(){
   const bl=fBranch==='ALL'?'All Branches':fBranch;
   const ml=fMonth==='ALL'?'All Months':fMonth+' 2026';
   document.getElementById('fbadge-txt').textContent='Showing: '+bl+' · '+ml+' (excl. Overview)';
+  try{ window._holdChip && window._holdChip(); }catch(e){}
   renderAll();
 }
 
@@ -3088,7 +3222,7 @@ function renderOverview(){
     const adInProg=ADM.filter(r=>/in progress/i.test(r.Status||'')).length;
     const adHoldOpen=ADM.filter(r=>/hold|open/i.test(r.Status||'')).length;
     setTxt('ov-admin', fi(adInProg)+' / '+fi(adHoldOpen));
-    setTxt('ov-admin-s', adInProg+' In Progress · '+adHoldOpen+' Hold/Open');
+    setTxt('ov-admin-s', adInProg+' In Progress · '+adHoldOpen+' Open');   // on hold is excluded on arrival
 
     // Vigilance — show OPEN count, sub: Closed (status now only Open/Closed)
     const VIG=(typeof VIG_DATA!=='undefined'&&Array.isArray(VIG_DATA))?VIG_DATA:[];
@@ -3228,7 +3362,7 @@ function renderOverview(){
     const hold=ADM.filter(r=>/hold|open/i.test(r.Status||'')).length;
     window._OV_ADMSTATUS=['Done','In Progress','Hold/Open'];
     mkChart('ov-admin-chart',{type:'doughnut',
-      data:{labels:['Done','In Progress','Hold/Open'],datasets:[{data:[done,prog,hold],
+      data:{labels:['Done','In Progress','Open'],datasets:[{data:[done,prog,hold],
         backgroundColor:['#059669','#3B82F6','#F59E0B'],borderWidth:2,borderColor:'#fff'}]},
       options:{responsive:true,maintainAspectRatio:false,
         onClick:(evt,els)=>{ if(!els||!els.length)return; viewAdminOverviewStatus(window._OV_ADMSTATUS[els[0].index]); },
@@ -4629,7 +4763,10 @@ function renderAdmin(){
   document.getElementById('admin-pct-s').textContent=totalTasks>0?compRate+'% completion':'–';
   document.getElementById('admin-ip').textContent=fi(ipTasks);
   document.getElementById('admin-hold').textContent=fi(holdTasks);
-  setTxt('admin-hold-s',`${holdCount} Hold · ${openCount} Open`);
+  {
+    const _held=((window._HOLD&&window._HOLD['Admin Tracker'])||[]).filter(r=>fBranch==='ALL'||r.Branch===fBranch).length;
+    setTxt('admin-hold-s',`${openCount} Open`+(_held?` · ${_held} on hold, not counted`:''));
+  }
 
   /* ── Tasks by branch ──
      Open share is what ranks branches here: 6 open of 8 is a worse position
@@ -4727,7 +4864,7 @@ function renderAdmin(){
     labels,
     datasets:[
       {label:'In Progress',data:inprog,backgroundColor:'#3B82F6',borderRadius:4,stack:'s'},
-      {label:'Hold/Open',  data:hold,  backgroundColor:'#F59E0B',borderRadius:4,stack:'s'},
+      {label:'Open',  data:hold,  backgroundColor:'#F59E0B',borderRadius:4,stack:'s'},
     ]
   },options:{responsive:true,maintainAspectRatio:true,
     onClick:(evt,elements)=>{
@@ -5442,7 +5579,10 @@ function renderHR(){
   setTxt('hr-closed',fi(totClosed));
   setTxt('hr-closed-s',compRate+'% closure rate');
   setTxt('hr-open',fi(totOpen));
-  setTxt('hr-open-s',totHold>0?totHold+' on hold · click to view':'Requires follow-up · click to view');
+  {
+    const _held=((window._HOLD&&window._HOLD.HR)||[]).filter(r=>fBranch==='ALL'||r.Branch===fBranch).length;
+    setTxt('hr-open-s',_held>0?_held+' on hold, not counted · click to view':'Requires follow-up · click to view');
+  }
   // Avg Closing/Month = mean of each active recruiter's (closed ÷ active-months) rate.
   const _cpmRates=activeHRs.map(h=>LIVE_KPI[h]&&LIVE_KPI[h].avg_closing_raw).filter(v=>typeof v==='number'&&isFinite(v)&&v>0);
   const avgClosePM=_cpmRates.length?+(_cpmRates.reduce((a,b)=>a+b,0)/_cpmRates.length).toFixed(1):0;
@@ -5855,7 +5995,8 @@ function viewHRKpi(status){
   let label='All Positions';
   if(status==='Open'){ rows=rows.filter(r=>/^open$/i.test(String(r.Status||'').trim())); label='Open / Pending'; }
   else if(status==='Closed'){ rows=rows.filter(r=>/closed|filled/i.test(String(r.Status||''))); label='Closed Positions'; }
-  else if(status==='Hold'){ rows=rows.filter(r=>/hold/i.test(String(r.Status||''))); label='On Hold'; }
+  else if(status==='Hold'){ rows=((window._HOLD&&window._HOLD.HR)||[]).filter(r=>fBranch==='ALL'||r.Branch===fBranch);
+                           label='On Hold (not counted)'; }
   const cols=[{key:'HR',label:'Recruiter'},{key:'PostDate',label:'Posted',date:true},{key:'Priority',label:'Priority',pill:true},
     {key:'Position',label:'Position',maxW:'180px'},{key:'Branch',label:'Branch'},{key:'Status',label:'Status',pill:true},
     {key:'ClosedDate',label:'Closed',date:true},{key:'DaysToClose',label:'Days'},
@@ -5869,7 +6010,7 @@ function viewHRByRecruiter(hr,status){
   let rows=(typeof HR_RECORDS!=='undefined'&&Array.isArray(HR_RECORDS))?HR_RECORDS.filter(r=>r.HR===hr):[];
   if(status==='Open') rows=rows.filter(r=>/^open$/i.test(String(r.Status||'').trim()));
   else if(status==='Closed') rows=rows.filter(r=>/closed|filled/i.test(String(r.Status||'')));
-  else if(status==='Hold') rows=rows.filter(r=>/hold/i.test(String(r.Status||'')));
+  else if(status==='Hold') rows=((window._HOLD&&window._HOLD.HR)||[]).filter(r=>r.HR===hr);
   const cols=[{key:'HR',label:'HR'},{key:'PostDate',label:'Posted',date:true},{key:'Priority',label:'Priority',pill:true},
     {key:'Position',label:'Position',maxW:'180px'},{key:'Branch',label:'Branch'},{key:'Status',label:'Status',pill:true},
     {key:'ClosedDate',label:'Closed',date:true},{key:'DaysToClose',label:'Days'},
@@ -11138,7 +11279,7 @@ function _renderAdminAllTasks(){
     if(!bar){ bar=document.createElement('div'); bar.id='adm-filter-bar'; bar.style.cssText='padding:6px 0 2px;'; sub.parentNode.insertBefore(bar,sub.nextSibling); }
     bar.innerHTML='<span style="font-size:10px;color:#94A3B8;font-weight:700;margin-right:4px;">STATUS:</span>'
       +chip('All','status','ALL',_admFilterStatus==='ALL')+chip('Done','status','Done',_admFilterStatus==='Done')
-      +chip('In Progress','status','In Progress',_admFilterStatus==='In Progress')+chip('Hold/Open','status','Hold/Open',_admFilterStatus==='Hold/Open')
+      +chip('In Progress','status','In Progress',_admFilterStatus==='In Progress')+chip('Open','status','Hold/Open',_admFilterStatus==='Hold/Open')
       +'<span style="font-size:10px;color:#94A3B8;font-weight:700;margin:0 4px 0 10px;">DUE:</span>'
       +chip('All','due','ALL',_admFilterDue==='ALL')+chip('Overdue','due','Overdue',_admFilterDue==='Overdue')
       +chip('On Track','due','OnTrack',_admFilterDue==='OnTrack')+chip('Completed','due','Completed',_admFilterDue==='Completed');
@@ -16687,7 +16828,9 @@ async function loadCivil(force){
       try{
         var c=await idbGet('pbes_civil_v2');
         if(c && c.data && c.data.civil && (Date.now()-c.t) < 24*3600*1000){
-          _cvRaw=c.data; _cvLoaded=true; _cvPaint(); _cvStatus('Cached · refreshing in background');
+          _cvRaw=Object.assign({},c.data,{civil:_dropHoldTable('Civil Work',c.data.civil)});
+          _cvLoaded=true; _cvPaint(); _cvStatus('Cached · refreshing in background');
+          try{ window._holdChip && window._holdChip(); }catch(e){}
         }
       }catch(e){}
     }
@@ -16709,8 +16852,10 @@ async function loadCivil(force){
       throw new Error('No civil rows returned. Check that the "Civil" tab exists and that '+
                       '/api/data forwards ?section=civil');
 
-    _cvRaw=raw; _cvLoaded=true;
     try{ idbSet('pbes_civil_v2',{ t:Date.now(), data:raw }); }catch(e){}
+    /* on hold is excluded here, after the untouched copy is saved */
+    _cvRaw=Object.assign({},raw,{civil:_dropHoldTable('Civil Work',raw.civil)}); _cvLoaded=true;
+    try{ window._holdChip && window._holdChip(); }catch(e){}
     _cvPaint();
     _cvStatus(raw.generatedAt ? ('Updated '+String(raw.generatedAt).replace('T',' ').slice(0,16)) : '');
   }catch(err){
@@ -19098,7 +19243,7 @@ function nlpDocs(){
   const stillOpen = r => {
     const st = String(r.Status || '').trim();
     if (!st) return true;
-    if (/progress|assigned|open|pending|hold|verification/i.test(st)) return true;
+    if (/progress|assigned|open|pending|verification/i.test(st)) return true;   // on hold never reaches here
     return !/closed|verified|resolved|completed|done|rejected|not valid|no concern/i.test(st);
   };
   const push = (branch, dept, text, row, colsKey) => {
@@ -21650,6 +21795,9 @@ window.VCHK = (function () {
   }
 
   function toRows(tab){
+    /* on hold is excluded from every checklist figure (see _dropHold) */
+    if (window._dropHoldTable) tab = window._dropHoldTable('Vigilance checklist', tab);
+    try { window._holdChip && window._holdChip(); } catch (e) {}
     var hdr = tab.hdr.map(function(x){ return String(x==null?'':x).trim(); });
     var M = indexOf(hdr);
     if(M.branch < 0 || M.status < 0)
