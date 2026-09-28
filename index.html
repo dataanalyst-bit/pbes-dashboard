@@ -2529,13 +2529,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div class="au-sec">
         <h3>Branch scorecard</h3>
         <div class="sub">Compliance is <b>(Yes + ½ × In Progress) ÷ (Yes + No + In Progress)</b> across the five stage
-          columns. In Progress earns half credit — started but not finished is neither a pass nor the same as never
-          having begun. NA and NR are excluded from the denominator, so an item that does not apply to a campus
-          neither helps nor hurts it, and an all-NA row scores a dash rather than 0%. This is the same formula
-          the branch sheets use in their own OVERALL COMPLIANCE SCORE row. NA and NR are excluded from the
-          denominator rather than counted against a branch. <b>In progress counts as a miss</b>: unfinished work at
-          audit time is not compliance, and half-crediting it would let a branch sit at 50% permanently by never
-          closing anything.</div>
+          columns — the same formula as the sheet's own <b>Score %</b> column, applied once to the pooled counts.
+          In Progress earns half credit: started but not finished is neither a pass nor the same as never having
+          begun. NA, NR and blank cells are left out of the denominator, so an item that does not apply to a
+          campus neither helps nor hurts it, and an all-NA row scores a dash rather than 0%. <b>Change</b> is
+          against the same branch's previous audit.</div>
         <div id="au-score"></div>
       </div>
 
@@ -12163,21 +12161,21 @@ window.addEventListener('message', function(ev){
    --------------------------------------------------------------------------
    Compliance analytics over the School Audit sheet.
 
-   THE MEASURE. Every figure on this tab is  Yes / (Yes + No + IP)  across the
-   five stage columns. NA, NR and blanks are excluded from the denominator.
-   This is the same formula the branch sheets use in their OVERALL COMPLIANCE
-   SCORE row, so a branch principal opening their own sheet sees the number
-   they see here. Verified against the Annual Tracker: 12 of the 13 section
-   figures for Boduppal June reproduce exactly.
+   THE MEASURE — identical to the School Audit sheet's own per-row columns:
+     Score %    = (Yes + ½ × IP) ÷ (Yes + No + IP)          the sheet's "Score %"
+     Coverage % = (Yes + No + IP) ÷ (Yes + No + IP + NA + NR) the sheet's "Coverage %"
+   Blank cells count in neither, exactly as in the sheet. Totals are pooled —
+   the counts are added up and the formula applied once — so a big branch and a
+   small one weigh by the checks they actually carry.
 
-   IP counts as a miss, not a half-mark. "In progress" at audit time is not
-   compliance, and treating it as half would let a branch sit permanently at
-   50% by never finishing anything.
+   Cells are read the way the sheet's COUNTIF columns read them: Yes, No, IP,
+   NA and NR, without regard to case. Anything else in a stage cell is counted
+   as unrecognised and listed under data quality.
 
-   COVERAGE IS REPORTED BESIDE EVERY SCORE. A branch that marks most of the
-   checklist NA or NR is scored on whatever is left, which can flatter it. The
-   score and the coverage have to be read together, so they are never shown
-   apart.
+   CROSS-CHECKED ON EVERY LOAD. Where the feed carries the sheet's own Yes, No,
+   IP, NA, NR, Score % and Coverage % columns, every row is recomputed here and
+   compared with them; any disagreement is listed row by row under "How far to
+   trust these numbers".
    ══════════════════════════════════════════════════════════════════════════ */
 window.AUDIT = (function () {
   'use strict';
@@ -12214,20 +12212,40 @@ window.AUDIT = (function () {
   }
   function monthShort(m) { return str(m).split(/\s+/)[0].slice(0, 3); }
 
-  /* ── one tally object per slice ── */
-  function blank() { return { yes: 0, no: 0, ip: 0, na: 0, nr: 0, none: 0, rows: 0 }; }
+  /* Header names compared the way Code.gs compares them: case, spaces,
+     punctuation and the kind of dash ("3–5" or "3-5") do not matter. */
+  function norm(h) {
+    return str(h).toLowerCase().replace(/[\u2010-\u2015\u2212]/g, '-').replace(/[^a-z0-9&-]/g, '');
+  }
+  /* ONE classifier for every cell on the tab. It reads a stage cell exactly as
+     the sheet's COUNTIF columns do — Yes, No, IP, NA, NR, any case — so a "yes"
+     typed in lower case counts here just as it counts in the sheet. A blank is
+     a blank; anything else is unrecognised and reported, never guessed at. */
+  function cls(v) {
+    var s = str(v).toUpperCase();
+    if (s === 'YES') return 'yes';
+    if (s === 'NO') return 'no';
+    if (s === 'IP') return 'ip';
+    if (s === 'NA') return 'na';
+    if (s === 'NR') return 'nr';
+    return s === '' ? 'none' : 'other';
+  }
+
+  /* ── one tally object per slice ──
+     none  = blank cells, other = unrecognised values; neither is scored */
+  function blank() { return { yes: 0, no: 0, ip: 0, na: 0, nr: 0, none: 0, other: 0, rows: 0 }; }
   function addRow(t, row, cols) {
     t.rows++;
     for (var i = 0; i < cols.length; i++) {
       if (cols[i] < 0) continue;
-      var v = str(row[cols[i]]);
-      if (v === 'Yes') t.yes++;
-      else if (v === 'No') t.no++;
-      else if (v === 'IP') t.ip++;
-      else if (v === 'NA') t.na++;
-      else if (v === 'NR') t.nr++;
-      else t.none++;
+      t[cls(row[cols[i]])]++;
     }
+  }
+  /* add one tally into another */
+  function merge(t, x) {
+    t.yes += x.yes; t.no += x.no; t.ip += x.ip; t.na += x.na; t.nr += x.nr;
+    t.none += x.none; t.other += (x.other || 0); t.rows += x.rows;
+    return t;
   }
   /* ── HOW AN AUDIT SCORE IS CALCULATED ──
        score = (Yes + 0.5 × In Progress) / (Yes + No + In Progress)
@@ -12259,8 +12277,13 @@ window.AUDIT = (function () {
      exists to record. NA and NR stay out of the denominator; IP stays in. */
   function scored(t) { return t.yes + t.no + t.ip; }
   function score(t) { var s = scored(t); return s ? (t.yes + 0.5 * t.ip) / s * 100 : null; }
+  /* The sheet's Coverage % column: scored ÷ (scored + NA + NR). Blank cells are
+     left out of both sides, as the sheet leaves them out — a stage left blank is
+     not part of that item's checklist. (Counting blanks here made the headline
+     read 59% scored where the sheet's own column says otherwise.) */
+  function markedOf(t) { return scored(t) + t.na + t.nr; }
   function coverage(t) {
-    var tot = scored(t) + t.na + t.nr + t.none;
+    var tot = markedOf(t);
     return tot ? scored(t) / tot * 100 : null;
   }
   function band(v) { return v === null ? 'none' : v >= ON_TRACK ? 'ok' : v >= REVIEW ? 'review' : 'critical'; }
@@ -12280,13 +12303,35 @@ window.AUDIT = (function () {
     if (!tab || !tab.hdr || !tab.rows || !tab.rows.length) {
       throw new Error('The School Audit sheet returned no rows.');
     }
-    var H = tab.hdr.map(str);
-    var ix = function (n) { return H.indexOf(n); };
+    var H = tab.hdr.map(str), NH = H.map(norm);
+    /* first header matching any of the names given, compared by norm() */
+    var ix = function () {
+      for (var a = 0; a < arguments.length; a++) {
+        var k = NH.indexOf(norm(arguments[a]));
+        if (k >= 0) return k;
+      }
+      return -1;
+    };
     var iB = ix('Branch'), iM = ix('Month'), iP = ix('Parameter'),
-        iC = ix('Category'), iR = ix('Remarks / Observations'),
-        iOwner = ix('Action Owner'), iTarget = ix('Target Date'), iClosed = ix('Closed');
-    var cols = GRADES.map(ix);
+        iC = ix('Category'),
+        iR = ix('Remarks / Observations', 'Remarks / Observation', 'Remarks', 'Observations', 'Observation'),
+        iOwner = ix('Action Owner'), iTarget = ix('Target Date'), iClosed = ix('Closed'),
+        iSN = ix('S.N', 'S.No', 'SNo', 'Sl No', 'Sr No');
+    /* The observations column was matched by its exact title, and Code.gs only
+       forwarded "Remarks / Observation" (singular) — the sheet's
+       "Remarks / Observations" never arrived, so every count read zero. Any
+       column whose title mentions a remark or an observation now qualifies. */
+    if (iR < 0) NH.forEach(function (n, i) { if (iR < 0 && /remark|observ/.test(n)) iR = i; });
+    var cols = GRADES.map(function (g) { return ix(g); });
     if (iB < 0 || iM < 0) throw new Error('The audit sheet needs Branch and Month columns.');
+
+    /* the sheet's own computed columns, used only to cross-check */
+    var SC = { yes: NH.indexOf('yes'), no: NH.indexOf('no'), ip: NH.indexOf('ip'),
+               na: NH.indexOf('na'), nr: NH.indexOf('nr'), pct: -1, cov: -1 };
+    H.forEach(function (h, i) {
+      if (SC.pct < 0 && /^score/.test(NH[i]) && h.indexOf('%') >= 0) SC.pct = i;
+      if (SC.cov < 0 && /^coverage/.test(NH[i])) SC.cov = i;
+    });
 
     var allRows = tab.rows.filter(function (r) { return str(r[iB]) && str(r[iM]); });
 
@@ -12377,11 +12422,13 @@ window.AUDIT = (function () {
       });
     });
 
-    /* ── remarks, kept with enough context to act on ── */
+    /* ── remarks, kept with enough context to act on ──
+       A cell holding only "NA", "-" or "nil" is a placeholder, not something
+       the auditor observed, and is not counted as one. */
     var remarks = [];
     rows.forEach(function (r) {
       var t = iR >= 0 ? str(r[iR]) : '';
-      if (!t) return;
+      if (!t || /^(n\/?a|nil|none|null|-+|\.+|\u2014|\u2013)$/i.test(t)) return;
       var sc = blank(); addRow(sc, r, cols);
       remarks.push({
         branch: str(r[iB]), month: str(r[iM]),
@@ -12390,6 +12437,54 @@ window.AUDIT = (function () {
         text: t, score: r1(score(sc))
       });
     });
+
+    /* ── values in stage cells the sheet's columns do not count ── */
+    var otherVals = {};
+    rows.forEach(function (r) {
+      cols.forEach(function (ci) {
+        if (ci < 0) return;
+        if (cls(r[ci]) === 'other') { var v = str(r[ci]); otherVals[v] = (otherVals[v] || 0) + 1; }
+      });
+    });
+
+    /* ── CROSS-CHECK against the sheet's own per-row columns ──
+       Every row is recomputed from its five stage cells and compared with what
+       the sheet itself wrote in Yes, No, IP, NA, NR, Score % and Coverage %.
+       Agreement row by row is what makes every total on this tab trustworthy:
+       the totals are only ever sums of these same counts. */
+    var recon = { available: SC.yes >= 0 || SC.pct >= 0 || SC.cov >= 0, checked: 0, agree: 0, rows: [],
+                  fields: ['Yes', 'No', 'IP', 'NA', 'NR', 'Score %', 'Coverage %'].filter(function (f, i) {
+                    return [SC.yes, SC.no, SC.ip, SC.na, SC.nr, SC.pct, SC.cov][i] >= 0; }) };
+    if (recon.available) {
+      allRows.forEach(function (r) {
+        var t = blank(); addRow(t, r, cols);
+        var diffs = [];
+        [['Yes', SC.yes, t.yes], ['No', SC.no, t.no], ['IP', SC.ip, t.ip],
+         ['NA', SC.na, t.na], ['NR', SC.nr, t.nr]].forEach(function (f) {
+          if (f[1] < 0) return;
+          var sv = cntVal(r[f[1]]);
+          if ((sv === null ? 0 : sv) !== f[2]) diffs.push({ f: f[0], sheet: sv === null ? '(blank)' : sv, dash: f[2] });
+        });
+        if (SC.pct >= 0) {
+          var sp = pctVal(r[SC.pct]), mp = score(t);
+          if (!(sp === null && mp === null) && (sp === null || mp === null || Math.abs(sp - mp) > 0.05))
+            diffs.push({ f: 'Score %', sheet: sp === null ? '(blank)' : sp.toFixed(2) + '%',
+                         dash: mp === null ? '(nothing scored)' : mp.toFixed(2) + '%' });
+        }
+        if (SC.cov >= 0) {
+          var sc2 = pctVal(r[SC.cov]), mc = coverage(t);
+          /* a row with nothing marked has no coverage here; the sheet shows 0 or blank */
+          if (!((sc2 === null || sc2 === 0) && mc === null) && (sc2 === null || mc === null || Math.abs(sc2 - mc) > 0.05))
+            diffs.push({ f: 'Coverage %', sheet: sc2 === null ? '(blank)' : sc2.toFixed(2) + '%',
+                         dash: mc === null ? '(nothing marked)' : mc.toFixed(2) + '%' });
+        }
+        recon.checked++;
+        if (!diffs.length) recon.agree++;
+        else recon.rows.push({ branch: str(r[iB]), month: str(r[iM]), sn: iSN >= 0 ? str(r[iSN]) : '',
+                               param: cleanParam(str(r[iP])), diffs: diffs,
+                               cells: cols.map(function (ci) { return ci < 0 ? '' : str(r[ci]); }) });
+      });
+    }
 
     /* ── governance: is the action side of the sheet being used at all? ── */
     var gov = { owner: 0, target: 0, closed: 0, total: rows.length };
@@ -12474,12 +12569,29 @@ window.AUDIT = (function () {
       byBM: byBM, byBMC: byBMC, byBMG: byBMG, byM: byM, byMC: byMC, byMG: byMG,
       byBMP: byBMP, params: params,
       remarks: remarks, gov: gov, chronic: chronic, movers: movers,
+      otherVals: otherVals, recon: recon, remarksCol: iR >= 0 ? H[iR] : null,
       audited: audited, stray: stray, minAudit: MIN_AUDIT, lowEvidence: lowEvidence,
       worstParams: worstParams,
       latest: latest, prev: prev,
       rowCount: rows.length,
-      raw: { H: H, rows: rows, cols: cols, iB: iB, iM: iM, iP: iP, iC: iC, iR: iR }
+      raw: { H: H, rows: rows, cols: cols, iB: iB, iM: iM, iP: iP, iC: iC, iR: iR, SC: SC }
     };
+  }
+
+  /* The sheet's count columns arrive as numbers; its % columns as a fraction
+     (0.6 for a cell formatted 60.00%), a number, or text such as "60.00%". */
+  function cntVal(v) {
+    if (v === null || v === undefined || str(v) === '') return null;
+    var n = parseFloat(String(v).replace(/,/g, ''));
+    return isFinite(n) ? Math.round(n) : null;
+  }
+  function pctVal(v) {
+    if (v === null || v === undefined) return null;
+    var s = str(v); if (!s || /^#/.test(s)) return null;
+    var n = parseFloat(s.replace(/[%,\s]/g, ''));
+    if (!isFinite(n)) return null;
+    if (s.indexOf('%') >= 0) return n;
+    return n <= 1 ? n * 100 : n;
   }
 
   /* the sheet prefixes every parameter with its section, e.g.
@@ -12500,8 +12612,7 @@ window.AUDIT = (function () {
     if (month) return scoreOf(D.byBM, b + '\u241f' + month);
     var t = blank();
     D.months.forEach(function (m) {
-      var x = D.byBM[b + '\u241f' + m]; if (!x) return;
-      t.yes += x.yes; t.no += x.no; t.ip += x.ip; t.na += x.na; t.nr += x.nr; t.none += x.none;
+      var x = D.byBM[b + '\u241f' + m]; if (x) merge(t, x);
     });
     return score(t);
   }
@@ -12509,8 +12620,7 @@ window.AUDIT = (function () {
     if (month) return D.byBM[b + '\u241f' + month] || blank();
     var t = blank();
     D.months.forEach(function (m) {
-      var x = D.byBM[b + '\u241f' + m]; if (!x) return;
-      t.yes += x.yes; t.no += x.no; t.ip += x.ip; t.na += x.na; t.nr += x.nr; t.none += x.none; t.rows += x.rows;
+      var x = D.byBM[b + '\u241f' + m]; if (x) merge(t, x);
     });
     return t;
   }
@@ -12519,8 +12629,7 @@ window.AUDIT = (function () {
     var t = blank(), any = false;
     D.months.forEach(function (m) {
       var x = D.byBMC[b + '\u241f' + m + '\u241f' + cat]; if (!x) return;
-      any = true;
-      t.yes += x.yes; t.no += x.no; t.ip += x.ip; t.na += x.na; t.nr += x.nr; t.none += x.none; t.rows += x.rows;
+      any = true; merge(t, x);
     });
     return any ? t : null;
   }
@@ -12529,7 +12638,8 @@ window.AUDIT = (function () {
     GRADES: GRADES, ON_TRACK: ON_TRACK, REVIEW: REVIEW, BAND: BAND, MIN_AUDIT: MIN_AUDIT,
     build: build, str: str, esc: esc, r1: r1, pctTxt: pctTxt,
     monthKey: monthKey, monthShort: monthShort,
-    blank: blank, scored: scored, score: score, coverage: coverage,
+    blank: blank, scored: scored, score: score, coverage: coverage, markedOf: markedOf,
+    cls: cls, norm: norm, merge: merge, cntVal: cntVal, pctVal: pctVal,
     band: band, colorFor: colorFor, cleanParam: cleanParam,
     get: get, scoreOf: scoreOf, covOf: covOf,
     branchScore: branchScore, branchTally: branchTally, cellTally: cellTally
@@ -12564,15 +12674,21 @@ window.AUDIT = (function () {
     var t = A.blank(), any = false;
     months().forEach(function (m) {
       var x = keyFn(m); if (!x) return;
-      any = true;
-      t.yes += x.yes; t.no += x.no; t.ip += x.ip;
-      t.na += x.na; t.nr += x.nr; t.none += x.none; t.rows += x.rows;
+      any = true; A.merge(t, x);
     });
     return any ? t : null;
   }
   function brT(b) { return combine(function (m) { return D.byBM[b + '\u241f' + m]; }); }
   function brCatT(b, c) { return combine(function (m) { return D.byBMC[b + '\u241f' + m + '\u241f' + c]; }); }
   function netT() { return combine(function (m) { return D.byM[m]; }); }
+  /* what the headline speaks for: the chosen branch, or the whole network */
+  function scopeT() { return VIEW.branch ? brT(VIEW.branch) : netT(); }
+  function scopeMonthT(m) { return VIEW.branch ? D.byBM[VIEW.branch + '\u241f' + m] : D.byM[m]; }
+  /* the audited month before m for this scope, or null */
+  function prevMonthOf(m, has) {
+    for (var i = D.months.indexOf(m) - 1; i >= 0; i--) if (has(D.months[i])) return D.months[i];
+    return null;
+  }
   function netCatT(c) { return combine(function (m) { return D.byMC[m + '\u241f' + c]; }); }
   function netGradeT(g) { return combine(function (m) { return D.byMG[m + '\u241f' + g]; }); }
   function brGradeT(b, g) { return combine(function (m) { return D.byBMG[b + '\u241f' + m + '\u241f' + g]; }); }
@@ -12592,13 +12708,19 @@ window.AUDIT = (function () {
 
   /* ══════════════════ 1. HEADLINE ══════════════════ */
   function renderKPIs() {
-    var t = netT(), sc = t ? A.score(t) : null, cov = t ? A.coverage(t) : null;
+    /* The headline follows the filter bar: with a branch chosen it is that
+       branch's figure, not the network's. It used to read the network whatever
+       was selected, under a filter chip that said otherwise. */
+    var t = scopeT(), sc = t ? A.score(t) : null, cov = t ? A.coverage(t) : null;
 
-    /* movement is only meaningful against the previous month */
-    var delta = null;
-    if (!VIEW.month && D.prev && D.latest) {
-      var a = A.score(D.byM[D.prev]), b = A.score(D.byM[D.latest]);
-      if (a !== null && b !== null) delta = b - a;
+    /* movement against the previous audit — of the chosen month when there is
+       one, of the latest month otherwise */
+    var delta = null, cmpFrom = null;
+    var hasM = function (m) { var x = scopeMonthT(m); return x && A.scored(x) > 0; };
+    var toM = VIEW.month || D.latest;
+    if (toM && hasM(toM)) {
+      cmpFrom = prevMonthOf(toM, hasM);
+      if (cmpFrom) delta = A.score(scopeMonthT(toM)) - A.score(scopeMonthT(cmpFrom));
     }
 
     var bands = { ok: 0, review: 0, critical: 0, none: 0 };
@@ -12613,9 +12735,11 @@ window.AUDIT = (function () {
     }).length;
 
     var K = [
-      { v: pc(sc), k: 'Network compliance', c: A.colorFor(sc),
-        d: '(Yes + \u00bd IP) \u00f7 (Yes + No + IP). ' + (delta === null ? 'Across all audited months.'
-          : (delta >= 0 ? 'Up ' : 'Down ') + Math.abs(delta).toFixed(1) + ' points on ' + A.monthShort(D.prev) + '.') },
+      { v: pc(sc), k: (VIEW.branch ? VIEW.branch : 'Network') + ' compliance', c: A.colorFor(sc),
+        d: '(Yes + \u00bd IP) \u00f7 (Yes + No + IP). ' + (delta === null
+          ? (VIEW.month ? 'No earlier audit to compare with.' : 'Across all audited months.')
+          : (VIEW.month ? A.monthShort(VIEW.month) + ' is ' : A.monthShort(toM) + ' was ') +
+            (delta >= 0 ? 'up ' : 'down ') + Math.abs(delta).toFixed(1) + ' points on ' + A.monthShort(cmpFrom) + '.') },
       { v: bands.ok + ' / ' + D.branches.length, k: 'Branches on track', c: '#059669',
         d: 'At or above ' + A.ON_TRACK + '%. ' + bands.review + ' in review, ' + bands.critical + ' critical.' },
       { v: bands.critical, k: 'Branches critical', c: bands.critical ? '#DC2626' : '#94A3B8',
@@ -12623,15 +12747,73 @@ window.AUDIT = (function () {
       { v: chronic, k: 'Items failing twice running', c: chronic ? '#DC2626' : '#059669',
         d: 'Below half in both of the last two audits. Repeat failure is the real signal.' },
       { v: pc(cov, 0), k: 'Checklist actually scored', c: cov !== null && cov < 60 ? '#D97706' : '#0F172A',
-        d: 'The rest is NA, NR or left blank. A score only speaks for the part that was audited.' },
+        d: 'Yes/No/IP \u00f7 every cell marked Yes, No, IP, NA or NR \u2014 the sheet\u2019s Coverage %. The rest was NA or NR.' },
       { v: rem, k: 'Written observations', c: '#1E4FD8',
-        d: 'Auditor notes attached to specific items — the qualitative half of the record.' }
+        d: D.remarksCol ? 'Rows with a note in \u201c' + D.remarksCol + '\u201d \u2014 the qualitative half of the record.'
+                        : 'No remarks column reached the dashboard \u2014 redeploy Code.gs.' }
     ];
     $('au-kpis').innerHTML = K.map(function (k, i) {
-      return '<button class="au-kpi" data-i="' + i + '">' +
+      return '<button class="au-kpi" data-i="' + i + '" title="Click for the working and the rows behind it">' +
         '<div class="v" style="color:' + k.c + '">' + k.v + '</div>' +
         '<div class="k">' + esc(k.k) + '</div><div class="d">' + esc(k.d) + '</div></button>';
     }).join('');
+    /* every tile opens something: the headline shows its working, the rest go
+       to the section that lists what they count */
+    var go = function (id) { var el = $(id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+    $('au-kpis').querySelectorAll('.au-kpi').forEach(function (b) {
+      b.onclick = function () {
+        var i = +b.dataset.i;
+        if (i === 0) return workingModal();
+        if (i === 1 || i === 2) return go('au-score');
+        if (i === 3) return go('au-chronic');
+        if (i === 4) return go('au-quality');
+        return go('au-remarks');
+      };
+    });
+  }
+
+  /* The headline's working, computed twice: once from the stage cells as this
+     tab does everywhere, and once from the sheet's own Yes / No / IP / NA / NR
+     columns. The two agree when the cross-check below does. */
+  function workingModal() {
+    var t = scopeT() || A.blank(), R = D.raw, ms = months();
+    var s = { yes: 0, no: 0, ip: 0, na: 0, nr: 0, n: 0 };
+    if (R.SC.yes >= 0) R.rows.forEach(function (r) {
+      if (ms.indexOf(A.str(r[R.iM])) < 0) return;
+      if (VIEW.branch && A.str(r[R.iB]) !== VIEW.branch) return;
+      s.n++;
+      ['yes', 'no', 'ip', 'na', 'nr'].forEach(function (k) {
+        if (R.SC[k] >= 0) s[k] += (A.cntVal(r[R.SC[k]]) || 0);
+      });
+    });
+    var sSc = s.yes + s.no + s.ip, sScore = sSc ? (s.yes + 0.5 * s.ip) / sSc * 100 : null,
+        sMk = sSc + s.na + s.nr, sCov = sMk ? sSc / sMk * 100 : null;
+    var line = function (lbl, x) {
+      var scd = x.yes + x.no + x.ip, mk = scd + x.na + x.nr;
+      return '<tr><td>' + lbl + '</td><td class="n">' + x.yes + '</td><td class="n">' + x.no + '</td><td class="n">' + x.ip +
+        '</td><td class="n">' + x.na + '</td><td class="n">' + x.nr + '</td>' +
+        '<td class="n"><b>' + pc(scd ? (x.yes + 0.5 * x.ip) / scd * 100 : null, 2) + '</b></td>' +
+        '<td class="n"><b>' + pc(mk ? scd / mk * 100 : null, 2) + '</b></td></tr>';
+    };
+    var scd = A.scored(t);
+    modal('\ud83e\uddee ' + esc((VIEW.branch || 'Network') + ' compliance') + ' \u2014 the working',
+      esc((VIEW.branch || 'All branches') + ' \u00b7 ' + (VIEW.month || 'all audited months')),
+      '<table class="au-tbl"><thead><tr><th>Counted from</th><th class="n">Yes</th><th class="n">No</th>' +
+      '<th class="n">IP</th><th class="n">NA</th><th class="n">NR</th><th class="n">Compliance</th>' +
+      '<th class="n">Coverage</th></tr></thead><tbody>' +
+      line('The five stage cells (this dashboard)', t) +
+      (R.SC.yes >= 0 ? line('The sheet\u2019s own Yes / No / IP / NA / NR columns', s) : '') +
+      '</tbody></table>' +
+      '<p class="au-note"><b>Compliance</b> = (Yes + \u00bd \u00d7 IP) \u00f7 (Yes + No + IP) = (' + t.yes + ' + \u00bd \u00d7 ' +
+      t.ip + ') \u00f7 ' + scd + ' = <b>' + pc(A.score(t), 2) + '</b><br>' +
+      '<b>Coverage</b> = (Yes + No + IP) \u00f7 (Yes + No + IP + NA + NR) = ' + scd + ' \u00f7 ' + A.markedOf(t) +
+      ' = <b>' + pc(A.coverage(t), 2) + '</b><br>' +
+      'Blank stage cells (' + t.none + ') count in neither, as in the sheet.' +
+      (t.other ? ' ' + t.other + ' cell(s) hold a value that is not Yes, No, IP, NA or NR and are not counted \u2014 listed under data quality.' : '') +
+      (R.SC.yes >= 0 ? (Math.abs((sScore || 0) - (A.score(t) || 0)) < 0.005 && Math.abs((sCov || 0) - (A.coverage(t) || 0)) < 0.005
+          ? '<br><span style="color:#059669;font-weight:700">\u2714 Both methods give the same figures.</span>'
+          : '<br><span style="color:#DC2626;font-weight:700">\u26a0 The two methods differ \u2014 the rows responsible are listed under \u201cHow far to trust these numbers\u201d.</span>')
+        : '') + '</p>');
   }
 
   /* ══════════════════ 2. BRANCH SCORECARD ══════════════════ */
@@ -12640,8 +12822,14 @@ window.AUDIT = (function () {
       var t = brT(b), sc = t ? A.score(t) : null;
       var hist = D.months.map(function (m) { return A.scoreOf(D.byBM, b + '\u241f' + m); });
       var seen = hist.filter(function (x) { return x !== null; });
+      /* Against this branch's previous audit — of the chosen month when one is
+         selected (it used to go blank then), of the latest audit otherwise. */
       var d = null;
-      if (!VIEW.month && seen.length > 1) d = seen[seen.length - 1] - seen[seen.length - 2];
+      if (VIEW.month) {
+        var mi = D.months.indexOf(VIEW.month);
+        if (mi >= 0 && hist[mi] !== null)
+          for (var j = mi - 1; j >= 0; j--) if (hist[j] !== null) { d = hist[mi] - hist[j]; break; }
+      } else if (seen.length > 1) d = seen[seen.length - 1] - seen[seen.length - 2];
       var best = null, worst = null;
       D.months.forEach(function (m, i) {
         if (hist[i] === null) return;
@@ -12833,9 +13021,7 @@ window.AUDIT = (function () {
   function addRowLocal(t, row, cols){
     for (var i = 0; i < cols.length; i++) {
       if (cols[i] < 0) continue;
-      var v = A.str(row[cols[i]]);
-      if (v === 'Yes') t.yes++; else if (v === 'No') t.no++; else if (v === 'IP') t.ip++;
-      else if (v === 'NA') t.na++; else if (v === 'NR') t.nr++; else t.none++;
+      t[A.cls(row[cols[i]])]++;
     }
   }
   /* section × one grade column, which the pre-computed tallies do not cover */
@@ -12973,8 +13159,7 @@ window.AUDIT = (function () {
         ordered.forEach(function (row) {
           var x = (gi === null) ? row.t : catGradeT(row.c, gi, scope);
           if (!x) return;
-          t.yes += x.yes; t.no += x.no; t.ip += x.ip;
-          t.na += x.na; t.nr += x.nr; t.none += x.none;
+          A.merge(t, x);
         });
         return t;
       }
@@ -13229,11 +13414,11 @@ window.AUDIT = (function () {
     if (!t) return '<td style="color:#CBD5E1">\u2014</td>';
     var c = A.coverage(t);
     if (c === null || c === undefined) return '<td style="color:#CBD5E1">\u2014</td>';
-    var sc = A.scored(t), tot = sc + t.na + t.nr + t.none;
+    var sc = A.scored(t), tot = A.markedOf(t);
     var col = c >= 75 ? '#059669' : c >= 55 ? '#D97706' : '#DC2626';
     return '<td style="color:' + col + ';font-weight:700" title="' + sc +
-      ' of ' + tot + ' cells scored \u00b7 ' + t.na + ' NA \u00b7 ' + t.nr + ' NR' +
-      (t.none ? ' \u00b7 ' + t.none + ' blank' : '') + '">' + c.toFixed(0) + '%</td>';
+      ' of ' + tot + ' marked cells scored \u00b7 ' + t.na + ' NA \u00b7 ' + t.nr + ' NR' +
+      (t.none ? ' \u00b7 ' + t.none + ' blank, not counted' : '') + '">' + c.toFixed(0) + '%</td>';
   }
 
   /* stage-by-stage ranking table */
@@ -13633,10 +13818,10 @@ window.AUDIT = (function () {
           '<td class="n" style="color:#059669">' + x.t.yes + '</td>' +
           '<td class="n" style="color:#DC2626">' + x.t.no + '</td>' +
           '<td class="n" style="color:#D97706">' + x.t.ip + '</td>' +
-          '<td class="n" style="color:#94A3B8">' + (x.t.na + x.t.nr + x.t.none) + '</td></tr>';
+          '<td class="n" style="color:#94A3B8">' + (x.t.na + x.t.nr) + '</td></tr>';
       }).join('') + '</tbody></table>' +
-      '<p class="au-note">Weakest section first. <b>Not scored</b> is NA, NR or blank \u2014 excluded from the ' +
-      'percentage rather than counted against the branch.</p>');
+      '<p class="au-note">Weakest section first. <b>Not scored</b> is NA or NR \u2014 excluded from the ' +
+      'percentage rather than counted against the branch. Blank cells are not counted at all, as in the sheet.</p>');
   }
 
   /* ══════════════════ 5. STAGE STRIP ══════════════════ */
@@ -13732,13 +13917,38 @@ window.AUDIT = (function () {
   function renderQuality() {
     var rows = branches().map(function (b) {
       var t = brT(b) || A.blank();
-      var tot = A.scored(t) + t.na + t.nr + t.none;
-      return { b: b, t: t, tot: tot, cov: tot ? A.scored(t) / tot * 100 : null };
+      return { b: b, t: t, cov: A.coverage(t) };
     }).sort(function (x, y) { return (x.cov === null ? 999 : x.cov) - (y.cov === null ? 999 : y.cov); });
 
     var g = D.gov, pctOwner = g.total ? g.owner / g.total * 100 : 0;
 
-    $('au-quality').innerHTML =
+    /* the row-by-row cross-check against the sheet's own columns */
+    var rc = D.recon, rcHtml;
+    if (!rc.available) {
+      rcHtml = '<div class="au-flag"><b>Cross-check not available yet.</b> The feed does not carry the sheet\u2019s own ' +
+        'Yes / No / IP / NA / NR / Score % / Coverage % columns. Redeploy Code.gs (it now forwards them) and press ' +
+        '\u21bb Refresh \u2014 every row will then be checked against the sheet.</div>';
+    } else if (!rc.rows.length) {
+      rcHtml = '<div class="au-flag" style="border-left-color:#059669;background:#ECFDF5">' +
+        '<b style="color:#059669">\u2714 Cross-checked against the sheet: all ' + rc.checked.toLocaleString('en-IN') +
+        ' rows agree.</b> Each row was recomputed from its five stage cells and compared with the sheet\u2019s own ' +
+        rc.fields.join(', ') + ' columns. Every total on this tab is a sum of those same counts.</div>';
+    } else {
+      rcHtml = '<div class="au-flag bad"><b>' + rc.rows.length + ' of ' + rc.checked.toLocaleString('en-IN') +
+        ' rows disagree with the sheet\u2019s own columns</b> (' + rc.agree.toLocaleString('en-IN') + ' agree). ' +
+        'Usually a stage cell with a stray space or an unusual spelling, or a formula column not copied down. ' +
+        '<button class="exm-refresh" id="au-recon-btn" style="margin-left:6px">View the rows</button></div>';
+    }
+    var ov = Object.keys(D.otherVals).sort(function (a, b) { return D.otherVals[b] - D.otherVals[a]; });
+    var ovHtml = ov.length
+      ? '<div class="au-flag"><b>' + ov.reduce(function (s, k) { return s + D.otherVals[k]; }, 0) +
+        ' stage cell(s) hold a value that is not Yes, No, IP, NA or NR</b> and are therefore not counted, here or ' +
+        'in the sheet\u2019s own columns: ' + ov.slice(0, 8).map(function (k) {
+          return '\u201c' + esc(k) + '\u201d \u00d7' + D.otherVals[k]; }).join(', ') +
+        (ov.length > 8 ? ' \u2026' : '') + '. Correct them in the sheet to bring them into the score.</div>'
+      : '';
+
+    $('au-quality').innerHTML = rcHtml + ovHtml +
       '<table class="au-tbl"><thead><tr><th>Branch</th><th class="n">Scored</th><th class="n">NA</th>' +
       '<th class="n">NR</th><th class="n">Blank</th><th class="n">Coverage</th><th></th></tr></thead><tbody>' +
       rows.map(function (r) {
@@ -13746,7 +13956,7 @@ window.AUDIT = (function () {
           '<td class="n">' + A.scored(r.t) + '</td>' +
           '<td class="n" style="color:#64748B">' + r.t.na + '</td>' +
           '<td class="n" style="color:#64748B">' + r.t.nr + '</td>' +
-          '<td class="n" style="color:' + (r.t.none > A.scored(r.t) * 0.4 ? '#D97706' : '#94A3B8') + '">' + r.t.none + '</td>' +
+          '<td class="n" style="color:#94A3B8" title="Blank cells are not part of the checklist and are not counted">' + r.t.none + '</td>' +
           '<td class="n" style="font-weight:600;color:' + (r.cov < 55 ? '#DC2626' : r.cov < 70 ? '#D97706' : '#059669') + '">' +
           pc(r.cov, 0) + '</td>' +
           '<td style="width:130px"><div class="au-bar"><i style="width:' + (r.cov || 0) + '%;background:' +
@@ -13766,10 +13976,32 @@ window.AUDIT = (function () {
         'can show whether an issue was actually resolved or simply re-observed the following month. Filling ' +
         'those three columns is the single change that would make this dashboard a tracker rather than a report.' +
       '</div>' +
-      '<p class="au-note">Coverage is the share of the checklist that received a Yes, No or IP. The remainder was ' +
-      'marked NA (does not apply), NR (not reviewed) or left blank. Two branches can post the same percentage on ' +
-      'very different amounts of evidence, and the lower the coverage the more a high score reflects what was ' +
-      'skipped rather than what was achieved.</p>';
+      '<p class="au-note">Coverage is the sheet\u2019s Coverage % pooled: cells marked Yes, No or IP \u00f7 every cell ' +
+      'marked Yes, No, IP, NA (does not apply) or NR (not reviewed). Blank cells are not part of that item\u2019s ' +
+      'checklist and count on neither side, as in the sheet. Two branches can post the same percentage on very ' +
+      'different amounts of evidence, and the lower the coverage the more a high score reflects what was skipped ' +
+      'rather than what was achieved.</p>';
+    var rb = $('au-recon-btn');
+    if (rb) rb.onclick = function () {
+      modal('\ud83d\udd0d Rows that disagree with the sheet', rc.rows.length + ' of ' + rc.checked + ' rows',
+        '<table class="au-tbl"><thead><tr><th>Branch</th><th>Month</th><th>S.N</th><th>Checklist item</th>' +
+        A.GRADES.map(function (g) { return '<th class="n">' + esc(g) + '</th>'; }).join('') +
+        '<th>Column</th><th class="n">Sheet says</th><th class="n">Stage cells give</th></tr></thead><tbody>' +
+        rc.rows.slice(0, 400).map(function (x) {
+          return x.diffs.map(function (df, di) {
+            return '<tr>' + (di ? '<td></td><td></td><td></td><td></td>' + A.GRADES.map(function () { return '<td></td>'; }).join('')
+                : '<td>' + esc(x.branch) + '</td><td>' + esc(A.monthShort(x.month)) + '</td><td>' + esc(x.sn) + '</td>' +
+                  '<td>' + esc(x.param) + '</td>' + x.cells.map(function (v) {
+                    return '<td class="n" style="color:' + (A.cls(v) === 'other' ? '#7C3AED;font-weight:700' : '#64748B') + '">' +
+                      (v === '' ? '\u00b7' : esc(v)) + '</td>'; }).join('')) +
+              '<td><b>' + esc(df.f) + '</b></td><td class="n" style="color:#DC2626">' + esc(df.sheet) + '</td>' +
+              '<td class="n" style="color:#059669">' + esc(df.dash) + '</td></tr>';
+          }).join('');
+        }).join('') + '</tbody></table>' +
+        (rc.rows.length > 400 ? '<p class="au-note">Showing the first 400.</p>' : '') +
+        '<p class="au-note">\u201cSheet says\u201d is the value in the sheet\u2019s own column; \u201cstage cells give\u201d is ' +
+        'what the five stage cells on that row add up to. The dashboard always uses the stage cells.</p>');
+    };
   }
 
   /* ══════════════════ 9. OBSERVATIONS ══════════════════ */
@@ -13847,7 +14079,7 @@ window.AUDIT = (function () {
           '<td class="n" style="color:#059669">' + x.yes + '</td>' +
           '<td class="n" style="color:#DC2626">' + x.no + '</td>' +
           '<td class="n" style="color:#D97706">' + x.ip + '</td>' +
-          '<td class="n" style="color:#94A3B8">' + (x.na + x.nr + x.none) + '</td></tr>';
+          '<td class="n" style="color:#94A3B8">' + (x.na + x.nr) + '</td></tr>';
       }).join('') + '</tbody></table>' +
       (chronic.length ? '<h4 class="au-h4">Failing twice running here</h4><ul class="au-list">' +
         chronic.map(function (x) {
@@ -13866,10 +14098,7 @@ window.AUDIT = (function () {
     }).map(function (r) {
       var cells = R.cols.map(function (ci) { return ci < 0 ? '' : A.str(r[ci]); });
       var t = A.blank();
-      cells.forEach(function (v) {
-        if (v === 'Yes') t.yes++; else if (v === 'No') t.no++; else if (v === 'IP') t.ip++;
-        else if (v === 'NA') t.na++; else if (v === 'NR') t.nr++; else t.none++;
-      });
+      cells.forEach(function (v) { t[A.cls(v)]++; });
       return {
         param: A.cleanParam(A.str(r[R.iP])), month: A.str(r[R.iM]), cells: cells,
         /* Scored through A.score, not a local formula. This row previously used
@@ -13890,8 +14119,9 @@ window.AUDIT = (function () {
         return '<tr><td>' + esc(x.param) + '</td>' +
           (ms.length > 1 ? '<td style="color:#64748B">' + esc(A.monthShort(x.month)) + '</td>' : '') +
           x.cells.map(function (v) {
-            var col = v === 'Yes' ? '#059669' : v === 'No' ? '#DC2626' : v === 'IP' ? '#D97706' : '#CBD5E1';
-            return '<td class="n" style="color:' + col + ';font-weight:' + (v === 'Yes' || v === 'No' || v === 'IP' ? 600 : 400) + '">' +
+            var k = A.cls(v);
+            var col = k === 'yes' ? '#059669' : k === 'no' ? '#DC2626' : k === 'ip' ? '#D97706' : k === 'other' ? '#7C3AED' : '#CBD5E1';
+            return '<td class="n" style="color:' + col + ';font-weight:' + (k === 'yes' || k === 'no' || k === 'ip' ? 600 : 400) + '">' +
               (v || '·') + '</td>';
           }).join('') +
           '<td class="n" style="font-weight:600;color:' + A.colorFor(x.v) + '">' + pc(x.v, 0) + '</td>' +
@@ -13944,10 +14174,10 @@ window.AUDIT = (function () {
                 '<td class="n" style="color:#059669">' + x.yes + '</td>' +
                 '<td class="n" style="color:#DC2626">' + x.no + '</td>' +
                 '<td class="n" style="color:#D97706">' + x.ip + '</td>' +
-                '<td class="n" style="color:#94A3B8">' + (x.na + x.nr + x.none) + '</td></tr>';
+                '<td class="n" style="color:#94A3B8">' + (x.na + x.nr) + '</td></tr>';
             }).join('') + '</tbody></table>' +
             '<p class="au-note">Not scored is NA or NR \u2014 not applicable to this campus, or not required ' +
-            'this month. Both are excluded from the percentage.</p>');
+            'this month. Both are excluded from the percentage, and blank cells are not counted at all.</p>');
           return;
         }
         branchModal(b);
