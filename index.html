@@ -17802,6 +17802,9 @@ function _sylNorm(s){ return String(s==null?'':s).toLowerCase().replace(/[^a-z0-
    collected, still to collect, corrected, not corrected, and the six almanac
    parameters. Matched by EXACT header only — no prefix guessing, so a column
    like itemHomeworkPct can never be mistaken for itemHomework. */
+/* almanac rows whose numerator/denominator columns disagreed with the weight
+   columns on the last load — logged, so a ledger change is visible */
+var _sylAlmRemapped = 0;
 var SYL_EXTRA = {
   cls:  ['classsize'],
   col:  ['studentscollected'],
@@ -17900,6 +17903,7 @@ var _SYL_MON = ['January','February','March','April','May','June',
    Order must match its own F map exactly:
    MOD BR STR GR GO STG FL SEC SUB GRP MO DT STA PCT NUM TOT INC REM DEN */
 function sylRowsFromSheet(tab){
+  _sylAlmRemapped = 0;
   var idx = _sylIndex(tab.hdr.map(function(x){ return String(x==null?'':x).trim(); }));
   if(idx.missing.indexOf('branch')>=0){
     throw new Error('The monitoring ledger has no Branch column. Columns received: '+
@@ -17934,6 +17938,18 @@ function sylRowsFromSheet(tab){
     }
     var den = _sylNum(g(r,'denominator'));
     var num = _sylNum(g(r,'numerator'));
+    var ex  = _sylExtraOf(r, XI);
+    /* ALMANAC: always weightEarned ÷ weightAvailable — the definition itself
+       (Homework 30, Classwork 30, Teacher sign 25, Parent sign 5, Word 5,
+       Thought 5), and the figure the sheet's own compliancePct shows. The
+       generic numerator/denominator columns held exactly these until the
+       ledger changed; then an almanac check read a head-count over weight
+       points (0 ÷ 1,900) and every branch's almanac fell to 0–1%. Reading the
+       weight columns directly means that can never happen again. */
+    if (mod === 'A' && ex && ex.wa > 0 && ex.we != null) {
+      if (num !== ex.we || den !== ex.wa) _sylAlmRemapped++;
+      num = ex.we; den = ex.wa;
+    }
     /* Always numerator ÷ denominator, so a single row agrees exactly with any
        total built from it. The sheet's own completionPct is the same figure,
        but recomputing it here means a rounded or hand-edited cell can never
@@ -17960,10 +17976,10 @@ function sylRowsFromSheet(tab){
       /* 19th element: the page derives this as students×6 for almanac when it is
          missing. The sheet already carries the real figure, so it is passed
          through rather than re-guessed. */
-      (M.itemsTotal>=0 ? _sylNum(g(r,'itemsTotal')) : 0) || den,
+      mod === 'A' ? den : ((M.itemsTotal>=0 ? _sylNum(g(r,'itemsTotal')) : 0) || den),
       /* 20th element: the ledger's own counts (see SYL_EXTRA). Read only by the
          drill-downs; no percentage on the tab is computed from it. */
-      _sylExtraOf(r, XI)
+      ex
     ];
   }).filter(function(t){ return t[1]; });        // a row with no branch is unusable
 }
