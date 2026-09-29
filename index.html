@@ -8428,92 +8428,162 @@ function renderCareSummary(){
     }
   }catch(e){ /* the card is optional; the report below still renders */ }
 
-  /* ══ WHAT PARENTS ARE RAISING — MONTH BY MONTH ══
-     Replaces the Category Mix (category list, sub-topics and donut) with one
-     trend a reader can take in at a glance: for each concern area, the share of
-     ANSWERED calls that raised it, month by month. A share, not a count, so a
-     month with more calls made does not look like a month with more problems.
-     The area comes from _careCatOf — the same spelling-tolerant rule every other
-     Care figure uses. The ranked, topic-level view is the "Top 10 problems"
-     pair of panels further down; this answers the question before it: which
-     way is each area moving? */
+  /* ══ WHAT PARENTS ARE RAISING — THE PROBLEMS, MONTH BY MONTH ══
+     This trended the GRIEVANCE CATEGORY the caller picked. The category is a
+     free-text box (30-odd spellings, whole sentences typed in) and it says
+     "Academics" or "Other", not what is wrong — "Other" was the second-biggest
+     line. The problem itself is written in the Remarks and the Follow-up action.
+
+     Now every answered call that raised a concern is read the way the Top-10
+     panels read it — _careTopicsOf: Remarks + Follow-up action + category,
+     against the shared problem list (CARE_TOPICS) — and each PROBLEM is trended
+     as a share of answered calls. Labels that are not a problem (escalated to
+     subject teacher, parent wants a meeting) are left out. A call can carry more
+     than one problem. Beside it, the most common KEYWORDS parents and teachers
+     actually used in those calls, with their own month-on-month movement.
+
+     Share, not count, so a month with more calls made does not look like a
+     month with more problems. */
   const _cEsc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const AREAS=['Academics','Behaviour / Wellbeing','Administration','Transport','Co Curricular','Other'];
+  const _PROB={}; CARE_TOPICS.forEach(t=>{ if(!t.meta) _PROB[t.topic]=t; });
+  /* words that are in almost every remark and say nothing about the problem */
+  const _STOP=new Set(('the and for with that this was were are has have had not but from they them their there then than into onto about '+
+    'will would should could can may might must shall also very much more most some any all each other same such only just even '+
+    'said told asked says tell informed inform discussed discuss regarding regards regard spoke spoken speak explained explain '+
+    'teacher teachers parent parents mother father mom dad mam madam maam sir miss ms mrs mr child children kid kids son daughter '+
+    'student students school class classes section grade call called calls calling phone number contacted contact reached '+
+    'ok okay fine yes good well done doing does did like want wants wanted need needs needed please kindly thank thanks '+
+    'his her him she he its our your you who what when where which why how being been make made get got give given take taken '+
+    'time times day days week weeks month months today yesterday tomorrow now still already again always every week '+
+    'concern concerns issue issues problem problems nothing no one two three first second next last new old').split(/\s+/));
+  /* the words of one call, cached on the text: stock remarks repeat hundreds of times */
+  const _kwCache=new Map();
+  const _kwOf=r=>{
+    const raw=(((r.Remarks&&r.Remarks!=='–')?r.Remarks:'')+' '+((r.Followup&&r.Followup!=='–')?r.Followup:''));
+    let set=_kwCache.get(raw); if(set) return set;
+    const t=raw.toLowerCase().replace(/[^a-z\s]+/g,' ');
+    set=new Set();
+    t.split(/\s+/).forEach(w=>{ if(w.length>=3 && !_STOP.has(w)) set.add(w.length>4&&w.endsWith('s')&&!w.endsWith('ss')?w.slice(0,-1):w); });
+    if(_kwCache.size<50000) _kwCache.set(raw,set);
+    return set;
+  };
   const _trRows=CARE.filter(r=>scope.includes(r.Branch)&&window._careAnswerable(r));
   const _byM={};
   _trRows.forEach(r=>{
     const m=String(r.Month||'').trim(); if(MONTHS.indexOf(m)<0) return;
-    const o=_byM[m]||(_byM[m]={n:0,any:0,a:{}});
+    const o=_byM[m]||(_byM[m]={n:0,any:0,p:{},kw:{},cat:{},nn:0,kwN:{}});
     o.n++;
-    if(window._careIsConcern(r)){
-      const a=window._careCatOf(r);
-      if(AREAS.indexOf(a)>=0){ o.any++; o.a[a]=(o.a[a]||0)+1; }
-    }
+    /* words in calls with NO concern too — so stock phrases that appear in
+       every remark ("Teacher : Discussed regarding …") can be told apart from
+       words that actually belong to problems */
+    if(!window._careIsConcern(r)){ o.nn++; _kwOf(r).forEach(w=>{ o.kwN[w]=(o.kwN[w]||0)+1; }); return; }
+    const tops=[...new Set(window._careTopicsOf(r).map(x=>x.topic).filter(t=>_PROB[t]))];
+    if(!tops.length) return;
+    o.any++;
+    const cat=window._careCatOf(r);
+    tops.forEach(t=>{ o.p[t]=(o.p[t]||0)+1; const c=o.cat[t]||(o.cat[t]={}); c[cat]=(c[cat]||0)+1; });
+    _kwOf(r).forEach(w=>{ o.kw[w]=(o.kw[w]||0)+1; });
   });
   /* a month with a handful of answered calls swings wildly on one remark */
   const MIN_CALLS=20;
   const _mo=MONTHS.filter(m=>_byM[m]&&_byM[m].n>=MIN_CALLS);
   const _thin=MONTHS.filter(m=>_byM[m]&&_byM[m].n<MIN_CALLS);
-  const _sh=(m,a)=>{ const o=_byM[m]; if(!o||!o.n) return null; return ((a==='ALL'?o.any:(o.a[a]||0))/o.n*100); };
-  const _cnt=(m,a)=>{ const o=_byM[m]; return o?(a==='ALL'?o.any:(o.a[a]||0)):0; };
-  /* the month being read: the one chosen in the filter bar, else the latest */
+  const _sh=(m,p)=>{ const o=_byM[m]; if(!o||!o.n) return null; return ((p==='ALL'?o.any:(o.p[p]||0))/o.n*100); };
+  const _cnt=(m,p)=>{ const o=_byM[m]; return o?(p==='ALL'?o.any:(o.p[p]||0)):0; };
+  const _kc=(m,w)=>{ const o=_byM[m]; return o?(o.kw[w]||0):0; };
   const _focus=(fMonth!=='ALL'&&_mo.indexOf(fMonth)>=0)?fMonth:_mo[_mo.length-1];
   const _prev=_focus?_mo[_mo.indexOf(_focus)-1]:null;
-  const _areasShown=AREAS.filter(a=>_mo.some(m=>_cnt(m,a)>0))
-    .sort((x,y)=>_cnt(_focus,y)-_cnt(_focus,x)||_mo.reduce((s,m)=>s+_cnt(m,y),0)-_mo.reduce((s,m)=>s+_cnt(m,x),0));
-  const _pp=v=>(v==null?'–':(v<1&&v>0?v.toFixed(1):Math.round(v))+'%');
+  const _tot=p=>_mo.reduce((s,m)=>s+_cnt(m,p),0);
+  /* the problems to show: the biggest this month, then the biggest overall */
+  const _probs=Object.keys(_PROB).filter(p=>_tot(p)>0)
+    .sort((x,y)=>_cnt(_focus,y)-_cnt(_focus,x)||_tot(y)-_tot(x));
+  const _lines=_probs.slice(0,6), _list=_probs.slice(0,10);
+  /* the category a problem is mostly filed under, all months */
+  const _mainCat=p=>{ const agg={}; _mo.forEach(m=>{ const c=(_byM[m].cat||{})[p]||{}; Object.keys(c).forEach(k=>agg[k]=(agg[k]||0)+c[k]); });
+    const k=Object.keys(agg).sort((a,b)=>agg[b]-agg[a])[0]; return k||''; };
+  const _PAL=['#2563EB','#DC2626','#059669','#D97706','#7C3AED','#0891B2','#DB2777','#65A30D','#EA580C','#475569'];
+  const _col=p=>_PAL[_list.indexOf(p)>=0?_list.indexOf(p):_PAL.length-1];
+  const _pp=v=>(v==null?'–':(v<1&&v>0?v.toFixed(1):Math.round(v*10)/10)+'%');
   const _dl=v=>(v>0?'+':'')+v.toFixed(1)+' pts';
   const _ms=m=>String(m).slice(0,3);
-  window._CARE_TREND={areas:_areasShown,months:_mo,focus:_focus};
+  window._CARE_TREND={problems:_lines,months:_mo,focus:_focus};
 
   if(!_focus){
-    h+='<div class="no-data">Not enough answered calls yet to show a month-by-month trend.</div>';
+    h+='<div class="no-data">Not enough answered calls yet to show the problems month by month.</div>';
   } else {
-    /* one plain-language sentence first */
+    /* ── one plain-language sentence ── */
     const aNow=_sh(_focus,'ALL'), aPrev=_prev?_sh(_prev,'ALL'):null;
-    const top=_areasShown[0];
-    const moves=_prev?_areasShown.map(a=>({a,d:(_sh(_focus,a)||0)-(_sh(_prev,a)||0)}))
-      .filter(x=>_cnt(_focus,x.a)+_cnt(_prev,x.a)>=5):[];
-    const riser=moves.filter(x=>x.d>=0.5).sort((x,y)=>y.d-x.d)[0];
-    const faller=moves.filter(x=>x.d<=-0.5).sort((x,y)=>x.d-y.d)[0];
-    let say='In <b>'+_cEsc(_focus)+'</b>, <b>'+_pp(aNow)+'</b> of answered calls raised a concern'
+    const top=_probs[0];
+    const moves=_prev?_list.map(p=>({p,d:(_sh(_focus,p)||0)-(_sh(_prev,p)||0)})).filter(x=>_cnt(_focus,x.p)+_cnt(_prev,x.p)>=5):[];
+    const riser=moves.filter(x=>x.d>=0.3).sort((a,b)=>b.d-a.d)[0];
+    const faller=moves.filter(x=>x.d<=-0.3).sort((a,b)=>a.d-b.d)[0];
+    let say='In <b>'+_cEsc(_focus)+'</b>, <b>'+_pp(aNow)+'</b> of answered calls raised a problem'
       +(aPrev!=null?(' \u2014 <b style="color:'+(aNow>aPrev?'#DC2626':'#059669')+'">'+(aNow>aPrev?'up ':'down ')
         +Math.abs(aNow-aPrev).toFixed(1)+' points</b> on '+_cEsc(_prev)):'')+'.';
-    if(top&&_cnt(_focus,top)) say+=' The biggest area is <b>'+_cEsc(top)+'</b> ('+_pp(_sh(_focus,top))+' of calls).';
-    if(riser) say+=' <b style="color:#DC2626">'+_cEsc(riser.a)+'</b> is rising fastest ('+_dl(riser.d)+').';
-    if(faller) say+=' <b style="color:#059669">'+_cEsc(faller.a)+'</b> improved most ('+_dl(faller.d)+').';
+    if(top&&_cnt(_focus,top)) say+=' The biggest is <b>'+_cEsc(top)+'</b> ('+fi(_cnt(_focus,top))+' parents, '+_pp(_sh(_focus,top))+' of calls).';
+    if(riser) say+=' <b style="color:#DC2626">'+_cEsc(riser.p)+'</b> is rising fastest ('+_dl(riser.d)+').';
+    if(faller) say+=' <b style="color:#059669">'+_cEsc(faller.p)+'</b> improved most ('+_dl(faller.d)+').';
 
-    const spark=a=>{
-      const v=_mo.map(m=>_sh(m,a)||0), mx=Math.max.apply(null,v.concat([0.0001])), W=92, H=26;
-      const pts=v.map((y,i)=>((v.length<2?W/2:i*(W/(v.length-1))).toFixed(1))+','+(H-2-(y/mx)*(H-5)).toFixed(1)).join(' ');
-      const fi2=_mo.indexOf(_focus), fx=(v.length<2?W/2:fi2*(W/(v.length-1))), fy=H-2-(v[fi2]/mx)*(H-5);
+    const spark=(vals,col)=>{
+      const mx=Math.max.apply(null,vals.concat([0.0001])), W=84, H=24;
+      const pts=vals.map((y,i)=>((vals.length<2?W/2:i*(W/(vals.length-1))).toFixed(1))+','+(H-2-(y/mx)*(H-5)).toFixed(1)).join(' ');
+      const fi2=_mo.indexOf(_focus), fx=(vals.length<2?W/2:fi2*(W/(vals.length-1))), fy=H-2-(vals[fi2]/mx)*(H-5);
       return '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" style="display:block">'
-        +'<polyline points="'+pts+'" fill="none" stroke="'+((META[a]||{}).c||'#94A3B8')+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'
-        +'<circle cx="'+fx.toFixed(1)+'" cy="'+fy.toFixed(1)+'" r="3" fill="'+((META[a]||{}).c||'#94A3B8')+'"/></svg>';
+        +'<polyline points="'+pts+'" fill="none" stroke="'+col+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'
+        +'<circle cx="'+fx.toFixed(1)+'" cy="'+fy.toFixed(1)+'" r="3" fill="'+col+'"/></svg>';
     };
-    const list=_areasShown.map(a=>{
-      const now=_sh(_focus,a), n=_cnt(_focus,a), d=_prev?(now||0)-(_sh(_prev,a)||0):null;
-      const tag=d==null?'':d>=0.5?'<span style="color:#DC2626;font-weight:800">\u25b2 '+_dl(d)+'</span>'
-        :d<=-0.5?'<span style="color:#059669;font-weight:800">\u25bc '+_dl(d)+'</span>'
+    const arrow=d=>d==null?'':d>=0.3?'<span style="color:#DC2626;font-weight:800">\u25b2 '+_dl(d)+'</span>'
+        :d<=-0.3?'<span style="color:#059669;font-weight:800">\u25bc '+_dl(d)+'</span>'
         :'<span style="color:#64748B;font-weight:700">\u25b6 steady</span>';
-      return '<div class="ctr-row" onclick="window._careTrendDrill(\''+a.replace(/'/g,"\\'")+'\',\''+_cEsc(_focus)+'\')" '
-        +'title="Click to see the '+fi(n)+' call(s)" style="display:grid;grid-template-columns:30px 1fr 92px 108px;gap:10px;align-items:center;'
-        +'padding:8px 10px;border-radius:10px;cursor:pointer;border:1px solid #EEF2F7;background:#fff;margin-bottom:6px;">'
-        +'<div style="width:30px;height:30px;border-radius:9px;background:'+((META[a]||{}).c||'#94A3B8')+'1f;display:flex;align-items:center;justify-content:center;font-size:15px;">'+((META[a]||{}).e||'\u2022')+'</div>'
-        +'<div style="min-width:0"><div style="font-size:12.5px;font-weight:800;color:#0F172A;">'+_cEsc(a)+'</div>'
-        +'<div style="font-size:11px;color:#64748B;"><b style="color:#0F172A">'+_pp(now)+'</b> of calls \u00b7 '+fi(n)+' parent'+(n===1?'':'s')+'</div></div>'
-        +spark(a)
-        +'<div style="font-size:11px;text-align:right;white-space:nowrap;">'+tag+'</div></div>';
+    const list=_list.map(p=>{
+      const now=_sh(_focus,p), n=_cnt(_focus,p), d=_prev?(now||0)-(_sh(_prev,p)||0):null, c=_col(p), mc=_mainCat(p);
+      return '<div class="ctr-row" onclick="window._careTrendDrill(\'topic\',\''+p.replace(/'/g,"\\'")+'\',\''+_cEsc(_focus)+'\')" '
+        +'title="Click for the '+fi(n)+' call(s)" style="display:grid;grid-template-columns:8px 1fr 84px 96px;gap:10px;align-items:center;'
+        +'padding:7px 10px;border-radius:10px;cursor:pointer;border:1px solid #EEF2F7;background:#fff;margin-bottom:5px;">'
+        +'<div style="width:8px;height:30px;border-radius:4px;background:'+c+'"></div>'
+        +'<div style="min-width:0"><div style="font-size:12.5px;font-weight:800;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+_cEsc(p)+'</div>'
+        +'<div style="font-size:10.5px;color:#64748B;"><b style="color:#0F172A">'+fi(n)+'</b> parent'+(n===1?'':'s')+' \u00b7 '+_pp(now)+' of calls'
+        +(mc?' \u00b7 <span title="The grievance category these calls are mostly filed under">filed as '+_cEsc(mc)+'</span>':'')+'</div></div>'
+        +spark(_mo.map(m=>_sh(m,p)||0),c)
+        +'<div style="font-size:10.5px;text-align:right;white-space:nowrap;">'+arrow(d)+'</div></div>';
+    }).join('');
+
+    /* ── the most common keywords this month, with their movement ── */
+    const fK=_byM[_focus].kw, pK=_prev?_byM[_prev].kw:{};
+    /* a word is kept only if it is at least twice as common in concern calls as
+       in calls with no concern: that is what makes it a word about a problem */
+    const cN=Math.max(1,_mo.reduce((s2,m)=>s2+_byM[m].any,0)), nN=Math.max(1,_mo.reduce((s2,m)=>s2+_byM[m].nn,0));
+    const allC={}, allN={};
+    _mo.forEach(m=>{ const o=_byM[m]; Object.keys(o.kw).forEach(w=>allC[w]=(allC[w]||0)+o.kw[w]); Object.keys(o.kwN).forEach(w=>allN[w]=(allN[w]||0)+o.kwN[w]); });
+    const distinctive=w=>(allC[w]/cN) >= 2*((allN[w]||0)/nN) && (allC[w]/cN) < 0.6;
+    const kws=Object.keys(fK).filter(w=>fK[w]>=3 && distinctive(w)).sort((a,b)=>fK[b]-fK[a]).slice(0,18);
+    const kMax=kws.length?fK[kws[0]]:1;
+    const fN=_byM[_focus].n, pN=_prev?_byM[_prev].n:0;
+    const chips=kws.map(w=>{
+      const now=fK[w]/fN*100, was=pN?((pK[w]||0)/pN*100):null, d=was==null?null:now-was;
+      const sz=11+Math.round((fK[w]/kMax)*5);
+      const col=d==null?'#334155':d>=0.2?'#B91C1C':d<=-0.2?'#047857':'#334155';
+      const bg =d==null?'#F1F5F9':d>=0.2?'#FEF2F2':d<=-0.2?'#ECFDF5':'#F1F5F9';
+      return '<span onclick="window._careTrendDrill(\'kw\',\''+w+'\',\''+_cEsc(_focus)+'\')" title="'+fi(fK[w])+' calls in '+_cEsc(_focus)
+        +(was!=null?' \u00b7 '+(pK[w]||0)+' in '+_cEsc(_prev):'')+' \u2014 click for the calls" '
+        +'style="display:inline-flex;align-items:baseline;gap:5px;padding:4px 10px;margin:0 6px 6px 0;border-radius:999px;cursor:pointer;'
+        +'background:'+bg+';color:'+col+';font-size:'+sz+'px;font-weight:700;border:1px solid #E2E8F0">'+_cEsc(w)
+        +'<span style="font-size:10px;font-weight:600;color:#64748B">'+fi(fK[w])+'</span>'
+        +(d==null?'':d>=0.2?'<span style="font-size:10px">\u25b2</span>':d<=-0.2?'<span style="font-size:10px">\u25bc</span>':'')+'</span>';
     }).join('');
 
     h+='<div style="margin:4px 0 12px;padding:11px 14px;border-radius:11px;background:#F8FAFC;border:1px solid #E2E8F0;font-size:13px;line-height:1.55;color:#334155;">'
       +'\ud83d\udcc8 '+say+'</div>'
       +'<div style="display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:16px;align-items:start;">'
-      +'<div><div style="font-size:12px;font-weight:800;color:#0F172A;margin-bottom:2px;">What parents are raising, month by month</div>'
-      +'<div style="font-size:11px;color:#64748B;margin-bottom:8px;">Share of answered calls that raised each concern'
+      +'<div><div style="font-size:12px;font-weight:800;color:#0F172A;margin-bottom:2px;">The problems parents raise, month by month</div>'
+      +'<div style="font-size:11px;color:#64748B;margin-bottom:8px;">Read from each call\u2019s remarks, follow-up action and grievance category \u00b7 share of answered calls'
       +(fBranch==='ALL'?' \u00b7 all branches':' \u00b7 '+_cEsc(fBranch))+' \u00b7 click a point for those calls</div>'
-      +'<div style="height:270px;position:relative;"><canvas id="care-summary-trend"></canvas></div></div>'
-      +'<div><div style="font-size:12px;font-weight:800;color:#0F172A;margin-bottom:2px;">Trending in '+_cEsc(_focus)+'</div>'
+      +'<div style="height:270px;position:relative;"><canvas id="care-summary-trend"></canvas></div>'
+      +'<div style="font-size:12px;font-weight:800;color:#0F172A;margin:14px 0 2px;">Most common words in '+_cEsc(_focus)+'\u2019s concern calls</div>'
+      +'<div style="font-size:11px;color:#64748B;margin-bottom:8px;">From the remarks and follow-up actions \u2014 words that mark a problem, not stock phrases \u00b7 size = how often \u00b7 '
+      +'<span style="color:#B91C1C;font-weight:700">red \u25b2</span> more than '+(_prev?_cEsc(_prev):'last month')+', <span style="color:#047857;font-weight:700">green \u25bc</span> less \u00b7 click a word for the calls</div>'
+      +'<div>'+(chips||'<span style="font-size:12px;color:#94A3B8">Not enough remark text yet.</span>')+'</div></div>'
+      +'<div><div style="font-size:12px;font-weight:800;color:#0F172A;margin-bottom:2px;">Top problems in '+_cEsc(_focus)+'</div>'
       +'<div style="font-size:11px;color:#64748B;margin-bottom:8px;">'+(_prev?'Change is against '+_cEsc(_prev)+'. ':'')
       +'\u25b2 means more parents raised it \u2014 worse.</div>'+list+'</div></div>'
       +(_thin.length?'<div style="font-size:10.5px;color:#94A3B8;margin-top:6px;">Left out of the trend (fewer than '+MIN_CALLS
@@ -8523,36 +8593,42 @@ function renderCareSummary(){
 
   if(_focus){
     mkChart('care-summary-trend',{type:'line',
-      data:{labels:_mo.map(_ms),datasets:_areasShown.map(a=>({label:a,data:_mo.map(m=>+(_sh(m,a)||0).toFixed(2)),
-        borderColor:(META[a]||{}).c||'#94A3B8',backgroundColor:(META[a]||{}).c||'#94A3B8',
+      data:{labels:_mo.map(_ms),datasets:_lines.map(p=>({label:p,data:_mo.map(m=>+(_sh(m,p)||0).toFixed(2)),
+        borderColor:_col(p),backgroundColor:_col(p),
         borderWidth:2.5,tension:0.3,pointRadius:_mo.map(m=>m===_focus?5:3),pointHoverRadius:6}))},
       options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'nearest',intersect:false},
-        onClick:(e,els,ch)=>{ if(!els||!els.length) return; const p=els[0];
-          window._careTrendDrill(_areasShown[p.datasetIndex], _mo[p.index]); },
+        onClick:(e,els)=>{ if(!els||!els.length) return; const q=els[0];
+          window._careTrendDrill('topic', _lines[q.datasetIndex], _mo[q.index]); },
         scales:{y:{beginAtZero:true,ticks:{callback:v=>v+'%'},grid:{color:'#F1F5F9'}},x:{grid:{display:false}}},
         plugins:{datalabels:{display:false},
           legend:{position:'bottom',labels:{boxWidth:10,boxHeight:10,usePointStyle:true,font:{size:11}}},
-          tooltip:{callbacks:{label:cx=>{ const m=_mo[cx.dataIndex], a=_areasShown[cx.datasetIndex];
-            return a+': '+_pp(_sh(m,a))+' \u00b7 '+fi(_cnt(m,a))+' of '+fi(_byM[m].n)+' answered calls'; }}}}}});
+          tooltip:{callbacks:{label:cx=>{ const m=_mo[cx.dataIndex], p=_lines[cx.datasetIndex];
+            return p+': '+_pp(_sh(m,p))+' \u00b7 '+fi(_cnt(m,p))+' of '+fi(_byM[m].n)+' answered calls'; }}}}}});
   }
 }
 
-/* The calls behind a point on the trend or a row of the list. */
-window._careTrendDrill=function(area, month){
+/* The calls behind a problem, or behind a word, in one month. */
+window._careTrendDrill=function(kind, key, month){
   const CARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
   const BR=['Boduppal','Keesara','Pocharam','Bachupally','Gowdavalli'];
   const scope=(fBranch==='ALL')?BR:[fBranch];
+  const txt=r=>((((r.Remarks&&r.Remarks!=='–')?r.Remarks:'')+' '+((r.Followup&&r.Followup!=='–')?r.Followup:'')).toLowerCase());
+  const has=(r)=>{
+    if(kind==='topic') return window._careTopicsOf(r).some(x=>x.topic===key);
+    if(kind==='kw'){ const re=new RegExp('\\b'+key.replace(/[^a-z]/g,'')+'s?\\b'); return re.test(txt(r).replace(/[^a-z\s]+/g,' ')); }
+    return window._careCatOf(r)===key;                      // older calls: by category
+  };
   const rows=CARE.filter(r=>scope.includes(r.Branch)&&String(r.Month||'').trim()===month
-      &&window._careAnswerable(r)&&window._careIsConcern(r)&&window._careCatOf(r)===area)
+      &&window._careAnswerable(r)&&window._careIsConcern(r)&&has(r))
     .map(r=>({Branch:r.Branch,Student:r.Student,Class:r.Class,Date:r.Date,
-      Grievance:r.GrievanceRaw||r.Grievance,Sentiment:_careRowSentiment(r),
+      Category:window._careCatOf(r),Sentiment:_careRowSentiment(r),
       Remarks:r.Remarks,Followup:r.Followup,Status:r.StatusRaw||r.Status}));
-  const cols=[{key:'Branch',label:'Branch'},{key:'Student',label:'Student',maxW:'160px'},{key:'Class',label:'Class'},
-    {key:'Date',label:'Date',date:true},{key:'Sentiment',label:'Sentiment',pill:true},
-    {key:'Remarks',label:'What the parent said',maxW:'320px'},{key:'Followup',label:'Follow-up',maxW:'220px'},
+  const cols=[{key:'Branch',label:'Branch'},{key:'Student',label:'Student',maxW:'150px'},{key:'Class',label:'Class'},
+    {key:'Date',label:'Date',date:true},{key:'Category',label:'Filed as',pill:true},{key:'Sentiment',label:'Sentiment',pill:true},
+    {key:'Remarks',label:'What was said',maxW:'320px'},{key:'Followup',label:'Follow-up action',maxW:'240px'},
     {key:'Status',label:'Status',pill:true}];
-  openModal('\ud83d\udcc8 '+area+' \u2014 '+month, rows.length+' call(s) \u00b7 '+(fBranch==='ALL'?'All Branches':fBranch)
-    +' \u00b7 answered calls that raised this concern', rows, cols);
+  openModal('\ud83d\udcc8 '+(kind==='kw'?'\u201c'+key+'\u201d':key)+' \u2014 '+month, rows.length+' call(s) \u00b7 '+(fBranch==='ALL'?'All Branches':fBranch)
+    +(kind==='kw'?' \u00b7 concern calls whose remarks or follow-up use this word':' \u00b7 answered calls that raised this problem'), rows, cols);
 };
 
 /* ══ CARE CALLS — CLASS AND SECTION WISE ══
