@@ -1365,9 +1365,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="card" style="margin-bottom:16px;">
     <div class="ch">
       <h3>🏆 Branch Performance Scorecard — Head-to-Head Comparison</h3>
-      <span class="fnote">Every row is the same percentage its own department tab shows, so the two always agree.
-        Composite scores, where a department has one, are printed underneath. Care Call &amp; Observation rows use
-        the PREVIOUS month; HR is the score from the HR Analytics tab.</span>
+      <span class="fnote">Every row is the same percentage its own department tab shows, so the two always agree —
+        except <b>Vigilance</b>, which is a performance score over visit issues <i>and</i> daily checklist points
+        (closure 70% + timeliness 30%). Composite scores, where a department has one, are printed underneath. Care
+        Call &amp; Observation rows use the PREVIOUS month; HR is the score from the HR Analytics tab. On-hold items
+        are left out everywhere. Click any figure for its working.</span>
       <span style="font-size:11px;background:#FFFBEB;border:1px solid rgba(217,119,6,.25);color:#D97706;padding:3px 10px;border-radius:6px;font-weight:600;" id="rank-tag">🥇 Rankings &amp; Awards — Current / Latest Month Per Branch</span>
     </div>
     <div class="cb" style="overflow-x:auto;">
@@ -10541,6 +10543,9 @@ const FORMULA_BOOK = [
      n:'Overdue days are counted against the time actually allowed. For HR a position counts as overdue past 30 days, and open positions accrue overdue days from their post date. Floored at 0, so a very late caseload bottoms out rather than going negative.'}]},
 
   {tab:'Head-to-Head scorecard', items:[
+    {m:'Vigilance performance score',
+     f:'Closure × 0.70 + Timeliness × 0.30 · Closure = (closed + ½ × awaiting verification) ÷ raised · Timeliness = raised items not late ÷ raised',
+     n:'Counts visit issues (Consolidated_Vigilance) and daily checklist points (Safety app) together — both are raised for a department to fix. A checkpoint counts once per branch however many rounds raised it; late = closed after its target, or still open past it; rejected / not-valid and on-hold items are left out.'},
     {m:'Branch rank',
      f:'mean of the branch\'s available metric percentages',
      n:'Branches missing a metric are ranked on the metrics they do have, so a branch with fewer feeds is not penalised for the gap — check the underlying counts before acting on a rank.'}]}
@@ -10561,6 +10566,7 @@ function viewScorecardCell(cat, branch){
       `<div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:#1F2937;background:#F8FAFF;border:1px solid #E0E8FF;border-radius:8px;padding:10px 12px;white-space:pre-wrap;line-height:1.7">${esc(fx.expr)}</div>` +
       '<div style="font-weight:800;color:#1E4FD8;font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin:16px 0 6px">Values used for ' + esc(branch) + '</div>' +
       `<div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:#0F172A;background:#ECFDF5;border:1px solid #BBF7D0;border-radius:8px;padding:10px 12px;white-space:pre-wrap;line-height:1.8">${esc(fx.work)}</div>` +
+      (fx.html || '') +
       (fx.note ? '<div style="font-weight:800;color:#1E4FD8;font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin:16px 0 6px">What this includes and excludes</div>' +
         `<div style="color:#475569;font-size:12px;line-height:1.65">${esc(fx.note)}</div>` : '') +
     '</div>';
@@ -11639,6 +11645,66 @@ function vigSafetyStats(rows){
   return {total,open:open_,closed,adminClosed,awaitingAdmin,onTime,onTimePct,closurePct,adminPct,score,u};
 }
 
+/* ══ VIGILANCE PERFORMANCE — visit issues + daily checklist points ══
+   Both kinds of issue are raised for a department to fix, so both belong in how
+   the branch is judged. Until now the scorecard read only the visit issues
+   (Consolidated_Vigilance); the checklist points raised by the Safety app on
+   every round counted for nothing.
+
+     Closure    = (closed + ½ × work done awaiting verification) ÷ raised
+     Timeliness = raised items that are not late ÷ raised
+                  late = closed after its target date, or still open past it
+     Score      = Closure × 0.70 + Timeliness × 0.30
+
+   The 70 / 30 split is the one the visit-only safety score already used, so the
+   two are comparable. Work reported done but not yet verified earns half: the
+   department says it is fixed, nobody has checked. A checkpoint counts once per
+   branch however many rounds raised it (the checklist's own rule), and issues
+   marked Rejected or Not valid were raised in error and count on neither side.
+   On hold was removed on arrival, like everywhere else. */
+function vigPerfStats(visitRows, chkRows){
+  const today=new Date(); today.setHours(0,0,0,0);
+  const v={raised:0,closed:0,verif:0,open:0,late:0};
+  (visitRows||[]).forEach(r=>{
+    const st=String(r.Status||'').trim();
+    if(/rejected|not valid/i.test(st)) return;
+    v.raised++;
+    if(/^(closed|completed|resolved|done)/i.test(st)) v.closed++; else v.open++;
+    const m=String(r.OverDue||'').match(/(\d+)\s*day/i);
+    if(m&&+m[1]>0) v.late++;
+  });
+  const c={raised:0,closed:0,verif:0,open:0,late:0,openByArea:{}};
+  const V=window.VCHK;
+  (chkRows||[]).forEach(r=>{
+    if(/rejected|not valid/i.test(String(r.status||''))) return;
+    c.raised++;
+    const tg=V.dt(r.target), cl=V.dt(r.closed);
+    if(V.toVerify(r)) c.verif++;
+    else if(V.isOpen(r)){
+      c.open++;
+      if(tg&&tg<today) c.late++;
+      const a=String(r.area||'').trim()||'Other'; c.openByArea[a]=(c.openByArea[a]||0)+1;
+    } else { c.closed++; if(tg&&cl&&cl>tg) c.late++; }
+  });
+  const part=o=>{
+    if(!o.raised) return null;
+    const clo=(o.closed+0.5*o.verif)/o.raised*100, tim=(o.raised-o.late)/o.raised*100;
+    return {clo:+clo.toFixed(1),tim:+tim.toFixed(1),score:Math.round(clo*0.70+tim*0.30)};
+  };
+  const all={raised:v.raised+c.raised,closed:v.closed+c.closed,verif:v.verif+c.verif,open:v.open+c.open,late:v.late+c.late};
+  return {v,c,all,vs:part(v),cs:part(c),as:part(all),hasChk:chkRows!=null};
+}
+/* the checklist, deduped and without hold, for the scorecard: the all-branch
+   slim feed when the payload carries it, the full checklist otherwise */
+function _vigChkForScore(slim){
+  try{
+    if(slim&&slim.vchk&&slim.vchk.rows&&slim.vchk.rows.length&&window.VCHK)
+      return {rows:window.VCHK.toRows(slim.vchk,{quiet:true}),src:'all branches'};
+  }catch(e){}
+  if(Array.isArray(window._VCHK_ROWS)) return {rows:window._VCHK_ROWS,src:'loaded checklist'};
+  return {rows:null,src:null};
+}
+
 /* ── HR adapter ── roles posted → roles filled, against a 30-day hiring target */
 function hrUnifiedStats(rows, maxAssigned){
   const total=rows.length;
@@ -11965,22 +12031,63 @@ function renderRankings(){
     html+=r.html; contrib.push(r.valMap);
   }
 
-  // Vigilance & Safety
+  // Vigilance performance — visit issues + daily checklist points
   {
-    /* Headline is the closure percentage the Vigilance tab shows; the composite
-       score sits beneath it. */
-    const r=scoreRow('🛡️','Vigilance issues closed %',vigStats,d=>{
-      if(!d||!d.total) return {value:null};
-      const pct=Math.round(d.closurePct);
-      return {value:pct,html:`<span style="font-weight:800;color:${scoreColor(pct)};font-size:15px;">${pct}%</span>`+
-        `<small style="color:#94A3B8;display:block;font-size:10px;">${d.onTimePct}% on time \u00b7 safety score ${d.score}</small>`+
-        `<small style="color:#94A3B8;display:block;font-size:9.5px;margin-top:2px;">`+
-        `${fi(d.total)} raised \u00b7 ${d.open} open \u00b7 admin verified ${d.adminPct}%</small>`};
-    },false,'Vigilance issues closed %',(d)=>d&&d.total?(d.fxIn?unifiedFx(d.u,d.fxIn,
-      {item:'issues',assigned:'raised',closed:'closed'}):{
-        expr:'score = WH\u00d70.35 + CE\u00d70.25 + CS\u00d70.20 + OC\u00d70.20',
-        work:`closure ${d.closurePct}% \u00b7 on time ${d.onTimePct}% \u00b7 ${fi(d.total)} raised \u00b7 ${d.open} open \u00b7 admin verified ${d.adminPct}%`,
-        note:'Closure counts issues whose vigilance status is Closed. Admin verification is tracked separately and is NOT part of this score, which is why an issue can be closed here and still awaiting admin sign-off.'}):null);
+    const _chk=_vigChkForScore(_SLIM);
+    const perf={};
+    ALLB.forEach(b=>{
+      perf[b]=vigPerfStats(VIGA.filter(r=>r.Branch===b),
+        _chk.rows?_chk.rows.filter(r=>r.branch===b):null);
+      perf[b].src=_chk.src;
+    });
+    const r=scoreRow('🛡️','Vigilance performance score<small style="display:block;font-weight:400;font-size:10px;color:#94A3B8">visit issues + daily checklist points</small>',perf,d=>{
+      if(!d||!d.as) return {value:null};
+      const sc=d.as.score;
+      return {value:sc,html:`<span style="font-weight:800;color:${scoreColor(sc)};font-size:15px;">${sc}</span>`+
+        `<small style="color:#94A3B8;display:block;font-size:10px;">${fi(d.all.closed)}/${fi(d.all.raised)} closed`+
+        `${d.all.verif?' \u00b7 '+d.all.verif+' awaiting verification':''} \u00b7 ${fi(d.all.late)} late</small>`+
+        `<small style="color:#94A3B8;display:block;font-size:9.5px;margin-top:2px;">visits ${d.v.closed}/${d.v.raised} \u00b7 `+
+        (d.hasChk?`checklist ${d.c.closed}/${d.c.raised}`:'checklist loading\u2026')+`</small>`};
+    },false,'Vigilance performance score',(d,b)=>{
+      if(!d||!d.as) return null;
+      const row=(lbl,o,p,bold)=>`<tr${bold?' style="background:#F8FAFF;font-weight:700"':''}><td style="padding:7px 10px;border-bottom:1px solid #E0E8FF">${lbl}</td>`+
+        [o.raised,o.closed,o.verif,o.open,o.late].map(x=>`<td style="padding:7px 10px;text-align:right;border-bottom:1px solid #E0E8FF">${fi(x)}</td>`).join('')+
+        `<td style="padding:7px 10px;text-align:right;border-bottom:1px solid #E0E8FF">${p?p.clo+'%':'\u2014'}</td>`+
+        `<td style="padding:7px 10px;text-align:right;border-bottom:1px solid #E0E8FF">${p?p.tim+'%':'\u2014'}</td>`+
+        `<td style="padding:7px 10px;text-align:right;border-bottom:1px solid #E0E8FF;font-weight:800;color:${p?scoreColor(p.score):'#94A3B8'}">${p?p.score:'\u2014'}</td></tr>`;
+      const th=h=>`<th style="padding:7px 10px;text-align:right;font-size:10.5px;color:#64748B;text-transform:uppercase;border-bottom:2px solid #E0E8FF">${h}</th>`;
+      let impact;
+      if(!d.hasChk) impact='The checklist has not loaded yet, so this score is visit issues only for now; it updates when the checklist arrives.';
+      else if(!d.c.raised) impact='No checklist points were raised for this branch, so the score is its visit issues alone.';
+      else if(!d.vs) impact=`No visit issues were raised for this branch, so the whole score comes from its <b>${fi(d.c.raised)} checklist points</b>.`;
+      else {
+        const dl=d.as.score-d.vs.score;
+        impact=`Visit issues alone would score <b>${d.vs.score}</b>. Adding the <b>${fi(d.c.raised)} checklist points</b> `+
+          `(${fi(d.c.closed)} closed, ${fi(d.c.verif)} awaiting verification, ${fi(d.c.open)} open, ${fi(d.c.late)} late) `+
+          (dl===0?'<b>leaves the score unchanged</b>.':`moves it <b style="color:${dl>0?'#059669':'#DC2626'}">${dl>0?'up':'down'} ${Math.abs(dl)} point${Math.abs(dl)===1?'':'s'}</b> to <b>${d.as.score}</b>.`);
+      }
+      const areas=Object.keys(d.c.openByArea||{}).sort((x,y)=>d.c.openByArea[y]-d.c.openByArea[x]);
+      const html=`<div style="font-weight:800;color:#1E4FD8;font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin:16px 0 6px">Impact of the checklist points</div>`+
+        `<div style="font-size:12.5px;line-height:1.6;color:#334155;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:10px 12px">${impact}</div>`+
+        `<div style="overflow-x:auto;margin-top:12px"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>`+
+        `<th style="padding:7px 10px;text-align:left;font-size:10.5px;color:#64748B;text-transform:uppercase;border-bottom:2px solid #E0E8FF">Source</th>`+
+        ['Raised','Closed','Awaiting verification','Open','Late','Closure','Timeliness','Score'].map(th).join('')+`</tr></thead><tbody>`+
+        row('Visit issues',d.v,d.vs)+(d.hasChk?row('Daily checklist points',d.c,d.cs):'')+row('Vigilance performance',d.all,d.as,true)+
+        `</tbody></table></div>`+
+        (areas.length?`<div style="font-size:12px;color:#475569;margin-top:10px"><b>Checklist points still open, by area:</b> `+
+          areas.slice(0,8).map(a=>`${a} ${d.c.openByArea[a]}`).join(' \u00b7 ')+`</div>`:'');
+      return {
+        expr:'score = Closure \u00d7 0.70 + Timeliness \u00d7 0.30\n'+
+             'Closure    = (closed + \u00bd \u00d7 awaiting verification) \u00f7 raised\n'+
+             'Timeliness = raised items not late \u00f7 raised   (late = closed after target, or open past it)',
+        work:`(${fi(d.all.closed)} + \u00bd \u00d7 ${fi(d.all.verif)}) \u00f7 ${fi(d.all.raised)} = ${d.as.clo}%   `+
+             `\u00b7   (${fi(d.all.raised)} \u2212 ${fi(d.all.late)}) \u00f7 ${fi(d.all.raised)} = ${d.as.tim}%\n`+
+             `${d.as.clo} \u00d7 0.70 + ${d.as.tim} \u00d7 0.30 = ${d.as.score}`,
+        note:'Visit issues come from the Consolidated_Vigilance sheet; checklist points from the Safety app\u2019s daily inspection checklist, '+
+             'each checkpoint counted once per branch however many rounds raised it. Work reported done but not yet verified earns half credit. '+
+             'Rejected / not-valid issues and anything on hold are left out of both sides.'+(d.src?' Checklist source: '+d.src+'.':''),
+        html:html};
+    });
     html+=r.html; contrib.push(r.valMap);
   }
 
@@ -20294,6 +20401,10 @@ async function _sylLoadData(){
    those columns never sit empty after the data has come in. */
 function _glanceDataArrived(){
   try{
+    if(typeof _currentTab === 'function' && _currentTab() === 'overview' &&
+       typeof renderRankings === 'function' && !(SCORE_SLIM && SCORE_SLIM.vchk)) renderRankings();
+  }catch(e){}
+  try{
     if(typeof _stale === 'object' && _stale) _stale.glance = true;
     if(typeof _currentTab === 'function' && _currentTab() === 'glance' &&
        typeof _renderTab === 'function') _renderTab('glance', true);
@@ -21794,10 +21905,15 @@ window.VCHK = (function () {
     });
   }
 
-  function toRows(tab){
-    /* on hold is excluded from every checklist figure (see _dropHold) */
-    if (window._dropHoldTable) tab = window._dropHoldTable('Vigilance checklist', tab);
-    try { window._holdChip && window._holdChip(); } catch (e) {}
+  function toRows(tab, opts){
+    /* on hold is excluded from every checklist figure (see _dropHold). A quiet
+       read (the scorecard's slim feed) drops them without replacing the list
+       the ⏸ chip shows. */
+    if (window._dropHoldTable) {
+      if (opts && opts.quiet) { tab = window._dropHoldTable('_quiet', tab); delete window._HOLD._quiet; }
+      else { tab = window._dropHoldTable('Vigilance checklist', tab);
+             try { window._holdChip && window._holdChip(); } catch (e) {} }
+    }
     var hdr = tab.hdr.map(function(x){ return String(x==null?'':x).trim(); });
     var M = indexOf(hdr);
     if(M.branch < 0 || M.status < 0)
