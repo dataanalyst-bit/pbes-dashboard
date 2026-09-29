@@ -739,6 +739,83 @@ table.vckt tr.vck-c td.nm{font-weight:600;color:var(--tx)}
 const DATA_API = '/api/data';   // server-side proxy — no Apps Script URL in the browser
 const AUTO_REFRESH_SECONDS = 120;
 
+/* ══════════════════ LIVE SECTIONS — no Refresh buttons anywhere ══════════════════
+   The main data (Care Calls, Observations, Admin, HR …) was always live: the
+   server rebuilds it every 10 minutes and this page re-fetches it on a timer.
+   The seven sections that load separately — PT-1, School Audit, PTM, Civil,
+   Syllabus & Notebook, Vigilance checklist, K-Innovative PTM — did neither:
+   each loaded once per visit and never asked again, behind a server copy up to
+   six hours old, with a ↻ Refresh button as the only way out. Every stale-figure
+   report came from that.
+
+   Now they follow the main data's rule, from one place:
+     • every section the user can open is re-checked in the background on the
+       same cycle as the main data (only while the page is visible);
+     • opening a tab shows the saved copy at once and checks the sheet behind it;
+     • the screen is redrawn only when the sheet actually changed;
+     • if the server's copy is ever more than 15 minutes old, the sheet is read
+       once more, quietly — a safety net if the server-side refresh stalls.
+   Nothing to click. A new section joins by adding one line to LIVE_SECTIONS. */
+window._LIVE = window._LIVE || {};
+/* true when the sheet has not been asked for this section in the last minute */
+function _liveDue(id){ var o=window._LIVE[id]; return !o || !o.netAt || (Date.now()-o.netAt) > 60000; }
+/* record a copy that came back; returns true when it differs from the one shown */
+function _liveMark(id, gen, reread, busy){
+  var o=window._LIVE[id]||(window._LIVE[id]={});
+  var changed = o.gen !== gen;
+  o.netAt=Date.now(); o.gen=gen;
+  var t=Date.parse(String(gen||''));
+  if(reread && !o.reread && !isNaN(t) && (Date.now()-t) > 15*60000){
+    o.reread=true;                                     // once per visit per section
+    (function wait(){ if(busy && busy()) return setTimeout(wait,400); try{ reread(); }catch(e){} })();
+  }
+  return changed;
+}
+/* "Live · updated 10:42" */
+function _liveLabel(gen){
+  var t=Date.parse(String(gen||'')); if(isNaN(t)) return 'Live';
+  var d=new Date(t);
+  return 'Live \u00b7 updated '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}
+window._liveDue=_liveDue; window._liveMark=_liveMark; window._liveLabel=_liveLabel;
+
+/* every separately-loaded section: the tab that needs it, and how to fetch it */
+var LIVE_SECTIONS = [
+  { tab:'pt1',       run:function(){ return window.loadPT1Review && loadPT1Review(false); } },
+  { tab:'audit',     run:function(){ return window.loadAudit && loadAudit(false); } },
+  { tab:'ptm',       run:function(){ return window.loadPTM && loadPTM(false); } },
+  { tab:'civil',     run:function(){ return window.loadCivil && loadCivil(false); } },
+  { tab:'vigilance', also:['glance','overview'], run:function(){ return window.loadVchk && loadVchk(false); } },
+  { tab:'kptm',      run:function(){ return window.loadKptm && loadKptm(false); } },
+  { tab:'syl',       also:['glance'], run:function(){
+      var b=document.querySelector('[onclick*="showTab(\'syl\'"]');
+      if(b && b.offsetParent!==null) return window.loadSyl && loadSyl(false);
+      return window._sylLoadData && _sylLoadData(); } }
+];
+function _liveCanOpen(ids){
+  return ids.some(function(id){
+    var b=document.querySelector('[onclick*="showTab(\''+id+'\'"]');
+    return b && b.offsetParent!==null;
+  });
+}
+function _liveCycle(){
+  if(document.visibilityState==='hidden') return;
+  LIVE_SECTIONS.forEach(function(sec, i){
+    if(!_liveCanOpen([sec.tab].concat(sec.also||[]))) return;
+    setTimeout(function(){
+      /* a background check: loaders skip the redraw they do when a tab is
+         opened, and redraw only if the sheet changed (flag read synchronously) */
+      window.__liveBg=true;
+      try{ sec.run(); }catch(e){} finally{ window.__liveBg=false; }
+    }, i*700);                                                       // staggered, never all at once
+  });
+}
+window._liveCycle=_liveCycle;
+setInterval(_liveCycle, AUTO_REFRESH_SECONDS*1000);
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState==='visible') _liveCycle();           // back on the tab: catch up at once
+});
+
 // ---- Global data arrays (populated by fetch, read by renderAll) ----
 let OBS_LOG = [], ADMP_DATA = [], SCORE_SLIM = null, GO_DATA = [], GRIEVANCE_DATA = [], ADM_TRENDS = [], MONTH_CONFIG = {}, ALL_TEACHER = [], CARE_DATA = [], OBS_DATA = [], ADMIN_DATA = [], PUR_DATA = [], DM_DATA = [],
     HR_RECORDS = [], VIG_DATA = [], TRACKER = [],
@@ -787,7 +864,7 @@ function showLoadOk(genAt, ms) {
   try { _sylPrefetch(); } catch (e) {}
   const t = genAt ? new Date(genAt).toLocaleString('en-IN') : 'just now';
   _banner('🟢 Live data loaded — ' + t + (ms ? ' (' + ms + 'ms)' : '') +
-          ' &nbsp;|&nbsp; <a href="javascript:loadLiveData(true)" style="color:#059669;font-weight:700;text-decoration:underline;">Refresh now</a>',
+          '',
           '#ECFDF5', '#059669', 8000);
 }
 
@@ -2047,7 +2124,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="card" style="margin-bottom:16px">
     <div class="ch"><h3>🔎 Daily inspection checklist — what the rounds are finding</h3>
       <span class="fnote" id="vck-fn">Loading…</span>
-      <button class="exm-refresh" onclick="loadVchk(true)" title="Re-read the Vigilance Checklist sheet">↻ Refresh</button>
       <span class="exm-status" id="vck-status"></span></div>
     <div class="cb" style="padding:14px 18px"><div id="vck-body">
       <div class="no-data">Reading the inspection checklist…</div></div></div>
@@ -2306,7 +2382,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div class="f"><label for="cv-cat">Category</label><select id="cv-cat"></select></div>
         <div class="f"><label for="cv-q">Search</label>
           <input id="cv-q" type="search" placeholder="e.g. tiles, auditorium, painting"></div>
-        <button class="exm-refresh" onclick="loadCivil(true)" title="Re-read the Civil sheet">↻ Refresh</button>
         <span class="exm-status" id="cv-status-msg"></span>
       </div>
     </div>
@@ -2389,7 +2464,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div class="au-ctl">
         <span class="scope-chip" id="pt-scope"><i></i>All branches · All months</span>
         <div class="f"><label for="pt-theme">Theme</label><select id="pt-theme"></select></div>
-        <button class="exm-refresh" onclick="loadPTM(true)" title="Re-read the PTM sheet">↻ Refresh</button>
         <span class="exm-status" id="pt-status"></span>
       </div>
     </div>
@@ -2504,7 +2578,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     <!-- The tab opens from the saved copy and checks for new rows by itself.
          Refresh reads the sheet NOW, past every cache — for straight after a
          change has been made in the Syllabus Monitor. -->
-    <button class="exm-refresh" onclick="loadSyl(true)" title="Read the sheet again now, past every cache">↻ Refresh</button>
     <span class="exm-status" id="syl-status"></span>
   </div>
   <div id="syl-loader" class="exm-loader"><div class="sp"></div>
@@ -2639,7 +2712,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div><h2 style="margin:0;font-size:20px;font-weight:800">⭐ K-Innovative PTM Feedback</h2>
         <div style="font-size:12.5px;color:var(--txm);margin-top:3px" id="kp-meta">Loading…</div></div>
       <div class="au-ctl">
-        <button class="exm-refresh" onclick="loadKptm(true)">↻ Refresh</button>
         <span class="exm-status" id="kp-status"></span>
       </div>
     </div>
@@ -2658,7 +2730,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
       <div class="au-ctl">
         <span class="scope-chip" id="au-scope"><i></i>All branches · All months</span>
-        <button class="exm-refresh" onclick="loadAudit(true)" title="Re-read the audit sheet">↻ Refresh</button>
         <span class="exm-status" id="au-status"></span>
       </div>
     </div>
@@ -2796,7 +2867,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     </div>
     <div class="sh-r">
       <span id="exm-status" class="exm-status"></span>
-      <button class="exm-refresh" onclick="loadPT1Review(true)" title="Re-read the marks from the sheet">↻ Refresh</button>
     </div>
   </div>
   <div class="exm-shell">
@@ -12385,13 +12455,13 @@ function _pt1Post(){
 async function loadPT1Review(force){
   _pt1MountFrame();
   if(_pt1Loading) return;
-  if(_pt1Loaded && !force){ _pt1Post(); return; }
+  if(_pt1Loaded && !force){ if(!window.__liveBg) _pt1Post(); if(!_liveDue('pt1')) return; }
   _pt1Loading=true;
-  _pt1SetStatus(force?'Refreshing…':'Loading…');
+  if(!_pt1Loaded) _pt1SetStatus('Loading…');
 
   try{
     // ── instant paint from the local snapshot ──
-    if(!force){
+    if(!force && !_pt1Loaded){
       try{
         var c=await idbGet('pbes_pt1');
         if(c && c.data && c.data.students && (Date.now()-c.t) < 24*3600*1000){
@@ -12421,11 +12491,11 @@ async function loadPT1Review(force){
       throw new Error('No marks returned. Check that the Student Result, Class & Subject Teachers '+
                       'and Period Structure tabs exist and that /api/data forwards ?section=pt1');
 
+    var _chg=_liveMark('pt1', raw.generatedAt, function(){ loadPT1Review(true); }, function(){ return _pt1Loading; }) || !_pt1Loaded;
     _pt1Raw=raw; window._pt1Raw=raw; _pt1Loaded=true;
     try{ idbSet('pbes_pt1',{ t:Date.now(), data:raw }); }catch(e){}
-    _pt1Post();
-    _pt1SetStatus(raw.generatedAt ? ('Updated '+String(raw.generatedAt).replace('T',' ').slice(0,16)) : '');
-    if(typeof renderRankings==='function') renderRankings();
+    if(_chg){ _pt1Post(); if(typeof renderRankings==='function') renderRankings(); }
+    _pt1SetStatus(_liveLabel(raw.generatedAt));
   }catch(err){
     if(!_pt1Loaded){
       _pt1HideLoader(false);
@@ -12433,7 +12503,7 @@ async function loadPT1Review(force){
       if(l) l.innerHTML='<div style="color:var(--r);font-weight:700">Could not load the academic review</div>'+
         '<div style="font-size:11px;color:var(--txm);max-width:460px">'+String(err&&err.message||err)+'</div>';
     }
-    _pt1SetStatus(String(err && err.message || err), true);
+    if(!_pt1Loaded) _pt1SetStatus(String(err && err.message || err), true);
   }finally{ _pt1Loading=false; }
 }
 
@@ -14596,10 +14666,10 @@ function _auAge(gen){
 async function loadAudit(force){
   if(_auLoading){ if(force){ _auQueued=true; _auStatus('Reading the sheet… (after the load already running)'); } return; }
   if(_auLoaded && !force){
-    _auPaint();
-    if(_auNetAt && Date.now()-_auNetAt < 60000) return;     // checked a moment ago
+    if(!window.__liveBg) _auPaint();
+    if(!_liveDue('audit')) return;                        // checked a moment ago
   }
-  _auLoading=true; _auStatus(force?'Reading the sheet…':(_auLoaded?'Checking the sheet…':'Loading…'));
+  _auLoading=true; if(!_auLoaded) _auStatus('Loading…');
   try{
     if(!force && !_auLoaded){
       try{
@@ -14626,14 +14696,11 @@ async function loadAudit(force){
       throw new Error('No audit rows returned. Check that the "School Audit" tab exists and that '+
                       '/api/data forwards ?section=audit');
 
-    var changed = !_auRaw || _auRaw.generatedAt !== raw.generatedAt;
+    var changed = _liveMark('audit', raw.generatedAt, function(){ loadAudit(true); }, function(){ return _auLoading; }) || !_auRaw;
     _auRaw=raw; _auLoaded=true; _auNetAt=Date.now();
     try{ idbSet('pbes_audit',{ t:Date.now(), data:raw }); }catch(e){}
     if(changed) _auPaint();
-    _auStatus((force?'Refreshed \u2014 ':'Updated \u2014 ')+(_auAge(raw.generatedAt)||''));
-    /* the server's copy is old: read the sheet once, quietly */
-    var age=Date.now()-Date.parse(String(raw.generatedAt||''));
-    if(!force && !_auStaleForced && age>20*60000){ _auStaleForced=true; _auQueued=true; }
+    _auStatus(_liveLabel(raw.generatedAt));
   }catch(err){
     if(!_auLoaded){
       _auShow(false);
@@ -14641,7 +14708,7 @@ async function loadAudit(force){
       if(l) l.innerHTML='<div style="color:var(--r);font-weight:700">Could not load the audit</div>'+
         '<div style="font-size:11px;color:var(--txm);max-width:460px">'+String(err&&err.message||err)+'</div>';
     }
-    _auStatus(String(err && err.message || err), true);
+    if(!_auLoaded) _auStatus(String(err && err.message || err), true);
   }finally{
     _auLoading=false;
     if(_auQueued){ _auQueued=false; setTimeout(function(){ loadAudit(true); }, 50); }
@@ -15936,10 +16003,10 @@ function _ptmPaint(){
 
 async function loadPTM(force){
   if(_ptmLoading) return;
-  if(_ptmLoaded && !force){ _ptmPaint(); return; }
-  _ptmLoading=true; _ptmStatus(force?'Refreshing…':'Loading…');
+  if(_ptmLoaded && !force){ if(!window.__liveBg) _ptmPaint(); if(!_liveDue('ptm')) return; }
+  _ptmLoading=true; if(!_ptmLoaded) _ptmStatus('Loading…');
   try{
-    if(!force){
+    if(!force && !_ptmLoaded){
       try{
         var c=await idbGet('pbes_ptm');
         if(c && c.data && c.data.ptm && (Date.now()-c.t) < 24*3600*1000){
@@ -15965,10 +16032,11 @@ async function loadPTM(force){
       throw new Error('No PTM rows returned. Check that the "PTM" tab exists and that '+
                       '/api/data forwards ?section=ptm');
 
+    var _chg=_liveMark('ptm', raw.generatedAt, function(){ loadPTM(true); }, function(){ return _ptmLoading; }) || !_ptmLoaded;
     _ptmRaw=raw; _ptmLoaded=true;
     try{ idbSet('pbes_ptm',{ t:Date.now(), data:raw }); }catch(e){}
-    _ptmPaint();
-    _ptmStatus(raw.generatedAt ? ('Updated '+String(raw.generatedAt).replace('T',' ').slice(0,16)) : '');
+    if(_chg) _ptmPaint();
+    _ptmStatus(_liveLabel(raw.generatedAt));
   }catch(err){
     if(!_ptmLoaded){
       _ptmShow(false);
@@ -15976,7 +16044,7 @@ async function loadPTM(force){
       if(l) l.innerHTML='<div style="color:var(--r);font-weight:700">Could not load parent feedback</div>'+
         '<div style="font-size:11px;color:var(--txm);max-width:460px">'+String(err&&err.message||err)+'</div>';
     }
-    _ptmStatus(String(err && err.message || err), true);
+    if(!_ptmLoaded) _ptmStatus(String(err && err.message || err), true);
   }finally{ _ptmLoading=false; }
 }
 
@@ -16957,10 +17025,10 @@ function _cvPaint(){
 
 async function loadCivil(force){
   if(_cvLoading) return;
-  if(_cvLoaded && !force){ _cvPaint(); return; }
-  _cvLoading=true; _cvStatus(force?'Refreshing…':'Loading…');
+  if(_cvLoaded && !force){ if(!window.__liveBg) _cvPaint(); if(!_liveDue('civil')) return; }
+  _cvLoading=true; if(!_cvLoaded) _cvStatus('Loading…');
   try{
-    if(!force){
+    if(!force && !_cvLoaded){
       try{
         var c=await idbGet('pbes_civil_v2');
         if(c && c.data && c.data.civil && (Date.now()-c.t) < 24*3600*1000){
@@ -16989,11 +17057,12 @@ async function loadCivil(force){
                       '/api/data forwards ?section=civil');
 
     try{ idbSet('pbes_civil_v2',{ t:Date.now(), data:raw }); }catch(e){}
+    var _chg=_liveMark('civil', raw.generatedAt, function(){ loadCivil(true); }, function(){ return _cvLoading; }) || !_cvLoaded;
     /* on hold is excluded here, after the untouched copy is saved */
     _cvRaw=Object.assign({},raw,{civil:_dropHoldTable('Civil Work',raw.civil)}); _cvLoaded=true;
     try{ window._holdChip && window._holdChip(); }catch(e){}
-    _cvPaint();
-    _cvStatus(raw.generatedAt ? ('Updated '+String(raw.generatedAt).replace('T',' ').slice(0,16)) : '');
+    if(_chg) _cvPaint();
+    _cvStatus(_liveLabel(raw.generatedAt));
   }catch(err){
     if(!_cvLoaded){
       _cvShow(false);
@@ -17001,7 +17070,7 @@ async function loadCivil(force){
       if(l) l.innerHTML='<div style="color:var(--r);font-weight:700">Could not load civil work</div>'+
         '<div style="font-size:11px;color:var(--txm);max-width:460px">'+String(err&&err.message||err)+'</div>';
     }
-    _cvStatus(String(err && err.message || err), true);
+    if(!_cvLoaded) _cvStatus(String(err && err.message || err), true);
   }finally{ _cvLoading=false; }
 }
 
@@ -22557,11 +22626,11 @@ window.VCHK = (function () {
   var loading=false, loaded=false;
   window.loadVchk = async function(force){
     if(loading) return;
-    if(loaded && !force){ safe(); return; }
+    if(loaded && !force){ if(!window.__liveBg) safe(); if(!_liveDue('vchk')) return; }
     loading=true;
-    var st=$('vck-status'); if(st){ st.textContent=force?'Refreshing…':'Loading…'; st.className='exm-status'; }
+    var st=$('vck-status'); if(st && !loaded){ st.textContent='Loading…'; st.className='exm-status'; }
     try{
-      if(!force){
+      if(!force && !loaded){
         try{ var c=await idbGet('pbes_vchk');
           if(c&&c.data&&c.data.vchk&&(Date.now()-c.t)<24*3600*1000){
             RAW=c.data; ROWS=VCHK.toRows(RAW.vchk); window._VCHK_ROWS=ROWS; loaded=true; safe();
@@ -22582,15 +22651,19 @@ window.VCHK = (function () {
       if(!raw||!raw.vchk||!raw.vchk.rows||!raw.vchk.rows.length)
         throw new Error('No rows returned. Check the "Vigilance Checklist" tab exists and that '+
                         '/api/data forwards ?section=vchk');
-      RAW=raw; ROWS=VCHK.toRows(raw.vchk); window._VCHK_ROWS=ROWS; loaded=true;
+      var _chg=_liveMark('vchk', raw.generatedAt, function(){ loadVchk(true); }, function(){ return loading; }) || !loaded;
+      if(_chg){
+        RAW=raw; ROWS=VCHK.toRows(raw.vchk); window._VCHK_ROWS=ROWS;
+        loaded=true; safe();
+        if(window._glanceDataArrived) _glanceDataArrived();
+      }
+      loaded=true;
       try{ idbSet('pbes_vchk',{t:Date.now(),data:raw}); }catch(e){}
-      safe();
-      if(window._glanceDataArrived) _glanceDataArrived();
-      if(st) st.textContent = raw.generatedAt ? ('Updated '+String(raw.generatedAt).replace('T',' ').slice(0,16)) : '';
+      if(st){ st.textContent=_liveLabel(raw.generatedAt); st.className='exm-status'; }
     }catch(err){
       if(!loaded){ var el=$('vck-body');
-        if(el) el.innerHTML='<div class="no-data" style="color:var(--r)">'+esc(String(err&&err.message||err))+'</div>'; }
-      if(st){ st.textContent=String(err&&err.message||err); st.className='exm-status err'; }
+        if(el) el.innerHTML='<div class="no-data" style="color:var(--r)">'+esc(String(err&&err.message||err))+'</div>';
+        if(st){ st.textContent=String(err&&err.message||err); st.className='exm-status err'; } }
     }finally{ loading=false; }
   };
 
@@ -23384,11 +23457,11 @@ window.KPTM = (function () {
   var loading=false, loaded=false;
   window.loadKptm=async function(force){
     if(loading) return;
-    if(loaded&&!force){ safe(); return; }
+    if(loaded&&!force){ if(!window.__liveBg) safe(); if(!_liveDue('kptm')) return; }
     loading=true;
-    var st=$('kp-status'); if(st){ st.textContent=force?'Refreshing…':'Loading…'; st.className='exm-status'; }
+    var st=$('kp-status'); if(st && !loaded){ st.textContent='Loading…'; st.className='exm-status'; }
     try{
-      if(!force){ try{ var c=await idbGet('pbes_kptm');
+      if(!force && !loaded){ try{ var c=await idbGet('pbes_kptm');
         if(c&&c.data&&c.data.kptm&&(Date.now()-c.t)<24*3600*1000){
           RAW=c.data; ROWS=KPTM.toRows(RAW.kptm); loaded=true; safe();
           if(st) st.textContent='Cached · refreshing in background'; }
@@ -23405,14 +23478,15 @@ window.KPTM = (function () {
       if(!raw||!raw.kptm||!raw.kptm.rows||!raw.kptm.rows.length)
         throw new Error('No rows returned. Check the "K-Innovative PTM Feedback" tab exists and that '+
                         '/api/data forwards ?section=kptm');
-      RAW=raw; ROWS=KPTM.toRows(raw.kptm); loaded=true;
+      var _chg=_liveMark('kptm', raw.generatedAt, function(){ loadKptm(true); }, function(){ return loading; }) || !loaded;
+      if(_chg){ RAW=raw; ROWS=KPTM.toRows(raw.kptm); loaded=true; safe(); }
+      loaded=true;
       try{ idbSet('pbes_kptm',{t:Date.now(),data:raw}); }catch(e){}
-      safe();
-      if(st) st.textContent=raw.generatedAt?('Updated '+String(raw.generatedAt).replace('T',' ').slice(0,16)):'';
+      if(st){ st.textContent=_liveLabel(raw.generatedAt); st.className='exm-status'; }
     }catch(err){
       if(!loaded){ var el=$('kp-body');
-        if(el) el.innerHTML='<div class="no-data" style="color:var(--r)">'+esc(String(err&&err.message||err))+'</div>'; }
-      if(st){ st.textContent=String(err&&err.message||err); st.className='exm-status err'; }
+        if(el) el.innerHTML='<div class="no-data" style="color:var(--r)">'+esc(String(err&&err.message||err))+'</div>';
+        if(st){ st.textContent=String(err&&err.message||err); st.className='exm-status err'; } }
     }finally{ loading=false; }
   };
 
