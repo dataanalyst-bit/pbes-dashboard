@@ -14492,7 +14492,12 @@ window.AUDIT = (function () {
   window.renderAuditTab = function (raw) {
     D = A.build(raw);
     window.__AUDIT_D = D;
-    var meta = D.rowCount.toLocaleString('en-IN') + ' audit lines · ' +
+    /* rows in the sheet = audit lines + stray rows (a branch-month too thin to be
+       an audit), so the count reconciles with the sheet's own row count */
+    var strayN = (D.stray || []).reduce(function (s, x) { return s + (x.rows || 0); }, 0);
+    var meta = D.rowCount.toLocaleString('en-IN') + ' audit lines' +
+      (strayN ? ' (+' + strayN + ' stray row' + (strayN === 1 ? '' : 's') + ' not counted — ' +
+        D.stray.map(function (x) { return x.branch + ' ' + A.monthShort(x.month); }).join(', ') + ')' : '') + ' · ' +
       D.branches.length + ' branches · ' + D.months.length + ' audited month' + (D.months.length === 1 ? '' : 's');
     var el = $('au-meta'); if (el) el.textContent = meta;
     if (D.lowEvidence) {
@@ -14574,12 +14579,29 @@ function _auPaint(){
   }
 }
 
+/* The audit used to load once per visit: after that, opening the tab never
+   asked the sheet again, and a Refresh pressed while a load was running was
+   dropped. So the dashboard kept showing September as it stood that morning
+   while the auditor went on entering it (Boduppal 91.5% here, 93.1% in its
+   sheet). Now: every opening checks the sheet in the background (at most once
+   a minute), a copy more than 20 minutes old triggers one re-read of the sheet,
+   and a Refresh pressed mid-load runs as soon as that load finishes. */
+var _auNetAt=0, _auQueued=false, _auStaleForced=false;
+function _auAge(gen){
+  var t=Date.parse(String(gen||'')); if(isNaN(t)) return '';
+  var d=new Date(t), mins=Math.max(0,Math.round((Date.now()-t)/60000));
+  return 'read from the sheet at '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+
+    ' ('+(mins<2?'just now':mins<60?mins+' min ago':Math.round(mins/60)+' h ago')+')';
+}
 async function loadAudit(force){
-  if(_auLoading) return;
-  if(_auLoaded && !force){ _auPaint(); return; }
-  _auLoading=true; _auStatus(force?'Refreshing…':'Loading…');
+  if(_auLoading){ if(force){ _auQueued=true; _auStatus('Reading the sheet… (after the load already running)'); } return; }
+  if(_auLoaded && !force){
+    _auPaint();
+    if(_auNetAt && Date.now()-_auNetAt < 60000) return;     // checked a moment ago
+  }
+  _auLoading=true; _auStatus(force?'Reading the sheet…':(_auLoaded?'Checking the sheet…':'Loading…'));
   try{
-    if(!force){
+    if(!force && !_auLoaded){
       try{
         var c=await idbGet('pbes_audit');
         if(c && c.data && c.data.audit && (Date.now()-c.t) < 24*3600*1000){
@@ -14604,10 +14626,14 @@ async function loadAudit(force){
       throw new Error('No audit rows returned. Check that the "School Audit" tab exists and that '+
                       '/api/data forwards ?section=audit');
 
-    _auRaw=raw; _auLoaded=true;
+    var changed = !_auRaw || _auRaw.generatedAt !== raw.generatedAt;
+    _auRaw=raw; _auLoaded=true; _auNetAt=Date.now();
     try{ idbSet('pbes_audit',{ t:Date.now(), data:raw }); }catch(e){}
-    _auPaint();
-    _auStatus(raw.generatedAt ? ('Updated '+String(raw.generatedAt).replace('T',' ').slice(0,16)) : '');
+    if(changed) _auPaint();
+    _auStatus((force?'Refreshed \u2014 ':'Updated \u2014 ')+(_auAge(raw.generatedAt)||''));
+    /* the server's copy is old: read the sheet once, quietly */
+    var age=Date.now()-Date.parse(String(raw.generatedAt||''));
+    if(!force && !_auStaleForced && age>20*60000){ _auStaleForced=true; _auQueued=true; }
   }catch(err){
     if(!_auLoaded){
       _auShow(false);
@@ -14616,7 +14642,10 @@ async function loadAudit(force){
         '<div style="font-size:11px;color:var(--txm);max-width:460px">'+String(err&&err.message||err)+'</div>';
     }
     _auStatus(String(err && err.message || err), true);
-  }finally{ _auLoading=false; }
+  }finally{
+    _auLoading=false;
+    if(_auQueued){ _auQueued=false; setTimeout(function(){ loadAudit(true); }, 50); }
+  }
 }
 
 (function(){
