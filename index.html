@@ -1081,6 +1081,7 @@ function applyLiveData(data){
     if (data.TOTAL_STUDENTS)    { document.getElementById('hv-students').textContent = data.TOTAL_STUDENTS.toLocaleString('en-IN');
     document.getElementById('ov-stu').textContent = data.TOTAL_STUDENTS.toLocaleString('en-IN'); }
     if (data.STUDENTS_BY_BRANCH){ window._STUDENTS_BY_BRANCH = data.STUDENTS_BY_BRANCH; }
+    if (Array.isArray(data.CARE_CLASS)){ window._CARE_CLASS = data.CARE_CLASS; }
     if (data.TOTAL_STUDENTS){ window._TOTAL_STUDENTS = data.TOTAL_STUDENTS; }
     if (data.AVIS_STRENGTH!==undefined){ window._AVIS_STRENGTH = data.AVIS_STRENGTH; }
     if (data.GO_DATA)          GO_DATA          = data.GO_DATA;
@@ -8554,6 +8555,98 @@ window._careTrendDrill=function(area, month){
     +' \u00b7 answered calls that raised this concern', rows, cols);
 };
 
+/* ══ CARE CALLS — CLASS AND SECTION WISE ══
+   Clicking a branch in "Branch Completion Rate Comparison" opens this: every
+   class-section of that branch for the month — students on the roster, students
+   called, calls made, completion % — with a subtotal for each class.
+   Students come from the branch's care sheet itself (one row per student each
+   month, called or not — counted in Code.gs as CARE_CLASS). Completion is
+   students called ÷ students, so a student called twice counts once. */
+function _careClassSplit(c){
+  var s=String(c||'').trim(), m=s.match(/^(.*?)[\s]*[-\u2013\u2014][\s]*([A-Za-z0-9]{1,3})$/);
+  return m ? { cls:m[1].trim(), sec:m[2].toUpperCase() } : { cls:s||'\u2013', sec:'\u2013' };
+}
+function _careClassOrder(c){
+  var s=String(c||'').toUpperCase().replace(/\s+/g,' ').trim();
+  if(/^(PLAY|PG\b|PRE ?NUR|NUR)/.test(s)) return 0;
+  if(/^(PP ?-?1|LKG|PP ?I\b)/.test(s)) return 1;
+  if(/^(PP ?-?2|UKG|PP ?II\b)/.test(s)) return 2;
+  var ey=s.match(/^EY ?(\d+)/); if(ey) return 3+(+ey[1])/10;
+  var R={I:1,II:2,III:3,IV:4,V:5,VI:6,VII:7,VIII:8,IX:9,X:10,XI:11,XII:12};
+  var m=s.match(/(?:GRADE|CLASS|STD|STAGE)?\s*([IVX]+|\d+)\b/);
+  if(m){ var v=R[m[1]]!=null?R[m[1]]:parseInt(m[1],10); if(!isNaN(v)) return 10+v; }
+  return 999;
+}
+function viewCareClassWise(b, month){
+  var escHtml=function(v){ return String(v==null?'':v).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
+  var CC=Array.isArray(window._CARE_CLASS)?window._CARE_CLASS:[];
+  var src=CC.filter(function(r){ return r.Branch===b && r.Month===month; });
+  var fromRoster=src.length>0;
+  /* before Code.gs sends the roll-up, fall back to the calls themselves: the
+     calls are exact, the class strength is not known yet */
+  if(!fromRoster){
+    var CARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
+    var agg={};
+    CARE.filter(function(r){ return r.Branch===b && r.Month===month; }).forEach(function(r){
+      var k=String(r.Class||'\u2013').trim(), o=agg[k]||(agg[k]={Branch:b,Month:month,Class:k,Students:null,cl:{},Calls:0});
+      o.cl[String(r.RollNo)+'|'+String(r.Student||'').toLowerCase()]=1; o.Calls++;
+    });
+    src=Object.keys(agg).map(function(k){ var o=agg[k]; return {Branch:b,Month:month,Class:k,Students:null,Called:Object.keys(o.cl).length,Calls:o.Calls}; });
+  }
+  var pct=function(c,s){ return s>0?Math.min(c/s*100,100):null; };
+  var rows=src.map(function(r){ var sp=_careClassSplit(r.Class);
+      return { ClassName:sp.cls, Section:sp.sec, Students:r.Students, Called:r.Called, Calls:r.Calls,
+               Pending:r.Students!=null?Math.max(r.Students-r.Called,0):null, Completion:pct(r.Called,r.Students),
+               _ord:_careClassOrder(sp.cls), _raw:r.Class }; })
+    .sort(function(x,y){ return x._ord-y._ord || x.ClassName.localeCompare(y.ClassName) || x.Section.localeCompare(y.Section); });
+  /* a subtotal after each class that has more than one section */
+  var out=[], T={Students:0,Called:0,Calls:0};
+  var groups=[]; rows.forEach(function(r){ var g=groups[groups.length-1]; if(!g||g.name!==r.ClassName) groups.push(g={name:r.ClassName,rows:[]}); g.rows.push(r); });
+  groups.forEach(function(g){
+    g.rows.forEach(function(r){ out.push(r); });
+    var t={Students:0,Called:0,Calls:0};
+    g.rows.forEach(function(r){ t.Students+=(r.Students||0); t.Called+=r.Called; t.Calls+=r.Calls; });
+    T.Students+=t.Students; T.Called+=t.Called; T.Calls+=t.Calls;
+    if(g.rows.length>1) out.push({ ClassName:g.name+' \u00b7 all sections', Section:g.rows.length+' sections', _tot:true,
+      Students:fromRoster?t.Students:null, Called:t.Called, Calls:t.Calls,
+      Pending:fromRoster?Math.max(t.Students-t.Called,0):null, Completion:fromRoster?pct(t.Called,t.Students):null });
+  });
+  out.push({ ClassName:b+' \u00b7 whole branch', Section:rows.length+' class-sections', _tot:true, _grand:true,
+    Students:fromRoster?T.Students:null, Called:T.Called, Calls:T.Calls,
+    Pending:fromRoster?Math.max(T.Students-T.Called,0):null, Completion:fromRoster?pct(T.Called,T.Students):null });
+  var bold=function(v,row){ return row._tot?'<b style="color:'+(row._grand?'#0F172A':'#1E4FD8')+'">'+v+'</b>':v; };
+  var num=function(k){ return function(v,row){ return bold(v==null?'<span style="color:#94A3B8">\u2014</span>':fi(v),row); }; };
+  var cols=[
+    {key:'ClassName',label:'Class',render:function(v,row){ return bold(escHtml(v),row); }},
+    {key:'Section',label:'Section',render:function(v,row){ return bold(escHtml(v),row); }},
+    {key:'Students',label:'Total students',render:num('Students')},
+    {key:'Called',label:'Students called',render:num('Called')},
+    {key:'Calls',label:'Calls made',render:num('Calls')},
+    {key:'Pending',label:'Not yet called',render:function(v,row){ return bold(v==null?'<span style="color:#94A3B8">\u2014</span>':
+       '<span style="color:'+(v>0?'#DC2626':'#059669')+';font-weight:700">'+fi(v)+'</span>',row); }},
+    {key:'Completion',label:'Completion %',render:function(v,row){
+       if(v==null) return '<span style="color:#94A3B8">\u2014</span>';
+       var c=v>=95?'#059669':v>=85?'#D97706':'#DC2626';
+       return '<div style="display:flex;align-items:center;gap:8px;min-width:130px"><div style="flex:1;height:7px;background:#EEF2F7;border-radius:4px;overflow:hidden">'+
+         '<div style="width:'+Math.min(v,100)+'%;height:100%;background:'+c+'"></div></div>'+
+         '<b style="color:'+c+';font-size:12px;min-width:44px;text-align:right">'+v.toFixed(1)+'%</b></div>'; }}
+  ];
+  var strength=+((window._STUDENTS_BY_BRANCH||{})[b])||0;
+  var sub=b+' \u00b7 '+month+' \u00b7 '+rows.length+' class-sections \u00b7 '+
+    (fromRoster ? fi(T.Called)+' of '+fi(T.Students)+' students called ('+(pct(T.Called,T.Students)||0).toFixed(1)+'%) \u00b7 '+fi(T.Calls)+' calls'+
+        (strength?' \u00b7 branch strength on the tracker: '+fi(strength):'')
+      : fi(T.Calls)+' calls \u00b7 class strength will show once Code.gs is redeployed');
+  openModal('\ud83c\udfeb '+b+' \u2014 class and section wise calls', sub, out, cols, {
+    expr:'completion % = students called \u00f7 total students in the class-section \u00d7 100',
+    work: fromRoster ? fi(T.Called)+' \u00f7 '+fi(T.Students)+' \u00d7 100 = '+(pct(T.Called,T.Students)||0).toFixed(1)+'% for the whole branch'
+                     : 'class strength not yet available',
+    note:'Total students is every student listed for that class-section in the branch\u2019s care sheet for '+month+
+      ', called or not. A student called more than once counts once in "Students called"; "Calls made" counts every call. '+
+      'The bar on the tab divides calls by the branch strength on the tracker, so the two can differ slightly when the sheet and the tracker disagree.'
+  });
+}
+window.viewCareClassWise=viewCareClassWise;
+
 // Click-to-view by Status with Sentiment column
 function viewCareWithSentiment(status){
   const CARE=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
@@ -8728,7 +8821,7 @@ function renderCare(){
     const pct=students>0?+(Math.min(calls/students*100,100).toFixed(1)):0;
     const pc=pct>=95?'pbg':pct>=85?'pba':'pbr';
     const vc=pct>=95?'#059669':pct>=85?'#D97706':'#DC2626';
-    html+=`<div class="bcb" style="cursor:pointer;" onclick="viewCareRecords('ALL','${b}','${useMonth}')" title="Click to view ${b}'s ${useMonth} calls">
+    html+=`<div class="bcb" style="cursor:pointer;" onclick="viewCareClassWise('${b}','${useMonth}')" title="Click for ${b}'s ${useMonth} class and section wise students, calls and completion">
       <div class="bcb-name"><span class="bd b${b}"></span>${b}</div>
       <div class="bcb-track"><div class="bcb-fill ${pc}" style="width:${Math.min(pct,100)}%"></div></div>
       <div class="bcb-val" style="color:${vc}">${pct}%</div>
