@@ -817,7 +817,7 @@ document.addEventListener('visibilitychange', function(){
 });
 
 // ---- Global data arrays (populated by fetch, read by renderAll) ----
-let OBS_LOG = [], ADMP_DATA = [], SCORE_SLIM = null, GO_DATA = [], GRIEVANCE_DATA = [], ADM_TRENDS = [], MONTH_CONFIG = {}, ALL_TEACHER = [], CARE_DATA = [], OBS_DATA = [], ADMIN_DATA = [], PUR_DATA = [], DM_DATA = [],
+let OBS_LOG = [], ADMP_DATA = [], TIEUP_DATA = [], SCORE_SLIM = null, GO_DATA = [], GRIEVANCE_DATA = [], ADM_TRENDS = [], MONTH_CONFIG = {}, ALL_TEACHER = [], CARE_DATA = [], OBS_DATA = [], ADMIN_DATA = [], PUR_DATA = [], DM_DATA = [],
     HR_RECORDS = [], VIG_DATA = [], TRACKER = [],
     ADM1_DATA = [], ADM2_DATA = [], LEAD_DATES = [],
     LEAD_SUMMARY = {}, OWNER_STATS = [], COMBINED_ADM = [],
@@ -1099,6 +1099,7 @@ function applyLiveData(data){
     if (data.DM_DATA)          DM_DATA          = data.DM_DATA;
     if (data.OBS_LOG)          OBS_LOG          = data.OBS_LOG;
     if (data.ADMP_DATA)        ADMP_DATA        = data.ADMP_DATA;
+    if (data.TIEUP_DATA)       TIEUP_DATA       = data.TIEUP_DATA;
     /* Head-to-head feed for every branch, names and free text already stripped. */
     if (data.SCORE_SLIM)       SCORE_SLIM       = data.SCORE_SLIM;
     if (data.ADM1_DATA)        ADM1_DATA        = data.ADM1_DATA;
@@ -2024,6 +2025,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="exm-head">
     <h2 style="margin:0;font-size:20px;font-weight:800">Admission Process</h2>
     <span class="exm-sub" id="admp-meta"></span>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;"><div class="ch">
+      <h3>&#127979; Admissions outreach &mdash; completed / total</h3>
+      <span class="fnote">Campus creches and preschools, branch by branch. Each cell reads <b>completed &divide; total</b>
+        &mdash; completed means the visit is done. Click any cell for the names behind it, with MOU signed and the
+        response recorded against each.</span></div>
+    <div class="cb-0" id="admp-tieups"></div>
   </div>
 
   <div class="card" style="margin-bottom:16px;"><div class="ch">
@@ -10532,7 +10541,151 @@ function admpRows(){
 }
 function admpEsc(v){ return String(v == null ? '' : v).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 
+/* ══════════════ ADMISSIONS OUTREACH — COMPLETED / TOTAL ══════════════
+   The director's table: branches down the side, Campus creches and Preschools
+   across, each cell completed over total. Every cell opens the names behind it.
+
+   Names come from the "Admission Tie-ups" sheet. Where a branch has no names
+   yet, the TOTAL still shows — taken from the 17-point sheet's own count (Pre
+   School Tie-ups, Gated Communities) and marked, so a branch that has done the
+   counting but not yet listed the names is not shown as zero. */
+var ADMP_TYPES = ['Campus creche', 'Preschool'];
+
+function _admpTieRows(){
+  return (typeof TIEUP_DATA !== 'undefined' && Array.isArray(TIEUP_DATA)) ? TIEUP_DATA : [];
+}
+/* the 17-point sheet's own count for a type, used only when no names are listed */
+function _admpSheetTotal(branch, type){
+  const rows = (typeof ADMP_DATA !== 'undefined' && Array.isArray(ADMP_DATA)) ? ADMP_DATA : [];
+  const want = type === 'Preschool' ? /pre\s*school\s*tie|preschool/i : /gated\s*communit|creche|day\s*care/i;
+  const r = rows.find(x => x.Branch === branch && want.test(String(x.Point || '')));
+  if (!r) return null;
+  const n = v => { const x = parseFloat(String(v == null ? '' : v).replace(/[^0-9.]/g, '')); return isNaN(x) ? 0 : x; };
+  const t = Math.max(n(r.Actual), n(r.Target));
+  return t > 0 ? t : null;
+}
+function _admpCell(branch, type){
+  const mine = _admpTieRows().filter(r => r.Branch === branch && r.Type === type);
+  const done = mine.filter(r => /^completed$/i.test(String(r.Status || '').trim())).length;
+  const sheet = _admpSheetTotal(branch, type);
+  /* a branch may have listed ten names out of seventy identified — the larger
+     figure is the real total, so the denominator never shrinks below the count
+     the branch itself reported */
+  const total = Math.max(mine.length, sheet || 0);
+  return { rows: mine, done: done, total: total, listed: mine.length,
+           fromSheet: mine.length === 0 && !!sheet,
+           mou: mine.filter(r => /^yes$/i.test(String(r.MOU || '').trim())).length,
+           pos: mine.filter(r => /^positive$/i.test(String(r.Response || '').trim())).length,
+           neg: mine.filter(r => /^negative$/i.test(String(r.Response || '').trim())).length };
+}
+
+function renderAdmpTieups(){
+  const host = document.getElementById('admp-tieups');
+  if (!host) return;
+  const order = ['Bachupally', 'Boduppal', 'Gowdavalli', 'Keesara', 'Pocharam'];
+  const seen = {};
+  _admpTieRows().forEach(r => seen[r.Branch] = 1);
+  ((typeof ADMP_DATA !== 'undefined' && Array.isArray(ADMP_DATA)) ? ADMP_DATA : []).forEach(r => seen[r.Branch] = 1);
+  let branches = order.filter(b => seen[b]).concat(Object.keys(seen).filter(b => order.indexOf(b) < 0).sort());
+  if (fBranch !== 'ALL') branches = branches.filter(b => b === fBranch);
+
+  if (!branches.length){
+    host.innerHTML = '<div style="padding:18px;color:#64748B;font-size:13px">No admission rows in this payload.</div>';
+    return;
+  }
+
+  const pct = (d, t) => t ? Math.round(d / t * 100) : null;
+  const col = p => p === null ? '#94A3B8' : p >= 80 ? '#059669' : p >= 40 ? '#D97706' : '#DC2626';
+  const cell = (b, ty) => {
+    const c = _admpCell(b, ty), p = pct(c.done, c.total);
+    if (!c.total)
+      return '<td style="text-align:center;color:#CBD5E1">\u2013</td>';
+    const q = "admpTieList('" + String(b).replace(/'/g, "\\'") + "','" + ty + "')";
+    return '<td style="text-align:center;cursor:pointer" onclick="' + q + '" title="click for the names">' +
+      '<div style="font-size:17px;font-weight:800;color:' + col(p) + '">' + c.done + ' / ' + c.total + '</div>' +
+      '<div style="height:5px;background:#EEF2F7;border-radius:3px;margin:4px auto 3px;max-width:92px">' +
+        '<i style="display:block;height:5px;border-radius:3px;width:' + (p === null ? 0 : Math.max(2, p)) +
+        '%;background:' + col(p) + '"></i></div>' +
+      '<div style="font-size:10.5px;color:#64748B">' + (p === null ? '' : p + '%') +
+        (c.fromSheet ? ' \u00b7 <span style="color:#D97706">names not listed</span>'
+                     : c.mou ? ' \u00b7 ' + c.mou + ' MOU' : '') + '</div></td>';
+  };
+
+  let tot = { listed: 0, sheetOnly: 0 };
+  const body = branches.map(b => {
+    ADMP_TYPES.forEach(ty => { const c = _admpCell(b, ty); tot.listed += c.listed; if (c.fromSheet) tot.sheetOnly++; });
+    return '<tr><td style="text-align:left;font-weight:700"><span class="bd b' + b + '"></span> ' + b + '</td>' +
+      ADMP_TYPES.map(ty => cell(b, ty)).join('') + '</tr>';
+  }).join('');
+
+  /* group row — the same arithmetic, over every branch shown */
+  const foot = ADMP_TYPES.map(ty => {
+    let d = 0, t = 0;
+    branches.forEach(b => { const c = _admpCell(b, ty); d += c.done; t += c.total; });
+    const p = pct(d, t);
+    return '<td style="text-align:center;font-weight:800;color:' + col(p) + '">' + d + ' / ' + t +
+      (p === null ? '' : '<div style="font-size:10.5px;color:#64748B;font-weight:600">' + p + '%</div>') + '</td>';
+  }).join('');
+
+  host.innerHTML =
+    '<div style="overflow-x:auto"><table class="dt brfz" style="min-width:420px">' +
+    '<thead><tr><th style="text-align:left">Branch</th>' +
+    '<th>\uD83C\uDFE0 Campus creches<div style="font-size:10px;font-weight:600;color:#94A3B8">completed / total</div></th>' +
+    '<th>\uD83C\uDF92 Preschools<div style="font-size:10px;font-weight:600;color:#94A3B8">completed / total</div></th>' +
+    '</tr></thead><tbody>' + body +
+    '<tr style="background:#F8FAFF;border-top:2px solid #E0E8FF">' +
+    '<td style="text-align:left;font-weight:800">' + (branches.length > 1 ? 'All branches' : branches[0]) + '</td>' +
+    foot + '</tr></tbody></table></div>' +
+    (tot.listed === 0
+      ? '<div style="margin:6px 14px 14px;padding:11px 14px;background:#FFF7ED;border:1px solid #FED7AA;' +
+        'border-radius:8px;color:#9A3412;font-size:12.5px;line-height:1.6">' +
+        '<b>No names listed yet.</b> The totals above come from the 17-point sheet\u2019s own counts. To open a cell ' +
+        'and see which preschool or creche is done, add the <b>Admission Tie-ups</b> sheet \u2014 one row per name, with ' +
+        'Branch, Type, Name, Visit status, MOU signed, Response and Remarks. In Apps Script, run ' +
+        '<code>setupTieupSheet()</code> once and it creates the sheet with its dropdowns.</div>'
+      : tot.sheetOnly
+        ? '<div class="fnote" style="display:block;padding:8px 14px 14px;color:#9A3412">Cells marked ' +
+          '<b>names not listed</b> show the total from the 17-point sheet; add those names to the Admission Tie-ups ' +
+          'sheet to open them.</div>'
+        : '<div class="fnote" style="display:block;padding:8px 14px 14px">Completed = visit status <b>Completed</b>. ' +
+          'Where a branch has identified more than it has listed by name, the larger figure is the total.</div>');
+}
+
+/* the names behind one cell — the director's second table */
+function admpTieList(branch, type){
+  const c = _admpCell(branch, type);
+  const rows = c.rows.slice().sort((a, b) => {
+    const rk = x => /^completed$/i.test(x.Status) ? 0 : /progress/i.test(x.Status) ? 1 : 2;
+    return rk(a) - rk(b) || String(a.Name).localeCompare(String(b.Name));
+  }).map((r, i) => ({
+    SNo: i + 1, Name: r.Name, Status: r.Status || '\u2013',
+    MOU: r.MOU || '\u2013', Response: r.Response || '\u2013',
+    Owner: r.Owner || '\u2013', Visited: r.Visited || '\u2013',
+    Next: r.Next || '\u2013', Remarks: r.Remarks || '\u2013'
+  }));
+  const label = type === 'Preschool' ? 'preschools' : 'campus creches';
+  if (!rows.length)
+    return openModal('\uD83C\uDFEB ' + branch + ' \u2014 ' + label,
+      c.total + ' identified \u00b7 no names listed yet', [], [],
+      { expr: 'completed \u00f7 total, where total is the count from the 17-point sheet',
+        work: c.done + ' of ' + c.total,
+        note: 'Add one row per name to the Admission Tie-ups sheet (Branch, Type, Name, Visit status, MOU signed, ' +
+              'Response, Remarks) and they will be listed here. Run setupTieupSheet() in Apps Script to create it.' });
+  openModal('\uD83C\uDFEB ' + branch + ' \u2014 ' + label,
+    c.done + ' of ' + c.total + ' completed \u00b7 ' + c.mou + ' MOU signed \u00b7 ' +
+    c.pos + ' positive, ' + c.neg + ' negative', rows,
+    [{ key: 'SNo', label: 'S.No' }, { key: 'Name', label: type === 'Preschool' ? 'Preschool name' : 'Creche name', maxW: '200px' },
+     { key: 'Status', label: 'Visit status', pill: true }, { key: 'MOU', label: 'MOU signed', pill: true },
+     { key: 'Response', label: 'Response', pill: true }, { key: 'Owner', label: 'Owner' },
+     { key: 'Visited', label: 'Visited on', date: true }, { key: 'Next', label: 'Next action', maxW: '200px' },
+     { key: 'Remarks', label: 'Remarks', maxW: '240px' }],
+    { expr: 'completed = visit status Completed; total = names listed, or the 17-point sheet\u2019s count when it is larger',
+      work: c.done + ' of ' + c.total + (c.listed < c.total ? ' \u00b7 ' + c.listed + ' listed by name so far' : ''),
+      note: 'MOU signed and Response are recorded per name in the Admission Tie-ups sheet.' });
+}
+
 function renderAdmProcess(){
+  try { renderAdmpTieups(); } catch(e){ console.error('tie-ups:', e && e.message); }
   const rows = admpRows();
   const host = document.getElementById('admp-matrix');
   const meta = document.getElementById('admp-meta');
