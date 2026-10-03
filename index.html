@@ -817,7 +817,7 @@ document.addEventListener('visibilitychange', function(){
 });
 
 // ---- Global data arrays (populated by fetch, read by renderAll) ----
-let OBS_LOG = [], ADMP_DATA = [], TIEUP_DATA = [], SCORE_SLIM = null, GO_DATA = [], GRIEVANCE_DATA = [], ADM_TRENDS = [], MONTH_CONFIG = {}, ALL_TEACHER = [], CARE_DATA = [], OBS_DATA = [], ADMIN_DATA = [], PUR_DATA = [], DM_DATA = [],
+let OBS_LOG = [], ADMP_DATA = [], SCORE_SLIM = null, GO_DATA = [], GRIEVANCE_DATA = [], ADM_TRENDS = [], MONTH_CONFIG = {}, ALL_TEACHER = [], CARE_DATA = [], OBS_DATA = [], ADMIN_DATA = [], PUR_DATA = [], DM_DATA = [],
     HR_RECORDS = [], VIG_DATA = [], TRACKER = [],
     ADM1_DATA = [], ADM2_DATA = [], LEAD_DATES = [],
     LEAD_SUMMARY = {}, OWNER_STATS = [], COMBINED_ADM = [],
@@ -1099,7 +1099,6 @@ function applyLiveData(data){
     if (data.DM_DATA)          DM_DATA          = data.DM_DATA;
     if (data.OBS_LOG)          OBS_LOG          = data.OBS_LOG;
     if (data.ADMP_DATA)        ADMP_DATA        = data.ADMP_DATA;
-    if (data.TIEUP_DATA)       TIEUP_DATA       = data.TIEUP_DATA;
     /* Head-to-head feed for every branch, names and free text already stripped. */
     if (data.SCORE_SLIM)       SCORE_SLIM       = data.SCORE_SLIM;
     if (data.ADM1_DATA)        ADM1_DATA        = data.ADM1_DATA;
@@ -2028,11 +2027,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   </div>
 
   <div class="card" style="margin-bottom:16px;"><div class="ch">
-      <h3>&#127979; Admissions outreach &mdash; completed / total</h3>
-      <span class="fnote">Campus creches and preschools, branch by branch. Each cell reads <b>completed &divide; total</b>
-        &mdash; completed means the visit is done. Click any cell for the names behind it, with MOU signed and the
-        response recorded against each.</span></div>
-    <div class="cb-0" id="admp-tieups"></div>
+      <h3>&#129504; How much is actually done &mdash; read from what the branches wrote</h3>
+      <span class="fnote">The sheet&rsquo;s own Progress % is a formula over Target and Actual, and those columns are
+        blank or inconsistent on most rows &mdash; one reads 494%. So progress here is read from the
+        <b>Next Action / Follow-up</b> and <b>Remarks / Evidence</b> text instead, by a language pipeline that can be
+        checked line by line: every figure opens the sentence behind it with the phrases that moved it marked.</span></div>
+    <div class="cb-0" id="admp-progress"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;"><div class="ch">
+      <h3>&#128269; Every point, every branch</h3>
+      <span class="fnote">The same reading, point by point. Darker red is further behind. Click a cell to see exactly
+        which words produced the figure.</span></div>
+    <div class="cb-0" id="admp-points"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;"><div class="ch">
+      <h3>&#128172; What each branch is talking about</h3>
+      <span class="fnote">The words each branch uses far more than the others do, weighted by TF-IDF, so shared
+        vocabulary drops away and what is particular to each branch is left.</span></div>
+    <div class="cb-0" id="admp-themes"></div>
   </div>
 
   <div class="card" style="margin-bottom:16px;"><div class="ch">
@@ -10541,151 +10555,616 @@ function admpRows(){
 }
 function admpEsc(v){ return String(v == null ? '' : v).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 
-/* ══════════════ ADMISSIONS OUTREACH — COMPLETED / TOTAL ══════════════
-   The director's table: branches down the side, Campus creches and Preschools
-   across, each cell completed over total. Every cell opens the names behind it.
+/* ══════════════════════════════════════════════════════════════════════════
+   ADMISSION PROCESS — PROGRESS READ FROM WHAT THE BRANCHES WROTE
 
-   Names come from the "Admission Tie-ups" sheet. Where a branch has no names
-   yet, the TOTAL still shows — taken from the 17-point sheet's own count (Pre
-   School Tie-ups, Gated Communities) and marked, so a branch that has done the
-   counting but not yet listed the names is not shown as zero. */
-var ADMP_TYPES = ['Campus creche', 'Preschool'];
+   The numeric columns of this sheet cannot carry the answer: Target is text in
+   places ("WITHIN 10KM RADIUS"), Actual is 0 on most rows, and Progress % is a
+   formula over those two, which is how Pocharam's Pre School Tie-ups reads
+   494% and School Outreach Visits reads 200%. Everything the branches actually
+   know is written in Next Action / Follow-up and Remarks / Evidence.
 
-function _admpTieRows(){
-  return (typeof TIEUP_DATA !== 'undefined' && Array.isArray(TIEUP_DATA)) ? TIEUP_DATA : [];
-}
-/* the 17-point sheet's own count for a type, used only when no names are listed */
-function _admpSheetTotal(branch, type){
-  const rows = (typeof ADMP_DATA !== 'undefined' && Array.isArray(ADMP_DATA)) ? ADMP_DATA : [];
-  const want = type === 'Preschool' ? /pre\s*school\s*tie|preschool/i : /gated\s*communit|creche|day\s*care/i;
-  const r = rows.find(x => x.Branch === branch && want.test(String(x.Point || '')));
-  if (!r) return null;
-  const n = v => { const x = parseFloat(String(v == null ? '' : v).replace(/[^0-9.]/g, '')); return isNaN(x) ? 0 : x; };
-  const t = Math.max(n(r.Actual), n(r.Target));
-  return t > 0 ? t : null;
-}
-function _admpCell(branch, type){
-  const mine = _admpTieRows().filter(r => r.Branch === branch && r.Type === type);
-  const done = mine.filter(r => /^completed$/i.test(String(r.Status || '').trim())).length;
-  const sheet = _admpSheetTotal(branch, type);
-  /* a branch may have listed ten names out of seventy identified — the larger
-     figure is the real total, so the denominator never shrinks below the count
-     the branch itself reported */
-  const total = Math.max(mine.length, sheet || 0);
-  return { rows: mine, done: done, total: total, listed: mine.length,
-           fromSheet: mine.length === 0 && !!sheet,
-           mou: mine.filter(r => /^yes$/i.test(String(r.MOU || '').trim())).length,
-           pos: mine.filter(r => /^positive$/i.test(String(r.Response || '').trim())).length,
-           neg: mine.filter(r => /^negative$/i.test(String(r.Response || '').trim())).length };
-}
+   So progress is read FROM THE TEXT, with a pipeline that can be audited line
+   by line — every percentage opens the sentence it came from with the phrases
+   that moved it highlighted. A neural model is the wrong instrument here: 85
+   rows, no labelled history, and a figure a director will act on must be able
+   to justify itself. What follows is the standard text-classification pipeline
+   with the learning replaced by an explicit, inspectable lexicon:
 
-function renderAdmpTieups(){
-  const host = document.getElementById('admp-tieups');
-  if (!host) return;
-  const order = ['Bachupally', 'Boduppal', 'Gowdavalli', 'Keesara', 'Pocharam'];
-  const seen = {};
-  _admpTieRows().forEach(r => seen[r.Branch] = 1);
-  ((typeof ADMP_DATA !== 'undefined' && Array.isArray(ADMP_DATA)) ? ADMP_DATA : []).forEach(r => seen[r.Branch] = 1);
-  let branches = order.filter(b => seen[b]).concat(Object.keys(seen).filter(b => order.indexOf(b) < 0).sort());
-  if (fBranch !== 'ALL') branches = branches.filter(b => b === fBranch);
+     1. NORMALISE   case, Indian date forms, numbered lists, stray punctuation
+     2. SEGMENT     into clauses — "1. …\n2. …", sentences, "but/however"
+     3. MATCH       each clause against a staged lexicon (longest phrase first,
+                    each span consumed once) built from this sheet's own wording
+     4. NEGATE      scope-aware: "not completed", "no response", "yet to"
+     5. TENSE       future markers ("will", "from 11th October", "next Saturday")
+                    demote a clause to planned however positive its verb
+     6. QUANTIFY    "Visited 10 nearby schools", "Identified 30 preschools" →
+                    a ratio against Target when one is usable
+     7. SCORE       0.55 × strongest clause + 0.45 × mean clause, so one strong
+                    word cannot erase three weak ones, then bounded by the
+                    row's own Current Status
+     8. CONFIDENCE  how much evidence the score rests on, reported beside it
+   ══════════════════════════════════════════════════════════════════════════ */
+var ADMPNLP = (function () {
 
-  if (!branches.length){
-    host.innerHTML = '<div style="padding:18px;color:#64748B;font-size:13px">No admission rows in this payload.</div>';
-    return;
+  /* ── 1. normalise ────────────────────────────────────────────────────── */
+  function norm(t) {
+    return String(t == null ? '' : t)
+      .replace(/\u2019/g, "'").replace(/[\u2013\u2014]/g, '-')
+      .replace(/\r/g, '\n')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
-  const pct = (d, t) => t ? Math.round(d / t * 100) : null;
-  const col = p => p === null ? '#94A3B8' : p >= 80 ? '#059669' : p >= 40 ? '#D97706' : '#DC2626';
-  const cell = (b, ty) => {
-    const c = _admpCell(b, ty), p = pct(c.done, c.total);
-    if (!c.total)
-      return '<td style="text-align:center;color:#CBD5E1">\u2013</td>';
-    const q = "admpTieList('" + String(b).replace(/'/g, "\\'") + "','" + ty + "')";
-    return '<td style="text-align:center;cursor:pointer" onclick="' + q + '" title="click for the names">' +
-      '<div style="font-size:17px;font-weight:800;color:' + col(p) + '">' + c.done + ' / ' + c.total + '</div>' +
-      '<div style="height:5px;background:#EEF2F7;border-radius:3px;margin:4px auto 3px;max-width:92px">' +
-        '<i style="display:block;height:5px;border-radius:3px;width:' + (p === null ? 0 : Math.max(2, p)) +
-        '%;background:' + col(p) + '"></i></div>' +
-      '<div style="font-size:10.5px;color:#64748B">' + (p === null ? '' : p + '%') +
-        (c.fromSheet ? ' \u00b7 <span style="color:#D97706">names not listed</span>'
-                     : c.mou ? ' \u00b7 ' + c.mou + ' MOU' : '') + '</div></td>';
+  /* ── 2. segment into clauses ─────────────────────────────────────────── */
+  function clauses(raw) {
+    var t = String(raw == null ? '' : raw).replace(/\u2019/g, "'");
+    /* numbered lists are the commonest shape here: "1. … 2. … 3. …" */
+    t = t.replace(/(^|[\s\n])(\d{1,2})[.)]\s+/g, '\n');
+    t = t.replace(/\b(but|however|though|whereas)\b/gi, '\n$1 ');
+    return t.split(/[\n;]+|(?<=[a-z0-9)])\.\s+(?=[A-Za-z])/)
+            .map(function (x) { return x.trim(); })
+            .filter(function (x) { return x.replace(/[^a-z0-9]/gi, '').length > 2; });
+  }
+
+  /* ── 3. the lexicon ──────────────────────────────────────────────────────
+     Weights are stages of work, not sentiment. Every phrase below was taken
+     from this sheet's own text, so the scorer is reading the language the
+     branches really use rather than a generic vocabulary. */
+  var LEX = [
+    /* finished */
+    { s: 'done',       w: 1.00, p: ['completed', 'is complete', 'has been done', 'done and', 'finalized', 'finalised',
+                                    'all set', 'submitted', 'signed', 'approved', 'closure of', 'closed the', 'received the',
+                                    'is ready', 'are ready', 'fully ready', 'place finalized', 'places finalized'] },
+    /* substantive work already carried out */
+    { s: 'strong',     w: 0.80, p: ['visited', 'sent to', 'requisition sent', 'shared with', 'collected', 'listed out',
+                                    'took ', 'conducted', 'completed the', 'prepared', 'fixed', 'informed', 'trained',
+                                    'checked their', 'gathering all'] },
+    /* under way right now */
+    { s: 'active',     w: 0.50, p: ['in process', 'in progress', 'are happening', 'is happening', 'happening',
+                                    'ongoing', 'going on', 'started connecting', 'started', 'working on', 'being in touch',
+                                    'in touch with', 'connecting with', 'coordinating', 'cordinating', 'following up',
+                                    'follow up', 'followup', 'visiting', 'addressing', 'streamline', 'streamlining',
+                                    'discussing', 'regularly', 'day to day', 'daily visit', 'postings are'] },
+    /* groundwork done, the work itself not yet */
+    /* being ready to start is not the task: "ready with list of communities,
+       will start visiting" is groundwork, not a community activation done */
+    { s: 'groundwork', w: 0.35, p: ['identified', 'shortlisted', 'mapped', 'listed', 'list of',
+                                    'ready with list', 'ready with', 'ready to start'] },
+    /* intended, not begun */
+    { s: 'planned',    w: 0.15, p: ['will start', 'will begin', 'will visit', 'will be', 'will fix', 'will conduct',
+                                    'will', 'planning', 'planned', 'plan to', 'scheduled', 'to commence', 'commence from',
+                                    'upcoming', 'need to', 'needs to', 'yet to', 'to be done', 'offering', 'expecting',
+                                    'after dussera', 'after holidays', 'next week', 'next saturday', 'next month',
+                                    'from next', 'from oct', 'from october', 'from november', 'in the month of'] },
+    /* stopped, waiting on somebody else */
+    { s: 'blocked',    w: 0.10, p: ['waiting for', 'waiting on', 'awaiting', 'pending with', 'is pending', 'are pending',
+                                    'pending', 'no response', 'not responding', 'support required', 'support from',
+                                    'on hold', 'blocker', 'stuck'] },
+    /* explicitly nothing */
+    { s: 'none',       w: 0.00, p: ['not started', 'not yet started', 'no action', 'nothing done', 'not done'] }
+  ];
+  var STAGE_LABEL = { done: 'finished', strong: 'work carried out', active: 'under way',
+                      groundwork: 'groundwork done', planned: 'planned only',
+                      blocked: 'waiting on someone', none: 'not started' };
+  var STAGE_COLOR = { done: '#059669', strong: '#15803D', active: '#2563EB', groundwork: '#7C3AED',
+                      planned: '#D97706', blocked: '#DC2626', none: '#64748B' };
+
+  /* longest phrase first, so "will start" is never read as the bare "will" */
+  var PHRASES = [];
+  LEX.forEach(function (g) { g.p.forEach(function (ph) { PHRASES.push({ ph: ph, s: g.s, w: g.w }); }); });
+  PHRASES.sort(function (a, b) { return b.ph.length - a.ph.length; });
+
+  /* ── 4. negation ─────────────────────────────────────────────────────── */
+  var NEG = /\b(not|no|never|without|yet to|unable to|haven't|hasn't|didn't|couldn't)\b/;
+  function negatedAt(text, idx) {
+    /* scope is the six words before the phrase — far enough to catch
+       "fee structure is not yet collected", short enough not to reach across
+       a clause boundary */
+    var before = text.slice(Math.max(0, idx - 40), idx);
+    var words = before.split(/\s+/).slice(-6).join(' ');
+    return NEG.test(words);
+  }
+
+  /* ── 5. future tense ─────────────────────────────────────────────────── */
+  var FUTURE_G = /\b(will|shall|going to|plan(ning|ned)? to|to commence|commence from|from (next|oct|october|november|december|\d{1,2}(st|nd|rd|th)?)|next (week|month|saturday|sunday|monday)|after (dussera|dasara|holidays|diwali))\b/g;
+  /* Where the future marker SITS matters. "Ready with list, will start visiting"
+     has its groundwork before the marker and the visiting after it, so only the
+     visiting is demoted; "corrections are happening, will go for approval" keeps
+     the work that is already under way. A marker therefore reaches forward
+     (about a clause-worth of characters), never backward. */
+  function futureSpans(t) {
+    var out = [], m;
+    FUTURE_G.lastIndex = 0;
+    while ((m = FUTURE_G.exec(t))) out.push(m.index);
+    return out;
+  }
+  function inFuture(spans, idx) {
+    for (var i = 0; i < spans.length; i++) if (spans[i] <= idx && idx - spans[i] <= 32) return true;
+    return false;
+  }
+
+  /* ── 6. numbers that carry evidence ──────────────────────────────────── */
+  var DOING = /(visited|contacted|covered|conducted|collected|completed|signed|tied up|met)\s+(?:with\s+)?(\d{1,4})\b/g;
+  var FOUND = /(identified|shortlisted|listed|mapped)\s+(?:about\s+)?(\d{1,4})\b/g;
+  var BARE  = /\b(\d{1,4})\s+(?:nearby\s+)?(schools|preschools|pre schools|communities|societies|enquiries|leads|parents)\b/g;
+  function numbers(text, target) {
+    var out = { done: null, found: null, ratio: null, basis: '' };
+    var m;
+    DOING.lastIndex = 0; while ((m = DOING.exec(text))) out.done = Math.max(out.done || 0, +m[2]);
+    FOUND.lastIndex = 0; while ((m = FOUND.exec(text))) out.found = Math.max(out.found || 0, +m[2]);
+    if (out.done === null) { BARE.lastIndex = 0; while ((m = BARE.exec(text))) {
+      /* a bare count only counts as work done when the clause also says it was done */
+      if (/visited|contacted|covered|conducted|collected/.test(text)) out.done = Math.max(out.done || 0, +m[1]);
+    } }
+    var t = parseFloat(String(target == null ? '' : target).replace(/[^0-9.]/g, ''));
+    if (!isFinite(t) || t <= 0) t = null;
+    /* the denominator: the stated target, else what the branch says it found */
+    var den = t || out.found;
+    if (out.done !== null && den) {
+      out.ratio = Math.max(0, Math.min(1, out.done / den));
+      out.basis = out.done + ' of ' + den + (t ? ' (target)' : ' (identified)');
+    } else if (out.done === null && out.found !== null && den) {
+      /* identification alone is groundwork, worth a third of the way */
+      out.ratio = Math.min(1, (out.found / den)) * 0.35;
+      out.basis = out.found + ' identified of ' + den;
+    }
+    return out;
+  }
+
+  /* ── 3-7. score one row ──────────────────────────────────────────────── */
+  function scoreRow(r) {
+    var rawNext = (r.Next && r.Next !== '\u2013') ? r.Next : '';
+    var rawRem  = (r.Remarks && r.Remarks !== '\u2013') ? r.Remarks : '';
+    var raw = (rawNext + (rawNext && rawRem ? '\n' : '') + rawRem).trim();
+    var status = String(r.Status || '').trim();
+
+    if (!raw) {
+      /* no text at all. The status column is the only thing left, and it is
+         evidence of intent rather than of progress — said so, and with the
+         lowest confidence, so a branch cannot gain a score by writing nothing. */
+      var byStatus = /^completed$/i.test(status) ? 100 : /progress/i.test(status) ? 25 : 0;
+      return { pct: byStatus, conf: 0.15, stage: /^completed$/i.test(status) ? 'done' : 'none',
+               hits: [], nums: { ratio: null, basis: '' }, raw: '', clauses: [],
+               why: ['Nothing written in either text column — scored from Current Status (' +
+                     (status || 'blank') + ') alone, at the lowest confidence.'] };
+    }
+
+    /* Branches often paste the same sentence into both columns. Counting it
+       twice pulls the average toward whatever it says, so identical clauses are
+       scored once. */
+    var cl = [], seenCl = {};
+    clauses(raw).forEach(function (c) { var k = norm(c); if (!seenCl[k]) { seenCl[k] = 1; cl.push(c); } });
+    var scored = [], hits = [];
+    cl.forEach(function (c) {
+      var t = norm(c), used = [], best = null, found = [];
+      PHRASES.forEach(function (P) {
+        var i = t.indexOf(P.ph);
+        while (i >= 0) {
+          var overlap = used.some(function (u) { return i < u[1] && i + P.ph.length > u[0]; });
+          if (!overlap) {
+            used.push([i, i + P.ph.length]);
+            var neg = negatedAt(t, i);
+            var st = neg ? 'none' : P.s, w = neg ? 0 : P.w;
+            found.push({ ph: P.ph, stage: st, w: w, neg: neg, clause: c, at: i });
+          }
+          i = t.indexOf(P.ph, i + 1);
+        }
+      });
+      if (!found.length) return;                       // a clause with no cue says nothing
+      /* future tense demotes only what follows the marker */
+      var spans = futureSpans(t);
+      found.forEach(function (f) {
+        if (f.w > 0.15 && f.stage !== 'blocked' && inFuture(spans, f.at)) {
+          f.w = 0.15; f.stage = 'planned'; f.demoted = true;
+        }
+        if (!best || f.w > best.w) best = f;
+      });
+      scored.push(best.w);
+      hits = hits.concat(found);
+    });
+
+    var why = [];
+    var base;
+    if (!scored.length) {
+      base = /^completed$/i.test(status) ? 1 : /progress/i.test(status) ? 0.25 : 0.05;
+      why.push('Text present but no recognised progress wording, so the score falls back to Current Status.');
+    } else {
+      var max = Math.max.apply(null, scored);
+      var mean = scored.reduce(function (a, b) { return a + b; }, 0) / scored.length;
+      base = 0.55 * max + 0.45 * mean;
+      why.push('Strongest clause ' + Math.round(max * 100) + '%, average of ' + scored.length +
+               ' scored clause' + (scored.length === 1 ? '' : 's') + ' ' + Math.round(mean * 100) +
+               '% \u2192 0.55\u00d7strongest + 0.45\u00d7average = ' + Math.round(base * 100) + '%.');
+    }
+
+    /* a blocked clause with nothing finished cannot read as nearly done */
+    var anyDone = hits.some(function (h) { return h.stage === 'done'; });
+    var anyBlocked = hits.some(function (h) { return h.stage === 'blocked'; });
+    if (anyBlocked && !anyDone && base > 0.6) {
+      base = 0.6;
+      why.push('Capped at 60%: the branch is waiting on someone and nothing is reported finished.');
+    } else if (anyBlocked && base > 0.75) {
+      /* part of it is finished, but something is still waiting on another party,
+         so the point as a whole cannot read as nearly complete */
+      base = 0.75;
+      why.push('Capped at 75%: part of this is finished, but the row still says it is waiting on someone.');
+    }
+
+    /* numeric evidence, averaged with the wording */
+    var nums = numbers(norm(raw), r.Target);
+    if (nums.ratio !== null) {
+      var before = base;
+      base = (base + nums.ratio) / 2;
+      why.push('Counted evidence in the text (' + nums.basis + ' = ' + Math.round(nums.ratio * 100) +
+               '%), averaged with the wording: (' + Math.round(before * 100) + ' + ' +
+               Math.round(nums.ratio * 100) + ') \u00f7 2 = ' + Math.round(base * 100) + '%.');
+    }
+
+    /* the row's own status bounds the result */
+    if (/^completed$/i.test(status) && base < 1) { base = 1; why.push('Current Status is Completed, which sets it to 100%.'); }
+    if (/not started/i.test(status) && base > 0.25 && !anyDone) {
+      base = Math.min(base, 0.25);
+      why.push('Current Status is Not Started, so it is held at 25% however the text reads.');
+    }
+
+    /* confidence: how much there is to go on */
+    var conf = 0.3;
+    if (hits.length >= 2) conf += 0.2;
+    if (hits.length >= 4) conf += 0.1;
+    if (nums.ratio !== null) conf += 0.2;
+    if (raw.length > 60) conf += 0.1;
+    if (String(r.Updated || '').match(/^\d{4}-\d{2}-\d{2}/)) conf += 0.1;
+    conf = Math.min(1, conf);
+
+    var strongest = hits.reduce(function (a, b) { return (!a || b.w > a.w) ? b : a; }, null);
+    return { pct: Math.round(base * 100), conf: conf, stage: strongest ? strongest.stage : 'none',
+             hits: hits, nums: nums, raw: raw, clauses: cl, why: why };
+  }
+
+  /* ── TF-IDF: what each branch writes about that the others do not ────── */
+  var STOP = ('the a an and or of to for in on at is are was were be been being with from by as it its this that these those ' +
+              'will shall can could would should may might must do does did done have has had not no but so if then than ' +
+              'we our they their he she his her you your i me my am all any each more most other some such only own same ' +
+              'very too also just about into over under again further once here there when where why how what which who whom ' +
+              'sir mam madam team teams will').split(' ');
+  function terms(t) {
+    return norm(t).replace(/[^a-z0-9 ]/g, ' ').split(/\s+/)
+      .filter(function (w) { return w.length > 3 && STOP.indexOf(w) < 0 && !/^\d+$/.test(w); });
+  }
+  function distinctive(rowsByBranch) {
+    var branches = Object.keys(rowsByBranch), df = {}, tf = {};
+    branches.forEach(function (b) {
+      tf[b] = {};
+      var seen = {};
+      rowsByBranch[b].forEach(function (r) {
+        terms((r.Next || '') + ' ' + (r.Remarks || '')).forEach(function (w) {
+          tf[b][w] = (tf[b][w] || 0) + 1; seen[w] = 1;
+        });
+      });
+      Object.keys(seen).forEach(function (w) { df[w] = (df[w] || 0) + 1; });
+    });
+    var out = {};
+    branches.forEach(function (b) {
+      out[b] = Object.keys(tf[b]).map(function (w) {
+        return { w: w, n: tf[b][w], score: tf[b][w] * Math.log(branches.length / df[w]) };
+      }).filter(function (x) { return x.score > 0; })
+        .sort(function (x, y) { return y.score - x.score || y.n - x.n; }).slice(0, 6);
+    });
+    return out;
+  }
+
+  return { scoreRow: scoreRow, clauses: clauses, norm: norm, distinctive: distinctive,
+           STAGE_LABEL: STAGE_LABEL, STAGE_COLOR: STAGE_COLOR, PHRASES: PHRASES };
+})();
+
+
+/* a local escaper: the page's esc() lives in another scope, and reaching for it
+   threw inside this panel, which blanked the grid and the themes below it */
+function _admpEsc(v){
+  return String(v == null ? '' : v).replace(/[&<>"']/g, function (c){
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+}
+
+/* ── the panel ───────────────────────────────────────────────────────────── */
+function _admpRowsAll(){
+  return (typeof ADMP_DATA !== 'undefined' && Array.isArray(ADMP_DATA)) ? ADMP_DATA : [];
+}
+var _ADMP_SCORE = {};
+function admpScored(){
+  var rows = _admpRowsAll();
+  _ADMP_SCORE = {};
+  rows.forEach(function (r, i) { r.__k = r.Branch + '\u241f' + (r.SNo || r.Point) + '\u241f' + i;
+    _ADMP_SCORE[r.__k] = ADMPNLP.scoreRow(r); });
+  return rows;
+}
+function _admpPctColor(p){
+  return p === null ? '#94A3B8' : p >= 75 ? '#059669' : p >= 50 ? '#15803D' :
+         p >= 30 ? '#D97706' : p > 0 ? '#DC2626' : '#94A3B8';
+}
+
+function renderAdmpProgress(){
+  var host = document.getElementById('admp-progress');
+  if (!host) return;
+  if (typeof ADMPNLP === 'undefined'){ host.innerHTML = ''; return; }
+  var rows = admpScored();
+  if (!rows.length){
+    host.innerHTML = '<div style="padding:18px;color:#64748B;font-size:13px">No Admission Process rows in this payload.</div>';
+    return;
+  }
+  var ORDER = ['Bachupally', 'Boduppal', 'Gowdavalli', 'Keesara', 'Pocharam'];
+  var seen = {}; rows.forEach(function (r){ seen[r.Branch] = 1; });
+  var branches = ORDER.filter(function (b){ return seen[b]; })
+    .concat(Object.keys(seen).filter(function (b){ return ORDER.indexOf(b) < 0; }).sort());
+  if (typeof fBranch !== 'undefined' && fBranch !== 'ALL') branches = branches.filter(function (b){ return b === fBranch; });
+
+  var byB = {}; branches.forEach(function (b){ byB[b] = rows.filter(function (r){ return r.Branch === b; }); });
+
+  /* every stage, so the bar shows WHAT the progress is made of */
+  var STAGES = ['done', 'strong', 'active', 'groundwork', 'planned', 'blocked', 'none'];
+  var branchStat = function (b){
+    var rs = byB[b] || [], ss = rs.map(function (r){ return _ADMP_SCORE[r.__k]; });
+    var withText = ss.filter(function (x){ return x.raw; }).length;
+    var pct = ss.length ? Math.round(ss.reduce(function (a, x){ return a + x.pct; }, 0) / ss.length) : null;
+    var evid = withText ? Math.round(ss.filter(function (x){ return x.raw; })
+      .reduce(function (a, x){ return a + x.pct; }, 0) / withText) : null;
+    var mix = {}; STAGES.forEach(function (s){ mix[s] = 0; });
+    ss.forEach(function (x){ mix[x.raw ? x.stage : 'none']++; });
+    var conf = ss.length ? ss.reduce(function (a, x){ return a + x.conf; }, 0) / ss.length : 0;
+    return { n: rs.length, withText: withText, pct: pct, evid: evid, mix: mix, conf: conf,
+             blocked: mix.blocked, done: mix.done + mix.strong };
   };
 
-  let tot = { listed: 0, sheetOnly: 0 };
-  const body = branches.map(b => {
-    ADMP_TYPES.forEach(ty => { const c = _admpCell(b, ty); tot.listed += c.listed; if (c.fromSheet) tot.sheetOnly++; });
-    return '<tr><td style="text-align:left;font-weight:700"><span class="bd b' + b + '"></span> ' + b + '</td>' +
-      ADMP_TYPES.map(ty => cell(b, ty)).join('') + '</tr>';
+  var bar = function (mix, n){
+    return '<div style="display:flex;height:9px;border-radius:5px;overflow:hidden;background:#EEF2F7">' +
+      STAGES.map(function (s){
+        var w = n ? mix[s] / n * 100 : 0;
+        return w ? '<i title="' + mix[s] + ' \u00d7 ' + ADMPNLP.STAGE_LABEL[s] + '" style="display:block;width:' +
+          w + '%;background:' + ADMPNLP.STAGE_COLOR[s] + '"></i>' : '';
+      }).join('') + '</div>';
+  };
+
+  var body = branches.map(function (b){
+    var st = branchStat(b);
+    return '<tr style="cursor:pointer" onclick="admpBranchDetail(\'' + String(b).replace(/'/g, "\\'") + '\')">' +
+      '<td style="text-align:left;font-weight:700"><span class="bd b' + b + '"></span> ' + b + '</td>' +
+      '<td style="text-align:center"><div style="font-size:19px;font-weight:800;color:' + _admpPctColor(st.pct) + '">' +
+        (st.pct === null ? '\u2013' : st.pct + '%') + '</div>' +
+        '<div style="font-size:10px;color:#94A3B8">of all ' + st.n + ' points</div></td>' +
+      '<td style="min-width:150px">' + bar(st.mix, st.n) +
+        '<div style="font-size:10px;color:#64748B;margin-top:3px">' + st.done + ' done or under way \u00b7 ' +
+        st.mix.planned + ' planned \u00b7 ' + st.blocked + ' waiting \u00b7 ' + (st.n - st.withText) + ' silent</div></td>' +
+      '<td style="text-align:center;font-weight:700;color:' + _admpPctColor(st.evid) + '">' +
+        (st.evid === null ? '\u2013' : st.evid + '%') + '</td>' +
+      '<td style="text-align:center">' + st.withText + ' / ' + st.n +
+        '<div style="font-size:10px;color:#94A3B8">points written up</div></td>' +
+      '<td style="text-align:center;color:' + (st.conf >= 0.6 ? '#059669' : st.conf >= 0.45 ? '#D97706' : '#DC2626') +
+        ';font-weight:700">' + Math.round(st.conf * 100) + '%</td></tr>';
   }).join('');
 
-  /* group row — the same arithmetic, over every branch shown */
-  const foot = ADMP_TYPES.map(ty => {
-    let d = 0, t = 0;
-    branches.forEach(b => { const c = _admpCell(b, ty); d += c.done; t += c.total; });
-    const p = pct(d, t);
-    return '<td style="text-align:center;font-weight:800;color:' + col(p) + '">' + d + ' / ' + t +
-      (p === null ? '' : '<div style="font-size:10.5px;color:#64748B;font-weight:600">' + p + '%</div>') + '</td>';
-  }).join('');
+  /* group line */
+  var allS = branches.reduce(function (a, b){ return a.concat(byB[b]); }, [])
+    .map(function (r){ return _ADMP_SCORE[r.__k]; });
+  var gPct = allS.length ? Math.round(allS.reduce(function (a, x){ return a + x.pct; }, 0) / allS.length) : null;
+  var gText = allS.filter(function (x){ return x.raw; }).length;
 
   host.innerHTML =
-    '<div style="overflow-x:auto"><table class="dt brfz" style="min-width:420px">' +
+    '<div style="overflow-x:auto"><table class="dt brfz" style="min-width:720px">' +
     '<thead><tr><th style="text-align:left">Branch</th>' +
-    '<th>\uD83C\uDFE0 Campus creches<div style="font-size:10px;font-weight:600;color:#94A3B8">completed / total</div></th>' +
-    '<th>\uD83C\uDF92 Preschools<div style="font-size:10px;font-weight:600;color:#94A3B8">completed / total</div></th>' +
-    '</tr></thead><tbody>' + body +
-    '<tr style="background:#F8FAFF;border-top:2px solid #E0E8FF">' +
-    '<td style="text-align:left;font-weight:800">' + (branches.length > 1 ? 'All branches' : branches[0]) + '</td>' +
-    foot + '</tr></tbody></table></div>' +
-    (tot.listed === 0
-      ? '<div style="margin:6px 14px 14px;padding:11px 14px;background:#FFF7ED;border:1px solid #FED7AA;' +
-        'border-radius:8px;color:#9A3412;font-size:12.5px;line-height:1.6">' +
-        '<b>No names listed yet.</b> The totals above come from the 17-point sheet\u2019s own counts. To open a cell ' +
-        'and see which preschool or creche is done, add the <b>Admission Tie-ups</b> sheet \u2014 one row per name, with ' +
-        'Branch, Type, Name, Visit status, MOU signed, Response and Remarks. In Apps Script, run ' +
-        '<code>setupTieupSheet()</code> once and it creates the sheet with its dropdowns.</div>'
-      : tot.sheetOnly
-        ? '<div class="fnote" style="display:block;padding:8px 14px 14px;color:#9A3412">Cells marked ' +
-          '<b>names not listed</b> show the total from the 17-point sheet; add those names to the Admission Tie-ups ' +
-          'sheet to open them.</div>'
-        : '<div class="fnote" style="display:block;padding:8px 14px 14px">Completed = visit status <b>Completed</b>. ' +
-          'Where a branch has identified more than it has listed by name, the larger figure is the total.</div>');
+    '<th>Progress<div style="font-size:10px;font-weight:600;color:#94A3B8">read from the text</div></th>' +
+    '<th style="text-align:left">What that progress is made of</th>' +
+    '<th>Where written up<div style="font-size:10px;font-weight:600;color:#94A3B8">points with text only</div></th>' +
+    '<th>Coverage</th><th>Confidence</th></tr></thead><tbody>' + body +
+    '<tr style="background:#F8FAFF;font-weight:800"><td style="text-align:left">' +
+      (branches.length > 1 ? 'All branches' : branches[0]) + '</td>' +
+    '<td style="text-align:center;font-size:19px;color:' + _admpPctColor(gPct) + '">' +
+      (gPct === null ? '\u2013' : gPct + '%') + '</td><td></td><td></td>' +
+    '<td style="text-align:center">' + gText + ' / ' + allS.length + '</td><td></td></tr>' +
+    '</tbody></table></div>' +
+    '<div class="fnote" style="display:block;padding:9px 14px 4px">Click a branch for every point it wrote, with the ' +
+      'phrases that moved the figure. <b>Progress</b> counts all 17 points, so a point nobody wrote up counts as 0 \u2014 ' +
+      'silence is not progress. <b>Where written up</b> ignores the silent points, which is the fairer read of the work ' +
+      'actually being done.</div>' +
+    '<div class="fnote" style="display:block;padding:0 14px 14px">' +
+      STAGES.map(function (s){ return '<span style="display:inline-block;margin-right:12px"><i style="display:inline-block;' +
+        'width:9px;height:9px;border-radius:2px;background:' + ADMPNLP.STAGE_COLOR[s] + ';margin-right:4px"></i>' +
+        ADMPNLP.STAGE_LABEL[s] + '</span>'; }).join('') + '</div>';
+
+  renderAdmpPoints(branches, byB);
+  renderAdmpThemes(branches, byB);
 }
 
-/* the names behind one cell — the director's second table */
-function admpTieList(branch, type){
-  const c = _admpCell(branch, type);
-  const rows = c.rows.slice().sort((a, b) => {
-    const rk = x => /^completed$/i.test(x.Status) ? 0 : /progress/i.test(x.Status) ? 1 : 2;
-    return rk(a) - rk(b) || String(a.Name).localeCompare(String(b.Name));
-  }).map((r, i) => ({
-    SNo: i + 1, Name: r.Name, Status: r.Status || '\u2013',
-    MOU: r.MOU || '\u2013', Response: r.Response || '\u2013',
-    Owner: r.Owner || '\u2013', Visited: r.Visited || '\u2013',
-    Next: r.Next || '\u2013', Remarks: r.Remarks || '\u2013'
-  }));
-  const label = type === 'Preschool' ? 'preschools' : 'campus creches';
-  if (!rows.length)
-    return openModal('\uD83C\uDFEB ' + branch + ' \u2014 ' + label,
-      c.total + ' identified \u00b7 no names listed yet', [], [],
-      { expr: 'completed \u00f7 total, where total is the count from the 17-point sheet',
-        work: c.done + ' of ' + c.total,
-        note: 'Add one row per name to the Admission Tie-ups sheet (Branch, Type, Name, Visit status, MOU signed, ' +
-              'Response, Remarks) and they will be listed here. Run setupTieupSheet() in Apps Script to create it.' });
-  openModal('\uD83C\uDFEB ' + branch + ' \u2014 ' + label,
-    c.done + ' of ' + c.total + ' completed \u00b7 ' + c.mou + ' MOU signed \u00b7 ' +
-    c.pos + ' positive, ' + c.neg + ' negative', rows,
-    [{ key: 'SNo', label: 'S.No' }, { key: 'Name', label: type === 'Preschool' ? 'Preschool name' : 'Creche name', maxW: '200px' },
-     { key: 'Status', label: 'Visit status', pill: true }, { key: 'MOU', label: 'MOU signed', pill: true },
-     { key: 'Response', label: 'Response', pill: true }, { key: 'Owner', label: 'Owner' },
-     { key: 'Visited', label: 'Visited on', date: true }, { key: 'Next', label: 'Next action', maxW: '200px' },
-     { key: 'Remarks', label: 'Remarks', maxW: '240px' }],
-    { expr: 'completed = visit status Completed; total = names listed, or the 17-point sheet\u2019s count when it is larger',
-      work: c.done + ' of ' + c.total + (c.listed < c.total ? ' \u00b7 ' + c.listed + ' listed by name so far' : ''),
-      note: 'MOU signed and Response are recorded per name in the Admission Tie-ups sheet.' });
+/* point × branch grid, the 17 points read from the text */
+function renderAdmpPoints(branches, byB){
+  var host = document.getElementById('admp-points');
+  if (!host) return;
+  var pts = [];
+  (branches || []).forEach(function (b){
+    (byB[b] || []).forEach(function (r){
+      var n = parseInt(r.SNo, 10), key = isNaN(n) ? r.Point : n;
+      if (!pts.some(function (p){ return p.key === key; })) pts.push({ key: key, no: isNaN(n) ? 99 : n, name: r.Point });
+    });
+  });
+  pts.sort(function (a, b){ return a.no - b.no; });
+
+  var cell = function (b, p){
+    var r = (byB[b] || []).find(function (x){
+      var n = parseInt(x.SNo, 10); return (isNaN(n) ? x.Point : n) === p.key; });
+    if (!r) return '<td style="text-align:center;color:#CBD5E1">\u2013</td>';
+    var s = _ADMP_SCORE[r.__k];
+    var bg = !s.raw ? '#F8FAFC' : s.pct >= 75 ? '#E8F6EE' : s.pct >= 50 ? '#EEF7F1' :
+             s.pct >= 30 ? '#FEF6E7' : '#FDECEC';
+    return '<td style="text-align:center;cursor:pointer;background:' + bg + '" onclick="admpExplain(\'' +
+      String(r.__k).replace(/'/g, "\\'") + '\')" title="click for the wording behind this">' +
+      '<b style="color:' + _admpPctColor(s.pct) + '">' + s.pct + '%</b>' +
+      (s.raw ? '' : '<div style="font-size:9.5px;color:#94A3B8">nothing written</div>') + '</td>';
+  };
+  var rowsHtml = pts.map(function (p){
+    var vals = branches.map(function (b){
+      var r = (byB[b] || []).find(function (x){ var n = parseInt(x.SNo, 10); return (isNaN(n) ? x.Point : n) === p.key; });
+      return r ? _ADMP_SCORE[r.__k].pct : null; }).filter(function (v){ return v !== null; });
+    var avg = vals.length ? Math.round(vals.reduce(function (a, b){ return a + b; }, 0) / vals.length) : null;
+    return '<tr><td style="text-align:left"><b>' + (p.no === 99 ? '' : p.no + '. ') + _admpEsc(p.name) + '</b></td>' +
+      branches.map(function (b){ return cell(b, p); }).join('') +
+      '<td style="text-align:center;font-weight:800;color:' + _admpPctColor(avg) + '">' +
+        (avg === null ? '\u2013' : avg + '%') + '</td></tr>';
+  }).join('');
+  host.innerHTML = '<div style="overflow-x:auto"><table class="dt brfz" style="min-width:700px">' +
+    '<thead><tr><th style="text-align:left">Monitoring point</th>' +
+    branches.map(function (b){ return '<th>' + b + '</th>'; }).join('') +
+    '<th>Across branches</th></tr></thead><tbody>' + rowsHtml + '</tbody></table></div>' +
+    '<div class="fnote" style="display:block;padding:9px 14px 14px">The weakest rows across the group are where a ' +
+      'management push changes the most. Click any cell for the sentence behind it.</div>';
 }
+
+/* what each branch is writing about that the others are not (TF-IDF) */
+function renderAdmpThemes(branches, byB){
+  var host = document.getElementById('admp-themes');
+  if (!host) return;
+  var sub = {}; branches.forEach(function (b){ sub[b] = byB[b] || []; });
+  var d = ADMPNLP.distinctive(sub);
+  host.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:12px;padding:14px">' +
+    branches.map(function (b){
+      var t = d[b] || [];
+      return '<div style="flex:1;min-width:210px;border:1px solid #E2E8F0;border-radius:9px;padding:11px 13px">' +
+        '<div style="font-weight:800;font-size:12.5px;margin-bottom:7px"><span class="bd b' + b + '"></span> ' + b + '</div>' +
+        (t.length ? t.map(function (x){
+          return '<span style="display:inline-block;background:#EEF2FF;color:#1E3A8A;border-radius:999px;' +
+            'padding:2px 9px;font-size:11.5px;margin:0 5px 5px 0">' + _admpEsc(x.w) + ' <b>' + x.n + '</b></span>'; }).join('')
+          : '<span style="color:#94A3B8;font-size:12px">nothing written yet</span>') + '</div>';
+    }).join('') + '</div>' +
+    '<div class="fnote" style="display:block;padding:0 14px 14px">Terms weighted by how much more this branch uses them ' +
+      'than the others (TF-IDF), so shared words like &ldquo;admission&rdquo; drop out and what is particular to each ' +
+      'branch remains. The number is how many times it appears.</div>';
+}
+
+/* ── one point, fully explained ──────────────────────────────────────────── */
+function admpExplain(key){
+  var rows = _admpRowsAll(), r = rows.find(function (x){ return x.__k === key; });
+  if (!r) return;
+  var s = _ADMP_SCORE[key] || ADMPNLP.scoreRow(r);
+
+  /* the raw text with every matched phrase marked */
+  var mark = function (txt){
+    if (!txt || txt === '\u2013') return '<i style="color:#94A3B8">nothing written</i>';
+    var spans = [];
+    ADMPNLP.PHRASES.forEach(function (P){
+      var low = ADMPNLP.norm(txt), i = low.indexOf(P.ph);
+      while (i >= 0){
+        if (!spans.some(function (sp){ return i < sp.e && i + P.ph.length > sp.s; }))
+          spans.push({ s: i, e: i + P.ph.length, stage: P.s, w: P.w });
+        i = low.indexOf(P.ph, i + 1);
+      }
+    });
+    spans.sort(function (a, b){ return a.s - b.s; });
+    var out = '', at = 0;
+    spans.forEach(function (sp){
+      if (sp.s < at) return;
+      out += _admpEsc(txt.slice(at, sp.s)) +
+        '<mark style="background:' + ADMPNLP.STAGE_COLOR[sp.stage] + '22;border-bottom:2px solid ' +
+        ADMPNLP.STAGE_COLOR[sp.stage] + ';padding:0 2px;border-radius:2px" title="' +
+        ADMPNLP.STAGE_LABEL[sp.stage] + ' \u00b7 ' + Math.round(sp.w * 100) + '%">' +
+        _admpEsc(txt.slice(sp.s, sp.e)) + '</mark>';
+      at = sp.e;
+    });
+    return out + _admpEsc(txt.slice(at));
+  };
+
+  var cue = {};
+  s.hits.forEach(function (h){
+    var k = h.stage + '\u241f' + h.ph;
+    cue[k] = cue[k] || { ph: h.ph, stage: h.stage, w: h.w, n: 0, neg: h.neg, demoted: h.demoted };
+    cue[k].n++;
+  });
+  var cueRows = Object.keys(cue).map(function (k){ return cue[k]; })
+    .sort(function (a, b){ return b.w - a.w; })
+    .map(function (c){
+      return '<tr><td style="padding:5px 9px;border-bottom:1px solid #EEF2F7"><code>' + _admpEsc(c.ph) + '</code>' +
+        (c.n > 1 ? ' <span style="color:#94A3B8">\u00d7' + c.n + '</span>' : '') + '</td>' +
+        '<td style="padding:5px 9px;border-bottom:1px solid #EEF2F7;color:' + ADMPNLP.STAGE_COLOR[c.stage] +
+        ';font-weight:700">' + ADMPNLP.STAGE_LABEL[c.stage] + '</td>' +
+        '<td style="padding:5px 9px;border-bottom:1px solid #EEF2F7;text-align:right;font-weight:700">' +
+        Math.round(c.w * 100) + '%</td>' +
+        '<td style="padding:5px 9px;border-bottom:1px solid #EEF2F7;color:#64748B;font-size:11.5px">' +
+        (c.neg ? 'negated by the words before it' : c.demoted ? 'demoted \u2014 it sits after a future marker' : '') +
+        '</td></tr>'; }).join('');
+
+  var html =
+    '<div style="padding:14px 16px">' +
+      '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:12px">' +
+        '<div style="font-size:34px;font-weight:800;color:' + _admpPctColor(s.pct) + '">' + s.pct + '%</div>' +
+        '<div><div style="font-weight:700;color:' + ADMPNLP.STAGE_COLOR[s.stage] + '">' +
+          ADMPNLP.STAGE_LABEL[s.stage] + '</div>' +
+          '<div style="font-size:12px;color:#64748B">confidence ' + Math.round(s.conf * 100) +
+          '% \u00b7 status on the sheet: <b>' + _admpEsc(r.Status || '\u2013') + '</b>' +
+          (r.Target && r.Target !== '\u2013' ? ' \u00b7 target <b>' + _admpEsc(r.Target) + '</b>' : '') +
+          (r.Updated && r.Updated !== '\u2013' ? ' \u00b7 updated ' + _admpEsc(r.Updated) : '') + '</div></div></div>' +
+
+      '<div style="background:#F8FAFF;border:1px solid #E0E8FF;border-radius:9px;padding:11px 13px;margin-bottom:12px">' +
+        '<div style="font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#1E3A8A;' +
+          'margin-bottom:6px">Next action / follow-up</div>' +
+        '<div style="font-size:13px;line-height:1.65">' + mark(r.Next) + '</div>' +
+        '<div style="font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#1E3A8A;' +
+          'margin:11px 0 6px">Remarks / evidence</div>' +
+        '<div style="font-size:13px;line-height:1.65">' + mark(r.Remarks) + '</div></div>' +
+
+      (cueRows ? '<table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:12px">' +
+        '<thead><tr>' + ['Phrase found', 'Reads as', 'Weight', ''].map(function (h, i){
+          return '<th style="text-align:' + (i === 2 ? 'right' : 'left') + ';padding:6px 9px;background:#F1F7F3;' +
+            'font-size:9.5px;font-weight:800;text-transform:uppercase;color:#07361F;border-bottom:1px solid #B7CFC0">' +
+            h + '</th>'; }).join('') + '</tr></thead><tbody>' + cueRows + '</tbody></table>'
+        : '<div style="color:#94A3B8;font-size:12.5px;margin-bottom:12px">No recognised progress wording in this row.</div>') +
+
+      '<div style="font-family:\'JetBrains Mono\',ui-monospace,monospace;font-size:11.5px;background:#0B4D2C;color:#D7F0E1;' +
+        'border-radius:9px;padding:11px 13px;line-height:1.75">' +
+        '<b style="color:#fff">How the figure was reached</b><br>' +
+        s.why.map(function (w){ return '\u2022 ' + _admpEsc(w); }).join('<br>') + '</div>' +
+
+      '<p style="color:#64748B;font-size:11.5px;line-height:1.6;margin-top:11px">The score comes from the wording, not ' +
+        'from the Actual or Progress % columns \u2014 those are blank or self-contradictory on most rows of this sheet ' +
+        '(one reads 494%). Where the text carries a count against a target, that ratio is averaged in, which is the only ' +
+        'place a number from the sheet is used.</p>' +
+    '</div>';
+
+  openHTMLModal('\uD83E\uDDE0 ' + r.Branch + ' \u2014 ' + (r.SNo ? r.SNo + '. ' : '') + r.Point,
+    s.pct + '% \u00b7 ' + ADMPNLP.STAGE_LABEL[s.stage] + ' \u00b7 read from what the branch wrote', html);
+}
+
+/* every point of one branch, worst first */
+function admpBranchDetail(branch){
+  var rows = _admpRowsAll().filter(function (r){ return r.Branch === branch; });
+  if (!rows.length) return;
+  var list = rows.map(function (r){ return { r: r, s: _ADMP_SCORE[r.__k] || ADMPNLP.scoreRow(r) }; })
+    .sort(function (a, b){ return a.s.pct - b.s.pct; });
+  var avg = Math.round(list.reduce(function (a, x){ return a + x.s.pct; }, 0) / list.length);
+  var html = '<div style="padding:12px 16px">' +
+    '<p style="font-size:12.5px;color:#64748B;margin:0 0 11px">Weakest first. Click any row for the wording behind it.</p>' +
+    '<table style="width:100%;border-collapse:collapse;font-size:12.5px">' +
+    '<thead><tr>' + ['#', 'Monitoring point', 'Progress', 'Reads as', 'What the branch wrote'].map(function (h, i){
+      return '<th style="text-align:' + (i === 2 ? 'center' : 'left') + ';padding:6px 9px;background:#F1F7F3;' +
+        'font-size:9.5px;font-weight:800;text-transform:uppercase;color:#07361F;border-bottom:1px solid #B7CFC0">' +
+        h + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    list.map(function (x){
+      var t = ((x.r.Next && x.r.Next !== '\u2013' ? x.r.Next : '') + ' ' +
+               (x.r.Remarks && x.r.Remarks !== '\u2013' ? x.r.Remarks : '')).replace(/\s+/g, ' ').trim();
+      return '<tr style="cursor:pointer" onclick="admpExplain(\'' + String(x.r.__k).replace(/'/g, "\\'") + '\')">' +
+        '<td style="padding:6px 9px;border-bottom:1px solid #EEF2F7;color:#94A3B8">' + _admpEsc(x.r.SNo || '') + '</td>' +
+        '<td style="padding:6px 9px;border-bottom:1px solid #EEF2F7;font-weight:600">' + _admpEsc(x.r.Point) + '</td>' +
+        '<td style="padding:6px 9px;border-bottom:1px solid #EEF2F7;text-align:center;font-weight:800;color:' +
+          _admpPctColor(x.s.pct) + '">' + x.s.pct + '%</td>' +
+        '<td style="padding:6px 9px;border-bottom:1px solid #EEF2F7;color:' + ADMPNLP.STAGE_COLOR[x.s.stage] +
+          ';font-weight:700;white-space:nowrap">' + ADMPNLP.STAGE_LABEL[x.s.stage] + '</td>' +
+        '<td style="padding:6px 9px;border-bottom:1px solid #EEF2F7;color:#475569;max-width:360px">' +
+          (t ? _admpEsc(t.length > 150 ? t.slice(0, 150) + '\u2026' : t) : '<i style="color:#94A3B8">nothing written</i>') +
+        '</td></tr>'; }).join('') + '</tbody></table></div>';
+  openHTMLModal('\uD83E\uDDE0 ' + branch + ' \u2014 progress read from the text',
+    avg + '% across ' + list.length + ' points', html);
+}
+
 
 function renderAdmProcess(){
-  try { renderAdmpTieups(); } catch(e){ console.error('tie-ups:', e && e.message); }
+  try { renderAdmpProgress(); } catch(e){ console.error('admp text analysis:', e && e.message); }
   const rows = admpRows();
   const host = document.getElementById('admp-matrix');
   const meta = document.getElementById('admp-meta');
