@@ -10652,9 +10652,10 @@ var ADMPNLP = (function () {
   ];
   var STAGE_LABEL = { done: 'finished', strong: 'work carried out', active: 'under way',
                       groundwork: 'groundwork done', planned: 'planned only',
-                      blocked: 'waiting on someone', none: 'not started' };
+                      blocked: 'waiting on someone', none: 'not started',
+                      unevidenced: 'nothing written \u2014 no evidence' };
   var STAGE_COLOR = { done: '#059669', strong: '#15803D', active: '#2563EB', groundwork: '#7C3AED',
-                      planned: '#D97706', blocked: '#DC2626', none: '#64748B' };
+                      planned: '#D97706', blocked: '#DC2626', none: '#64748B', unevidenced: '#94A3B8' };
 
   /* longest phrase first, so "will start" is never read as the bare "will" */
   var PHRASES = [];
@@ -10744,14 +10745,24 @@ var ADMPNLP = (function () {
     var status = String(r.Status || '').trim();
 
     if (!raw) {
-      /* no text at all. The status column is the only thing left, and it is
-         evidence of intent rather than of progress — said so, and with the
-         lowest confidence, so a branch cannot gain a score by writing nothing. */
-      var byStatus = /^completed$/i.test(status) ? 100 : /progress/i.test(status) ? 25 : 0;
-      return { pct: byStatus, conf: 0.15, stage: /^completed$/i.test(status) ? 'done' : 'none',
+      /* NOTHING WRITTEN. The status word is a claim, not evidence, and scoring
+         it gave two branches different figures for the same empty row:
+         Bachupally's School Outreach Visits read 25% because its status said
+         "In Progress", while Boduppal's read 0% because its status said "Not
+         Started" — both with nothing written against them, and both labelled
+         "not started". A silent point is now 0 everywhere, which is also what
+         this panel has always said it does.
+
+         The one exception is a status of Completed. That is an explicit record
+         that the work is finished, and the same rule already applies lower down
+         to rows that do have text. */
+      var done = /^completed$/i.test(status);
+      return { pct: done ? 100 : 0, conf: 0.15, stage: done ? 'done' : 'unevidenced',
                hits: [], nums: { ratio: null, basis: '' }, raw: '', clauses: [],
-               why: ['Nothing written in either text column — scored from Current Status (' +
-                     (status || 'blank') + ') alone, at the lowest confidence.'] };
+               why: [done
+                 ? 'Nothing written in either text column, but Current Status reads Completed, which records the work as finished.'
+                 : 'Nothing written in either text column. The status word alone is a claim rather than evidence, so this ' +
+                   'counts as 0% \u2014 the same for every branch, whether its status says In Progress or Not Started.'] };
     }
 
     /* Branches often paste the same sentence into both columns. Counting it
@@ -10796,8 +10807,14 @@ var ADMPNLP = (function () {
     var why = [];
     var base;
     if (!scored.length) {
-      base = /^completed$/i.test(status) ? 1 : /progress/i.test(status) ? 0.25 : 0.05;
-      why.push('Text present but no recognised progress wording, so the score falls back to Current Status.');
+      /* Something was written but none of it describes a stage of work. That is
+         thin evidence, not none — it is scored the same way whatever the status
+         column says, so two branches in the same position get the same figure. */
+      base = /^completed$/i.test(status) ? 1 : 0.2;
+      why.push(/^completed$/i.test(status)
+        ? 'No recognised progress wording, but Current Status reads Completed, which sets it to 100%.'
+        : 'Something is written but none of it names a stage of work, so it scores 20% \u2014 thin evidence, ' +
+          'read the same way for every branch regardless of the status column.');
     } else {
       var max = Math.max.apply(null, scored);
       var mean = scored.reduce(function (a, b) { return a + b; }, 0) / scored.length;
@@ -10847,7 +10864,7 @@ var ADMPNLP = (function () {
     conf = Math.min(1, conf);
 
     var strongest = hits.reduce(function (a, b) { return (!a || b.w > a.w) ? b : a; }, null);
-    var stage = strongest ? strongest.stage : 'none';
+    var stage = strongest ? strongest.stage : (/^completed$/i.test(status) ? 'done' : 'unevidenced');
     /* The label must agree with the figure. "Out of 17, 6 signed" has its
        strongest word at "signed", but the count brought the row down to 45% —
        calling that "finished" would contradict the number beside it. */
@@ -10937,7 +10954,7 @@ function renderAdmpProgress(){
   var byB = {}; branches.forEach(function (b){ byB[b] = rows.filter(function (r){ return r.Branch === b; }); });
 
   /* every stage, so the bar shows WHAT the progress is made of */
-  var STAGES = ['done', 'strong', 'active', 'groundwork', 'planned', 'blocked', 'none'];
+  var STAGES = ['done', 'strong', 'active', 'groundwork', 'planned', 'blocked', 'none', 'unevidenced'];
   var branchStat = function (b){
     var rs = byB[b] || [], ss = rs.map(function (r){ return _ADMP_SCORE[r.__k]; });
     var withText = ss.filter(function (x){ return x.raw; }).length;
@@ -10945,7 +10962,7 @@ function renderAdmpProgress(){
     var evid = withText ? Math.round(ss.filter(function (x){ return x.raw; })
       .reduce(function (a, x){ return a + x.pct; }, 0) / withText) : null;
     var mix = {}; STAGES.forEach(function (s){ mix[s] = 0; });
-    ss.forEach(function (x){ mix[x.raw ? x.stage : 'none']++; });
+    ss.forEach(function (x){ mix[x.stage] = (mix[x.stage] || 0) + 1; });
     var conf = ss.length ? ss.reduce(function (a, x){ return a + x.conf; }, 0) / ss.length : 0;
     return { n: rs.length, withText: withText, pct: pct, evid: evid, mix: mix, conf: conf,
              blocked: mix.blocked, done: mix.done + mix.strong };
@@ -10969,7 +10986,7 @@ function renderAdmpProgress(){
         '<div style="font-size:10px;color:#94A3B8">of all ' + st.n + ' points</div></td>' +
       '<td style="min-width:150px">' + bar(st.mix, st.n) +
         '<div style="font-size:10px;color:#64748B;margin-top:3px">' + st.done + ' done or under way \u00b7 ' +
-        st.mix.planned + ' planned \u00b7 ' + st.blocked + ' waiting \u00b7 ' + (st.n - st.withText) + ' silent</div></td>' +
+        st.mix.planned + ' planned \u00b7 ' + st.blocked + ' waiting \u00b7 ' + (st.n - st.withText) + ' silent (0%)</div></td>' +
       '<td style="text-align:center;font-weight:700;color:' + _admpPctColor(st.evid) + '">' +
         (st.evid === null ? '\u2013' : st.evid + '%') + '</td>' +
       '<td style="text-align:center">' + st.withText + ' / ' + st.n +
@@ -10998,9 +11015,10 @@ function renderAdmpProgress(){
     '<td style="text-align:center">' + gText + ' / ' + allS.length + '</td><td></td></tr>' +
     '</tbody></table></div>' +
     '<div class="fnote" style="display:block;padding:9px 14px 4px">Click a branch for every point it wrote, with the ' +
-      'phrases that moved the figure. <b>Progress</b> counts all 17 points, so a point nobody wrote up counts as 0 \u2014 ' +
-      'silence is not progress. <b>Where written up</b> ignores the silent points, which is the fairer read of the work ' +
-      'actually being done.</div>' +
+      'phrases that moved the figure. <b>Progress</b> counts all 17 points, so a point nobody wrote up counts as ' +
+      '<b>0% for every branch</b> \u2014 whether its status column says In Progress or Not Started, a status word with ' +
+      'nothing behind it is a claim rather than evidence. <b>Where written up</b> ignores the silent points, which is ' +
+      'the fairer read of the work actually being done.</div>' +
     '<div class="fnote" style="display:block;padding:0 14px 14px">' +
       STAGES.map(function (s){ return '<span style="display:inline-block;margin-right:12px"><i style="display:inline-block;' +
         'width:9px;height:9px;border-radius:2px;background:' + ADMPNLP.STAGE_COLOR[s] + ';margin-right:4px"></i>' +
