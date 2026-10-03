@@ -2326,8 +2326,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   </div>
 
 <div class="card" style="margin-bottom:16px;">
-    <div class="ch"><h3>&#128197; Monthly asset check &mdash; branch &times; system</h3>
-      <span class="fnote">One table per month, newest first. Rows are branches, columns are systems, and each cell
+    <div class="ch"><h3>&#128197; Monthly asset check &mdash; branch &times; system &middot; <span id="it-monthly-cur-lbl">latest month</span></h3>
+      <span class="fnote">The latest month first; what changed since the previous check follows directly below it, then the earlier months. Rows are branches, columns are systems, and each cell
         reads <b>working / total</b>. The total comes from the IT Assets master, so it stays the same from month to
         month &mdash; only the working figure moves. Click any cell for that month's records.</span></div>
     <div class="cb-0" id="it-monthly"></div>
@@ -2339,6 +2339,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       <span class="fnote">Each branch and system compared against its own previous month. A rise means equipment
         was added, a fall means it was retired. Systems whose count did not move are not listed.</span></div>
     <div class="cb-0" style="overflow-x:auto"><table class="dt" id="it-moved"></table></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;" id="it-monthly-rest-card">
+    <div class="ch"><h3>&#128197; Monthly asset check &mdash; earlier months</h3>
+      <span class="fnote">The same table for every earlier month, newest first. Click any cell for that month's records.</span></div>
+    <div class="cb-0" id="it-monthly-rest"></div>
   </div>
 
   <div class="card" style="margin-bottom:16px;">
@@ -4743,8 +4749,7 @@ function viewAdminBranch(branch, kind){
   let rows, title, expr;
   if(kind==='open'){ rows=all.filter(r=>!done(r)); title='tasks still open';
     expr='tasks not marked Done or Completed'; }
-  else if(kind==='past'){ rows=all.filter(r=>!done(r) &&
-      (()=>{const t=Date.parse(String(r.Deadline||'')); return !isNaN(t)&&t<today;})());
+  else if(kind==='past'){ rows=all.filter(r=>!done(r) && cgAdminOverdue(r));
     title='tasks past their deadline'; expr='still open AND deadline earlier than today'; }
   else if(kind==='done'){ rows=all.filter(done); title='tasks completed';
     expr='tasks marked Done or Completed'; }
@@ -4860,7 +4865,7 @@ function renderAdmin(){
           brs.map(b=>{
             const rows=ADMIN_DATA.filter(r=>r.Branch===b);
             const open=rows.filter(r=>!done(r));
-            const past=open.filter(r=>{const t=Date.parse(String(r.Deadline||'')); return !isNaN(t)&&t<today;});
+            const past=open.filter(cgAdminOverdue);   // the sheet's Days Due ("Overdue (n days)"); due today is not late
             const comp=rows.filter(done);
             const pct=rows.length?Math.round(open.length/rows.length*100):null;
             T.t+=rows.length; T.o+=open.length; T.p+=past.length; T.c+=comp.length;
@@ -5069,6 +5074,7 @@ function viewVigBranch(branch, kind){
   if(kind==='chk'){
     rows=(window._VCHK_ROWS||[]).filter(r=>{
       if(r.branch!==branch) return false;
+      if(window.VCHK && typeof VCHK.isOpen==='function') return VCHK.isOpen(r);   // the checklist's own rule
       const st=String(r.status||'').trim();
       if(/verification pending/i.test(st)) return false;   // done, awaiting sign-off
       return !/^(closed|verified|resolved|rejected|not valid|work done)/i.test(st);
@@ -5087,8 +5093,7 @@ function viewVigBranch(branch, kind){
   const all=VIG_DATA.filter(r=>r.Branch===branch);
   if(kind==='open'){ rows=all.filter(isOpenV); title='issues still open';
     expr='issues whose status is not Closed, Verified or Resolved'; }
-  else if(kind==='past'){ rows=all.filter(r=>isOpenV(r) &&
-      (()=>{const t=Date.parse(String(r.TargetDate||'')); return !isNaN(t)&&t<today;})());
+  else if(kind==='past'){ rows=all.filter(r=>isOpenV(r) && cgPast(r.TargetDate));
     title='issues past their target date'; expr='still open AND target date earlier than today'; }
   else { rows=all; title='all issues raised'; expr='every issue recorded at this branch'; }
 
@@ -5214,13 +5219,14 @@ function renderVigilance(){
           brs.map(b=>{
             const rows=VIG_DATA.filter(r=>r.Branch===b);
             const open=rows.filter(isOpenV);
-            const past=open.filter(r=>{const t=Date.parse(String(r.TargetDate||'')); return !isNaN(t)&&t<today;});
+            const past=open.filter(r=>cgPast(r.TargetDate));   // calendar date gone by — due today is not past
             /* Work still to be DONE. "Work Done - Verification Pending" is
                excluded: the work is finished and only the sign-off is
                outstanding, so counting it here overstates the backlog and
                makes a branch look as though it is sitting on work it has
                already completed. */
             const chkOpen=r=>{
+              if(window.VCHK && typeof VCHK.isOpen==='function') return VCHK.isOpen(r);
               const st=String(r.status||'').trim();
               if(/verification pending/i.test(st)) return false;
               return /^(open|assigned|in progress|re-?opened|unassigned)/i.test(st) ||
@@ -5346,11 +5352,17 @@ function _grievRows(){
 function _isResolved(s){ return /resolved/i.test(s||''); }
 function _isOpen(s){ return s && !/resolved/i.test(s) && !/^nan$/i.test(s); }
 function _isSatisfied(v){ return /^satisfied/i.test(v||''); }
-function _isOverdue(r){
-  // Overdue if OverDue numeric > 0, OR status not resolved and target date is in the past
-  if(typeof r.OverDue==='number' && r.OverDue>0 && r.OverDue<100000) return true;
-  return false;
+/* Overdue = still open AND past its target date. The sheet's "Over Due" column
+   is a formula that breaks on some rows (Pocharam's open case, target 31 July,
+   reads -46,234), so the tab used to call a case 62 days late "on time". The
+   target date decides; the column is used only when there is no target date. */
+function _grIsOverdue(r){
+  if(!_isOpen(r.Status)) return false;
+  const t = String(r.TargetDate || '').trim();
+  if(/^\d{4}-\d{2}-\d{2}/.test(t)) return cgPast(t);
+  return typeof r.OverDue==='number' && r.OverDue>0 && r.OverDue<100000;
 }
+function _isOverdue(r){ return _grIsOverdue(r); }
 
 function renderGrievance(){
   renderGrievMatrix();
@@ -5419,7 +5431,8 @@ function renderGrievance(){
   const SAT_PILL={'Satisfied':'pg','Partially Satisfied':'pa','Not Satisfied':'pr'};
   const tbody=document.getElementById('gr-tbody');
   const display=rows.slice(0,200);
-  tbody.innerHTML = display.length?display.map(r=>{
+  /* the records table was removed from the tab; writing to it threw on every render */
+  if(tbody) tbody.innerHTML = display.length?display.map(r=>{
     const sev=/^nan$/i.test(r.Severity)?'–':r.Severity;
     const sat=/^nan$/i.test(r.ParentSatisfaction)?'–':r.ParentSatisfaction;
     return `<tr style="cursor:pointer" onclick='openGrievDetail(${JSON.stringify(r).replace(/'/g,"&#39;")})'>
@@ -9818,6 +9831,9 @@ function renderITMonthly(){
   const D = _itData();
   const health = (D.health || []).filter(r => fBranch === 'ALL' || r.Branch === fBranch);
   const assets = (D.assets || []);
+  /* cleared first, so an early return below never leaves an earlier filter's tables on screen */
+  { const r0 = document.getElementById('it-monthly-rest'), c0 = document.getElementById('it-monthly-rest-card');
+    if (r0) r0.innerHTML = ''; if (c0) c0.style.display = 'none'; }
 
   if (!health.length){
     host.innerHTML = '<div style="padding:20px;color:#64748B;font-size:13px">' +
@@ -9895,7 +9911,7 @@ function renderITMonthly(){
   /* Collected while the cells are drawn, reported underneath. */
   const mismatches = [];
 
-  host.innerHTML = months.map(mk => {
+  const _blocks = months.map(mk => {
     let rows = '';
     branches.forEach(b => {
       rows += '<tr><td style="text-align:left;font-weight:700"><span class="bd b' + b + '"></span> ' + b + '</td>' +
@@ -9941,7 +9957,16 @@ function renderITMonthly(){
       '<tr style="background:#F8FAFF;border-top:2px solid #E0E8FF">' +
       '<td style="text-align:left;font-weight:800">All branches</td>' + foot + '</tr>' +
       '</tbody></table></div>';
-  }).join('');
+  });
+  /* The latest month stays in this card; "What changed since the previous check"
+     sits directly under it, and the earlier months follow in their own card —
+     so the comparison is read straight after the month it compares, without
+     scrolling past every earlier month first. */
+  host.innerHTML = _blocks[0] || '';
+  const _lbl = document.getElementById('it-monthly-cur-lbl'); if (_lbl) _lbl.textContent = months[0] ? itMonthLabel(months[0]) : 'latest month';
+  const _rest = document.getElementById('it-monthly-rest'), _restCard = document.getElementById('it-monthly-rest-card');
+  if (_rest) _rest.innerHTML = _blocks.slice(1).join('');
+  if (_restCard) _restCard.style.display = _blocks.length > 1 ? '' : 'none';
 
   /* A disagreement between the monthly check and the asset master is a data
      problem, not a display problem — it means one of the two sheets is out of
@@ -13472,25 +13497,67 @@ window.AUDIT = (function () {
 
     var maxCells = Math.max.apply(null, rows.map(function (r) { return r.t ? A.scored(r.t) : 0; }).concat([1]));
 
+    /* LAYOUT: the month in focus comes first and is coloured — the month picked in
+       the header, otherwise the current month if it has been audited, otherwise
+       the most recent audit. Its counts sit in their own block (every figure the
+       percentage rests on: Yes, No, In progress, NA/NR, items scored), and the
+       month columns then run newest to oldest. The branch column is pinned. */
+    var MN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    var nowName = MN[new Date().getMonth()];
+    var withData = D.months.filter(function (m) {
+      return branches().some(function (b) { return A.scoreOf(D.byBM, b + '\u241f' + m) !== null; });
+    });
+    var focus = VIEW.month ||
+      (withData.filter(function (m) { return String(m).toLowerCase().indexOf(nowName.toLowerCase()) === 0; })[0]) ||
+      withData[withData.length - 1] || D.months[D.months.length - 1] || null;
+    var order = D.months.map(function (m, i) { return i; }).reverse();
+    if (focus) {                                   // focus month first, the rest newest → oldest
+      var fi = D.months.indexOf(focus);
+      order = [fi].concat(order.filter(function (i) { return i !== fi; }));
+    }
+    var HL = 'background:#FEF3C7;', HLH = 'background:#F59E0B;color:#fff;';
+    var cnt = function (b) {
+      var t = focus ? (D.byBM[b + '\u241f' + focus] || null) : null;
+      return t ? { yes: t.yes, no: t.no, ip: t.ip, nn: (t.na || 0) + (t.nr || 0), sc: t.yes + t.no + t.ip } : null;
+    };
+    var tot = { yes: 0, no: 0, ip: 0, nn: 0, sc: 0 };
+    rows.forEach(function (r) { var c = cnt(r.b); if (c) ['yes','no','ip','nn','sc'].forEach(function (k) { tot[k] += c[k]; }); });
+    var cntCell = function (b, v, col, bold) {
+      return '<td class="n auc" data-b="' + esc(b) + '" data-m="' + esc(focus || '') + '" style="' + HL +
+        (col ? 'color:' + col + ';' : '') + (bold ? 'font-weight:700;' : '') + '">' + (v === null || v === undefined ? '\u2014' : v) + '</td>';
+    };
+
     $('au-score').innerHTML =
-      '<table class="au-tbl"><thead><tr>' +
-      '<th>Branch</th><th class="n">Compliance</th><th></th><th class="n">Change</th>' +
-      D.months.map(function (m) { return '<th class="n">' + esc(A.monthShort(m)) + '</th>'; }).join('') +
-      '<th class="n">Best</th><th class="n">Weakest</th>' +
+      '<div style="overflow-x:auto"><table class="au-tbl brfz"><thead>' +
+      '<tr><th rowspan="2">Branch</th><th class="n" rowspan="2">Compliance</th><th rowspan="2"></th><th class="n" rowspan="2">Change</th>' +
+      (focus ? '<th colspan="5" style="text-align:center;' + HLH + '">' + esc(A.monthShort(focus)) +
+        (VIEW.month ? ' \u00b7 selected' : String(focus).toLowerCase().indexOf(nowName.toLowerCase()) === 0 ? ' \u00b7 current month' : ' \u00b7 latest audit') + ' \u2014 counts</th>' : '') +
+      '<th colspan="' + D.months.length + '" style="text-align:center">Score by month \u00b7 newest first</th>' +
+      '<th class="n" rowspan="2">Best</th><th class="n" rowspan="2">Weakest</th></tr><tr>' +
+      (focus ? ['Yes', 'No', 'In progress', 'NA / NR', 'Items scored'].map(function (h) {
+        return '<th class="n" style="' + HLH + '">' + h + '</th>'; }).join('') : '') +
+      order.map(function (i) {
+        var m = D.months[i];
+        return '<th class="n" style="' + (m === focus ? HLH : '') + '">' + esc(A.monthShort(m)) + '</th>'; }).join('') +
       '</tr></thead><tbody>' +
       rows.map(function (r) {
+        var c = cnt(r.b);
         return '<tr class="clk" data-b="' + esc(r.b) + '">' +
           '<td><b>' + esc(r.b) + '</b></td>' +
           '<td class="n auc" data-b="' + esc(r.b) + '" style="font-weight:700;color:' + A.colorFor(r.sc) + '">' + pc(r.sc) + '</td>' +
-          '<td style="width:150px"><div class="au-bar"><i style="width:' +
+          '<td style="width:130px;min-width:110px"><div class="au-bar"><i style="width:' +
             (r.sc === null ? 0 : Math.max(1, r.sc)) + '%;background:' + A.colorFor(r.sc) + '"></i>' +
             '<span class="tgt" style="left:' + A.ON_TRACK + '%"></span></div></td>' +
           '<td class="n' + (r.d === null ? '' : ' auc') + '" data-b="' + esc(r.b) + '" style="color:' +
             (r.d === null ? '#94A3B8' : r.d >= 0 ? '#059669' : '#DC2626') + '">' +
             (r.d === null ? '\u2014' : sgn(r.d)) + '</td>' +
-          r.hist.map(function (h, hi) {
+          (focus ? (c ? cntCell(r.b, c.yes, '#059669', true) + cntCell(r.b, c.no, c.no ? '#DC2626' : null, !!c.no) +
+                        cntCell(r.b, c.ip, c.ip ? '#D97706' : null) + cntCell(r.b, c.nn, '#64748B') + cntCell(r.b, c.sc, null, true)
+                     : '<td colspan="5" style="' + HL + 'color:#94A3B8;text-align:center">not audited</td>') : '') +
+          order.map(function (hi) {
+            var h = r.hist[hi], m = D.months[hi];
             return '<td class="n' + (h === null ? '' : ' auc') + '" data-b="' + esc(r.b) + '" data-m="' +
-              esc(D.months[hi]) + '" style="color:' + A.colorFor(h) + '">' +
+              esc(m) + '" style="color:' + A.colorFor(h) + ';' + (m === focus ? HL + 'font-weight:800;' : '') + '">' +
               (h === null ? '\u2014' : h.toFixed(1)) + '</td>';
           }).join('') +
           '<td class="n auc" data-b="' + esc(r.b) + '" data-m="' + esc(r.best || '') + '" style="color:#059669">' +
@@ -13498,9 +13565,15 @@ window.AUDIT = (function () {
           '<td class="n auc" data-b="' + esc(r.b) + '" data-m="' + esc(r.worst || '') + '" style="color:#DC2626">' +
             esc(r.worst ? A.monthShort(r.worst) : '—') + '</td>' +
           '</tr>';
-      }).join('') + '</tbody></table>' +
-      '<p class="au-note">The marker on each bar is the ' + A.ON_TRACK + '% on-track line. Every figure opens the ' +
-      'audit rows behind it \u2014 a month column opens that branch\u2019s file for that month.</p>';
+      }).join('') +
+      (focus ? '<tr style="background:#F8FAFF;font-weight:800"><td>All branches</td><td></td><td></td><td></td>' +
+        ['yes','no','ip','nn','sc'].map(function (k) { return '<td class="n" style="' + HL + '">' + tot[k] + '</td>'; }).join('') +
+        order.map(function () { return '<td></td>'; }).join('') + '<td></td><td></td></tr>' : '') +
+      '</tbody></table></div>' +
+      '<p class="au-note">The highlighted block is ' + (focus ? '<b>' + esc(A.monthShort(focus)) + '</b>' : 'the latest month') +
+      ' \u2014 the month picked in the header, otherwise the current month, otherwise the latest audit. Months then run ' +
+      'newest to oldest. <b>Items scored</b> = Yes + No + In progress, the base of the compliance figure; NA and NR are ' +
+      'left out of it. The marker on each bar is the ' + A.ON_TRACK + '% on-track line. Every figure opens the audit rows behind it.</p>';
   }
 
   /* ══════════════════ 3. TREND ══════════════════ */
@@ -18696,6 +18769,26 @@ const cgIsClosed = s => /closed|verified|resolved|completed|done|filled/i.test(S
 const cgNum = v => { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; };
 const cgDate = v => { const t = Date.parse(String(v || '')); return isNaN(t) ? null : t; };
 const CG_DAY = 86400000;
+/* A target or deadline is PAST when its calendar date has gone by. Comparing the
+   parsed date with the current moment made anything due TODAY read as overdue
+   from 5:30 in the morning (a bare date parses as UTC midnight). */
+function cgTodayIso(){ const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function cgPast(v){
+  const s = String(v == null ? '' : v).trim();
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[0] < cgTodayIso();
+  const t = cgDate(s); if (t === null) return false;
+  const d = new Date(t); const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  return iso < cgTodayIso();
+}
+/* The Admin tab's own overdue rule: the sheet's Days Due text ("Overdue (11 days)").
+   When that column is empty the deadline decides. */
+function cgAdminOverdue(r){
+  const s = String(r.DaysDue || '').trim();
+  if (/overdue/i.test(s)) return true;
+  if (s && s !== '\u2013' && s !== '-') return false;
+  return cgPast(r.Deadline);
+}
 
 /* One object per branch holding every count the tab needs. Each entry keeps the
    ROWS behind it so a cell can open them. */
@@ -18742,11 +18835,13 @@ function cgCollect(){
 
     const careRes = care.filter(r => /resolved|no concern/i.test(String(r.Status || '')));
     const grOpen  = griev.filter(r => !cgIsClosed(r.Status));
-    const grOver  = grOpen.filter(r => { const t = cgDate(r.TargetDate); return t && t < today; });
+    /* Every count below uses the SAME rule as the department's own tab, so the
+       glance and the tab can never show two numbers for one thing. */
+    const grOver  = grOpen.filter(_grIsOverdue);                         // Grievance tab
     const admOpen = admin.filter(r => !cgIsClosed(r.Status));
-    const admOver = admOpen.filter(r => { const t = cgDate(r.Deadline); return t && t < today; });
+    const admOver = admOpen.filter(cgAdminOverdue);                      // Admin tab (Days Due)
     const vigOpen = vig.filter(r => !cgIsClosed(r.Status));
-    const vigOver = vigOpen.filter(r => { const t = cgDate(r.TargetDate); return t && t < today; });
+    const vigOver = vigOpen.filter(r => cgPast(r.TargetDate));
     /* Critical and High are different severities and were being added together
        under a column labelled "Critical", so a branch with no critical issues
        still showed a critical count. They are now counted separately. */
@@ -18754,7 +18849,7 @@ function cgCollect(){
     const vigHigh = vigOpen.filter(r => /\bhigh\b/i.test(String(r.RiskLevel || '')) &&
                                         !/critical/i.test(String(r.RiskLevel || '')));
     const purOpen = pur.filter(r => !/delivered|completed|closed|rejected/i.test(String(r.PurchaseStatus || '')));
-    const hrOpen  = hr.filter(r => !/closed|filled/i.test(String(r.Status || '')));
+    const hrOpen  = hr.filter(r => /^open$/i.test(String(r.Status || '').trim()));   // HR tab: status exactly Open
 
     /* Observation completion needs the working-day config, the same way the
        Teacher Observations tab computes it. */
@@ -18856,9 +18951,13 @@ function cgCollect(){
     /* The vigilance CHECKLIST is a separate feed from the vigilance tracker and
        loads with its own tab, so it is reported as unavailable rather than as
        zero until that tab has been opened once. */
+    /* The Vigilance tab's own rule (VCHK.isOpen): a point whose work is done and
+       is only awaiting verification is NOT open — counting it here made the
+       glance higher than the tab. */
     const chkAll = (window._VCHK_ROWS || []).filter(r => r && r.branch === b);
-    const chkOpen = chkAll.filter(r =>
-      !/^(closed|verified|resolved|rejected|not valid)/i.test(String(r.status || '').trim()));
+    const chkOpen = chkAll.filter(r => (window.VCHK && typeof VCHK.isOpen === 'function')
+      ? VCHK.isOpen(r)
+      : !/^(closed|verified|resolved|rejected|not valid)/i.test(String(r.status || '').trim()) && !/verification pending/i.test(String(r.status || '')));
 
     out[b] = {
       branch: b,
@@ -19211,6 +19310,40 @@ function cgRenderFlags(D, branches){
 }
 
 /* Drill-through for any cell in either table. */
+/* Pending to be addressed, month by month: counts only. The same rows the cell
+   counted (d.care.pendRows — open concerns, the Care Calls tab's own measure),
+   grouped by the call's Month, against the calls made that month. */
+function cgCarePendingByMonth(branch, d){
+  const ORDER = ['April','May','June','July','August','September','October','November','December','January','February','March'];
+  const byM = {};
+  const key = r => { const m = String(r.Month || '').trim(); return m || '(no month)'; };
+  /* months are put in calendar order by the dates of their own calls — the year
+     runs from March, so a name-based order would put March 2026 after October */
+  d.care.rows.forEach(r => { const k = key(r); const e = (byM[k] = byM[k] || { made: 0, pend: 0, ym: {} }); e.made++;
+    const t = String(r.Date || '').slice(0, 7); if (/^\d{4}-\d{2}$/.test(t)) e.ym[t] = (e.ym[t] || 0) + 1; });
+  d.care.pendRows.forEach(r => { const k = key(r); (byM[k] = byM[k] || { made: 0, pend: 0, ym: {} }).pend++; });
+  /* the year-month most of the month's calls carry — a few mistyped dates cannot move it */
+  Object.keys(byM).forEach(k => { const ym = byM[k].ym; byM[k].first = Object.keys(ym).sort((a, b) => ym[b] - ym[a])[0] || ''; });
+  const months = Object.keys(byM).sort((x, y) => {
+    const fx = byM[x].first, fy = byM[y].first;
+    if (fx && fy) return fx < fy ? -1 : fx > fy ? 1 : 0;
+    const ix = ORDER.indexOf(x), iy = ORDER.indexOf(y);
+    return (ix < 0 ? 99 : ix) - (iy < 0 ? 99 : iy);
+  });
+  const rows = months.map(m => ({ Month: m, Calls: byM[m].made, Pending: byM[m].pend,
+    Share: byM[m].made ? (byM[m].pend / byM[m].made * 100).toFixed(1) + '%' : '\u2013' }));
+  const tm = rows.reduce((t, r) => t + r.Calls, 0), tp = rows.reduce((t, r) => t + r.Pending, 0);
+  rows.push({ Month: 'Total', Calls: tm, Pending: tp, Share: tm ? (tp / tm * 100).toFixed(1) + '%' : '\u2013' });
+  openModal('\uD83D\uDCDE ' + branch + ' \u2014 pending to be addressed, month by month',
+    tp + ' open concern' + (tp === 1 ? '' : 's') + ' across ' + months.length + ' month' + (months.length === 1 ? '' : 's'),
+    rows,
+    [{ key: 'Month', label: 'Month' }, { key: 'Calls', label: 'Calls made' },
+     { key: 'Pending', label: 'Pending to be addressed' }, { key: 'Share', label: 'Share of calls' }],
+    { expr: 'pending = calls carrying a concern that is still open \u2014 the Care Calls tab\u2019s own measure, counted by the call\u2019s month',
+      work: tp + ' of ' + tm + ' calls',
+      note: 'Counts only. A call marked resolved, or one carrying no concern in the first place, is not counted.' });
+}
+
 function cgCell(key, branch){
   const D = cgCollect(), d = D[branch];
   if (!d) return;
@@ -19252,11 +19385,7 @@ function cgCell(key, branch){
         work: '(' + d.tr.vehicles + ' − ' + d.tr.expiring + ') ÷ ' + d.tr.vehicles + ' × 100 = ' + fxPct(d.tr.vehicles - d.tr.expiring, d.tr.vehicles),
         note: 'A vehicle with no expiry date recorded counts as non-compliant, not as unknown.' });
 
-    case 'care-pending': return T('Pending to be addressed', d.care.pending + ' open concerns',
-      d.care.pendRows, CG_COLS.care,
-      { expr: 'calls carrying a concern that is still open — the same measure the Care Calls tab uses',
-        work: d.care.pending + ' of ' + d.care.made + ' calls',
-        note: 'A call marked resolved, or one carrying no concern in the first place, is not counted.' });
+    case 'care-pending': return cgCarePendingByMonth(branch, d);
     case 'griev-open': return T('Grievance open', d.griev.open + ' open', d.griev.openRows, CG_COLS.griev,
       { expr: 'open = cases whose status is not Resolved or Closed', work: d.griev.open + ' of ' + d.griev.total });
     case 'griev-over': return T('Grievance past target date', d.griev.over + ' overdue', d.griev.overRows, CG_COLS.griev,
@@ -24003,6 +24132,73 @@ window.renderCivilTab = function (raw) {
   if (meta) meta.textContent = P.length + ' projects · ' + liveAll.length + ' subtasks · ' + overAll + ' overdue';
 };
 
+</script>
+
+<style>
+  /* Branch names stay on screen. Any table whose first column is the branch is
+     pinned at its left edge, so a wide comparison can be scrolled sideways
+     without losing which row is which. Applied by the script below, to every
+     such table however it was drawn — tabs, sections and click-to-view windows. */
+  table.brfz > thead > tr > *:first-child,
+  table.brfz > tbody > tr > *:first-child,
+  table.brfz > tfoot > tr > *:first-child,
+  table.brfz > tr > *:first-child{
+    position: sticky; left: 0; z-index: 2; box-shadow: 1px 0 0 #E2E8F0;
+  }
+  table.brfz > thead > tr > *:first-child{ z-index: 3; }
+</style>
+<script>
+(function(){
+  var BR = /^(bachupally|boduppal|gowdavalli|keesara|pocharam|all branches?|group)\b/i;
+  function bgOf(el){
+    while (el && el.nodeType === 1){
+      var c = getComputedStyle(el).backgroundColor;
+      if (c && c !== 'transparent' && !/rgba\([^)]*,\s*0\)$/.test(c)) return c;
+      el = el.parentElement;
+    }
+    return '#ffffff';
+  }
+  function isBranchTable(t){
+    var h = t.tHead && t.tHead.rows[0] && t.tHead.rows[0].cells[0];
+    if (h && /^\s*branch\b/i.test(h.textContent)) return true;
+    var n = 0, rows = t.tBodies[0] ? t.tBodies[0].rows : t.rows;
+    for (var i = 0; i < Math.min(rows.length, 12); i++){
+      var c = rows[i].cells[0];
+      if (c && BR.test(c.textContent.replace(/^[^A-Za-z]+/, '').trim())) n++;
+    }
+    return n >= 2;
+  }
+  function paint(t){
+    for (var i = 0; i < t.rows.length; i++){
+      var c = t.rows[i].cells[0];
+      if (!c || c.__fz) continue;
+      c.__fz = 1;
+      /* a sticky cell needs a solid background or the scrolled cells show through */
+      if (!c.style.backgroundColor) c.style.backgroundColor = bgOf(c);
+    }
+  }
+  function scan(){
+    var ts = document.querySelectorAll('table');
+    for (var i = 0; i < ts.length; i++){
+      var t = ts[i];
+      if (t.__fzChecked !== t.rows.length){
+        t.__fzChecked = t.rows.length;
+        if (!t.classList.contains('brfz') && isBranchTable(t)) t.classList.add('brfz');
+      }
+      if (t.classList.contains('brfz')){
+        paint(t);
+        /* a wide table must scroll inside its own box for the pin to work */
+        var p = t.parentElement;
+        if (p && t.scrollWidth > p.clientWidth + 2 && getComputedStyle(p).overflowX === 'visible') p.style.overflowX = 'auto';
+      }
+    }
+  }
+  var timer = null;
+  function soon(){ if (timer) return; timer = setTimeout(function(){ timer = null; try { scan(); } catch(e){} }, 150); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', soon); else soon();
+  new MutationObserver(soon).observe(document.documentElement, { childList: true, subtree: true });
+  window.addEventListener('resize', soon);
+})();
 </script>
 </body>
 </html>
