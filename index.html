@@ -7908,6 +7908,22 @@ window._careAnswerable = function(r){
   return !_NOANS_TXT.test(txt);
 };
 
+/* ── ONE definition of a concern, and of an OPEN concern ──
+   These used to be created INSIDE renderCareSummary, so they existed only after
+   somebody had opened the Care Calls tab. Consolidated Glance, which loads
+   first, found nothing and fell back to a status-only rule that counted every
+   unanswered call and every "No Concern" call as pending — Boduppal read 807
+   against the tab's 546. They are defined here, once, so every panel and every
+   tab uses the same rule from the first paint. */
+var _CARE_NOT_A_CONCERN = /^(no concern|not answering|no response)/i;
+window._careIsConcern = function (r) {
+  if (window._careAnswerable && !window._careAnswerable(r)) return false;   // nobody answered: nothing was raised
+  return !_CARE_NOT_A_CONCERN.test(String(r.Grievance || '').trim());
+};
+window._careIsOpenConcern = function (r) {
+  return window._careIsConcern(r) && !/^resolved$/i.test(String(r.Status || '').trim());
+};
+
 function renderCareSummary(){
   const el=document.getElementById('care-summary-report'); if(!el)return;
   /* The class / section / concern / sentiment chips were removed with the
@@ -7950,17 +7966,9 @@ function renderCareSummary(){
   const _scope=window._CARE_SCOPE||'ALL';
   const _pendOnly=!!window._CARE_PENDING;
 
-  /* One definition of a concern, used by the chip, the Remaining tile and the
-     compliance report alike. It must also drop calls nobody answered — the chip
-     read 1,727 against the tile's 1,711 purely because it kept sixteen
-     unanswered calls the others had excluded. */
-  window._careIsConcern=function(r){
-    if(window._careAnswerable && !window._careAnswerable(r)) return false;
-    return !_CARE_NOT_CONCERN.test(String(r.Grievance||'').trim());
-  };
-  window._careIsOpenConcern=function(r){
-    return window._careIsConcern(r) && !/^resolved$/i.test(String(r.Status||'').trim());
-  };
+  /* _careIsConcern and _careIsOpenConcern are defined once, above, so the chip,
+     the "To be addressed" tile, the compliance report and Consolidated Glance
+     all read the same figure whichever tab was opened first. */
   window._careActiveFilter=function(list){
     return list.filter(function(r){
       const cat=String(r.Grievance||'');
@@ -8039,9 +8047,8 @@ function renderCareSummary(){
      filed as No Concern — nothing to address there — and made this tile
      disagree with both the Pending chip and the compliance report. All three
      now mean the same thing. */
-  const _NOT_A_CONCERN=/^(no concern|not answering|no response)/i;
-  const _concerns=_answered.filter(r=>!_NOT_A_CONCERN.test(String(r.Grievance||'').trim()));
-  const remaining=_concerns.filter(r=>!/^resolved$/i.test(String(r.Status||'').trim())).length;
+  const _concerns=sentFilteredRows.filter(window._careIsConcern);
+  const remaining=sentFilteredRows.filter(window._careIsOpenConcern).length;
   /* In Progress and Pending are reported separately again, but only for calls
      somebody actually answered. A call whose CATEGORY is "Not Answering" is
      counted once, under Not Answered — even when its status column happens to
@@ -18940,9 +18947,9 @@ function cgCollect(){
     const grSevere = grOpen.filter(r => /high|critical|severe|major/i.test(String(r.Severity || '')));
     const admHigh  = admOpen.filter(r => /high|urgent|critical/i.test(String(r.Priority || '')));
     const careProg = care.filter(r => /progress/i.test(String(r.Status || '')));
-    const carePend = (typeof window._careIsOpenConcern === 'function')
-      ? care.filter(window._careIsOpenConcern)
-      : care.filter(r => !/resolved|no concern/i.test(String(r.Status || '')));
+    /* the Care Calls tab's own rule, defined at top level so it is available
+       whichever tab the reader opens first */
+    const carePend = care.filter(window._careIsOpenConcern);
     const obsWeak  = (ALL_TEACHER || []).filter(r => r.Branch === b &&
       !isNaN(parseFloat(r.GrandAvg)) && parseFloat(r.GrandAvg) < 3);
     const trExpired = tr.filter(_trHasExpired);
