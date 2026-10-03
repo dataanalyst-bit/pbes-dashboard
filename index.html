@@ -9082,29 +9082,115 @@ function _trParse(s){
   return new Date(y,mo-1,d);
 }
 function _trToday(){ var t=new Date(); return new Date(t.getFullYear(),t.getMonth(),t.getDate()); }
+
+/* ══ ONE SET OF TRANSPORT RULES, used by every view ══
+   The Consolidated Glance count used the sheet's own "Days To Expiry" column
+   (blank, or a date where a number belongs, for many buses) while its
+   click-to-view list checked the document dates — so the count said 10 and the
+   list showed nine buses with "no document issue found". Every count, list and
+   chart now calls the functions below, so they cannot disagree.
+
+   STATUS   Sold / Retired — left out of everything.
+            Spare / Standby — never in occupancy; documents still checked, since a
+            spare can be put on a route any day.
+            Active (or blank) — counted.
+   NEW      A new vehicle needs no Fitness, PUC or Road Tax yet: a blank one is not
+            a problem (a date that IS entered and has lapsed still is). New means
+            registered within TR_NEW_VEHICLE_DAYS, or bought this year, or — when
+            neither is recorded — a freshly issued 5-year permit with Fitness, PUC
+            and Road Tax all blank (Bachupally's routes 29–32).
+   PERMIT   "N/R", "NA" or "not required" in Permit No: no permit expected — and, as
+            that marks a private (non-transport) vehicle, no fitness certificate.
+   LICENCE / LABOUR CERT  checked when a date is recorded; a blank is not flagged,
+            since not every vehicle needs them. */
+var TR_NEW_VEHICLE_DAYS = 365;
+function _trStatus(v){ return String(v&&v.Status||'').trim(); }
+function _trIsRetired(v){ return /sold|retired|scrap|disposed|written\s*off/i.test(_trStatus(v)); }
+function _trIsSpare(v){ return /spare|standby/i.test(_trStatus(v)); }
+function _trIsActive(v){ return !_trIsRetired(v) && !_trIsSpare(v); }
+function _trBlank(x){ return x===undefined||x===null||String(x).trim()===''||String(x).trim()==='\u2013'||String(x).trim()==='-'; }
+function _trIsNew(v){
+  if(/\bnew\b/i.test(_trStatus(v)) || /\bnew\s*(vehicle|bus)\b/i.test(String(v.Remarks||''))) return true;
+  var today=_trToday(), reg=_trParse(v.RegDate);
+  if(reg) return (today-reg)/86400000 <= TR_NEW_VEHICLE_DAYS;
+  var py=parseInt(v.PurchaseYear,10);
+  if(py>2000) return py>=today.getFullYear();
+  var permit=_trParse(v.PermitExp);
+  return !!permit && (permit-today)/86400000 >= 4*365 && _trBlank(v.FitnessExp) && _trBlank(v.PucExp) && _trBlank(v.RoadTaxExp);
+}
+function _trRequired(v,k){
+  if(k==='PermitExp') return !/^(n\s*\/?\s*r|n\s*\/?\s*a|not\s*required|nil|exempt)$/i.test(String(v.PermitNo||'').trim());
+  /* Permit No "N/R" marks a non-transport (private) vehicle such as the school car:
+     it needs no fitness certificate in its early years either */
+  if(k==='FitnessExp' && /^(n\s*\/?\s*r|n\s*\/?\s*a|not\s*required|nil|exempt)$/i.test(String(v.PermitNo||'').trim())) return false;
+  if(k==='FitnessExp'||k==='PucExp'||k==='RoadTaxExp') return !_trIsNew(v);
+  if(k==='LabourCertExp'||k==='HeavyLicenceExp') return false;
+  return true;
+}
 function _trDocList(v){
   var today=_trToday();
   return _TR_DOCS.map(function(D){
     var raw=v[D.k], dt=_trParse(raw);
     var days=dt?Math.round((dt-today)/86400000):null;
+    var blank=_trBlank(raw);
     return {
-      label:D.label,
+      label:D.label, k:D.k,
       no:(D.n&&v[D.n]&&v[D.n]!=='–')?v[D.n]:'',
-      raw:(raw&&raw!=='–')?raw:'',
+      raw:blank?'':raw,
       date:dt, days:days,
-      state: dt===null ? 'missing' : days<0 ? 'expired' : days<=30 ? 'soon' : 'ok'
+      state: dt!==null ? (days<0 ? 'expired' : days<=30 ? 'soon' : 'ok')
+           : blank ? (_trRequired(v,D.k) ? 'missing' : 'na')
+           : 'unreadable'
     };
   });
+}
+/* the documents that are a problem, worst first: expired, then no date / unreadable, then due soon */
+function _trDocIssues(v){
+  if(_trIsRetired(v)) return [];
+  var rank={expired:0,missing:1,unreadable:1,soon:2};
+  return _trDocList(v).filter(function(d){ return d.state in rank; })
+    .sort(function(a,b){ return rank[a.state]-rank[b.state] || (a.days===null?0:a.days)-(b.days===null?0:b.days); });
+}
+function _trHasIssue(v){ return _trDocIssues(v).length>0; }
+function _trHasExpired(v){ return _trDocIssues(v).some(function(d){ return d.state==='expired'; }); }
+function _trIssueText(d){
+  return d.state==='expired' ? 'EXPIRED '+Math.abs(d.days)+'d ago'
+       : d.state==='soon' ? (d.days===0 ? 'due today' : 'due in '+d.days+'d')
+       : d.state==='unreadable' ? 'unreadable date ("'+String(d.raw).slice(0,20)+'")'
+       : 'no date recorded';
+}
+/* Occupancy, bus by bus, for ACTIVE buses only. Riders come from the route sheet
+   (the school's own count) or, failing that, the students assigned to the route
+   or the bus. A bus with no rider data is left out of the percentage and named,
+   rather than counted as an empty bus. */
+var _trRK=function(x){ return String(x==null?'':x).toUpperCase().replace(/[^A-Z0-9]/g,'').replace(/^(ROUTE|RTE|RT|R)(?=\d)/,'').replace(/^0+/,''); };
+function _trBusRows(T,b){
+  var routes=(T.routes||[]).filter(function(r){ return r.Branch===b; });
+  var studs=(T.students||[]).filter(function(x){ return x.Branch===b; });
+  return (T.vehicles||[]).filter(function(v){ return v.Branch===b && !_trIsRetired(v); }).map(function(v){
+    var rt=routes.find(function(r){ return _trRK(r.Route)!=='' && _trRK(r.Route)===_trRK(v.RouteNo); });
+    var counted=studs.filter(function(x){ return (_trRK(x.Route)!=='' && _trRK(x.Route)===_trRK(v.RouteNo)) ||
+                                                  (_trRK(x.VehicleNo)!=='' && _trRK(x.VehicleNo)===_trRK(v.VehicleNo)); }).length;
+    var known=(rt && +rt.ActiveRiders>0) || counted>0;
+    var riders=(rt && +rt.ActiveRiders>0) ? +rt.ActiveRiders : counted;
+    var seats=(+v.Seats>0) ? +v.Seats : ((rt && +rt.Capacity>0) ? +rt.Capacity : 0);
+    return { v:v, active:_trIsActive(v), spare:_trIsSpare(v), known:known, riders:riders, seats:seats };
+  });
+}
+function _trOcc(rows){
+  var use=rows.filter(function(x){ return x.active && x.known && x.seats>0; });
+  var seats=use.reduce(function(s,x){ return s+x.seats; },0), riders=use.reduce(function(s,x){ return s+x.riders; },0);
+  return { seats:seats, riders:riders, pct: seats ? Math.round(riders/seats*100) : 0,
+           active:rows.filter(function(x){ return x.active; }).length,
+           spare:rows.filter(function(x){ return x.spare; }).length,
+           noData:rows.filter(function(x){ return x.active && !x.known; }).length };
 }
 function _trWorst(v){
   var live=_trDocList(v).filter(function(d){ return d.days!==null; });
   if(!live.length) return null;
   return live.reduce(function(a,b){ return b.days<a.days?b:a; });
 }
-function _trExpiring(v){
-  var w=_trWorst(v);
-  return !!(w && w.days<=30);
-}
+function _trExpiring(v){ return _trHasIssue(v); }
 function renderTransport(){
   const T=_trData();
   const bl=fBranch==='ALL'?'All Branches':fBranch;
@@ -9119,22 +9205,22 @@ function renderTransport(){
     ['tr-branch-occ','tr-route-occ','tr-compliance','tr-repair'].forEach(id=>{const e=document.getElementById(id); if(e)mkChart(id,{type:'bar',data:{labels:[],datasets:[]},options:{responsive:true,maintainAspectRatio:true}});});
     return;
   }
-  const seats=vehicles.reduce((s,v)=>s+(+v.Seats||0),0);
-  const routeRiders=routes.reduce((s,r)=>s+(+r.ActiveRiders||0),0);
-  const riders=routeRiders>0?routeRiders:students.length;
-  const occ=seats>0?Math.round(riders/seats*100):0;
+  /* occupancy over ACTIVE buses only — spare and sold buses carry no riders and
+     only diluted the figure */
+  const occAll=_trOcc((fBranch==='ALL'?TR_BRANCHES:[fBranch]).reduce((a,b)=>a.concat(_trBusRows(T,b)),[]));
+  const seats=occAll.seats, riders=occAll.riders, occ=occAll.pct;
   const expiring=vehicles.filter(_trExpiring).length;
   const mils=mileage.map(m=>+m.Mileage).filter(v=>!isNaN(v)&&v>0);
   const avgMil=mils.length?+(mils.reduce((a,c)=>a+c,0)/mils.length).toFixed(1):null;
 
-  setTxt('tr-veh',fi(vehicles.length));
-  setTxt('tr-veh-s',(vehicles.filter(v=>/active/i.test(v.Status)).length||vehicles.length)+' active · click to view');
+  setTxt('tr-veh',fi(vehicles.filter(v=>!_trIsRetired(v)).length));
+  setTxt('tr-veh-s',fi(occAll.active)+' active · '+fi(occAll.spare)+' spare · click to view');
   setTxt('tr-stu',fi(students.length));
   setTxt('tr-occ',occ+'%');
-  setTxt('tr-occ-s',fi(riders)+' riders ÷ '+fi(seats)+' seats');
+  setTxt('tr-occ-s',fi(riders)+' riders ÷ '+fi(seats)+' seats · active buses'+(occAll.noData?' · '+occAll.noData+' with no rider data left out':''));
   // Spare/Extra vehicles: routes named "EXTRA"/"SPARE"/"STANDBY" or vehicles not assigned to a numbered route
   // Spare vehicles: identified by Status="Spare" in the Transport_Vehicle sheet
-  const spareVehicles=vehicles.filter(v=>/^spare$/i.test(String(v.Status||'').trim()));
+  const spareVehicles=vehicles.filter(_trIsSpare);
   setTxt('tr-spare',fi(spareVehicles.length));
   setTxt('tr-spare-s',spareVehicles.length>0?spareVehicles.map(v=>v.Branch).filter((v,i,a)=>a.indexOf(v)===i).join(', ')+' · click to view':'None identified');
   window._TR_SPARE=spareVehicles;
@@ -9144,9 +9230,8 @@ function renderTransport(){
   // Branch occupancy — riders vs seats
   const scope=fBranch==='ALL'?TR_BRANCHES:[fBranch];
   const bSeats={},bRiders={};
-  scope.forEach(b=>{ bSeats[b]=(T.vehicles||[]).filter(v=>v.Branch===b).reduce((s,v)=>s+(+v.Seats||0),0);
-    const rr=(T.routes||[]).filter(r=>r.Branch===b).reduce((s,r)=>s+(+r.ActiveRiders||0),0);
-    bRiders[b]=rr>0?rr:(T.students||[]).filter(s=>s.Branch===b).length; });
+  const bOcc={};
+  scope.forEach(b=>{ const o=_trOcc(_trBusRows(T,b)); bOcc[b]=o; bSeats[b]=o.seats; bRiders[b]=o.riders; });
   const boLabels=scope.filter(b=>bSeats[b]||bRiders[b]);
   window._TR_BRANCH_OCC=boLabels;
   mkChart('tr-branch-occ',{type:'bar',data:{labels:boLabels,datasets:[
@@ -9169,10 +9254,11 @@ function renderTransport(){
       layout:{padding:{right:34}},scales:{x:{beginAtZero:true,grid:{color:'#E0E8FF'}},y:{grid:{display:false},ticks:{font:{size:10}}}}}});
 
   // Fleet compliance
-  const okC=vehicles.filter(v=>/^ok/i.test(String(v.Compliance||''))).length;
-  const expC=vehicles.filter(v=>/expir/i.test(String(v.Compliance||''))).length;
-  const otherC=vehicles.length-okC-expC;
-  mkChart('tr-compliance',{type:'doughnut',data:{labels:['OK','Expired','Other/Unknown'],
+  const liveV=vehicles.filter(v=>!_trIsRetired(v));
+  const okC=liveV.filter(v=>!_trHasIssue(v)).length;
+  const expC=liveV.filter(_trHasExpired).length;
+  const otherC=liveV.length-okC-expC;
+  mkChart('tr-compliance',{type:'doughnut',data:{labels:['OK','Expired','Due soon / no date'],
     datasets:[{data:[okC,expC,otherC],backgroundColor:['#059669','#DC2626','#CBD5E1'],borderWidth:2,borderColor:'#fff'}]},
     options:{responsive:true,maintainAspectRatio:true,cutout:'58%',onClick:(e,el)=>{if(el&&el.length){viewTransport(el[0].index===1?'expired':el[0].index===0?'okdocs':'vehicles');}},
       plugins:{legend:{position:'bottom',labels:{font:{size:10.5},usePointStyle:true,padding:10}},
@@ -9191,7 +9277,7 @@ function renderTransport(){
   const fb=document.getElementById('tr-fleet-tbody');
   if(fb){
     fb.innerHTML=boLabels.map(b=>{
-      const bv=(T.vehicles||[]).filter(v=>v.Branch===b);
+      const bo=bOcc[b]||{active:0,spare:0,noData:0};
       const s=bSeats[b], r=bRiders[b]; const o=s>0?Math.round(r/s*100):0;
       /* Riders split by type. RiderType is the only field that tells a pupil
          from a member of staff, so a blank one is counted as a student — the
@@ -9205,7 +9291,7 @@ function renderTransport(){
          which is what the row's single percentage is averaging over. */
       return `<tr style="cursor:pointer" onclick="viewTransport('occupancy','${b}')">
         <td style="padding:8px 10px;border-bottom:1px solid #F1F5F9;"><span class="bd b${b}"></span> <strong>${b}</strong></td>
-        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${fi(bv.length)}</td>
+        <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;" title="active buses (spare not counted)">${fi(bo.active)}${bo.spare?'<small style="color:#94A3B8"> +'+bo.spare+' spare</small>':''}${bo.noData?'<small style="color:#D97706;display:block">'+bo.noData+' no rider data</small>':''}</td>
         <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${fi(s)}</td>
         <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;">${fi(r)}</td>
         <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #F1F5F9;font-weight:700;color:${oc}">${o}%</td>
@@ -9490,7 +9576,7 @@ function viewTransport(kind,branch){
       .replace(/^0+/,'');
     const groups=scope.map(b=>{
       const routes=(T.routes||[]).filter(r=>r.Branch===b);
-      const rows=(T.vehicles||[]).filter(r=>r.Branch===b).map(v=>{
+      const rows=(T.vehicles||[]).filter(r=>r.Branch===b && !_trIsRetired(r)).map(v=>{
         const rt=routes.find(r=>rkey(r.Route)===rkey(v.RouteNo) && rkey(v.RouteNo)!=='');
         const counted=(T.students||[]).filter(x=>x.Branch===b && (
           (rkey(x.Route)!=='' && rkey(x.Route)===rkey(v.RouteNo)) ||
@@ -9498,16 +9584,17 @@ function viewTransport(kind,branch){
         )).length;
         const riders=(rt && +rt.ActiveRiders>0) ? +rt.ActiveRiders : counted;
         const seats=(+v.Seats>0) ? +v.Seats : ((rt && +rt.Capacity>0) ? +rt.Capacity : 0);
-        const pct=seats?Math.round(riders/seats*100):null;
+        const known=(rt && +rt.ActiveRiders>0) || counted>0, spare=_trIsSpare(v);
+        const pct=(seats && known && !spare)?Math.round(riders/seats*100):null;
         return { Branch:b, VehicleNo:v.VehicleNo||'–', RouteNo:v.RouteNo||'–', Driver:v.Driver||'–',
-          Seats:seats||'–', Riders:riders,
-          Occupancy: pct===null?'no seat count':pct+'%',
-          Spare: seats?Math.max(0,seats-riders):'–', _pct: pct===null?-1:pct };
+          Seats:seats||'–', Riders:spare?'–':(known?riders:'–'),
+          Occupancy: spare?'spare — not counted':!known?'no rider data — not counted':pct===null?'no seat count':pct+'%',
+          Spare: (seats && known && !spare)?Math.max(0,seats-riders):'–', _pct: pct===null?(spare?-3:!known?-2:-1):pct };
       }).sort((a,b2)=>b2._pct-a._pct);
       return {key:b,count:rows.length,rows:rows};
     }).filter(g=>g.count>0);
     openBranchAccordion('\uD83D\uDE8C Bus occupancy \u2014 branch by branch',
-      'Each bus, fullest first \u00b7 riders \u00f7 seats', groups, cols, 'vehicles');
+      'Each active bus, fullest first \u00b7 riders \u00f7 seats \u00b7 spare buses and buses with no rider data are not counted', groups, cols, 'vehicles');
     return;
   }
   if(kind==='vehicles'||kind==='fleet'){
@@ -9528,21 +9615,20 @@ function viewTransport(kind,branch){
   if(kind==='expiring'||kind==='expired'){
     // Per-vehicle expand dropdown showing ALL Vehicle_Master details
     const rows=(T.vehicles||[]).filter(bf)
-      .filter(kind==='expired'?(v=>{var w=_trWorst(v);return w&&w.days<0;}):_trExpiring)
-      .sort((a,b)=>{var x=_trWorst(a),y=_trWorst(b);
-        return (x?x.days:1e9)-(y?y.days:1e9);});
-    let h='<div style="font-size:12px;color:#334155;margin-bottom:10px;"><strong>'+rows.length+'</strong> vehicle(s) with documents expiring/expired. Click a vehicle to see every Vehicle_Master detail.</div>';
+      .filter(kind==='expired'?_trHasExpired:_trHasIssue)
+      .sort((a,b)=>{var x=_trDocIssues(a)[0],y=_trDocIssues(b)[0],r={expired:0,missing:1,unreadable:1,soon:2};
+        return (r[x.state]-r[y.state]) || ((x.days===null?0:x.days)-(y.days===null?0:y.days));});
+    let h='<div style="font-size:12px;color:#334155;margin-bottom:10px;"><strong>'+rows.length+'</strong> vehicle(s) with a document expired, due within 30 days, or required but not recorded. Sold / retired buses are left out; a new vehicle is not asked for Fitness, PUC or Road Tax. Click a vehicle to see every detail.</div>';
     rows.forEach((v,i)=>{
       const id='veh_'+i+'_'+Math.random().toString(36).slice(2,7);
-      const W=_trWorst(v);
-      const dcol=!W?'#94A3B8':(W.days<0?'#DC2626':W.days<=30?'#D97706':'#059669');
-      const dtxt=!W?'no dated document':(W.days<0?W.label+' expired '+Math.abs(W.days)+'d ago'
-                                                 :W.label+' due in '+W.days+'d');
+      const I=_trDocIssues(v), W=I[0];
+      const dcol=W.state==='expired'?'#DC2626':W.state==='soon'?'#D97706':'#64748B';
+      const dtxt=W.label+' — '+_trIssueText(W)+(I.length>1?' · +'+(I.length-1)+' more':'');
       h+=`<div style="border:1px solid #FECACA;border-radius:9px;margin-bottom:8px;overflow:hidden;">
         <div onclick="toggleAcc('${id}',this)" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#FEF2F2;">
           <div style="font-weight:800;font-size:13px;color:#0F172A;"><span class="acc-caret" style="color:#DC2626;margin-right:6px;">▸</span><span class="bd b${v.Branch}"></span> ${v.VehicleNo} <small style="color:#64748B;font-weight:600;">· ${v.Branch} · ${v.Category}</small></div>
           <div style="font-weight:800;font-size:12.5px;color:${dcol};text-align:right;">${dtxt}
-            <small style="color:#94A3B8;display:block;font-weight:600;">${W&&W.date?W.date.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):''}</small></div>
+            <small style="color:#94A3B8;display:block;font-weight:600;">${W.date?W.date.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):''}${_trIsSpare(v)?' · spare':''}${_trIsNew(v)?' · new vehicle':''}</small></div>
         </div>
         <div id="${id}" style="display:none;padding:12px 14px;background:#fff;">${_trDocTable(v)}${_vehicleDetailHTML(v)}</div>
       </div>`;
@@ -9551,7 +9637,7 @@ function viewTransport(kind,branch){
     return;
   }
   if(kind==='okdocs'){
-    const rows=(T.vehicles||[]).filter(bf).filter(v=>/^ok/i.test(String(v.Compliance||'')));
+    const rows=(T.vehicles||[]).filter(bf).filter(v=>!_trIsRetired(v) && !_trHasIssue(v));
     openModal('🛡️ Vehicles — Compliant',`${rows.length} vehicle(s)`,rows,_TR_VCOLS());
     return;
   }
@@ -9569,8 +9655,8 @@ function viewTransport(kind,branch){
    the problem rather than a single aggregate number. */
 function _trDocTable(v){
   var docs=_trDocList(v);
-  var C={expired:'#DC2626',soon:'#D97706',ok:'#059669',missing:'#94A3B8'};
-  var L={expired:'EXPIRED',soon:'DUE SOON',ok:'OK',missing:'NO DATE ON RECORD'};
+  var C={expired:'#DC2626',soon:'#D97706',ok:'#059669',missing:'#DC2626',unreadable:'#D97706',na:'#94A3B8'};
+  var L={expired:'EXPIRED',soon:'DUE SOON',ok:'OK',missing:'NO DATE ON RECORD',unreadable:'UNREADABLE DATE',na:'NOT REQUIRED'};
   return '<div style="font-size:11px;font-weight:800;color:#0F172A;text-transform:uppercase;'+
     'letter-spacing:.05em;margin-bottom:7px;">Document status</div>'+
     '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;">'+
@@ -18720,12 +18806,11 @@ function cgCollect(){
       return CG_MONTHS[d.getMonth()] + ' ' + d.getFullYear();
     })();
 
+    /* Sold / retired buses are not part of the fleet. The count and its
+       click-to-view list both come from _trDocIssues, so they always agree. */
     const tr = (window._TRANSPORT && window._TRANSPORT.vehicles)
-      ? window._TRANSPORT.vehicles.filter(r => r.Branch === b) : [];
-    const trExp = tr.filter(r => {
-      const d = r.DaysToExpiry;
-      return d === null || d === undefined || d === '' || cgNum(d) <= 30;
-    });
+      ? window._TRANSPORT.vehicles.filter(r => r.Branch === b && !_trIsRetired(r)) : [];
+    const trExp = tr.filter(_trHasIssue);
 
     /* Syllabus arrives with its own tab, so it is only here once that has been
        opened. Reported as unavailable rather than as zero. */
@@ -18765,10 +18850,7 @@ function cgCollect(){
       : care.filter(r => !/resolved|no concern/i.test(String(r.Status || '')));
     const obsWeak  = (ALL_TEACHER || []).filter(r => r.Branch === b &&
       !isNaN(parseFloat(r.GrandAvg)) && parseFloat(r.GrandAvg) < 3);
-    const trExpired = tr.filter(r => {
-      const d = r.DaysToExpiry;
-      return d !== null && d !== undefined && d !== '' && cgNum(d) <= 0;
-    });
+    const trExpired = tr.filter(_trHasExpired);
     const hrStale = hrOpen.filter(r => { const t = cgDate(r.PostDate); return t && (today - t) / CG_DAY > 30; });
 
     /* The vigilance CHECKLIST is a separate feed from the vigilance tracker and
@@ -18966,7 +19048,7 @@ const CG_BLOCKS = [
   { icon:'🚌', name:'Transport', cols:[
       {l:'Vehicles',           g:d=>d.tr.vehicles,                    k:'tr'},
       {l:'Docs expired',       g:d=>d.tr.expired,                     k:'tr-expired', bad:true},
-      {l:'Docs due ≤30 days',  g:d=>d.tr.expiring,                    k:'tr-exp', bad:true},
+      {l:'Docs due / missing', g:d=>d.tr.expiring,                    k:'tr-exp', bad:true},
       {l:'Compliant',          g:d=>d.tr.vehicles-d.tr.expiring,      k:'tr-ok'}
     ]},
   { icon:'🛒', name:'Purchase', cols:[
@@ -19045,7 +19127,7 @@ const CG_OPEN_COLS = [
   { i:'🔥', l:'Critical<br>still open',   get: d => d.vig.crit,    k:'vig-crit' },
   { i:'📋', l:'Checklist<br>open',        get: d => d.chk.open,    k:'chk-open' },
   { i:'💻', l:'IT assets<br>down',        get: d => d.it.down,     k:'it-down' },
-  { i:'🚌', l:'Vehicle docs<br>due ≤30d', get: d => d.tr.expiring, k:'tr-exp' },
+  { i:'🚌', l:'Vehicle docs<br>due / missing', get: d => d.tr.expiring, k:'tr-exp' },
   { i:'🛒', l:'Purchase<br>pending',      get: d => d.pur.open,    k:'pur-open' },
   { i:'👥', l:'Positions<br>open',        get: d => d.hr.open,     k:'hr-open' }
 ];
@@ -19473,33 +19555,15 @@ function cgObsCompletion(branch, d){
    of fine dates to find the one that had lapsed. Each vehicle now carries just
    its failing documents, with how overdue or how close each one is. */
 function cgVehicleDocs(branch, d, mode){
-  const DOCS = [
-    { k: 'InsuranceExp', l: 'Insurance' }, { k: 'FitnessExp', l: 'Fitness' },
-    { k: 'PermitExp', l: 'Permit' }, { k: 'PucExp', l: 'PUC' },
-    { k: 'TaxExp', l: 'Road tax' }, { k: 'LicenceExp', l: 'Driver licence' }
-  ];
-  const today = Date.now();
+  /* the same check that produced the count: _trDocIssues */
   const rows = (mode === 'expired' ? d.tr.expiredRows : d.tr.expRows).map(v => {
-    const bad = [];
-    DOCS.forEach(doc => {
-      if (!(doc.k in v)) return;
-      const raw = v[doc.k];
-      const t = cgDate(raw);
-      /* Expired ranks above missing, which ranks above falling due. */
-      if (!raw || String(raw).trim() === '' || String(raw).trim() === '\u2013') {
-        bad.push({ l: doc.l, txt: 'no date recorded', days: 0.5 }); return;
-      }
-      if (t === null) { bad.push({ l: doc.l, txt: 'unreadable date', days: 0.5 }); return; }
-      const days = Math.round((t - today) / CG_DAY);
-      if (days <= 0) bad.push({ l: doc.l, txt: 'EXPIRED ' + Math.abs(days) + 'd ago', days: days });
-      else if (days <= 30) bad.push({ l: doc.l, txt: 'due in ' + days + 'd', days: days });
-    });
-    bad.sort((a, b) => a.days - b.days);
+    const bad = _trDocIssues(v).filter(x => mode !== 'expired' || x.state === 'expired');
     return {
       Branch: v.Branch, VehicleNo: v.VehicleNo, RouteNo: v.RouteNo, Driver: v.Driver,
+      Status: (_trStatus(v) || 'Active') + (_trIsNew(v) ? ' · new' : ''),
       Problems: bad.length,
-      Detail: bad.length ? bad.map(x => x.l + ' \u2014 ' + x.txt).join('  ·  ') : 'no document issue found',
-      Worst: bad.length ? bad[0].days : null
+      Detail: bad.map(x => x.label + ' \u2014 ' + _trIssueText(x)).join('  \u00b7  '),
+      Worst: bad.length ? ({expired:0,missing:1,unreadable:1,soon:2}[bad[0].state] * 10000 + (bad[0].days || 0)) : null
     };
   }).sort((a, b) => (a.Worst === null ? 1 : b.Worst === null ? -1 : a.Worst - b.Worst));
 
@@ -19507,13 +19571,13 @@ function cgVehicleDocs(branch, d, mode){
     (mode === 'expired' ? 'Vehicle documents already expired' : 'Vehicle documents due or missing'),
     rows.length + ' vehicle' + (rows.length === 1 ? '' : 's') + ' \u00b7 only the failing documents are listed',
     rows,
-    [{key:'VehicleNo',label:'Vehicle'},{key:'RouteNo',label:'Route'},{key:'Driver',label:'Driver'},
+    [{key:'VehicleNo',label:'Vehicle'},{key:'RouteNo',label:'Route'},{key:'Driver',label:'Driver'},{key:'Status',label:'Status'},
      {key:'Problems',label:'Issues'},{key:'Detail',label:'What is wrong',maxW:'420px'}],
     { expr: mode === 'expired'
         ? 'documents whose expiry date has already passed'
         : 'documents expiring within 30 days, already expired, or with no date recorded',
       work: rows.length + ' of ' + d.tr.vehicles + ' vehicles at this branch',
-      note: 'A document with no date recorded counts as a problem, not as unknown \u2014 an unrecorded expiry is the one most likely to have lapsed.' });
+      note: 'A REQUIRED document with no date recorded counts as a problem. Sold / retired buses are left out. A new vehicle is not asked for Fitness, PUC or Road Tax; a permit marked N/R is not expected; driver licence and labour certificate are checked when a date is recorded.' });
 }
 
 /* The index, spelled out — every department that fed it and its weight. */
