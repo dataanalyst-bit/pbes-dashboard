@@ -2036,6 +2036,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   </div>
 
   <div class="card" style="margin-bottom:16px;"><div class="ch">
+      <h3>&#127902; Monitoring points &mdash; one at a time</h3>
+      <span class="fnote">All 17 points as slides. Each shows every branch side by side; the green button opens the
+        full branch-wise comparison of every column in the sheet. Arrow keys move between points.</span></div>
+    <div class="cb-0" id="admp-slides"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;"><div class="ch">
       <h3>&#128269; Every point, every branch</h3>
       <span class="fnote">The same reading, point by point. Darker red is further behind. Click a cell to see exactly
         which words produced the figure.</span></div>
@@ -2420,8 +2427,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div>Reading the civil work register…<br><span>Civil · every branch</span></div></div>
 
     <div id="cv-body" style="display:none;flex-direction:column;gap:16px">
-
-      <!-- KPI strip removed on request -->
 
       <div class="au-sec">
         <h3>Branch scorecard</h3>
@@ -10687,12 +10692,29 @@ var ADMPNLP = (function () {
 
   /* ── 6. numbers that carry evidence ──────────────────────────────────── */
   var DOING = /(visited|contacted|covered|conducted|collected|completed|signed|tied up|met)\s+(?:with\s+)?(\d{1,4})\b/g;
+  /* A count is written either way round in this sheet: "Visited 10 nearby
+     schools", but also "Out of 17, 6 pre school have signed the MOU" and
+     "6 of 30 completed". Reading only the first shape scored Gowdavalli's
+     six signed MOUs as if the whole point were finished. */
+  var OUTOF = /\bout of\s+(\d{1,4})\s*[,:\-]?\s*(\d{1,4})\b/;
+  var RATIO = /\b(\d{1,4})\s*(?:\/|\s+of\s+|\s+out of\s+)\s*(\d{1,4})\b/;
+  var PREVERB = /\b(\d{1,4})\s+[a-z'\- ]{0,26}?\b(signed|visited|contacted|completed|covered|conducted|tied up|met)\b/g;
+  function clauseRatio(t) {
+    var m = t.match(OUTOF);
+    if (m) { var den = +m[1], num = +m[2]; if (den > 0 && num <= den) return num / den; }
+    m = t.match(RATIO);
+    if (m) { var a = +m[1], b = +m[2]; if (b > 0 && a <= b) return a / b; }
+    return null;
+  }
   var FOUND = /(identified|shortlisted|listed|mapped)\s+(?:about\s+)?(\d{1,4})\b/g;
   var BARE  = /\b(\d{1,4})\s+(?:nearby\s+)?(schools|preschools|pre schools|communities|societies|enquiries|leads|parents)\b/g;
   function numbers(text, target) {
     var out = { done: null, found: null, ratio: null, basis: '' };
     var m;
     DOING.lastIndex = 0; while ((m = DOING.exec(text))) out.done = Math.max(out.done || 0, +m[2]);
+    PREVERB.lastIndex = 0; while ((m = PREVERB.exec(text))) out.done = Math.max(out.done || 0, +m[1]);
+    var ex = text.match(OUTOF);
+    if (ex && +ex[1] > 0 && +ex[2] <= +ex[1]) { out.done = Math.max(out.done || 0, +ex[2]); out.stated = +ex[1]; }
     FOUND.lastIndex = 0; while ((m = FOUND.exec(text))) out.found = Math.max(out.found || 0, +m[2]);
     if (out.done === null) { BARE.lastIndex = 0; while ((m = BARE.exec(text))) {
       /* a bare count only counts as work done when the clause also says it was done */
@@ -10700,11 +10722,12 @@ var ADMPNLP = (function () {
     } }
     var t = parseFloat(String(target == null ? '' : target).replace(/[^0-9.]/g, ''));
     if (!isFinite(t) || t <= 0) t = null;
-    /* the denominator: the stated target, else what the branch says it found */
-    var den = t || out.found;
+    /* the denominator: the stated target first, then one the sentence states
+       itself, then whatever the branch says it identified */
+    var den = t || out.stated || out.found;
     if (out.done !== null && den) {
       out.ratio = Math.max(0, Math.min(1, out.done / den));
-      out.basis = out.done + ' of ' + den + (t ? ' (target)' : ' (identified)');
+      out.basis = out.done + ' of ' + den + (t ? ' (target)' : out.stated ? ' (stated in the text)' : ' (identified)');
     } else if (out.done === null && out.found !== null && den) {
       /* identification alone is groundwork, worth a third of the way */
       out.ratio = Math.min(1, (out.found / den)) * 0.35;
@@ -10753,6 +10776,10 @@ var ADMPNLP = (function () {
         }
       });
       if (!found.length) return;                       // a clause with no cue says nothing
+      /* A clause that counts itself is scored by its own count: "Out of 17, 6
+         pre school have signed" is 35% of that point, not the 100% the word
+         "signed" would otherwise carry. */
+      var cr = clauseRatio(t);
       /* future tense demotes only what follows the marker */
       var spans = futureSpans(t);
       found.forEach(function (f) {
@@ -10761,7 +10788,8 @@ var ADMPNLP = (function () {
         }
         if (!best || f.w > best.w) best = f;
       });
-      scored.push(best.w);
+      scored.push(cr !== null ? Math.min(best.w, Math.max(cr, 0.1)) : best.w);
+      if (cr !== null && best.w > cr) best.cappedBy = cr;
       hits = hits.concat(found);
     });
 
@@ -10819,7 +10847,14 @@ var ADMPNLP = (function () {
     conf = Math.min(1, conf);
 
     var strongest = hits.reduce(function (a, b) { return (!a || b.w > a.w) ? b : a; }, null);
-    return { pct: Math.round(base * 100), conf: conf, stage: strongest ? strongest.stage : 'none',
+    var stage = strongest ? strongest.stage : 'none';
+    /* The label must agree with the figure. "Out of 17, 6 signed" has its
+       strongest word at "signed", but the count brought the row down to 45% —
+       calling that "finished" would contradict the number beside it. */
+    if ((stage === 'done' || stage === 'strong') && base < 0.65)
+      stage = base >= 0.45 ? 'active' : base >= 0.30 ? 'groundwork' : 'planned';
+    if (stage === 'done' && anyBlocked) stage = 'strong';
+    return { pct: Math.round(base * 100), conf: conf, stage: stage,
              hits: hits, nums: nums, raw: raw, clauses: cl, why: why };
   }
 
@@ -11163,8 +11198,232 @@ function admpBranchDetail(branch){
 }
 
 
+
+/* ══════════════ THE 17 POINTS, ONE SLIDE AT A TIME ══════════════
+   One slide per monitoring point, with every branch on it side by side, and a
+   full record comparison a click away. Arrow keys work while the tab is open. */
+var _ADMP_SLIDE = 0;
+
+function admpPoints(){
+  var rows = _admpRowsAll(), pts = [];
+  rows.forEach(function (r){
+    var n = parseInt(r.SNo, 10), key = isNaN(n) ? r.Point : n;
+    var p = pts.find(function (x){ return x.key === key; });
+    if (!p) pts.push({ key: key, no: isNaN(n) ? 99 : n, name: r.Point, what: r.What || '', rows: [r] });
+    else { p.rows.push(r); if (!p.what && r.What) p.what = r.What; }
+  });
+  pts.sort(function (a, b){ return a.no - b.no; });
+  return pts;
+}
+function _admpBranchOrder(list){
+  var ORDER = ['Bachupally', 'Boduppal', 'Gowdavalli', 'Keesara', 'Pocharam'], seen = {};
+  list.forEach(function (r){ seen[r.Branch] = 1; });
+  return ORDER.filter(function (b){ return seen[b]; })
+    .concat(Object.keys(seen).filter(function (b){ return ORDER.indexOf(b) < 0; }).sort());
+}
+
+function admpSlideGo(d){
+  var pts = admpPoints();
+  if (!pts.length) return;
+  _ADMP_SLIDE = (_ADMP_SLIDE + d + pts.length) % pts.length;
+  renderAdmpSlides();
+}
+function admpSlideSet(i){ _ADMP_SLIDE = i; renderAdmpSlides(); }
+
+function renderAdmpSlides(){
+  var host = document.getElementById('admp-slides');
+  if (!host) return;
+  if (typeof ADMPNLP === 'undefined'){ host.innerHTML = ''; return; }
+  var rows = _admpRowsAll();
+  if (!rows.length){ host.innerHTML = '<div style="padding:18px;color:#64748B;font-size:13px">No Admission Process rows.</div>'; return; }
+  if (!Object.keys(_ADMP_SCORE).length) admpScored();
+
+  var pts = admpPoints();
+  if (_ADMP_SLIDE >= pts.length) _ADMP_SLIDE = 0;
+  var p = pts[_ADMP_SLIDE];
+  var mine = p.rows.slice();
+  if (typeof fBranch !== 'undefined' && fBranch !== 'ALL') mine = mine.filter(function (r){ return r.Branch === fBranch; });
+  var branches = _admpBranchOrder(mine);
+
+  var S = function (r){ return _ADMP_SCORE[r.__k] || ADMPNLP.scoreRow(r); };
+  var vals = mine.map(function (r){ return S(r).pct; });
+  var avg = vals.length ? Math.round(vals.reduce(function (a, b){ return a + b; }, 0) / vals.length) : null;
+  var best = null, worst = null;
+  mine.forEach(function (r){
+    var v = S(r).pct;
+    if (!best || v > S(best).pct) best = r;
+    if (!worst || v < S(worst).pct) worst = r;
+  });
+
+  /* each branch's line on this slide */
+  var lines = branches.map(function (b){
+    var r = mine.find(function (x){ return x.Branch === b; });
+    var s = S(r), t = ((r.Next && r.Next !== '\u2013' ? r.Next : '') + ' ' +
+                       (r.Remarks && r.Remarks !== '\u2013' ? r.Remarks : '')).replace(/\s+/g, ' ').trim();
+    return '<div style="display:grid;grid-template-columns:132px 54px 1fr;gap:10px;align-items:center;padding:9px 0;' +
+      'border-bottom:1px solid #F1F5F9;cursor:pointer" onclick="admpExplain(\'' + String(r.__k).replace(/'/g, "\\'") + '\')">' +
+      '<div style="font-weight:700;font-size:12.5px"><span class="bd b' + b + '"></span> ' + b +
+        '<div style="font-size:10px;font-weight:600;color:' + ADMPNLP.STAGE_COLOR[s.raw ? s.stage : 'none'] + '">' +
+        (s.raw ? ADMPNLP.STAGE_LABEL[s.stage] : 'nothing written') + '</div></div>' +
+      '<div style="font-size:16px;font-weight:800;text-align:right;color:' + _admpPctColor(s.pct) + '">' + s.pct + '%</div>' +
+      '<div><div style="height:8px;background:#EEF2F7;border-radius:4px;overflow:hidden">' +
+        '<i style="display:block;height:8px;width:' + Math.max(1, s.pct) + '%;background:' + _admpPctColor(s.pct) + '"></i></div>' +
+        '<div style="font-size:11px;color:#64748B;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
+        (t ? _admpEsc(t) : '<i style="color:#CBD5E1">nothing written against this point</i>') + '</div></div></div>';
+  }).join('');
+
+  /* the dots: colour each by how the group is doing on that point */
+  var dots = pts.map(function (q, i){
+    var vs = q.rows.map(function (r){ return S(r).pct; });
+    var a = vs.length ? Math.round(vs.reduce(function (x, y){ return x + y; }, 0) / vs.length) : 0;
+    return '<button type="button" onclick="admpSlideSet(' + i + ')" title="' + _admpEsc((q.no === 99 ? '' : q.no + '. ') + q.name) +
+      ' \u2014 ' + a + '%" style="width:' + (i === _ADMP_SLIDE ? 26 : 11) + 'px;height:11px;border-radius:6px;border:0;' +
+      'cursor:pointer;padding:0;margin:0 3px 0 0;background:' + _admpPctColor(a) +
+      ';opacity:' + (i === _ADMP_SLIDE ? 1 : 0.42) + '"></button>';
+  }).join('');
+
+  host.innerHTML =
+    '<div style="padding:14px 16px 16px">' +
+      /* header */
+      '<div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;justify-content:space-between">' +
+        '<div style="min-width:280px;flex:1">' +
+          '<div style="font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#94A3B8">' +
+            'Point ' + (_ADMP_SLIDE + 1) + ' of ' + pts.length + '</div>' +
+          '<div style="font-size:19px;font-weight:800;color:#0F172A;margin-top:2px">' +
+            (p.no === 99 ? '' : p.no + '. ') + _admpEsc(p.name) + '</div>' +
+          (p.what ? '<div style="font-size:12px;color:#64748B;margin-top:3px;max-width:62ch">' + _admpEsc(p.what) + '</div>' : '') +
+        '</div>' +
+        '<div style="text-align:right">' +
+          '<div style="font-size:34px;font-weight:800;line-height:1;color:' + _admpPctColor(avg) + '">' +
+            (avg === null ? '\u2013' : avg + '%') + '</div>' +
+          '<div style="font-size:11px;color:#94A3B8">across ' + branches.length + ' branch' +
+            (branches.length === 1 ? '' : 'es') + '</div></div>' +
+      '</div>' +
+
+      /* branch lines */
+      '<div style="margin-top:12px">' + lines + '</div>' +
+
+      /* where it stands */
+      (branches.length > 1 && best && worst && S(best).pct !== S(worst).pct
+        ? '<div style="margin-top:11px;font-size:12.5px;color:#334155;background:#F8FAFF;border:1px solid #E0E8FF;' +
+          'border-radius:8px;padding:9px 12px"><b>' + best.Branch + '</b> is furthest ahead at ' + S(best).pct +
+          '%, <b>' + worst.Branch + '</b> furthest behind at ' + S(worst).pct + '%.</div>' : '') +
+
+      /* controls */
+      '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px">' +
+        '<button type="button" onclick="admpSlideGo(-1)" style="border:1px solid #E2E8F0;background:#fff;border-radius:8px;' +
+          'padding:7px 13px;cursor:pointer;font-size:13px;font-weight:700">&#8249; Previous</button>' +
+        '<button type="button" onclick="admpSlideGo(1)" style="border:1px solid #E2E8F0;background:#fff;border-radius:8px;' +
+          'padding:7px 13px;cursor:pointer;font-size:13px;font-weight:700">Next &#8250;</button>' +
+        '<button type="button" onclick="admpPointCompare(' + JSON.stringify(String(p.key)) + ')" ' +
+          'style="border:0;background:#0B4D2C;color:#fff;border-radius:8px;padding:7px 15px;cursor:pointer;' +
+          'font-size:13px;font-weight:700">&#128202; Branch-wise comparison &mdash; every field</button>' +
+        '<span style="flex:1"></span>' +
+        '<div style="display:flex;align-items:center">' + dots + '</div>' +
+      '</div>' +
+      '<div class="fnote" style="display:block;padding-top:9px">Arrow keys move between points while this tab is open. ' +
+        'A branch line opens the wording behind its figure; the green button compares every column of the sheet, ' +
+        'branch against branch.</div>' +
+    '</div>';
+}
+
+/* ── every field of one point, branch against branch ───────────────────── */
+function admpPointCompare(key){
+  var pts = admpPoints();
+  var p = pts.find(function (x){ return String(x.key) === String(key); });
+  if (!p) return;
+  var mine = p.rows.slice();
+  if (typeof fBranch !== 'undefined' && fBranch !== 'ALL') mine = mine.filter(function (r){ return r.Branch === fBranch; });
+  var branches = _admpBranchOrder(mine);
+  var S = function (r){ return _ADMP_SCORE[r.__k] || ADMPNLP.scoreRow(r); };
+  var get = function (b){ return mine.find(function (r){ return r.Branch === b; }); };
+
+  var cellTxt = function (v, wrap){
+    var t = (v == null || v === '' || v === '\u2013') ? '' : String(v);
+    if (!t) return '<span style="color:#CBD5E1">\u2014</span>';
+    return wrap ? '<div style="white-space:pre-wrap;line-height:1.6">' + _admpEsc(t) + '</div>' : _admpEsc(t);
+  };
+  var statusPill = function (v){
+    var t = String(v || '').trim();
+    var c = /^completed$/i.test(t) ? '#059669' : /progress/i.test(t) ? '#2563EB' : /not started/i.test(t) ? '#DC2626' : '#64748B';
+    return t ? '<span style="background:' + c + '1a;color:' + c + ';font-weight:700;border-radius:999px;' +
+      'padding:2px 10px;font-size:11.5px">' + _admpEsc(t) + '</span>' : '<span style="color:#CBD5E1">\u2014</span>';
+  };
+
+  /* fields down the side, branches across — a true side-by-side read */
+  var FIELDS = [
+    { l: 'Progress read from the text', f: function (r){ var s = S(r);
+        return '<div style="font-size:19px;font-weight:800;color:' + _admpPctColor(s.pct) + '">' + s.pct + '%</div>' +
+          '<div style="font-size:11px;font-weight:700;color:' + ADMPNLP.STAGE_COLOR[s.raw ? s.stage : 'none'] + '">' +
+          (s.raw ? ADMPNLP.STAGE_LABEL[s.stage] : 'nothing written') + '</div>' +
+          '<div style="font-size:10.5px;color:#94A3B8">confidence ' + Math.round(s.conf * 100) + '%</div>'; } },
+    { l: 'Current status', f: function (r){ return statusPill(r.Status); } },
+    { l: 'Target', f: function (r){ return cellTxt(r.Target); } },
+    { l: 'Actual / count', f: function (r){ return cellTxt(r.Actual); } },
+    { l: 'Progress % on the sheet', f: function (r){
+        var v = parseFloat(String(r.Progress == null ? '' : r.Progress).replace(/[^0-9.\-]/g, ''));
+        if (!isFinite(v)) return cellTxt(r.Progress);
+        var odd = v > 100;
+        return '<span style="font-weight:700;color:' + (odd ? '#DC2626' : '#334155') + '">' + v + '%</span>' +
+          (odd ? '<div style="font-size:10.5px;color:#DC2626">above 100 \u2014 the formula is counting against a blank target</div>' : ''); } },
+    { l: 'Owner / counsellor', f: function (r){ return cellTxt(r.Owner); } },
+    { l: 'Due date', f: function (r){ return cellTxt(r.Due); } },
+    { l: 'Last updated', f: function (r){ return cellTxt(r.Updated); } },
+    { l: 'Priority', f: function (r){ return cellTxt(r.Priority); } },
+    { l: 'Next action / follow-up', f: function (r){ return cellTxt(r.Next, true); }, tall: true },
+    { l: 'Remarks / evidence', f: function (r){ return cellTxt(r.Remarks, true); }, tall: true },
+    { l: 'Management support required', f: function (r){ return cellTxt(r.Support, true); }, tall: true }
+  ];
+
+  var html = '<div style="padding:12px 16px 16px">' +
+    (p.what ? '<p style="font-size:12.5px;color:#64748B;margin:0 0 11px;max-width:80ch"><b>What to update:</b> ' +
+      _admpEsc(p.what) + '</p>' : '') +
+    '<div style="overflow-x:auto"><table class="dt brfz" style="min-width:' + (190 + branches.length * 210) + 'px">' +
+    '<thead><tr><th style="text-align:left;min-width:180px">Field</th>' +
+    branches.map(function (b){
+      var r = get(b), s = S(r);
+      return '<th style="text-align:left;min-width:200px"><span class="bd b' + b + '"></span> ' + b +
+        '<div style="font-size:10.5px;font-weight:700;color:' + _admpPctColor(s.pct) + '">' + s.pct + '%</div></th>';
+    }).join('') + '</tr></thead><tbody>' +
+    FIELDS.map(function (F){
+      return '<tr><td style="text-align:left;font-weight:700;color:#475569;vertical-align:top">' + F.l + '</td>' +
+        branches.map(function (b){
+          return '<td style="text-align:left;vertical-align:top;font-size:12.5px' +
+            (F.tall ? ';max-width:320px' : '') + '">' + F.f(get(b)) + '</td>';
+        }).join('') + '</tr>';
+    }).join('') + '</tbody></table></div>' +
+    '<div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:12px">' +
+      branches.map(function (b){
+        var r = get(b);
+        return '<button type="button" onclick="admpExplain(\'' + String(r.__k).replace(/'/g, "\\'") + '\')" ' +
+          'style="border:1px solid #E2E8F0;background:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;' +
+          'font-size:12px;font-weight:700">Why ' + b + ' reads ' + S(r).pct + '%</button>';
+      }).join('') + '</div>' +
+    '<p style="color:#64748B;font-size:11.5px;line-height:1.6;margin-top:11px">Every column of the Admission Process ' +
+      'sheet for this one point, branch against branch. The top row is the reading taken from the two text columns; the ' +
+      'sheet&rsquo;s own Progress % is shown underneath it for comparison, and flagged where it exceeds 100%.</p></div>';
+
+  var vals = mine.map(function (r){ return S(r).pct; });
+  var avg = vals.length ? Math.round(vals.reduce(function (a, b){ return a + b; }, 0) / vals.length) : 0;
+  openHTMLModal('\uD83D\uDCCA ' + (p.no === 99 ? '' : p.no + '. ') + p.name,
+    'Branch-wise comparison \u00b7 ' + avg + '% across ' + branches.length + ' branch' + (branches.length === 1 ? '' : 'es'),
+    html);
+}
+
+/* arrow keys, only while the Admission Process tab is on screen and no modal is open */
+document.addEventListener('keydown', function (e){
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  var pane = document.getElementById('pane-admp');
+  if (!pane || !pane.offsetParent) return;
+  var ov = document.getElementById('drill-modal');
+  if (ov && ov.style.display !== 'none' && ov.offsetParent) return;   // a drill-down is open: leave the keys to it
+  var tag = (e.target && e.target.tagName) || '';
+  if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
+  admpSlideGo(e.key === 'ArrowRight' ? 1 : -1);
+});
+
 function renderAdmProcess(){
-  try { renderAdmpProgress(); } catch(e){ console.error('admp text analysis:', e && e.message); }
+  try { renderAdmpProgress(); renderAdmpSlides(); } catch(e){ console.error('admp text analysis:', e && e.message); }
   const rows = admpRows();
   const host = document.getElementById('admp-matrix');
   const meta = document.getElementById('admp-meta');
@@ -17982,8 +18241,627 @@ function _cvShow(ok){
   if(l) l.classList.toggle('hide',!!ok);
   if(b) b.style.display=ok?'flex':'none';
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CIVIL WORK — BRANCH-WISE ANALYSIS
+
+   The Civil sheet has been through two layouts: the tracker one (Work ID,
+   Project / Task, Work Status, Timeline Health …) and the shorter one now in
+   the workbook (Project, Owner, Status, Delay (days), No. of labour …). Both
+   are read, because a dashboard that breaks when a column is renamed is a
+   dashboard nobody trusts. Every field below is resolved by a list of names and
+   is allowed to be missing; whatever is absent is reported rather than guessed.
+   ══════════════════════════════════════════════════════════════════════════ */
+var CVX = (function () {
+  var raw = null, rows = [], C = {}, hdr = [];
+
+  function nh(v){ return String(v == null ? '' : v).toLowerCase().replace(/[^a-z0-9]/g, ''); }
+  function pick(names){
+    for (var i = 0; i < names.length; i++){
+      var k = nh(names[i]), j = hdr.indexOf(k);
+      if (j >= 0) return j;
+    }
+    for (var a = 0; a < names.length; a++){
+      var kk = nh(names[a]);
+      for (var b = 0; b < hdr.length; b++)
+        if (hdr[b] && (hdr[b].indexOf(kk) === 0 || kk.indexOf(hdr[b]) === 0)) return b;
+    }
+    return -1;
+  }
+  var CLEAN = function (v){
+    var t = String(v == null ? '' : v).trim();
+    return (!t || t === '\u2013' || t === '-' || /^(null|nan|undefined|#n\/a)$/i.test(t)) ? '' : t;
+  };
+  var NUM = function (v){ var n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isFinite(n) ? n : null; };
+  var ISO = function (v){
+    var t = CLEAN(v); if (!t) return '';
+    var m = t.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return m[0];
+    m = t.match(/^(\d{1,2})[-\/ ]([A-Za-z]{3,})[-\/ ](\d{4})$/);           // 20-Mar-2026
+    var MON = { jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12' };
+    if (m && MON[m[2].slice(0,3).toLowerCase()]) return m[3] + '-' + MON[m[2].slice(0,3).toLowerCase()] + '-' + ('0'+m[1]).slice(-2);
+    m = t.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);                   // 25/09/2026 (day first)
+    if (m) return m[3] + '-' + ('0'+m[2]).slice(-2) + '-' + ('0'+m[1]).slice(-2);
+    var d = new Date(t); return isNaN(d) ? '' : d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2);
+  };
+  function today(){ var d = new Date(); return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2); }
+  function days(a, b){ return Math.round((Date.parse(b + 'T00:00:00') - Date.parse(a + 'T00:00:00')) / 86400000); }
+
+  /* one row, normalised, whichever layout it came from */
+  function build(tab){
+    hdr = (tab.hdr || []).map(nh);
+    C = {
+      id:       pick(['Work ID', 'ID', 'S.No']),
+      branch:   pick(['Branch']),
+      project:  pick(['Project / Task', 'Project', 'Project Task']),
+      sub:      pick(['Subtask', 'Sub task', 'Sub-task']),
+      desc:     pick(['Work Description', 'Description', 'Work']),
+      cat:      pick(['Work Category', 'Category']),
+      loc:      pick(['Location', 'Area']),
+      pri:      pick(['Priority']),
+      stage:    pick(['Work Stage', 'Stage']),
+      owner:    pick(['Responsible Person', 'Owner', 'Raised By']),
+      assigned: pick(['Assigned To', 'Assigned to', 'Contractor']),
+      material: pick(['Material Status', 'Material status', 'Material']),
+      labour:   pick(['No. of labour', 'No of labour', 'Labour count', 'Labour']),
+      ndays:    pick(['No of days', 'No. of days', 'Days Open', 'Days']),
+      cost:     pick(['Estimated Cost (₹)', 'Estimated Cost', 'Cost']),
+      start:    pick(['Start Date', 'Start date']),
+      target:   pick(['Target Date', 'Target date']),
+      done:     pick(['Completion Date', 'Completion date']),
+      status:   pick(['Work Status', 'Status']),
+      prog:     pick(['Progress %', 'Progress']),
+      delay:    pick(['Delay Days', 'Delay (days)', 'Delay days', 'Delay']),
+      why:      pick(['Delay Reason', 'Reason']),
+      remarks:  pick(['Remarks', 'Remark', 'Remarks / Evidence']),
+      health:   pick(['Timeline Health', 'Health']),
+      req:      pick(['Request Date', 'Raised on'])
+    };
+    var T = today();
+    var get = function (r, k){ return C[k] >= 0 ? CLEAN(r[C[k]]) : ''; };
+    rows = (tab.rows || []).map(function (r, i){
+      var o = {
+        _i: i,
+        id: get(r,'id'), branch: get(r,'branch'), project: get(r,'project') || '(not set)',
+        sub: get(r,'sub'), desc: get(r,'desc'), cat: get(r,'cat') || 'Civil',
+        loc: get(r,'loc'), pri: get(r,'pri') || 'None', stage: get(r,'stage'),
+        owner: get(r,'owner'), assigned: get(r,'assigned'), material: get(r,'material'),
+        labour: C.labour >= 0 ? NUM(r[C.labour]) : null,
+        ndays: C.ndays >= 0 ? NUM(r[C.ndays]) : null,
+        cost: C.cost >= 0 ? NUM(r[C.cost]) : null,
+        start: ISO(get(r,'start')), target: ISO(get(r,'target')), done: ISO(get(r,'done')),
+        statusRaw: get(r,'status'), why: get(r,'why'), remarks: get(r,'remarks'),
+        health: get(r,'health'), req: ISO(get(r,'req'))
+      };
+      var p = C.prog >= 0 ? NUM(r[C.prog]) : null;
+      o.prog = p === null ? null : (p <= 1 ? Math.round(p * 100) : Math.round(p));   // 0-1 and 0-100 both appear
+      /* one status vocabulary, whichever word the sheet used */
+      var s = o.statusRaw.toLowerCase();
+      o.status = /complet|done|closed|finish/.test(s) ? 'Completed'
+               : /cancel|drop|not required/.test(s) ? 'Cancelled'
+               : /progress|ongoing|execution|wip/.test(s) ? 'In Progress'
+               : /hold/.test(s) ? 'On Hold'
+               : s ? 'Pending' : 'Not set';
+      o.open = (o.status !== 'Completed' && o.status !== 'Cancelled');
+      /* delay: the sheet's own number when it has one, else measured from the dates */
+      var dd = C.delay >= 0 ? NUM(r[C.delay]) : null;
+      if (dd === null && o.target){
+        if (o.done) dd = days(o.target, o.done);
+        else if (o.open) dd = days(o.target, T);
+      }
+      o.delay = dd;
+      o.late = o.open && o.target && o.target < T;
+      o.lateBy = o.late ? days(o.target, T) : (o.done && o.target && o.done > o.target ? days(o.target, o.done) : 0);
+      o.ageDays = o.ndays !== null ? o.ndays : (o.start ? days(o.start, o.done || T) : null);
+      o.notStarted = o.open && !o.start;
+      return o;
+    }).filter(function (o){ return o.branch || o.project !== '(not set)' || o.sub || o.desc; });
+    return rows;
+  }
+
+  function load(r){ raw = r; if (r && r.civil) build(r.civil); return rows; }
+  function all(){ return rows; }
+  function cols(){ return C; }
+  function has(k){ return C[k] >= 0; }
+  function branches(){
+    var ORDER = ['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam'], seen = {};
+    rows.forEach(function (r){ if (r.branch) seen[r.branch] = 1; });
+    return ORDER.filter(function (b){ return seen[b]; })
+      .concat(Object.keys(seen).filter(function (b){ return ORDER.indexOf(b) < 0; }).sort());
+  }
+  return { load: load, all: all, cols: cols, has: has, branches: branches,
+           iso: ISO, num: NUM, clean: CLEAN, today: today, days: days };
+})();
+
+/* ── shared helpers for the panels ─────────────────────────────────────── */
+function _cvEsc(v){
+  return String(v == null ? '' : v).replace(/[&<>"']/g, function (c){
+    return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]; });
+}
+var CV_STATUS_COLOR = { 'Completed':'#059669', 'In Progress':'#2563EB', 'Pending':'#D97706',
+                        'On Hold':'#7C3AED', 'Cancelled':'#94A3B8', 'Not set':'#CBD5E1' };
+var CV_PRI_COLOR = { 'Urgent':'#B91C1C', 'High':'#DC2626', 'Medium':'#D97706', 'Low':'#059669', 'None':'#94A3B8' };
+function _cvPct(d, t){ return t ? Math.round(d / t * 100) : null; }
+function _cvPctColor(p){ return p === null ? '#94A3B8' : p >= 80 ? '#059669' : p >= 60 ? '#15803D' : p >= 40 ? '#D97706' : '#DC2626'; }
+var _CV_SCOPE = [];     // rows behind whatever was clicked last
+
+/* the record table used by every click-through on this tab */
+function cvOpenRows(title, sub, list, fx){
+  var C = CVX.cols();
+  var cols = [
+    { key:'branch', label:'Branch' },
+    { key:'project', label:'Project' },
+    { key:'sub', label:'Subtask', maxW:'170px' },
+    { key:'desc', label:'Work', maxW:'240px' },
+    { key:'loc', label:'Location' },
+    { key:'status', label:'Status', pill:true },
+    { key:'pri', label:'Priority', pill:true },
+    { key:'owner', label:'Owner' },
+    { key:'assigned', label:'Assigned to' },
+    { key:'start', label:'Start', date:true },
+    { key:'target', label:'Target', date:true },
+    { key:'done', label:'Completed', date:true },
+    { key:'lateBy', label:'Days late' },
+    { key:'labour', label:'Labour' },
+    { key:'material', label:'Material' },
+    { key:'remarks', label:'Remarks', maxW:'280px' }
+  ].filter(function (c){
+    if (c.key === 'labour') return C.labour >= 0;
+    if (c.key === 'material') return C.material >= 0;
+    if (c.key === 'loc') return C.loc >= 0;
+    if (c.key === 'desc') return C.desc >= 0;
+    if (c.key === 'owner') return C.owner >= 0;
+    return true;
+  });
+  var rows = list.map(function (r){
+    var o = {};
+    cols.forEach(function (c){ o[c.key] = (r[c.key] === null || r[c.key] === '') ? '\u2013' : r[c.key]; });
+    return o;
+  });
+  openModal(title, sub, rows, cols, fx);
+}
+
+/* ══════════════ 1. KPI STRIP — every tile opens its records ══════════════ */
+function cvRenderKpis(){
+  var host = document.getElementById('cv-kpis'); if (!host) return;
+  var R = CVX.all(), C = CVX.cols();
+  var done = R.filter(function (r){ return r.status === 'Completed'; });
+  var open = R.filter(function (r){ return r.open; });
+  var late = R.filter(function (r){ return r.late; });
+  var notSt = R.filter(function (r){ return r.notStarted; });
+  var urgent = open.filter(function (r){ return /urgent|high/i.test(r.pri); });
+  var matBlock = R.filter(function (r){ return r.open && /pending|ordered/i.test(r.material); });
+  var lateDays = late.map(function (r){ return r.lateBy; }).filter(function (v){ return v > 0; });
+  var avgLate = lateDays.length ? Math.round(lateDays.reduce(function (a,b){ return a+b; },0) / lateDays.length) : 0;
+  var labour = R.reduce(function (a,r){ return a + (r.labour || 0); }, 0);
+
+  var K = [
+    { l:'Works logged', v:R.length, s:CVX.branches().length + ' branches', c:'#1E293B', k:'all' },
+    { l:'Completed', v:done.length, s:(_cvPct(done.length, R.length) || 0) + '% of all works', c:'#059669', k:'done' },
+    { l:'Still open', v:open.length, s:notSt.length + ' never started', c:'#2563EB', k:'open' },
+    { l:'Past target date', v:late.length, s:avgLate ? 'average ' + avgLate + ' days late' : 'none overdue', c:'#DC2626', k:'late' },
+    { l:'Urgent / high open', v:urgent.length, s:'need a decision first', c:'#B91C1C', k:'urgent' }
+  ];
+  if (C.material >= 0) K.push({ l:'Held by material', v:matBlock.length, s:'material pending or only ordered', c:'#7C3AED', k:'material' });
+  if (C.labour >= 0 && labour) K.push({ l:'Labour deployed', v:labour, s:'summed across works', c:'#0891B2', k:'labour' });
+
+  host.innerHTML = '<div class="krow k6" style="margin:0">' + K.map(function (x){
+    return '<div class="kc clickable" onclick="cvKpi(\'' + x.k + '\')" style="cursor:pointer">' +
+      '<div class="kc-lbl">' + x.l + '</div>' +
+      '<div class="kc-val" style="color:' + x.c + '">' + (typeof x.v === 'number' ? fi(x.v) : x.v) + '</div>' +
+      '<div class="kc-sub">' + x.s + ' \u00b7 click to view</div></div>';
+  }).join('') + '</div>';
+}
+function cvKpi(k){
+  var R = CVX.all();
+  var M = {
+    all:   [R, 'Every civil work logged', 'all rows in the sheet'],
+    done:  [R.filter(function (r){ return r.status === 'Completed'; }), 'Completed works', 'status reads Completed'],
+    open:  [R.filter(function (r){ return r.open; }), 'Works still open', 'status is not Completed or Cancelled'],
+    late:  [R.filter(function (r){ return r.late; }), 'Past their target date', 'still open and the target date has gone by'],
+    urgent:[R.filter(function (r){ return r.open && /urgent|high/i.test(r.pri); }), 'Urgent and high priority, still open', 'open works marked Urgent or High'],
+    material:[R.filter(function (r){ return r.open && /pending|ordered/i.test(r.material); }), 'Open works waiting on material', 'material status is Pending or Ordered'],
+    labour:[R.filter(function (r){ return r.labour; }), 'Works with labour recorded', 'rows carrying a labour count']
+  }[k];
+  if (!M) return;
+  var list = M[0].slice().sort(function (a,b){ return (b.lateBy||0) - (a.lateBy||0); });
+  cvOpenRows('\uD83C\uDFD7\uFE0F ' + M[1], list.length + ' work' + (list.length===1?'':'s'), list,
+    { expr: M[2], work: list.length + ' of ' + R.length + ' works' });
+}
+
+/* ══════════════ 2. BRANCH-WISE COMPARISON, SEGMENT BY SEGMENT ══════════════ */
+var CV_SEGMENTS = [
+  { k:'project',  l:'Project',        f:function (r){ return r.project; } },
+  { k:'cat',      l:'Work category',  f:function (r){ return r.cat; } },
+  { k:'status',   l:'Status',         f:function (r){ return r.status; } },
+  { k:'pri',      l:'Priority',       f:function (r){ return r.pri; } },
+  { k:'material', l:'Material status',f:function (r){ return r.material || '(not recorded)'; } },
+  { k:'assigned', l:'Assigned to',    f:function (r){ return r.assigned || '(not assigned)'; } },
+  { k:'owner',    l:'Owner',          f:function (r){ return r.owner || '(not set)'; } },
+  { k:'loc',      l:'Location',       f:function (r){ return r.loc || '(not set)'; } },
+  { k:'health',   l:'Timeline health',f:function (r){ return r.health || '(not set)'; } }
+];
+var _CV_SEG = 'project';
+function cvSetSeg(k){ _CV_SEG = k; cvRenderSegments(); }
+
+function cvRenderSegments(){
+  var host = document.getElementById('cv-segments'); if (!host) return;
+  var R = CVX.all(), C = CVX.cols(), B = CVX.branches();
+  var segs = CV_SEGMENTS.filter(function (s){
+    if (s.k === 'status' || s.k === 'pri' || s.k === 'project' || s.k === 'cat') return true;
+    return C[s.k] >= 0 && R.some(function (r){ return s.f(r) && !/^\(/.test(s.f(r)); });
+  });
+  var seg = segs.find(function (s){ return s.k === _CV_SEG; }) || segs[0];
+  _CV_SEG = seg.k;
+
+  var vals = [];
+  R.forEach(function (r){ var v = seg.f(r); if (v && vals.indexOf(v) < 0) vals.push(v); });
+  vals.sort(function (a,b){
+    var na = R.filter(function (r){ return seg.f(r) === a; }).length;
+    var nb = R.filter(function (r){ return seg.f(r) === b; }).length;
+    return nb - na || String(a).localeCompare(String(b));
+  });
+
+  var cell = function (v, b){
+    var list = R.filter(function (r){ return seg.f(r) === v && (!b || r.branch === b); });
+    if (!list.length) return '<td style="text-align:center;color:#E2E8F0">\u00b7</td>';
+    var d = list.filter(function (r){ return r.status === 'Completed'; }).length;
+    var lt = list.filter(function (r){ return r.late; }).length;
+    var p = _cvPct(d, list.length);
+    return '<td style="text-align:center;cursor:pointer" onclick="cvSegCell(' +
+      JSON.stringify(v).replace(/"/g,'&quot;') + ',' + JSON.stringify(b || '').replace(/"/g,'&quot;') + ')">' +
+      '<div style="font-weight:800;font-size:14px;color:' + _cvPctColor(p) + '">' + d + '/' + list.length + '</div>' +
+      '<div style="height:4px;background:#EEF2F7;border-radius:2px;margin:3px auto 0;max-width:70px">' +
+        '<i style="display:block;height:4px;border-radius:2px;width:' + (p||0) + '%;background:' + _cvPctColor(p) + '"></i></div>' +
+      (lt ? '<div style="font-size:9.5px;color:#DC2626;margin-top:2px">' + lt + ' late</div>' : '') + '</td>';
+  };
+
+  host.innerHTML =
+    '<div style="padding:12px 14px 0;display:flex;gap:6px;flex-wrap:wrap">' +
+      segs.map(function (s){
+        return '<button type="button" onclick="cvSetSeg(\'' + s.k + '\')" style="border:1px solid ' +
+          (s.k === seg.k ? '#0B4D2C' : '#E2E8F0') + ';background:' + (s.k === seg.k ? '#0B4D2C' : '#fff') +
+          ';color:' + (s.k === seg.k ? '#fff' : '#334155') + ';border-radius:999px;padding:5px 13px;cursor:pointer;' +
+          'font-size:12px;font-weight:700">' + s.l + '</button>';
+      }).join('') + '</div>' +
+    '<div style="overflow-x:auto;padding:12px 14px 0"><table class="dt brfz" style="min-width:' + (240 + B.length*110) + 'px">' +
+    '<thead><tr><th style="text-align:left">' + seg.l + '</th>' +
+      B.map(function (b){ return '<th>' + b + '</th>'; }).join('') +
+      '<th>All branches</th></tr></thead><tbody>' +
+    vals.map(function (v){
+      return '<tr><td style="text-align:left;font-weight:700">' + _cvEsc(v) + '</td>' +
+        B.map(function (b){ return cell(v, b); }).join('') + cell(v, '') + '</tr>';
+    }).join('') +
+    '<tr style="background:#F8FAFF;font-weight:800"><td style="text-align:left">All ' + seg.l.toLowerCase() + 's</td>' +
+      B.map(function (b){
+        var list = R.filter(function (r){ return r.branch === b; });
+        var d = list.filter(function (r){ return r.status === 'Completed'; }).length;
+        return '<td style="text-align:center;color:' + _cvPctColor(_cvPct(d, list.length)) + '">' + d + '/' + list.length + '</td>';
+      }).join('') +
+      '<td style="text-align:center">' + R.filter(function (r){ return r.status === 'Completed'; }).length + '/' + R.length + '</td>' +
+    '</tr></tbody></table></div>' +
+    '<div class="fnote" style="display:block;padding:9px 14px 14px">Each cell reads <b>completed / total</b> for that ' +
+      'combination, with the bar showing the share done and any works past their target date marked underneath. ' +
+      'Click a cell for the records behind it.</div>';
+}
+function cvSegCell(v, b){
+  var seg = CV_SEGMENTS.find(function (s){ return s.k === _CV_SEG; });
+  var list = CVX.all().filter(function (r){ return seg.f(r) === v && (!b || r.branch === b); });
+  cvOpenRows('\uD83C\uDFD7\uFE0F ' + (b ? b + ' \u2014 ' : '') + seg.l + ': ' + v,
+    list.filter(function (r){ return r.status === 'Completed'; }).length + ' of ' + list.length + ' completed',
+    list.slice().sort(function (x,y){ return (y.lateBy||0)-(x.lateBy||0); }),
+    { expr: 'works where ' + seg.l.toLowerCase() + ' is "' + v + '"' + (b ? ' at ' + b : ', across every branch'),
+      work: list.length + ' of ' + CVX.all().length + ' works' });
+}
+
+/* ══════════════ 3. BRANCH → PROJECT → SUBTASK, TAP TO EXPAND ══════════════ */
+var _CV_OPEN = {};
+function cvToggle(k){ _CV_OPEN[k] = !_CV_OPEN[k]; cvRenderTree(); }
+function cvRenderTree(){
+  var host = document.getElementById('cv-tree'); if (!host) return;
+  var R = CVX.all(), B = CVX.branches();
+  var bar = function (list){
+    var n = list.length, seg = ['Completed','In Progress','Pending','On Hold','Cancelled','Not set'];
+    return '<div style="display:flex;height:9px;border-radius:5px;overflow:hidden;background:#EEF2F7;min-width:90px">' +
+      seg.map(function (s){
+        var c = list.filter(function (r){ return r.status === s; }).length;
+        return c ? '<i title="' + c + ' ' + s + '" style="display:block;width:' + (c/n*100) + '%;background:' +
+          CV_STATUS_COLOR[s] + '"></i>' : '';
+      }).join('') + '</div>';
+  };
+  var pctCell = function (list){
+    var d = list.filter(function (r){ return r.status === 'Completed'; }).length, p = _cvPct(d, list.length);
+    return '<span style="font-weight:800;color:' + _cvPctColor(p) + '">' + (p === null ? '\u2013' : p + '%') + '</span>';
+  };
+
+  host.innerHTML = B.map(function (b){
+    var mine = R.filter(function (r){ return r.branch === b; });
+    var bk = 'b:' + b, bOpen = !!_CV_OPEN[bk];
+    var projects = [];
+    mine.forEach(function (r){ if (projects.indexOf(r.project) < 0) projects.push(r.project); });
+    projects.sort(function (x,y){
+      return mine.filter(function (r){ return r.project === y; }).length -
+             mine.filter(function (r){ return r.project === x; }).length; });
+    var late = mine.filter(function (r){ return r.late; }).length;
+
+    var head = '<div onclick="cvToggle(\'' + bk.replace(/'/g,"\\'") + '\')" style="cursor:pointer;display:flex;' +
+      'align-items:center;gap:12px;padding:11px 14px;background:' + (bOpen ? '#F1F7F3' : '#fff') + ';' +
+      'border-bottom:1px solid #EEF2F7">' +
+      '<span style="color:#0B4D2C;font-weight:800;width:12px">' + (bOpen ? '\u25be' : '\u25b8') + '</span>' +
+      '<span style="font-weight:800;font-size:13.5px;min-width:120px"><span class="bd b' + b + '"></span> ' + b + '</span>' +
+      '<span style="font-size:12px;color:#64748B;min-width:150px">' + projects.length + ' projects \u00b7 ' +
+        mine.length + ' works' + (late ? ' \u00b7 <b style="color:#DC2626">' + late + ' late</b>' : '') + '</span>' +
+      '<span style="flex:1;max-width:260px">' + bar(mine) + '</span>' +
+      '<span style="min-width:52px;text-align:right">' + pctCell(mine) + '</span></div>';
+
+    var body = '';
+    if (bOpen){
+      body = projects.map(function (p){
+        var pr = mine.filter(function (r){ return r.project === p; });
+        var pk = 'p:' + b + '|' + p, pOpen = !!_CV_OPEN[pk];
+        var pLate = pr.filter(function (r){ return r.late; }).length;
+        var ph = '<div onclick="cvToggle(\'' + pk.replace(/'/g,"\\'") + '\')" style="cursor:pointer;display:flex;' +
+          'align-items:center;gap:12px;padding:9px 14px 9px 34px;background:' + (pOpen ? '#FAFCFB' : '#fff') +
+          ';border-bottom:1px solid #F4F7F5">' +
+          '<span style="color:#64748B;width:12px">' + (pOpen ? '\u25be' : '\u25b8') + '</span>' +
+          '<span style="font-weight:700;font-size:12.5px;min-width:190px">' + _cvEsc(p) + '</span>' +
+          '<span style="font-size:11.5px;color:#64748B;min-width:120px">' + pr.length + ' subtask' +
+            (pr.length===1?'':'s') + (pLate ? ' \u00b7 <b style="color:#DC2626">' + pLate + ' late</b>' : '') + '</span>' +
+          '<span style="flex:1;max-width:220px">' + bar(pr) + '</span>' +
+          '<span style="min-width:52px;text-align:right">' + pctCell(pr) + '</span></div>';
+        var subs = '';
+        if (pOpen){
+          subs = '<div style="padding:0 14px 10px 54px"><table class="dt" style="width:100%">' +
+            '<thead><tr><th style="text-align:left">Subtask</th><th style="text-align:left">Work</th>' +
+            '<th>Status</th><th>Priority</th><th>Target</th><th>Days late</th><th style="text-align:left">Remarks</th></tr></thead><tbody>' +
+            pr.slice().sort(function (x,y){ return (y.lateBy||0)-(x.lateBy||0); }).map(function (r){
+              return '<tr style="cursor:pointer" onclick="cvWork(' + r._i + ')">' +
+                '<td style="text-align:left;font-weight:600">' + _cvEsc(r.sub || '\u2013') + '</td>' +
+                '<td style="text-align:left;color:#475569;max-width:230px">' + _cvEsc(r.desc || r.loc || '\u2013') + '</td>' +
+                '<td><span style="background:' + CV_STATUS_COLOR[r.status] + '1a;color:' + CV_STATUS_COLOR[r.status] +
+                  ';font-weight:700;border-radius:999px;padding:2px 9px;font-size:11px">' + r.status + '</span></td>' +
+                '<td style="color:' + (CV_PRI_COLOR[r.pri] || '#64748B') + ';font-weight:700">' + _cvEsc(r.pri) + '</td>' +
+                '<td>' + (r.target || '\u2013') + '</td>' +
+                '<td style="font-weight:700;color:' + (r.lateBy > 0 ? '#DC2626' : '#94A3B8') + '">' +
+                  (r.lateBy > 0 ? r.lateBy : '\u2013') + '</td>' +
+                '<td style="text-align:left;color:#64748B;max-width:260px">' + _cvEsc(r.remarks || '\u2013') + '</td></tr>';
+            }).join('') + '</tbody></table></div>';
+        }
+        return ph + subs;
+      }).join('');
+    }
+    return '<div style="border:1px solid #E2E8F0;border-radius:10px;overflow:hidden;margin:0 14px 10px">' + head + body + '</div>';
+  }).join('') +
+  '<div class="fnote" style="display:block;padding:0 14px 14px">Tap a branch to open its projects, then a project for ' +
+    'its subtasks. Any subtask row opens the full record.</div>';
+}
+function cvWork(i){
+  var r = CVX.all().filter(function (x){ return x._i === i; })[0];
+  if (!r) return;
+  var F = [['Branch', r.branch], ['Project', r.project], ['Subtask', r.sub], ['Work', r.desc], ['Location', r.loc],
+           ['Category', r.cat], ['Priority', r.pri], ['Status', r.status + (r.statusRaw && r.statusRaw !== r.status ? ' (sheet: ' + r.statusRaw + ')' : '')],
+           ['Stage', r.stage], ['Owner', r.owner], ['Assigned to', r.assigned], ['Material', r.material],
+           ['Labour', r.labour], ['Start date', r.start], ['Target date', r.target], ['Completion date', r.done],
+           ['Days late', r.lateBy > 0 ? r.lateBy : ''], ['Days open', r.ageDays], ['Progress % on the sheet', r.prog === null ? '' : r.prog + '%'],
+           ['Delay reason', r.why], ['Remarks', r.remarks], ['Timeline health', r.health]];
+  var html = '<div style="padding:14px 16px"><table style="width:100%;border-collapse:collapse;font-size:13px">' +
+    F.filter(function (f){ return f[1] !== '' && f[1] !== null && f[1] !== undefined; }).map(function (f){
+      return '<tr><td style="padding:7px 10px;border-bottom:1px solid #F1F5F9;color:#64748B;width:190px;' +
+        'font-weight:600">' + f[0] + '</td><td style="padding:7px 10px;border-bottom:1px solid #F1F5F9;' +
+        'font-weight:600;color:#0F172A">' + _cvEsc(f[1]) + '</td></tr>';
+    }).join('') + '</table></div>';
+  openHTMLModal('\uD83C\uDFD7\uFE0F ' + (r.sub || r.project), r.branch + ' \u00b7 ' + r.status, html);
+}
+
+/* ══════════════ 4. CHARTS ══════════════ */
+function cvRenderCharts(){
+  var R = CVX.all(), B = CVX.branches();
+  if (typeof mkChart !== 'function') return;
+
+  /* status mix per branch */
+  var ST = ['Completed','In Progress','Pending','On Hold','Cancelled','Not set'];
+  if (document.getElementById('cv-ch-status'))
+    mkChart('cv-ch-status', { type:'bar',
+      data:{ labels:B, datasets: ST.filter(function (s){ return R.some(function (r){ return r.status===s; }); })
+        .map(function (s){ return { label:s, backgroundColor:CV_STATUS_COLOR[s], borderRadius:3,
+          data:B.map(function (b){ return R.filter(function (r){ return r.branch===b && r.status===s; }).length; }) }; }) },
+      /* these panels are built while the tab is still hidden; with animation on,
+           the opening frames never run and every bar stays at zero height */
+      options:{ responsive:true, maintainAspectRatio:true, animation:false,
+        onClick:function (e,el){ if(el&&el.length){ var b=B[el[0].index], s=e.chart.data.datasets[el[0].datasetIndex].label;
+          cvOpenRows('\uD83C\uDFD7\uFE0F '+b+' \u2014 '+s, '', R.filter(function(r){return r.branch===b&&r.status===s;}), null); } },
+        plugins:{ legend:{ position:'bottom', labels:{ font:{size:10}, usePointStyle:true } },
+          datalabels:{ display:function(c){ return c.dataset.data[c.dataIndex] > 0; }, color:'#fff', font:{weight:'bold',size:10} } },
+        scales:{ x:{ stacked:true, grid:{display:false} }, y:{ stacked:true, grid:{color:'#E0E8FF'} } } } });
+
+  /* how late the late ones are */
+  var buckets = [['1\u20137 days',1,7],['8\u201330 days',8,30],['31\u201390 days',31,90],['over 90 days',91,1e9]];
+  var late = R.filter(function (r){ return r.late; });
+  if (document.getElementById('cv-ch-delay'))
+    mkChart('cv-ch-delay', { type:'bar',
+      data:{ labels:buckets.map(function (x){ return x[0]; }),
+        datasets:[{ label:'Works past target', borderRadius:4, maxBarThickness:46,
+          backgroundColor:['#FBBF24','#F97316','#DC2626','#7F1D1D'],
+          data:buckets.map(function (x){ return late.filter(function (r){ return r.lateBy>=x[1] && r.lateBy<=x[2]; }).length; }) }] },
+      /* these panels are built while the tab is still hidden; with animation on,
+           the opening frames never run and every bar stays at zero height */
+      options:{ responsive:true, maintainAspectRatio:true, animation:false,
+        onClick:function (e,el){ if(el&&el.length){ var x=buckets[el[0].index];
+          cvOpenRows('\uD83C\uDFD7\uFE0F Past target by '+x[0], '', late.filter(function(r){return r.lateBy>=x[1]&&r.lateBy<=x[2];}), null); } },
+        plugins:{ legend:{display:false}, datalabels:{ display:true, anchor:'end', align:'top', color:'#0F172A', font:{weight:'bold',size:11} } },
+        layout:{ padding:{top:16} }, scales:{ y:{ beginAtZero:true, grid:{color:'#E0E8FF'} }, x:{ grid:{display:false} } } } });
+
+  /* completions month by month */
+  var mk = {}, MN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  R.forEach(function (r){ var d = r.done || ''; if (/^\d{4}-\d{2}/.test(d)) mk[d.slice(0,7)] = (mk[d.slice(0,7)]||0)+1; });
+  var months = Object.keys(mk).sort();
+  if (document.getElementById('cv-ch-month') && months.length)
+    mkChart('cv-ch-month', { type:'line',
+      data:{ labels:months.map(function (m){ return MN[+m.slice(5,7)-1]+' '+m.slice(2,4); }),
+        datasets:[{ label:'Works completed', data:months.map(function (m){ return mk[m]; }),
+          borderColor:'#059669', backgroundColor:'rgba(5,150,105,.12)', fill:true, tension:.3, pointRadius:4 }] },
+      /* these panels are built while the tab is still hidden; with animation on,
+           the opening frames never run and every bar stays at zero height */
+      options:{ responsive:true, maintainAspectRatio:true, animation:false,
+        onClick:function (e,el){ if(el&&el.length){ var m=months[el[0].index];
+          cvOpenRows('\uD83C\uDFD7\uFE0F Completed in '+m, '', R.filter(function(r){return (r.done||'').slice(0,7)===m;}), null); } },
+        plugins:{ legend:{display:false}, datalabels:{display:false} },
+        scales:{ y:{ beginAtZero:true, grid:{color:'#E0E8FF'} }, x:{ grid:{display:false} } } } });
+
+  /* priority mix */
+  var PR = ['Urgent','High','Medium','Low','None'].filter(function (p){ return R.some(function (r){ return r.pri===p; }); });
+  if (document.getElementById('cv-ch-pri'))
+    mkChart('cv-ch-pri', { type:'doughnut',
+      data:{ labels:PR, datasets:[{ data:PR.map(function (p){ return R.filter(function (r){ return r.pri===p; }).length; }),
+        backgroundColor:PR.map(function (p){ return CV_PRI_COLOR[p]; }), borderWidth:2, borderColor:'#fff' }] },
+      /* these panels are built while the tab is still hidden; with animation on,
+           the opening frames never run and every bar stays at zero height */
+      options:{ responsive:true, maintainAspectRatio:true, animation:false, cutout:'56%',
+        onClick:function (e,el){ if(el&&el.length){ var p=PR[el[0].index];
+          cvOpenRows('\uD83C\uDFD7\uFE0F Priority: '+p, '', R.filter(function(r){return r.pri===p;}), null); } },
+        plugins:{ legend:{ position:'bottom', labels:{ font:{size:10.5}, usePointStyle:true, padding:9 } },
+          datalabels:{ display:true, color:'#fff', font:{weight:'bold',size:12} } } } });
+}
+
+/* ══════════════ 5. WHAT TO DO ABOUT IT — ranked, each opens its rows ══════════════ */
+var _CV_SUGG = [];
+function cvRenderSuggestions(){
+  var host = document.getElementById('cv-suggest'); if (!host) return;
+  var R = CVX.all(), B = CVX.branches(), C = CVX.cols(), out = [];
+  var add = function (sev, title, body, list){ if (list && list.length) out.push({ sev:sev, title:title, body:body, list:list }); };
+
+  /* 1. the worst overruns */
+  var bad = R.filter(function (r){ return r.late && r.lateBy > 30; }).sort(function (a,b){ return b.lateBy-a.lateBy; });
+  if (bad.length) add(3, bad.length + ' work' + (bad.length===1?'':'s') + ' more than a month past target',
+    'Worst is <b>' + _cvEsc(bad[0].sub || bad[0].project) + '</b> at ' + bad[0].branch + ', ' + bad[0].lateBy +
+    ' days late. These are the ones to name in the next review \u2014 a target date that has slipped this far is no longer a plan.', bad);
+
+  /* 2. urgent work nobody has started */
+  var u = R.filter(function (r){ return r.notStarted && /urgent|high/i.test(r.pri); });
+  add(3, u.length + ' urgent or high-priority work' + (u.length===1?'':'s') + ' never started',
+    'Marked urgent when raised, with no start date recorded. Either the priority was wrong or the work has been forgotten; both are worth settling.', u);
+
+  /* 3. material holding things up */
+  if (C.material >= 0){
+    var m = R.filter(function (r){ return r.open && /pending/i.test(r.material); });
+    add(2, m.length + ' open work' + (m.length===1?'':'s') + ' waiting on material',
+      'The site cannot move on these whatever the labour position is. Procurement is the single lever.', m);
+  }
+
+  /* 4. a branch carrying far more than its share of lateness */
+  var worst = null;
+  B.forEach(function (b){
+    var mine = R.filter(function (r){ return r.branch===b; }), lt = mine.filter(function (r){ return r.late; });
+    if (mine.length >= 4){
+      var share = lt.length / mine.length;
+      if (!worst || share > worst.share) worst = { b:b, share:share, list:lt, n:mine.length };
+    }
+  });
+  if (worst && worst.share >= 0.3)
+    add(2, worst.b + ' has ' + Math.round(worst.share*100) + '% of its works past target',
+      worst.list.length + ' of ' + worst.n + ' works at this branch are overdue, the highest share in the group. ' +
+      'That is a scheduling problem rather than a work problem \u2014 the targets being set are not the ones being met.', worst.list);
+
+  /* 5. completed but no completion date — the records cannot be audited */
+  var noDate = R.filter(function (r){ return r.status==='Completed' && !r.done; });
+  add(1, noDate.length + ' completed work' + (noDate.length===1?'':'s') + ' carry no completion date',
+    'Marked done with nothing to say when. Without it there is no way to measure how long civil work actually takes, ' +
+    'and the delay figures above understate the position.', noDate);
+
+  /* 6. open with no target date at all */
+  var noTarget = R.filter(function (r){ return r.open && !r.target; });
+  add(1, noTarget.length + ' open work' + (noTarget.length===1?'':'s') + ' have no target date',
+    'These can never appear as overdue however long they sit, so they are invisible to every deadline report including this one.', noTarget);
+
+  /* 7. where the group is strongest — worth saying so */
+  var best = null;
+  B.forEach(function (b){
+    var mine = R.filter(function (r){ return r.branch===b; });
+    if (mine.length >= 4){
+      var p = _cvPct(mine.filter(function (r){ return r.status==='Completed'; }).length, mine.length);
+      if (!best || p > best.p) best = { b:b, p:p, list:mine };
+    }
+  });
+  if (best && best.p >= 70)
+    add(0, best.b + ' has closed ' + best.p + '% of its civil works',
+      'The strongest completion rate in the group across ' + best.list.length + ' works. Worth asking what the ' +
+      'site routine is there before setting targets elsewhere.', best.list);
+
+  out.sort(function (a,b){ return b.sev - a.sev || b.list.length - a.list.length; });
+  _CV_SUGG = out;
+  var COL = { 3:'#DC2626', 2:'#D97706', 1:'#2563EB', 0:'#059669' };
+  var LBL = { 3:'Act now', 2:'Needs a decision', 1:'Data gap', 0:'Working well' };
+  host.innerHTML = out.length
+    ? '<div style="padding:12px 14px 14px">' + out.map(function (s, i){
+        return '<div onclick="cvSuggest(' + i + ')" style="cursor:pointer;display:flex;gap:12px;align-items:flex-start;' +
+          'padding:11px 13px;border:1px solid #E2E8F0;border-left:4px solid ' + COL[s.sev] + ';border-radius:9px;margin-bottom:9px">' +
+          '<div style="min-width:112px"><span style="background:' + COL[s.sev] + '1a;color:' + COL[s.sev] +
+            ';font-weight:800;font-size:10px;border-radius:999px;padding:3px 9px;text-transform:uppercase;' +
+            'letter-spacing:.05em">' + LBL[s.sev] + '</span></div>' +
+          '<div style="flex:1"><div style="font-weight:800;font-size:13px;color:#0F172A">' + s.title + '</div>' +
+          '<div style="font-size:12.5px;color:#475569;line-height:1.6;margin-top:3px">' + s.body + '</div></div>' +
+          '<div style="color:#94A3B8;font-size:11.5px;white-space:nowrap">' + s.list.length + ' records \u203a</div></div>';
+      }).join('') + '</div>'
+    : '<div style="padding:18px;color:#64748B;font-size:13px">Nothing stands out in the civil register right now.</div>';
+}
+function cvSuggest(i){
+  var s = _CV_SUGG[i]; if (!s) return;
+  cvOpenRows('\uD83C\uDFD7\uFE0F ' + s.title.replace(/<[^>]+>/g,''), s.list.length + ' record' + (s.list.length===1?'':'s'),
+    s.list.slice().sort(function (a,b){ return (b.lateBy||0)-(a.lateBy||0); }),
+    { expr:'civil works matching this finding', work:s.list.length + ' of ' + CVX.all().length + ' works' });
+}
+
+/* ── paint everything ──────────────────────────────────────────────────── */
+/* renderCivilTab() rewrites the whole of #cv-body, so these sections cannot be
+   static markup — they are built here, after it has painted, and inserted above
+   its own output. */
+function cvShell(){
+  var body = document.getElementById('cv-body');
+  if (!body || document.getElementById('cv-analytics')) return !!body;
+  var d = document.createElement('div');
+  d.id = 'cv-analytics';
+  d.style.cssText = 'display:flex;flex-direction:column;gap:16px';
+  d.innerHTML =
+    '<div id="cv-kpis"></div>' +
+    '<div class="au-sec"><h3>\uD83D\uDCCA Branch-wise comparison \u2014 segment by segment</h3>' +
+      '<div class="sub">Pick a segment and every branch is compared on it: completed against total, with anything past ' +
+      'its target date marked. Click a cell for the records behind it.</div><div id="cv-segments"></div></div>' +
+    '<div class="au-sec"><h3>\uD83C\uDFD7\uFE0F Branch \u2192 project \u2192 subtask</h3>' +
+      '<div class="sub">Tap a branch to open its projects, then a project to see every subtask with its status, ' +
+      'priority, target date and how late it is running.</div><div id="cv-tree"></div></div>' +
+    '<div class="au-sec"><h3>\uD83D\uDCA1 What to do about it</h3>' +
+      '<div class="sub">Findings ranked by what they cost if left alone. Each one opens the records it was drawn from, ' +
+      'so nothing here has to be taken on trust.</div><div id="cv-suggest"></div></div>' +
+    '<div class="row r2">' +
+      '<div class="card"><div class="ch"><h3>\uD83D\uDCDA Status mix by branch</h3>' +
+        '<span class="fnote">Click a band for those works</span></div>' +
+        '<div class="cb"><div class="cw tall"><canvas id="cv-ch-status"></canvas></div></div></div>' +
+      '<div class="card"><div class="ch"><h3>\u23F3 How far past target</h3>' +
+        '<span class="fnote">Open works only \u00b7 click a bar</span></div>' +
+        '<div class="cb"><div class="cw tall"><canvas id="cv-ch-delay"></canvas></div></div></div></div>' +
+    '<div class="row r2">' +
+      '<div class="card"><div class="ch"><h3>\uD83D\uDCC5 Works completed, month by month</h3>' +
+        '<span class="fnote">By completion date \u00b7 click a point</span></div>' +
+        '<div class="cb"><div class="cw tall"><canvas id="cv-ch-month"></canvas></div></div></div>' +
+      '<div class="card"><div class="ch"><h3>\uD83C\uDFAF Priority mix</h3>' +
+        '<span class="fnote">Every work logged \u00b7 click a slice</span></div>' +
+        '<div class="cb"><div class="cw tall"><canvas id="cv-ch-pri"></canvas></div></div></div></div>';
+  body.insertBefore(d, body.firstChild);
+  return true;
+}
+
+function cvRenderAnalytics(raw){
+  try {
+    CVX.load(raw);
+    if (!CVX.all().length) return;
+    if (!cvShell()) return;
+    cvRenderKpis(); cvRenderSegments(); cvRenderTree(); cvRenderSuggestions();
+    var draw = function (){ try { cvRenderCharts(); } catch(e){ console.error('civil charts:', e && e.message); } };
+    setTimeout(draw, 30); setTimeout(draw, 400);
+  } catch (e){ console.error('civil analytics:', e && e.message); }
+}
+
 function _cvPaint(){
-  try{ window.renderCivilTab(_cvRaw); _cvShow(true); }
+  try{ window.renderCivilTab(_cvRaw); cvRenderAnalytics(_cvRaw); _cvShow(true); }
   catch(err){
     _cvShow(false);
     var l=document.getElementById('cv-loader');
