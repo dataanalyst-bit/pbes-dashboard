@@ -1119,7 +1119,7 @@ function applyLiveData(data){
     if (data.VIG_DATA)        VIG_DATA       = _dropHold('Vigilance', VIG_DATA);
     if (data.GRIEVANCE_DATA)  GRIEVANCE_DATA = _dropHold('Grievance', GRIEVANCE_DATA);
     if (data.PUR_DATA)        PUR_DATA       = _dropHold('Purchase', PUR_DATA);
-    if (data.HR_RECORDS)      HR_RECORDS     = _dropHold('HR', HR_RECORDS);
+    if (data.HR_RECORDS)      HR_RECORDS     = _hrHandover(_dropHold('HR', HR_RECORDS));
     if (data.CARE_DATA)       CARE_DATA      = _dropHold('Care Calls', CARE_DATA);
     if (data.ADMP_DATA)       ADMP_DATA      = _dropHold('Admission Process', ADMP_DATA);
     if (data.GO_DATA)         GO_DATA        = _dropHold('Grievance Officer', GO_DATA);
@@ -2275,7 +2275,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   <div class="krow k6">
     <div class="kc blue clickable" onclick="viewTransport('vehicles')" title="Click to view all vehicles"><div class="kc-ico">🚌</div><div class="kc-lbl">Total Vehicles</div><div class="kc-val" id="tr-veh">–</div><div class="kc-sub" id="tr-veh-s">Active fleet · click to view</div></div>
     <div class="kc teal clickable" onclick="viewTransport('students')" title="Click to view transport students"><div class="kc-ico">🎒</div><div class="kc-lbl">Transport Students</div><div class="kc-val" id="tr-stu">–</div><div class="kc-sub" id="tr-stu-s">Riders · click to view</div></div>
-    <div class="kc green"><div class="kc-ico">🪑</div><div class="kc-lbl">Fleet Occupancy</div><div class="kc-val" id="tr-occ">–</div><div class="kc-sub" id="tr-occ-s">Riders ÷ seats</div></div>
+    <div class="kc green"><div class="kc-ico">🪑</div><div class="kc-lbl">Fleet Occupancy</div><div class="kc-val" id="tr-occ">–</div><div class="kc-sub" id="tr-occ-s">Students ÷ seats</div></div>
     <div class="kc amber clickable" onclick="viewTransport('spare')" title="Click to view spare/extra vehicles"><div class="kc-ico">🔄</div><div class="kc-lbl">Spare Vehicles</div><div class="kc-val" id="tr-spare">–</div><div class="kc-sub" id="tr-spare-s">Extra / standby · click to view</div></div>
     <div class="kc red clickable" onclick="viewTransport('expiring')" title="Click to view expiring documents"><div class="kc-ico">⚠️</div><div class="kc-lbl">Docs Expiring/Expired</div><!-- Docs Expiring KPI removed on request --><div class="kc-sub" id="tr-exp-s">Compliance risk · click to view</div></div>
     <div class="kc purple"><div class="kc-ico">⛽</div><div class="kc-lbl">Avg Mileage</div><div class="kc-val" id="tr-mil">–</div><div class="kc-sub" id="tr-mil-s">KM / litre</div></div>
@@ -5579,17 +5579,52 @@ function viewOwnerUpload(owner,mode){
 
 const HR_COLORS = {
   'Kavitha':'#059669','Priya':'#1E4FD8','Navya':'#D97706',
-  'Swathi Priya':'#7C3AED','Preethi':'#DC2626','Stella':'#0D9488'
+  'Swathi Priya':'#7C3AED','Preethi':'#DC2626','Stella':'#0D9488',
+  'Niveditha':'#B45309','R Kavitha':'#0369A1','Divya':'#9333EA','Savina':'#BE185D'
 };
-const HR_NAMES = ['Kavitha','Priya','Navya','Swathi Priya','Preethi','Stella'];
+const HR_NAMES = ['Kavitha','Priya','Navya','Swathi Priya','Preethi','Stella','Niveditha','R Kavitha'];
 // Recruiters who have LEFT the organization: hidden from performance ranking & scorecard,
 // but the positions they posted (open or closed) still count in the KPI totals.
 // To bring someone back or add a new leaver, just edit this list.
 /* Recruiters who have left. Their closed roles still count in every KPI and
    record view — the work happened — but they are kept out of the live ranking,
    where a leaver cannot act on the result. Keesara is now held by Savina. */
-const HR_RESIGNED_LIST = ['Priya', 'Navya'];
-const HR_BRANCH_MAP = {Pocharam:'Kavitha',Boduppal:[],Keesara:'Navya',Gowdavalli:'Swathi Priya',Bachupally:['Preethi','Stella']};
+const HR_RESIGNED_LIST = ['Priya', 'Navya', 'Swathi Priya', 'Divya'];
+const HR_BRANCH_MAP = {Pocharam:'Kavitha',Boduppal:'R Kavitha',Keesara:'Savina',Gowdavalli:'Niveditha',Bachupally:['Preethi','Stella']};
+
+/* ── 9 Oct 2026 · RECRUITER HANDOVER ──────────────────────────────────────
+   Niveditha has taken Gowdavalli and R Kavitha has taken Boduppal; the people
+   who held those two branches before them have left.
+
+   A vacancy still to be filled is the new recruiter's work from the day she
+   arrives, so every OPEN or ON-HOLD requisition at these branches is moved to
+   her and counts towards her figures. A requisition that was already CLOSED
+   stays with whoever closed it — the hire happened, and moving it would credit
+   one person with another's work and leave a gap in the leaver's record.
+
+   R Kavitha is not the Kavitha who holds Pocharam. They are two people and the
+   dashboard keeps them apart by name.
+
+   When the next handover happens, add the line here and the leaver's name to
+   HR_RESIGNED_LIST above — nothing else needs touching. */
+const HR_HANDOVER = { Gowdavalli:'Niveditha', Boduppal:'R Kavitha' };
+/* Month each recruiter started, shared by the scorecard and the ranking so
+   both treat a new joiner the same way. */
+const HR_START_MONTH_SHARED={'kavitha':1,'priya':1,'navya':1,'swathi priya':1,'preethi':1,'stella':3,
+                             'divya':6,'savina':7,'niveditha':10,'r kavitha':10};
+function _hrHandover(rows){
+  if (!Array.isArray(rows)) return rows;
+  var closed = /closed|filled/i;
+  return rows.map(function(r){
+    var to = r && HR_HANDOVER[String(r.Branch || '').trim()];
+    if (!to || closed.test(String(r.Status || ''))) return r;
+    if (String(r.HR || '').trim() === to) return r;
+    var o = Object.assign({}, r);
+    o.HRPrevious = r.HR;          // kept so a record view can still show who posted it
+    o.HR = to;
+    return o;
+  });
+}
 
 function renderHR(){
   const bl=fBranch==='ALL'?'All Recruiters':fBranch;
@@ -5626,7 +5661,11 @@ function renderHR(){
   const hsBand=d=>d<=10?5:d<=15?4.5:d<=20?4:d<=25?3.5:d<=30?3:d<=35?2.5:d<=40?2:1;
   const acmBand=pm=>pm>=8?5:pm>=6?4:pm>=4?3:pm>=2?2:1;
   // Start month per recruiter (from the HR sheet's AA:AB helper table). Year is the 2026 cycle.
-  const HR_START_MONTH={'kavitha':1,'priya':1,'navya':1,'swathi priya':1,'preethi':1,'stella':3,'divya':6};
+  /* Month the recruiter started, for "closings per month": a recruiter three
+     weeks in is not judged against someone who has had the whole year. The two
+     who joined in October are given October, so their first report is read
+     against one month of work rather than ten. */
+  const HR_START_MONTH=HR_START_MONTH_SHARED;
   const _W=getDateWindows();
   const _curAbs=(()=>{ const t=(_W&&_W.today)?_W.today:new Date().toISOString().slice(0,10);
     const y=+t.slice(0,4), m=+t.slice(5,7); return y*12+m; })();
@@ -5660,9 +5699,15 @@ function renderHR(){
     const vcr=total>0?+(closed/total*5).toFixed(1):0;
     const compliance=4.5;
     const overall=+(((hiring_speed*0.40)+(closeScore*0.40)+(vcr*0.10)+(compliance*0.10))).toFixed(1);
-    const rating=overall>=4.3?'Excellent':overall>=3.5?'Good':overall>=2.8?'Average':'Needs Focus';
+    /* A recruiter in her first month with nothing closed yet scores 0 on every
+       band and lands at the bottom of the ranking — which is an artefact of
+       having just arrived, not a judgement anyone should act on. Someone with
+       no closed requisition in her first month is marked "new" and left
+       unranked until there is something to measure. */
+    const isNew = closed===0 && activeMonths<=1;
+    const rating=isNew?'New':overall>=4.3?'Excellent':overall>=3.5?'Good':overall>=2.8?'Average':'Needs Focus';
     LIVE_KPI[h]={hiring_speed,vcr,avg_closing:closeScore,avg_closing_raw:perMonth,active_months:activeMonths,
-      compliance,overall,rating,branch:branchOf(h),closed,open,hold,total,avgDays};
+      compliance,overall,rating,isNew,branch:branchOf(h),closed,open,hold,total,avgDays};
   });
 
   // Which recruiters to show based on branch filter
@@ -5710,6 +5755,7 @@ function renderHR(){
     'Good':'background:#FFFBEB;color:#D97706',
     'Average':'background:#FEF2F2;color:#DC2626',
     'Needs Focus':'background:#FEF2F2;color:#DC2626',
+    'New':'background:#EFF6FF;color:#1E4FD8',
   };
   const tbodyEl=document.getElementById('hr-scorecard-tbody');
   if(tbodyEl){
@@ -5722,19 +5768,21 @@ function renderHR(){
       const k=LIVE_KPI[h]; if(!k)return'';
       const bg=i%2===0?'#fff':'#F8FAFF';
       const badge=RATING_BADGE[k.rating]||RATING_BADGE.Average;
-      const rIcon=k.rating==='Excellent'?'🏆':k.rating==='Good'?'⭐':'🔥';
+      const rIcon=k.rating==='New'?'🌱':k.rating==='Excellent'?'🏆':k.rating==='Good'?'⭐':'🔥';
       const scoreColor=k.overall>=4.5?'#059669':k.overall>=3.5?'#D97706':'#DC2626';
+      /* a recruiter in her first month is shown as joined, not scored */
+      const sc=v=>k.isNew?'<span style="color:#94A3B8">–</span>':v;
       return `<tr style="background:${bg};cursor:pointer;" onclick="viewHRByRecruiter('${h.replace(/'/g,"\\\\'")}','ALL')" title="Click to view ${h}'s positions">
         <td style="padding:10px 14px;font-size:13px;font-weight:700;border-bottom:1px solid #E0E8FF;color:#0F172A;">${h}</td>
         <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;font-size:12px;color:#64748B;">${k.branch}</td>
         <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;">
-          <span style="display:inline-flex;align-items:center;gap:4px;"><span style="font-weight:800;font-size:14px;color:${k.hiring_speed>=4?'#059669':k.hiring_speed>=3?'#D97706':'#DC2626'}">${k.hiring_speed}</span><span style="color:#94A3B8;font-size:10px;">/5</span></span>
+          <span style="display:inline-flex;align-items:center;gap:4px;"><span style="font-weight:800;font-size:14px;color:${k.hiring_speed>=4?'#059669':k.hiring_speed>=3?'#D97706':'#DC2626'}">${sc(k.hiring_speed)}</span><span style="color:#94A3B8;font-size:10px;">/5</span></span>
         </td>
-        <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:700;font-size:14px;color:${k.vcr>=4.5?'#059669':'#D97706'}">${k.vcr}</td>
-        <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:700;font-size:14px;" title="${k.avg_closing_raw} closings/month over ${k.active_months} active month(s) → score ${k.avg_closing}/5"><span style="color:${k.avg_closing>=4?'#059669':k.avg_closing>=3?'#D97706':'#DC2626'}">${k.avg_closing}</span><span style="color:#94A3B8;font-size:10px;"> /5</span></td>
+        <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:700;font-size:14px;color:${k.vcr>=4.5?'#059669':'#D97706'}">${sc(k.vcr)}</td>
+        <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:700;font-size:14px;" title="${k.avg_closing_raw} closings/month over ${k.active_months} active month(s) → score ${k.avg_closing}/5"><span style="color:${k.avg_closing>=4?'#059669':k.avg_closing>=3?'#D97706':'#DC2626'}">${sc(k.avg_closing)}</span><span style="color:#94A3B8;font-size:10px;"> /5</span></td>
         <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:700;font-size:14px;color:${k.compliance>=4.5?'#059669':'#D97706'}">${k.compliance}</td>
-        <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;"><span style="font-size:18px;font-weight:900;color:${scoreColor}">${k.overall}</span></td>
-        <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;"><span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;${badge};">${rIcon} ${k.rating}</span></td>
+        <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;"><span style="font-size:18px;font-weight:900;color:${scoreColor}">${sc(k.overall)}</span></td>
+        <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;"><span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;${badge};" title="${k.isNew?'Joined this month \u2014 nothing closed yet, so not rated':''}">${rIcon} ${k.rating==='New'?'New \u2014 joined this month':k.rating}</span></td>
         <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:700;color:#059669;font-size:13px;">${k.closed}</td>
         <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:700;color:${k.open>5?'#DC2626':'#D97706'};font-size:13px;">${k.open}</td>
       </tr>`;
@@ -6078,24 +6126,44 @@ function renderHRRanking(){
             targetTAT,actualTAT,maxAssigned:maxClosed};
   }).sort((a,b)=>b.score-a.score || b.closed-a.closed);
 
+  /* A recruiter who joined this month inherits a branch's open vacancies on her
+     first day, including roles that have been open since before she arrived.
+     Scoring that as "0% overdue control" and placing her last is a verdict on
+     her predecessor's backlog, not on her. New joiners with nothing closed yet
+     are listed below the ranked recruiters and shown as not yet rated; the
+     moment one closes a role she takes her place in the order. */
+  const _newKpi=(typeof LIVE_HR_KPI_NEW==='object')?LIVE_HR_KPI_NEW:null;
+  const _isNewJoiner=s=>{
+    if(s.closed>0) return false;
+    const sm=(typeof HR_START_MONTH_SHARED==='object'&&HR_START_MONTH_SHARED)
+      ? HR_START_MONTH_SHARED[String(s.hr).trim().toLowerCase()] : null;
+    if(!sm) return false;
+    const now=new Date();
+    return (now.getFullYear()*12+now.getMonth()+1) - (2026*12+sm) <= 1;
+  };
+  stats.sort((a,b)=>(_isNewJoiner(a)?1:0)-(_isNewJoiner(b)?1:0) || b.score-a.score || b.closed-a.closed);
+
   /* Kept so clicking a recruiter can show every input that produced the score,
      rather than the reader having to trust four percentages. */
   window._HR_UNIFIED={}; stats.forEach(s=>{ window._HR_UNIFIED[s.hr]=s; });
 
   const medals=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣'];
+  let _rank=0;
   tbody.innerHTML=stats.map((s,i)=>{
+    const isNew=_isNewJoiner(s);
+    if(!isNew) _rank++;
     const scoreColor=s.score>=80?'#059669':s.score>=60?'#D97706':'#DC2626';
     /* one scale for all four components, so a weak column is visible at a glance */
     const cmp=v=>v>=80?'#059669':v>=60?'#D97706':'#DC2626';
     return `<tr style="cursor:pointer" onclick="viewHRByRecruiter('${s.hr.replace(/'/g,"\\\\'")}','ALL')">
-      <td style="font-size:17px;text-align:center">${medals[i]||(i+1)}</td>
-      <td><strong>${s.hr}</strong><br><small style="color:#94A3B8;font-size:10px;">${s.branch}</small></td>
+      <td style="font-size:17px;text-align:center">${isNew?'🌱':(medals[_rank-1]||_rank)}</td>
+      <td><strong>${s.hr}</strong><br><small style="color:#94A3B8;font-size:10px;">${s.branch}${isNew?' · <span style="color:#1E4FD8">new this month</span>':''}</small></td>
       <td><strong>${fi(s.closed)}</strong></td><td>${s.open>0?`<span style="color:#DC2626;font-weight:600">${s.open}</span>`:'0'}</td>
       <td><strong style="color:${cmp(s.u.wh)}">${s.u.wh}%</strong><small style="display:block;font-size:9px;color:#94A3B8">${fi(s.closed+s.open)} roles</small></td>
       <td><strong style="color:${cmp(s.u.ce)}">${s.u.ce}%</strong><small style="display:block;font-size:9px;color:#94A3B8">${fi(s.closed)} of ${fi(s.closed+s.open)}</small></td>
       <td><strong style="color:${cmp(s.u.cs)}">${s.u.cs}%</strong><small style="display:block;font-size:9px;color:#94A3B8">${s.avgDays===null?'–':s.avgDays+'d avg vs 15d'}</small></td>
       <td><strong style="color:${cmp(s.u.oc)}">${s.u.oc}%</strong><small style="display:block;font-size:9px;color:#94A3B8">${fi(s.odDays)} overdue days${s.open>0?` · ${s.open} still open`:''}</small></td>
-      <td><span style="display:inline-block;min-width:44px;padding:2px 8px;border-radius:8px;background:${scoreColor};color:#fff;font-weight:800;font-size:11px;text-align:center">${s.score}</span>
+      <td><span style="display:inline-block;min-width:44px;padding:2px 8px;border-radius:8px;background:${isNew?'#94A3B8':scoreColor};color:#fff;font-weight:800;font-size:11px;text-align:center" title="${isNew?'Joined this month with roles already open — not rated until she closes one':''}">${isNew?'not rated':s.score}</span>
         <div style="font-size:9px;color:#94A3B8;margin-top:1px;display:flex;gap:3px;flex-wrap:wrap;">
           <span title="Workload 35%">WH${s.u.wh.toFixed(0)}</span>·<span title="Closure 25%">CE${s.u.ce.toFixed(0)}</span>·<span title="Speed 20%">CS${s.u.cs.toFixed(0)}</span>·<span title="Overdue 20%">OC${s.u.oc.toFixed(0)}</span>
         </div></td></tr>`;
@@ -9207,28 +9275,45 @@ function _trIssueText(d){
        : d.state==='unreadable' ? 'unreadable date ("'+String(d.raw).slice(0,20)+'")'
        : 'no date recorded';
 }
-/* Occupancy, bus by bus, for ACTIVE buses only. Riders come from the route sheet
-   (the school's own count) or, failing that, the students assigned to the route
-   or the bus. A bus with no rider data is left out of the percentage and named,
-   rather than counted as an empty bus. */
+/* Occupancy, bus by bus, for ACTIVE buses only.
+
+   STUDENTS ONLY (9 Oct 2026, at the director's instruction). Seats are bought
+   for children, so the percentage answers "how full is the bus of pupils".
+   Transport_Student carries a Rider Type on every row — 2,690 Student and 191
+   Teacher across the group — and the route sheet's own "Active Riders" column
+   is the two added together (Boduppal 829 = 788 + 41, Gowdavalli 100 = 79 + 21),
+   which is why it used to flatter the figure. Riders are therefore counted from
+   the student sheet with the staff rows removed, and the route sheet's total is
+   used only for a bus that has no rider rows at all. A blank Rider Type counts
+   as a pupil — the larger and safer assumption for a school bus.
+
+   A bus with no rider data is left out of the percentage and named, rather than
+   counted as an empty bus. */
 var _trRK=function(x){ return String(x==null?'':x).toUpperCase().replace(/[^A-Z0-9]/g,'').replace(/^(ROUTE|RTE|RT|R)(?=\d)/,'').replace(/^0+/,''); };
+function _trIsStaffRider(x){ return /staff|teacher|employee|faculty|driver|attender|attendant|ayah|helper/i.test(String(x&&x.RiderType||'')); }
 function _trBusRows(T,b){
   var routes=(T.routes||[]).filter(function(r){ return r.Branch===b; });
   var studs=(T.students||[]).filter(function(x){ return x.Branch===b; });
   return (T.vehicles||[]).filter(function(v){ return v.Branch===b && !_trIsRetired(v); }).map(function(v){
     var rt=routes.find(function(r){ return _trRK(r.Route)!=='' && _trRK(r.Route)===_trRK(v.RouteNo); });
-    var counted=studs.filter(function(x){ return (_trRK(x.Route)!=='' && _trRK(x.Route)===_trRK(v.RouteNo)) ||
-                                                  (_trRK(x.VehicleNo)!=='' && _trRK(x.VehicleNo)===_trRK(v.VehicleNo)); }).length;
-    var known=(rt && +rt.ActiveRiders>0) || counted>0;
-    var riders=(rt && +rt.ActiveRiders>0) ? +rt.ActiveRiders : counted;
+    var onBus=studs.filter(function(x){ return (_trRK(x.Route)!=='' && _trRK(x.Route)===_trRK(v.RouteNo)) ||
+                                               (_trRK(x.VehicleNo)!=='' && _trRK(x.VehicleNo)===_trRK(v.VehicleNo)); });
+    var staff=onBus.filter(_trIsStaffRider).length, pupils=onBus.length-staff;
+    /* the route sheet's figure is students + staff, so it is a last resort only */
+    var fromRoute=!onBus.length && rt && +rt.ActiveRiders>0;
+    var known=onBus.length>0 || !!fromRoute;
+    var riders=onBus.length ? pupils : (fromRoute ? +rt.ActiveRiders : 0);
     var seats=(+v.Seats>0) ? +v.Seats : ((rt && +rt.Capacity>0) ? +rt.Capacity : 0);
-    return { v:v, active:_trIsActive(v), spare:_trIsSpare(v), known:known, riders:riders, seats:seats };
+    return { v:v, active:_trIsActive(v), spare:_trIsSpare(v), known:known, riders:riders, seats:seats,
+             pupils:pupils, staff:staff, listed:onBus.length, fromRoute:!!fromRoute };
   });
 }
 function _trOcc(rows){
   var use=rows.filter(function(x){ return x.active && x.known && x.seats>0; });
   var seats=use.reduce(function(s,x){ return s+x.seats; },0), riders=use.reduce(function(s,x){ return s+x.riders; },0);
   return { seats:seats, riders:riders, pct: seats ? Math.round(riders/seats*100) : 0,
+           staff:use.reduce(function(s,x){ return s+(x.staff||0); },0),
+           routeOnly:use.filter(function(x){ return x.fromRoute; }).length,
            active:rows.filter(function(x){ return x.active; }).length,
            spare:rows.filter(function(x){ return x.spare; }).length,
            noData:rows.filter(function(x){ return x.active && !x.known; }).length };
@@ -9265,7 +9350,7 @@ function renderTransport(){
   setTxt('tr-veh-s',fi(occAll.active)+' active · '+fi(occAll.spare)+' spare · click to view');
   setTxt('tr-stu',fi(students.length));
   setTxt('tr-occ',occ+'%');
-  setTxt('tr-occ-s',fi(riders)+' riders ÷ '+fi(seats)+' seats · active buses'+(occAll.noData?' · '+occAll.noData+' with no rider data left out':''));
+  setTxt('tr-occ-s',fi(riders)+' students ÷ '+fi(seats)+' seats · active buses · staff riders not counted'+(occAll.noData?' · '+occAll.noData+' with no rider data left out':''));
   // Spare/Extra vehicles: routes named "EXTRA"/"SPARE"/"STANDBY" or vehicles not assigned to a numbered route
   // Spare vehicles: identified by Status="Spare" in the Transport_Vehicle sheet
   const spareVehicles=vehicles.filter(_trIsSpare);
@@ -9608,41 +9693,27 @@ function viewTransport(kind,branch){
        seats come from the vehicle. A bus with no seat count cannot be given a
        percentage and says so rather than showing 0%. */
     const cols=[{key:'VehicleNo',label:'Vehicle'},{key:'RouteNo',label:'Route'},
-      {key:'Driver',label:'Driver'},{key:'Seats',label:'Seats'},{key:'Riders',label:'Riders'},
+      {key:'Driver',label:'Driver'},{key:'Seats',label:'Seats'},{key:'Riders',label:'Students'},
+      {key:'Staff',label:'Staff riders'},
       {key:'Occupancy',label:'Occupancy'},{key:'Spare',label:'Free seats'}];
-    /* Route numbers are written differently in the three sheets — "1", "01",
-       "Route 1", "R-1" — so a string comparison matched almost nothing and
-       every bus reported zero riders. Normalising to digits-and-letters only
-       makes the join work; the same for vehicle numbers, which carry stray
-       spaces. Where the route sheet already holds ActiveRiders and Capacity,
-       those are used in preference: they are the school's own figures. */
-    const rkey=v=>String(v==null?'':v).toUpperCase().replace(/[^A-Z0-9]/g,'')
-      /* "ROUTE12", "RT12", "R12" and "12" are the same route. Only strip the
-         prefix when digits follow it, so a vehicle number beginning with R is
-         left alone. */
-      .replace(/^(ROUTE|RTE|RT|R)(?=\d)/,'')
-      .replace(/^0+/,'');
+    /* This list is built from _trBusRows, the same function the percentage
+       above it is built from, so the two can never disagree — and like that
+       percentage it counts PUPILS only, with staff riders shown in their own
+       column rather than folded into the figure. */
     const groups=scope.map(b=>{
-      const routes=(T.routes||[]).filter(r=>r.Branch===b);
-      const rows=(T.vehicles||[]).filter(r=>r.Branch===b && !_trIsRetired(r)).map(v=>{
-        const rt=routes.find(r=>rkey(r.Route)===rkey(v.RouteNo) && rkey(v.RouteNo)!=='');
-        const counted=(T.students||[]).filter(x=>x.Branch===b && (
-          (rkey(x.Route)!=='' && rkey(x.Route)===rkey(v.RouteNo)) ||
-          (rkey(x.VehicleNo)!=='' && rkey(x.VehicleNo)===rkey(v.VehicleNo))
-        )).length;
-        const riders=(rt && +rt.ActiveRiders>0) ? +rt.ActiveRiders : counted;
-        const seats=(+v.Seats>0) ? +v.Seats : ((rt && +rt.Capacity>0) ? +rt.Capacity : 0);
-        const known=(rt && +rt.ActiveRiders>0) || counted>0, spare=_trIsSpare(v);
-        const pct=(seats && known && !spare)?Math.round(riders/seats*100):null;
-        return { Branch:b, VehicleNo:v.VehicleNo||'–', RouteNo:v.RouteNo||'–', Driver:v.Driver||'–',
-          Seats:seats||'–', Riders:spare?'–':(known?riders:'–'),
-          Occupancy: spare?'spare — not counted':!known?'no rider data — not counted':pct===null?'no seat count':pct+'%',
-          Spare: (seats && known && !spare)?Math.max(0,seats-riders):'–', _pct: pct===null?(spare?-3:!known?-2:-1):pct };
+      const rows=_trBusRows(T,b).map(x=>{
+        const v=x.v, pct=(x.seats && x.known && !x.spare)?Math.round(x.riders/x.seats*100):null;
+        return { Branch:b, VehicleNo:v.VehicleNo||'\u2013', RouteNo:v.RouteNo||'\u2013', Driver:v.Driver||'\u2013',
+          Seats:x.seats||'\u2013', Riders:x.spare?'\u2013':(x.known?x.riders:'\u2013'),
+          Staff:x.spare?'\u2013':(x.listed?(x.staff||0):(x.fromRoute?'not split':'\u2013')),
+          Occupancy: x.spare?'spare \u2014 not counted':!x.known?'no rider data \u2014 not counted':pct===null?'no seat count':pct+'%',
+          Spare: (x.seats && x.known && !x.spare)?Math.max(0,x.seats-x.riders):'\u2013',
+          _pct: pct===null?(x.spare?-3:!x.known?-2:-1):pct };
       }).sort((a,b2)=>b2._pct-a._pct);
       return {key:b,count:rows.length,rows:rows};
     }).filter(g=>g.count>0);
     openBranchAccordion('\uD83D\uDE8C Bus occupancy \u2014 branch by branch',
-      'Each active bus, fullest first \u00b7 riders \u00f7 seats \u00b7 spare buses and buses with no rider data are not counted', groups, cols, 'vehicles');
+      'Each active bus, fullest first \u00b7 students \u00f7 seats \u00b7 staff riders are listed but not counted \u00b7 spare buses and buses with no rider data are left out', groups, cols, 'vehicles');
     return;
   }
   if(kind==='vehicles'||kind==='fleet'){
@@ -23832,9 +23903,24 @@ window.VCHK = (function () {
     status:['status'], raised:['raiseddate','date','raisedon'], raisedAt:['raisedat','time'],
     raisedBy:['raisedby','officer','inspector'], source:['source'],
     assigned:['assignedto','assignee','owner','incharge'],
-    assignedRole:['assignedrole','role'], assignedDate:['assigneddate'],
-    approval:['approval'], note:['updatenote','note'], closed:['closeddate','closedon'],
-    target:['targetdate','duedate'], days:['daysopen','days']
+    assignedRole:['assignedrole','role'], assignedDate:['assignedon','assigneddate'],
+    approval:['approval'], note:['updatenote','note'], closed:['closedon','closeddate'],
+    target:['targetdate','duedate'], days:['daysopen','days'],
+    /* 9 Oct 2026 — the columns the Safety app has been writing all along and
+       this module never read. "Stage" is the app's own three-state summary
+       (Open · Resolved - to verify · Closed) and is more dependable than the
+       seven-value Status, so it decides whether a point is open when it is
+       present. The rest is what a manager asks for the moment a point is put in
+       front of them: what the plan is, who was given it, what was done, who
+       signed it off, how far past target it is. */
+    stage:['stage'], assignedBy:['assignedby'], plan:['actionplan','plan'],
+    est:['estcost','estimatedcost'], overdue:['overduedays'],
+    workDone:['workdone'], workDoneBy:['workdoneby'],
+    verifiedBy:['verifiedby'], verifyResult:['verifyresult'], verifyDate:['verifydate'],
+    daysToClose:['daystoclose'], root:['rootcause'], prevent:['preventiveaction'],
+    remarks:['remarks','remark'], repeat:['repeat'], checkpoint:['checkpoint'],
+    timesSeen:['timesseen'], lastSeen:['lastseen'], reopens:['reopens'],
+    updated:['lastupdated']
   };
   function norm(s){ return String(s==null?'':s).toLowerCase().replace(/[^a-z0-9]/g,''); }
   function indexOf(hdr){
@@ -23942,6 +24028,14 @@ window.VCHK = (function () {
         raisedBy:g(r,'raisedBy'), source:g(r,'source'), assigned:g(r,'assigned'),
         assignedRole:g(r,'assignedRole'), approval:g(r,'approval'), note:g(r,'note'),
         closed:g(r,'closed'), target:g(r,'target'),
+        stage:g(r,'stage'), assignedDate:g(r,'assignedDate'), assignedBy:g(r,'assignedBy'),
+        plan:g(r,'plan'), est:g(r,'est'), overdue:g(r,'overdue'),
+        workDone:g(r,'workDone'), workDoneBy:g(r,'workDoneBy'),
+        verifiedBy:g(r,'verifiedBy'), verifyResult:g(r,'verifyResult'), verifyDate:g(r,'verifyDate'),
+        daysToClose:g(r,'daysToClose'), root:g(r,'root'), prevent:g(r,'prevent'),
+        remarks:g(r,'remarks'), repeat:g(r,'repeat'), checkpoint:g(r,'checkpoint'),
+        timesSeen:g(r,'timesSeen'), lastSeen:g(r,'lastSeen'), reopens:g(r,'reopens'),
+        updated:g(r,'updated'),
         photos: photosOf(r, M)
       };
     }).filter(function(x){ return x.branch; });
@@ -24004,6 +24098,30 @@ window.VCHK = (function () {
         .sort(function(a,b){ return dayOf(a) - dayOf(b); });
       if (targets.length) rep.target = targets[0];
 
+      /* The written record of a checkpoint is spread across its visits: the
+         plan was typed on the visit that assigned it, the sign-off on the visit
+         that closed it. Taking everything from the newest live visit left those
+         boxes empty on screen, so each one is filled from the most recent visit
+         that actually has it. Counters take the highest figure seen, and the
+         closing date the latest one. */
+      ['plan','remarks','note','root','prevent','assignedBy','assignedDate','workDone','workDoneBy',
+       'verifiedBy','verifyResult','verifyDate','est','checkpoint','detail','approval'].forEach(function(k){
+        if (rep[k]) return;
+        for (var i = 0; i < g.length; i++) if (g[i][k]) { rep[k] = g[i][k]; return; }
+      });
+      ['timesSeen','reopens'].forEach(function(k){
+        var n = g.map(function(v){ return parseFloat(v[k]); }).filter(function(x){ return isFinite(x); });
+        if (n.length) rep[k] = String(Math.max.apply(null, n));
+      });
+      var closes = g.map(function(v){ return v.closed; }).filter(function(t){ return dayOf(t); })
+        .sort(function(a,b){ return dayOf(b) - dayOf(a); });
+      rep.closed = isOpen(rep) || toVerify(rep) ? '' : (closes[0] || rep.closed);
+      /* days past target, recomputed against the target this checkpoint is
+         actually being held to rather than copied from one of its visits */
+      var tgt = dayOf(rep.target);
+      rep.overdueDays = (isOpen(rep) && tgt)
+        ? Math.max(0, Math.round((Date.now() - tgt) / 86400000)) : 0;
+
       rep.visits = g.length;
       rep.openVisits = g.filter(isOpen).length;
       rep.history = g;
@@ -24034,9 +24152,24 @@ window.VCHK = (function () {
      (unassigned, overdue, open critical, over 30 days). It gets its own counter
      instead, because an unverified fix is still a loose end — just a different
      one, owned by whoever verifies rather than by the branch. */
-  function isOpen(r){ return !/^(closed|verified|resolved|rejected|not valid)/i.test(String(r.status).trim())
+  /* The Safety app writes its own three-state summary in "Stage" — Open ·
+     Resolved - to verify · Closed — and uses it to drive the app's own views.
+     Where it is present it decides, because it is one field with three values
+     rather than seven status strings that have to be pattern-matched; on this
+     sheet the two agree exactly (38 open · 12 to verify · 102 closed), so this
+     changes no figure today and keeps them agreeing when a new status wording
+     appears. A sheet or a Code.gs old enough not to carry Stage falls through
+     to the status rules below, unchanged. */
+  function stageOf(r){ return String(r && r.stage || '').trim(); }
+  function isOpen(r){
+    var st = stageOf(r);
+    if(st) return /^open/i.test(st);
+    return !/^(closed|verified|resolved|rejected|not valid)/i.test(String(r.status).trim())
       && !/verified/i.test(r.status) && !toVerify(r); }
-  function toVerify(r){ return /work done.*verification pending|verification pending/i.test(r.status); }
+  function toVerify(r){
+    var st = stageOf(r);
+    if(st) return /to\s*verify|verification\s*pending/i.test(st);
+    return /work done.*verification pending|verification pending/i.test(r.status); }
   function awaitingSanction(r){ return /awaiting approval|awaiting sanction|approval pending/i.test(r.status+' '+r.approval); }
   function isRed(r){ return /^red$/i.test(String(r.flag).trim()); }
   function unassigned(r){ return !r.assigned || /unassigned|^-+$|^not yet assigned$/i.test(r.assigned.trim()); }
@@ -24213,7 +24346,32 @@ window.VCHK = (function () {
     {key:'raised',label:'First raised',date:true},
     {key:'area',label:'Area'},{key:'location',label:'Location',maxW:'170px'},
     {key:'detail',label:'Detail',maxW:'240px'},
-    {key:'severity',label:'Severity',pill:true},{key:'assigned',label:'Assigned to'},
+    {key:'severity',label:'Severity',pill:true},
+    {key:'assigned',label:'Assigned to',render:function(v,r){
+      var who=esc(v||'—');
+      var by=r.assignedBy?'<div style="font-size:10.5px;color:#94A3B8">by '+esc(r.assignedBy)+
+             (r.assignedDate?' · '+esc(_vckD(r.assignedDate)):'')+'</div>':'';
+      return who+by; }},
+    /* Recovered on 9 Oct 2026. The feed had been dropping these columns, so a
+       point opened from any tile showed what was wrong and nothing about what
+       anyone intended to do, had done, or had signed off. */
+    {key:'plan',label:'Action plan',maxW:'260px'},
+    {key:'target',label:'Target',date:true,render:function(v,r){
+      if(!v) return '<span style="color:#CBD5E1">—</span>';
+      var d=esc(_vckD(v));
+      return r.overdueDays>0 ? d+'<div style="font-size:10.5px;color:#B91C1C;font-weight:700">'+r.overdueDays+'d past target</div>' : d; }},
+    {key:'workDone',label:'Work done',render:function(v,r){
+      if(!v) return '<span style="color:#CBD5E1">—</span>';
+      return esc(_vckD(v))+(r.workDoneBy?'<div style="font-size:10.5px;color:#94A3B8">'+esc(r.workDoneBy)+'</div>':''); }},
+    {key:'verifyResult',label:'Verified',render:function(v,r){
+      if(!v && !r.verifiedBy) return '<span style="color:#CBD5E1">—</span>';
+      var c=/fail/i.test(v)?'#B91C1C':/pass/i.test(v)?'#059669':'#64748B';
+      return '<b style="color:'+c+'">'+esc(v||'—')+'</b>'+
+        (r.verifiedBy?'<div style="font-size:10.5px;color:#94A3B8">'+esc(r.verifiedBy)+
+          (r.verifyDate?' · '+esc(_vckD(r.verifyDate)):'')+'</div>':''); }},
+    {key:'closed',label:'Closed on',date:true},
+    {key:'remarks',label:'Remarks',maxW:'240px'},
+    {key:'root',label:'Root cause'},
     {key:'status',label:'Status',pill:true},
     {key:'visitLog',label:'Every visit',maxW:'300px',render:function(v,r){
       var h=r.history||[];
