@@ -803,10 +803,12 @@ function _liveCycle(){
   LIVE_SECTIONS.forEach(function(sec, i){
     if(!_liveCanOpen([sec.tab].concat(sec.also||[]))) return;
     setTimeout(function(){
-      /* a background check: loaders skip the redraw they do when a tab is
-         opened, and redraw only if the sheet changed (flag read synchronously) */
-      window.__liveBg=true;
-      try{ sec.run(); }catch(e){} finally{ window.__liveBg=false; }
+      /* Keep the background flag set until async loaders have settled; otherwise
+         their post-fetch render can be mistaken for a foreground tab open. */
+      window.__liveBg = true;
+      Promise.resolve().then(function(){ return sec.run(); })
+        .catch(function(err){ console.warn('Background refresh failed for ' + sec.tab + ':', err); })
+        .finally(function(){ window.__liveBg = false; });
     }, i*700);                                                       // staggered, never all at once
   });
 }
@@ -942,13 +944,18 @@ async function loadLiveData(isRefresh) {
       return;
     }
     const txt = await res.text();
-let data;
-try { data = JSON.parse(txt); }
-catch (e) {
-  showLoadError('Data server busy (HTTP ' + res.status + ') — retrying in 5 seconds…');
-  setTimeout(() => loadLiveData(true), 5000);
-  return;
-}  
+    if (!res.ok) {
+      showLoadError('Data service returned HTTP ' + res.status + ' — retrying in 5 seconds…');
+      setTimeout(() => loadLiveData(true), 5000);
+      return;
+    }
+    let data;
+    try { data = JSON.parse(txt); }
+    catch (e) {
+      showLoadError('Data server returned an invalid response (HTTP ' + res.status + ') — retrying in 5 seconds…');
+      setTimeout(() => loadLiveData(true), 5000);
+      return;
+    }
 
     if (data.error) {
       showLoadError('Server error: ' + data.message +
@@ -962,7 +969,7 @@ catch (e) {
     showLoadOk(data.generatedAt, data.computeMs);
     // Persist to IndexedDB (localStorage can't hold the multi-MB payload → its writes silently
     // failed, which is why every open was slow). IndexedDB makes the next open instant.
-    idbSet('pbes_data', { t: Date.now(), data: data });
+    idbSet('pbes_data', { t: Date.now(), userId: session.user && session.user.id || '', data: data });
     idbSet('pbes_role', { role: window._ROLE||'', branch: window._USER_BRANCH||null });
     if (typeof renderAll === 'function') renderAll();
     applyRoleAccess();
@@ -1268,6 +1275,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const userBranch = session.user?.app_metadata?.branch || null;
   /* Exposed so panels rendered later can tell a branch account from a
      group-wide one without re-reading the session. */
+  window._SESSION_USER_ID = session.user?.id || '';
+  const sessionMeta = session.user?.app_metadata || {};
+  window._ROLE = String(sessionMeta.role || '').toLowerCase().trim();
   window._USER_BRANCH = userBranch;
   window._ME_EMAIL = session.user?.email || '';
   if (userBranch) {
