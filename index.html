@@ -341,6 +341,15 @@ body.nav-min .sn-foot{display:none}
 #pane-civil tr.clkr{cursor:pointer}
 #pane-civil tr.clkr:hover td{background:var(--pl)}
 
+/* ═══ TERM 1 FEEDBACK TAB ═══ */
+/* Every figure on this page opens the responses behind it, so every figure has
+   to look like it can be opened — a dotted underline on hover rather than a
+   permanent link colour, which would turn the tables into a wall of blue. */
+.t1k{cursor:pointer;border-bottom:1px dotted transparent;transition:border-color .12s,background .12s}
+.t1k:hover{border-bottom-color:currentColor;background:rgba(30,79,216,.07);border-radius:3px}
+button.au-cell.t1k{border:none}
+#pane-term1 .au-tbl td .t1k{display:inline-block}
+#pane-term1 .pt-warn .t1k:hover{background:rgba(146,64,14,.1)}
 /* ═══ PTM FEEDBACK TAB ═══ */
 .pt-warn{border:1px solid #FCD34D;background:linear-gradient(180deg,#FFFBEB,#FFFDF5);
   border-radius:14px;padding:16px 20px}
@@ -2763,7 +2772,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
       <div class="au-ctl">
         <span class="scope-chip" id="t1-scope"><i></i>All branches</span>
-        <div class="f"><label for="t1-branch">Branch</label><select id="t1-branch"></select></div>
+        <span style="font-size:10.5px;color:var(--txl);align-self:center">branch follows the filter at the top of the page</span>
         <div class="f"><label for="t1-curr">Curriculum</label><select id="t1-curr"></select></div>
         <div class="f"><label for="t1-band">Grade band</label><select id="t1-band"></select></div>
         <span class="exm-status" id="t1-status"></span>
@@ -2825,6 +2834,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div style="height:18px"></div>
         <div class="au-h4">Which subject clusters where</div>
         <div id="t1-lift"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>The words only they are using</h3>
+        <div class="sub">Not the most common words — the words each branch uses disproportionately against the
+          others, and the phrases parents reached for most often. This is the layer that says something a manager
+          has not already heard.</div>
+        <div id="t1-words"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>The same point, made separately by several parents</h3>
+        <div class="sub">Comments grouped by how much language they share. A theme count tells you how many parents
+          mentioned academics; this tells you which particular complaint a dozen of them wrote independently — the
+          one worth answering in a circular rather than one call at a time.</div>
+        <div id="t1-repeat"></div>
       </div>
 
       <div class="au-sec">
@@ -26046,88 +26071,283 @@ window.renderCivilTab = function (raw) {
      comparable across branches, never as a sentiment score pretending to be
      precise.
    ══════════════════════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════════
+   TERM 1 PARENT FEEDBACK & NPS  —  analysis engine
+
+   The survey tab is the Google Form's own response sheet: seven rated
+   questions, a 0–10 recommend score, a free-text box and a request-a-call
+   flag. Nothing is pre-computed in the sheet, so every figure on this page is
+   derived here — which means a second survey round needs no new code.
+
+   THE DECISIONS THIS ENGINE MAKES, because each one changes the numbers:
+
+   DUPLICATES  A handful of parents filled the form twice. The later answer is
+     the one they meant, so earlier submissions by the same student are set
+     aside — counted and shown, never silently dropped.
+
+   NPS  Standard: promoters 9–10, passives 7–8, detractors 0–6, score =
+     %promoters − %detractors. Reported as a whole number between −100 and
+     +100 and never averaged with the 1–5 ratings.
+
+   STRAIGHT-LINING  A response that gives all seven questions the same score
+     carries no information about which part of the school is working. They are
+     left in the totals — they are real parents — but counted and reported,
+     because a page of identical 5s moves every average upward.
+
+   ── THE TEXT LAYER ──────────────────────────────────────────────────────
+   "9. Your Feedback" is the only place a parent says WHY, so it is read
+   properly rather than keyword-counted:
+
+   CLAUSE SPLITTING  A comment is cut at sentence ends and at the words that
+     turn a sentence round — "but", "however", "although", "except". Each piece
+     is scored on its own, so "teaching is excellent but the bus is always
+     late" is positive about academics and negative about transport instead of
+     averaging to nothing.
+
+   NEGATION  A sentiment word is flipped when a negator governs it within a
+     short window: "not good", "no response", "never informed". Scoped to the
+     clause so a negation does not leak across a full stop.
+
+   INTENSITY  Modifiers scale the weight — "very poor" and "slightly late" are
+     not the same complaint — and so do capitals and exclamation marks.
+
+   ASPECT SENTIMENT  Tone is attributed to the THEME in the clause that carries
+     it, not to the whole comment. That is what lets the page say academics is
+     praised at one branch and attacked at another from the same corpus.
+
+   DISTINCTIVE WORDS  TF-IDF across branches: the terms a branch uses far more
+     than the group does. These are the words a manager has not already heard.
+
+   REPEATED COMPLAINTS  Comments are compared on their content words (Jaccard)
+     and grouped above a similarity threshold, which surfaces the complaint
+     twenty families wrote separately — the single most actionable thing in a
+     free-text box and invisible to a theme count.
+
+   URGENCY  A separate axis from sentiment: a calm sentence reporting a child
+     being hurt outranks an angry one about a notice board. Driven by harm
+     words, repetition ("again", "several times"), escalation ("no response
+     from management") and an explicit threat to leave.
+
+   None of this is a neural model and the page never claims it is. It is a
+   lexicon with structure around it, which is honest about what it can do and
+   fails visibly rather than silently.
+   ══════════════════════════════════════════════════════════════════════════ */
 window.T1 = (function () {
   'use strict';
 
   var str = function (v) { return String(v == null ? '' : v).trim(); };
   var num = function (v) { var n = parseFloat(String(v).replace(/[^0-9.\-]/g, '')); return isFinite(n) ? n : null; };
 
-  /* the seven rated questions, in the order the form asks them */
   var DIMS = [
-    { k: 'overall', q: '1. Overall Satisfaction',                     label: 'Overall satisfaction', c: '#1E4FD8' },
-    { k: 'acad',    q: '2. Academics & Teaching',                     label: 'Academics & teaching', c: '#7C3AED' },
-    { k: 'comm',    q: '3. Communication with Parents',               label: 'Communication',        c: '#0D9488' },
-    { k: 'safe',    q: '4. Safety & Security',                        label: 'Safety & security',    c: '#059669' },
-    { k: 'infra',   q: '5. Infrastructure & Cleanliness',             label: 'Infrastructure',       c: '#B45309' },
-    { k: 'admin',   q: '6. Administration & Support Services',        label: 'Administration',       c: '#BE185D' },
-    { k: 'trans',   q: '7. Transport',                                label: 'Transport',            c: '#DC2626' }
+    { k: 'overall', q: '1. Overall Satisfaction',              label: 'Overall satisfaction', c: '#1E4FD8' },
+    { k: 'acad',    q: '2. Academics & Teaching',              label: 'Academics & teaching', c: '#7C3AED' },
+    { k: 'comm',    q: '3. Communication with Parents',        label: 'Communication',        c: '#0D9488' },
+    { k: 'safe',    q: '4. Safety & Security',                 label: 'Safety & security',    c: '#059669' },
+    { k: 'infra',   q: '5. Infrastructure & Cleanliness',      label: 'Infrastructure',       c: '#B45309' },
+    { k: 'admin',   q: '6. Administration & Support Services', label: 'Administration',       c: '#BE185D' },
+    { k: 'trans',   q: '7. Transport',                         label: 'Transport',            c: '#DC2626' }
   ];
 
-  /* Grade order as the school runs it, so "where satisfaction falls away"
-     reads down the school rather than alphabetically. */
   var GRADE_ORDER = ['EY 1','EY 2','EY 3','Pre-Primary','Nursery','LKG','UKG',
                      'I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
-  function gradeRank(g) {
-    var i = GRADE_ORDER.indexOf(str(g));
-    return i < 0 ? 99 : i;
-  }
-  /* EY and primary and secondary, for the three-band read */
-  function band(g) {
-    var r = gradeRank(g);
-    return r <= 6 ? 'Early years' : r <= 11 ? 'Primary (I–V)' : 'Secondary (VI–XII)';
-  }
+  function gradeRank(g) { var i = GRADE_ORDER.indexOf(str(g)); return i < 0 ? 99 : i; }
+  function band(g) { var r = gradeRank(g); return r <= 6 ? 'Early years' : r <= 11 ? 'Primary (I–V)' : 'Secondary (VI–XII)'; }
 
-  /* ── what parents write about ───────────────────────────────────────────
-     Each theme is the wording that actually appears in these 471 comments,
-     not a generic satisfaction taxonomy. A comment can carry several. */
+  /* ── themes: the wording these parents actually use ── */
   var THEMES = [
     { k: 'Academics & teaching', c: '#1E4FD8', owner: 'Principal & Coordinators',
-      re: /\b(teach|teacher|teaching|academ|syllabus|curriculum|subject|lesson|concept|explain|revision|revise|learning|learn|study|studies|tutor|doubt|portion|exam|test|marks|result|grammar|maths|math|science|english|hindi|telugu|social)\b/i },
+      /* exam\w* also matched "example" */
+      re: /\b(teach\w*|academ\w*|syllabus|curriculum|subject\w*|lesson\w*|concept\w*|explain\w*|revision|revise|learning|learn|study|studies|tutor|doubt\w*|portion|exam|exams|examination\w*|test|tests|marks|result\w*|grammar|maths|math|science|english|hindi|telugu|social|spoken)\b/i },
     { k: 'Sports & activities', c: '#0369A1', owner: 'Principal',
-      re: /\b(sport|sports|games|playground|physical education|\bpe\b|activity|activities|extra ?curricular|dance|music|art|craft|yoga|swimming|celebration|annual day|field trip|excursion)\b/i },
+      re: /\b(sport\w*|games|playground|physical education|\bpe\b|activit\w*|extra ?curricular|dance|music|art|craft|yoga|swimming|celebration\w*|annual day|field trip|excursion|competition)\b/i },
     { k: 'Administration & staff conduct', c: '#BE185D', owner: 'Admin Incharge',
-      re: /\b(administrat|\badmin\b|office|reception|front desk|management|rude|attitude|misbehav|partial|bias|biased|favour|favor|unprofessional|careless)\b/i },
+      re: /\b(administrat\w*|\badmin\b|office|reception|front desk|management|rude\w*|attitude|misbehav\w*|partial\w*|bias\w*|favour\w*|favor\w*|unprofessional|careless|arrogan\w*|disrespect\w*)\b/i },
     { k: 'Communication & response', c: '#0D9488', owner: 'Grievance Officer',
-      re: /\b(communicat|inform|informed|update|respond|response|reply|call back|callback|no information|circular|whatsapp|message|diary|almanac|parent teacher meeting|\bptm\b)\b/i },
+      re: /\b(communicat\w*|inform\w*|update\w*|respond\w*|response|reply|replies|call back|callback|no information|circular|whatsapp|message\w*|diary|almanac|parent teacher meeting|\bptm\b|intimat\w*)\b/i },
     { k: 'Homework & workload', c: '#7C3AED', owner: 'Coordinators',
-      re: /\b(homework|home work|\bhw\b|assignment|workload|burden|too much work|writing work|worksheet|project work)\b/i },
+      re: /\b(homework|home work|\bhw\b|assignment\w*|workload|burden|too much work|writing work|worksheet\w*|project work|pressure)\b/i },
     { k: 'Individual attention', c: '#9333EA', owner: 'Coordinators',
-      re: /\b(individual attention|personal attention|one on one|slow learner|not focus|ignor|neglect|special care|weak student|weak in)\b/i },
+      re: /\b(individual attention|personal attention|one on one|slow learner\w*|not focus\w*|ignor\w*|neglect\w*|special care|weak student\w*|weak in|left behind)\b/i },
     { k: 'Cleanliness & washrooms', c: '#059669', owner: 'Admin Incharge',
-      re: /\b(clean|cleanli|hygien|washroom|toilet|rest ?room|dirty|dust|smell|sanitat)\b/i },
+      re: /\b(clean\w*|hygien\w*|washroom\w*|toilet\w*|rest ?room\w*|dirty|dust\w*|smell\w*|sanitat\w*|stink\w*)\b/i },
     { k: 'Infrastructure & class size', c: '#4F46E5', owner: 'Admin Incharge',
-      re: /\b(infrastructur|classroom|class room|building|furniture|bench|desk|\bac\b|fan|lab\b|library|crowd|class size|class strength|smart board|projector)\b/i },
+      /* fan\w* also matched "fantastic" */
+      re: /\b(infrastructur\w*|class ?room\w*|building|furniture|bench\w*|desk\w*|\bac\b|fan|fans|\blab\b|labs|library|crowd\w*|class size|class strength|smart board|projector|space)\b/i },
     { k: 'Transport & bus', c: '#DC2626', owner: 'Transport Incharge',
-      re: /\b(bus|transport|driver|route|pick ?up|drop|\bvan\b|ayah|attender|attendant)\b/i },
+      /* bus\w* also matched "business" */
+      re: /\b(bus|buses|busses|transport\w*|driver\w*|route\w*|pick ?up|drop\w*|\bvan\b|ayah|attender\w*|attendant\w*|tracking|neotrack)\b/i },
     { k: 'Fees & billing', c: '#B45309', owner: 'Accounts',
-      re: /\b(fee|fees|payment|charge|charges|expensive|costly|money|refund|hike|donation)\b/i },
+      /* fee\w* also matched "feel", "feeling" and — worst — "feedback", which
+         appears in a quarter of all comments. Spelled out instead. */
+      re: /\b(fee|fees|fee ?structure|payment\w*|charge|charges|charged|expensive|costly|money|refund\w*|hike|donation\w*|invoice\w*|bill|bills|billing)\b/i },
     { k: 'Food & canteen', c: '#CA8A04', owner: 'Admin Incharge',
-      re: /\b(food|meal|lunch|snack|canteen|menu|nutrition|drinking water|breakfast|tiffin)\b/i },
+      re: /\b(food|meal\w*|lunch|snack\w*|canteen|menu|nutrition|drinking water|breakfast|tiffin)\b/i },
     { k: 'Safety & discipline', c: '#991B1B', owner: 'Vigilance Officer',
-      re: /\b(safe|safety|secur|bully|bullying|fight|\bhit\b|beat|injur|discipline|cctv|guard|gate)\b/i }
+      re: /\b(safe\w*|secur\w*|bully\w*|fight\w*|\bhit\b|beat\w*|injur\w*|discipline|cctv|guard\w*|gate\w*|harass\w*)\b/i }
   ];
 
-  /* Tone. Counted as words, not scored as a probability: the honest claim is
-     "this comment leans negative", not "this comment is 0.62 negative". */
-  var POS = /\b(good|great|excellent|happy|satisfied|satisfy|thank|appreciat|nice|wonderful|best|love|impress|improved|better|commendable|supportive|caring|dedicat|prompt|helpful|friendly|proud|pleased)\b/ig;
-  var NEG = /\b(not|never|poor|bad|worst|disappoint|unhappy|dissatisf|concern|problem|issue|complain|lack|fail|ignor|neglect|rude|delay|late|dirty|unsafe|waste|useless|pathetic|horrible|terrible|lacking|insufficient|inadequate|should improve|need to improve)\b/ig;
-  var ASK = /\b(should|please|request|kindly|need to|needs to|must|suggest|expect|hope|would like|better if|improve|improvement)\b/i;
+  /* ── sentiment lexicon, weighted: "pathetic" is not "okay" ── */
+  var POS_W = {
+    excellent:2, outstanding:2, wonderful:2, superb:2, fantastic:2, amazing:2, brilliant:2,
+    best:1.6, love:1.6, loved:1.6, delighted:1.6, impressed:1.5, impressive:1.5, commendable:1.5,
+    appreciate:1.4, appreciated:1.4, appreciating:1.4, grateful:1.4, thankful:1.4, thanks:1.1, thank:1.1,
+    happy:1.3, satisfied:1.3, satisfactory:1, pleased:1.3, proud:1.3,
+    good:1, great:1.4, nice:1, fine:0.7, better:0.9, improved:1.1, improving:1, improvement:0.5,
+    supportive:1.3, caring:1.3, dedicated:1.3, dedication:1.3, helpful:1.2, friendly:1.2,
+    prompt:1.1, punctual:1.1, polite:1.2, patient:1.1, approachable:1.2, responsive:1.2,
+    safe:1, comfortable:1, enjoy:1.2, enjoys:1.2, enjoying:1.2, perfect:1.6, smooth:1
+  };
+  var NEG_W = {
+    pathetic:2.2, horrible:2.2, terrible:2.2, worst:2.2, disgusting:2.2, unacceptable:2,
+    useless:2, waste:1.8, nonsense:1.8, shocking:1.8, appalling:2,
+    poor:1.5, bad:1.4, disappointing:1.6, disappointed:1.6, dissatisfied:1.6, unhappy:1.5,
+    frustrated:1.6, frustrating:1.6, annoyed:1.4, angry:1.6, upset:1.4,
+    rude:1.8, arrogant:1.8, careless:1.6, negligent:1.8, negligence:1.8, irresponsible:1.8,
+    unprofessional:1.6, biased:1.6, partial:1.2, unfair:1.5,
+    problem:1, problems:1, issue:0.9, issues:0.9, concern:0.9, concerns:0.9, complaint:1.2, complaints:1.2,
+    lack:1.2, lacking:1.2, insufficient:1.2, inadequate:1.3, missing:1,
+    delay:1.1, delayed:1.1, delays:1.1, late:1, slow:1, dirty:1.5, unhygienic:1.8, unsafe:2,
+    fail:1.4, failed:1.4, failing:1.4, failure:1.5, ignore:1.5, ignored:1.5, ignoring:1.5,
+    neglect:1.6, neglected:1.6, suffer:1.6, suffering:1.6, struggle:1.3, struggling:1.3,
+    worried:1.3, worry:1.2, stress:1.2, stressed:1.3, pressure:1.1, burden:1.3,
+    /* harm words carry tone as well as urgency — a sentence reporting a child
+       being hurt is not neutral just because it is calmly written */
+    hurt:1.8, injured:1.9, injury:1.8, bleeding:2, bullied:2, bullying:2,
+    hit:1.4, beaten:2, slapped:2, abuse:2.2, abused:2.2, harassed:2.2, scared:1.6, afraid:1.5
+  };
+  var NEGATORS = /^(not|no|never|none|cannot|cant|can't|dont|don't|doesnt|doesn't|didnt|didn't|wont|won't|isnt|isn't|arent|aren't|wasnt|wasn't|hasnt|hasn't|havent|haven't|nor|neither|without|hardly|barely|rarely|seldom|lack|lacking|fails|failed|stop|stopped)$/i;
+  var INTENS = { very:1.5, really:1.4, extremely:1.9, highly:1.5, totally:1.7, completely:1.8, absolutely:1.8,
+                 utterly:1.9, so:1.3, too:1.4, quite:1.1, much:1.2, 'very much':1.6, always:1.5, constantly:1.6,
+                 repeatedly:1.6, frequently:1.4, often:1.3, severely:1.8, badly:1.6, terribly:1.8,
+                 slightly:0.5, somewhat:0.6, bit:0.6, little:0.6, sometimes:0.7, occasionally:0.6, mostly:0.9 };
 
-  /* a comment with nothing in it: "NA", "ok", "good", a full stop */
-  var FILLER = /^(n\s*\/?\s*a|na|none|nil|no|nothing|ok|okay|good|very good|nice|yes|fine|\.|-)+[\s.!]*$/i;
+  /* urgency is a separate axis from tone */
+  var URGENT = [
+    { w: 34, l: 'a child was hurt or unsafe',
+      re: /\b(hurt|injur\w*|bleed\w*|wound\w*|accident|unsafe|danger\w*|choke\w*|strangl\w*|beat\w*|\bhit\b|slap\w*|abuse\w*|harass\w*|molest\w*|bull(y|ied|ying))\b/i },
+    { w: 20, l: 'raised more than once',
+      re: /\b(again|repeated\w*|multiple times|several times|many times|every ?day|daily|still not|yet to|since (last )?(month|week|term|year)|third time|second time|3rd time|2nd time|no (one|body) (has )?(responded|replied|called))\b/i },
+    { w: 18, l: 'already escalated and unanswered',
+      re: /\b(no response|not responded|no reply|never replied|no action|nothing (has been )?done|informed (the )?(principal|management|office)|complained (to|several)|escalat\w*|head office)\b/i },
+    { w: 22, l: 'threatening to leave',
+      re: /\b(change the school|changing school|leave the school|leaving the school|withdraw\w*|\btc\b|transfer certificate|shift (him|her|my child)|another school|different school|not continue|discontinu\w*)\b/i },
+    { w: 12, l: 'health',
+      re: /\b(malaria|typhoid|dengue|fever|vomit\w*|infection|sick|illness|mosquito\w*|allerg\w*|food poison\w*)\b/i },
+    { w: 10, l: 'money dispute',
+      re: /\b(refund|overcharg\w*|extra fee|double charge|paid twice|not refunded)\b/i }
+  ];
+
+  /* the sentence a parent uses to say what they want done */
+  /* "appreciate" belongs in the praise lexicon, not here: matching it made
+     "their response is highly appreciated" read as a request. An ask has to
+     carry a request verb, and a clause that is clearly praise is skipped even
+     when it does — requests normally follow the compliments, so the search
+     runs from the end of the comment backwards. */
+  var ASK_RE = /\b(should|shall|please|request(s|ed|ing)?|kindly|need to|needs to|needed|must|expect\w*|suggest\w*|would like|better if|appreciate it if|take (some )?action|look into|improve|improved|improvement|provide|arrange|ensure|increase|reduce|introduce|start|stop|allow|give|add more|focus on)\b/i;
+
+  var STOP = (' a an the and or but if is are was were be been being am to of in on for with at by from as that this ' +
+    'these those it its we our ours you your yours they their them he she his her i me my mine have has had do does ' +
+    'did doing done will would shall should can could may might must there here what which who whom when where why ' +
+    'how all any some no not very more most much many also just like really too so such only own same than then ' +
+    'once about into over under again further other each few both s t don now ').split(/\s+/)
+    .reduce(function (a, w) { if (w) a[w] = 1; return a; }, {});
+
+  var FILLER = /^(n\s*\/?\s*a|na|none|nil|no|nothing|ok|okay|good|very good|nice|yes|fine|great|excellent|satisfied|happy|\.|-|–)+[\s.!,]*$/i;
   function substantive(t) {
     if (!t) return false;
     if (FILLER.test(t.trim())) return false;
-    return (t.replace(/[^a-zA-Z]/g, '').length) >= 12;
+    return t.replace(/[^a-zA-Z]/g, '').length >= 12;
+  }
+
+  function words(t) {
+    return String(t).toLowerCase().replace(/[^a-z0-9\s']/g, ' ').split(/\s+/).filter(Boolean);
+  }
+  function content(t) {
+    return words(t).filter(function (w) { return w.length > 2 && !STOP[w]; });
+  }
+
+  /* Split into clauses. Sentence enders end one; contrast words start a new one
+     because what follows "but" is usually the real message. */
+  function clauses(t) {
+    return String(t)
+      .replace(/\s+/g, ' ')
+      .split(/(?<=[.!?;])\s+|\s+(?=\b(?:but|however|although|though|except|whereas|unfortunately|sadly)\b)/i)
+      .map(function (c) { return c.trim(); })
+      .filter(function (c) { return c.replace(/[^a-zA-Z]/g, '').length >= 3; });
+  }
+
+  /* Score one clause. Returns the signed weight and the words that produced it,
+     so the page can show its working rather than asking to be believed. */
+  function scoreClause(c) {
+    var w = words(c), score = 0, hits = [];
+    for (var i = 0; i < w.length; i++) {
+      var base = POS_W[w[i]] ? POS_W[w[i]] : NEG_W[w[i]] ? -NEG_W[w[i]] : 0;
+      if (!base) continue;
+      var mult = 1, neg = false;
+      /* look back three words for a negator or an intensifier */
+      for (var j = Math.max(0, i - 3); j < i; j++) {
+        if (NEGATORS.test(w[j])) neg = true;
+        if (INTENS[w[j]]) mult *= INTENS[w[j]];
+      }
+      var v = base * mult;
+      /* Negation does not simply flip: "not excellent" is mild disappointment,
+         not fury. Flip the sign and damp it. */
+      if (neg) v = -v * 0.6;
+      score += v;
+      hits.push({ w: w[i], v: v, neg: neg });
+    }
+    /* A clause can be a complaint without using a single negative word:
+       "never respond", "no action taken", "nobody informed us". The negator
+       is doing all the work and has nothing to flip, so these were scoring
+       zero. When a clause carries a negator and no sentiment word at all, it
+       is read as a mild complaint — which is what that construction almost
+       always is in a feedback box. */
+    if (!hits.length) {
+      for (var k = 0; k < w.length; k++) {
+        if (NEGATORS.test(w[k])) { score = -0.8; hits.push({ w: w[k], v: -0.8, neg: true, bare: true }); break; }
+      }
+    }
+    if (/!{2,}/.test(c)) score *= 1.2;
+    if (/[A-Z]{5,}/.test(c)) score *= 1.15;
+    return { score: score, hits: hits };
   }
 
   function readComment(t) {
-    var low = ' ' + String(t).toLowerCase() + ' ';
-    var th = [];
-    THEMES.forEach(function (x) { if (x.re.test(low)) th.push(x.k); });
-    var p = (low.match(POS) || []).length, n = (low.match(NEG) || []).length;
-    var tone = p > n ? 'positive' : n > p ? 'negative' : 'mixed';
-    return { themes: th, pos: p, neg: n, tone: tone, ask: ASK.test(low) };
+    var cls = clauses(t), total = 0, hits = [];
+    var aspect = {};                       // theme → signed weight from its own clauses
+    var themes = [];
+    cls.forEach(function (c) {
+      var sc = scoreClause(c);
+      total += sc.score;
+      hits = hits.concat(sc.hits);
+      var inThis = [];
+      THEMES.forEach(function (th) { if (th.re.test(c)) inThis.push(th.k); });
+      inThis.forEach(function (k) {
+        if (themes.indexOf(k) < 0) themes.push(k);
+        /* a clause mentioning two subjects splits its weight between them
+           rather than counting twice */
+        aspect[k] = (aspect[k] || 0) + sc.score / inThis.length;
+      });
+    });
+    /* a theme named only outside any scored clause still counts as raised */
+    THEMES.forEach(function (th) { if (th.re.test(t) && themes.indexOf(th.k) < 0) themes.push(th.k); });
+
+    var urg = 0, flags = [];
+    URGENT.forEach(function (u) { if (u.re.test(t)) { urg += u.w; flags.push(u.l); } });
+
+    var ask = null;
+    for (var ci = cls.length - 1; ci >= 0; ci--) {
+      var cc = cls[ci];
+      if (cc.length <= 15 || !ASK_RE.test(cc)) continue;
+      if (scoreClause(cc).score > 1.2) continue;            // this one is praise, not a request
+      ask = cc.replace(/^(and|but|also|so)\s+/i, '');
+      break;                                                 // nearest the end wins
+    }
+
+    var tone = total > 0.6 ? 'positive' : total < -0.6 ? 'negative' : 'mixed';
+    return { clauses: cls, score: total, hits: hits, themes: themes, aspect: aspect,
+             tone: tone, urgency: urg, urgencyFlags: flags, ask: ask,
+             words: content(t) };
   }
 
   function npsOf(vals) {
@@ -26146,7 +26366,7 @@ window.T1 = (function () {
     return (sx && sy) ? sxy / Math.sqrt(sx * sy) : null;
   }
 
-  /* ══════════════════════════════════════════════════════════════════════ */
+  /* ══ build ══ */
   function build(tab) {
     if (!tab || !tab.hdr || !tab.rows || !tab.rows.length)
       throw new Error('The Term 1 Feedback sheet returned no rows.');
@@ -26169,13 +26389,11 @@ window.T1 = (function () {
     if (c.branch < 0) throw new Error('The feedback sheet needs a Branch column.');
     var dimIx = DIMS.map(function (d) { return ix(d.q); });
 
-    /* ── rows ── */
     var all = tab.rows.map(function (r, i) {
       var o = { i: i, branch: str(r[c.branch]), curr: str(r[c.curr]),
         grade: str(r[c.grade]), section: str(r[c.section]),
         student: str(r[c.student]), parent: str(r[c.parent]),
-        ts: str(r[c.ts]), nps: num(r[c.nps]),
-        text: str(r[c.text]),
+        ts: str(r[c.ts]), nps: num(r[c.nps]), text: str(r[c.text]),
         wants: /^y/i.test(str(r[c.wants])), wantsBlank: str(r[c.wants]) === '',
         phone: str(r[c.phone]) };
       DIMS.forEach(function (d, k) { o[d.k] = dimIx[k] >= 0 ? num(r[dimIx[k]]) : null; });
@@ -26187,12 +26405,20 @@ window.T1 = (function () {
       o.phoneOk = o.phone.replace(/\D/g, '').length >= 10;
       o.seg = o.nps == null ? 'unrated' : o.nps >= 9 ? 'promoter' : o.nps >= 7 ? 'passive' : 'detractor';
       o.sub = substantive(o.text);
-      if (o.sub) { var rd = readComment(o.text); o.themes = rd.themes; o.tone = rd.tone; o.ask = rd.ask; }
-      else { o.themes = []; o.tone = null; o.ask = false; }
+      if (o.sub) {
+        var rd = readComment(o.text);
+        o.themes = rd.themes; o.aspect = rd.aspect; o.tone = rd.tone;
+        o.sentScore = rd.score; o.sentHits = rd.hits;
+        o.urgency = rd.urgency; o.urgencyFlags = rd.urgencyFlags;
+        o.ask = rd.ask; o.cwords = rd.words; o.clauses = rd.clauses;
+      } else {
+        o.themes = []; o.aspect = {}; o.tone = null; o.sentScore = 0; o.sentHits = [];
+        o.urgency = 0; o.urgencyFlags = []; o.ask = null; o.cwords = []; o.clauses = [];
+      }
       return o;
     }).filter(function (o) { return o.branch; });
 
-    /* ── duplicates: the later answer is the one the parent meant ── */
+    /* duplicates: the later answer is the one the parent meant */
     var byStudent = {};
     all.forEach(function (o) {
       var k = (o.student || ('#' + o.i)).toLowerCase() + '|' + o.branch + '|' + o.grade + '|' + o.section;
@@ -26200,19 +26426,17 @@ window.T1 = (function () {
     });
     var superseded = [];
     Object.keys(byStudent).forEach(function (k) {
-      var g = byStudent[k];
-      if (g.length < 2) return;
+      var g = byStudent[k]; if (g.length < 2) return;
       g.sort(function (a, b) { return String(a.ts).localeCompare(String(b.ts)); });
       for (var i = 0; i < g.length - 1; i++) { g[i].superseded = true; superseded.push(g[i]); }
       g[g.length - 1].resubmitted = g.length;
     });
     var rows = all.filter(function (o) { return !o.superseded; });
 
-    return { all: all, rows: rows, superseded: superseded, DIMS: DIMS, THEMES: THEMES,
-             tab: tab, npsOf: npsOf, mean: mean, corr: corr, gradeRank: gradeRank };
+    return { all: all, rows: rows, superseded: superseded, DIMS: DIMS, THEMES: THEMES, tab: tab };
   }
 
-  /* ── the cuts the page draws ── */
+  /* ── cuts ── */
   function scope(M, branch, curriculum, gradeBand) {
     return M.rows.filter(function (o) {
       if (branch && branch !== 'ALL' && o.branch !== branch) return false;
@@ -26230,25 +26454,164 @@ window.T1 = (function () {
              sat: v.filter(function (x) { return x >= 4; }).length / v.length * 100,
              low: v.filter(function (x) { return x <= 2; }).length };
   }
+
+  /* theme counts WITH aspect-level tone */
   function themeCounts(list) {
     var sub = list.filter(function (o) { return o.sub; }), out = {};
-    THEMES.forEach(function (t) { out[t.k] = { k: t.k, c: t.c, owner: t.owner, n: 0, neg: 0, rows: [] }; });
-    sub.forEach(function (o) { o.themes.forEach(function (k) {
-      if (!out[k]) return;
-      out[k].n++; out[k].rows.push(o); if (o.tone === 'negative') out[k].neg++; }); });
-    return { total: sub.length, list: Object.keys(out).map(function (k) { return out[k]; })
-      .filter(function (x) { return x.n; }).sort(function (a, b) { return b.n - a.n; }) };
+    THEMES.forEach(function (t) {
+      out[t.k] = { k: t.k, c: t.c, owner: t.owner, n: 0, neg: 0, pos: 0, rows: [],
+                   negRows: [], posRows: [], sum: 0 };
+    });
+    sub.forEach(function (o) {
+      o.themes.forEach(function (k) {
+        var b = out[k]; if (!b) return;
+        b.n++; b.rows.push(o);
+        var a = o.aspect[k];
+        /* no scored clause carried this theme — fall back to the comment's tone */
+        if (a == null) a = o.sentScore;
+        b.sum += a;
+        if (a < -0.4) { b.neg++; b.negRows.push(o); }
+        else if (a > 0.4) { b.pos++; b.posRows.push(o); }
+      });
+    });
+    return { total: sub.length,
+      list: Object.keys(out).map(function (k) { return out[k]; })
+        .filter(function (x) { return x.n; })
+        .sort(function (a, b) { return b.n - a.n; }) };
+  }
+
+  /* ── the words that actually distinguish one group from the rest ──
+     TF-IDF is the obvious tool and it is the wrong one here: with five
+     branches all writing about the same school, a word appears in every branch,
+     the inverse-document-frequency term collapses to a constant, and the
+     ranking degenerates into raw frequency — every branch's "distinctive"
+     words came back as school, good, students, teachers.
+
+     What is wanted is the word this group uses MORE THAN the others do, which
+     is a log-odds ratio. Raw log-odds is unusable on rare words (one use of a
+     word nobody else used gives an enormous ratio), so it is smoothed with a
+     prior drawn from the whole corpus and divided by its own standard error —
+     the informative-Dirichlet-prior method. The result is a z-score: how
+     surprising this word's rate is in this group, given how common it is
+     overall. Roughly, |z| above 2 is worth reading. */
+  function distinctiveTerms(groups, limit, minCount) {
+    var corpus = {}, N = 0;
+    var counted = groups.map(function (g) {
+      var c = {}, tot = 0;
+      g.rows.forEach(function (o) { o.cwords.forEach(function (w) {
+        c[w] = (c[w] || 0) + 1; tot++; corpus[w] = (corpus[w] || 0) + 1; N++; }); });
+      return { k: g.k, c: c, tot: tot, n: g.rows.length };
+    });
+    var alpha0 = 500;                      // strength of the prior, in pseudo-words
+    return counted.map(function (g) {
+      var out = [];
+      Object.keys(g.c).forEach(function (w) {
+        if (g.c[w] < (minCount || 3)) return;
+        var aw = alpha0 * (corpus[w] / N);           // prior mass for this word
+        var yi = g.c[w], ni = g.tot;
+        var yj = corpus[w] - yi, nj = N - ni;
+        var li = Math.log((yi + aw) / (ni + alpha0 - yi - aw));
+        var lj = Math.log((yj + aw) / (nj + alpha0 - yj - aw));
+        var varr = 1 / (yi + aw) + 1 / (yj + aw);
+        var z = (li - lj) / Math.sqrt(varr);
+        out.push({ w: w, n: yi, z: z,
+                   rate: ni ? yi / ni * 1000 : 0,
+                   groupRate: N ? corpus[w] / N * 1000 : 0 });
+      });
+      return { k: g.k, n: g.n,
+               terms: out.sort(function (a, b) { return b.z - a.z; }).slice(0, limit || 10) };
+    });
+  }
+
+  /* ── phrases: two- and three-word runs, which carry what single words lose ── */
+  function phrases(list, limit, minN) {
+    var cnt = {};
+    list.filter(function (o) { return o.sub; }).forEach(function (o) {
+      var w = words(o.text).filter(function (x) { return x.length > 1; });
+      for (var n = 2; n <= 3; n++) {
+        for (var i = 0; i + n <= w.length; i++) {
+          var g = w.slice(i, i + n);
+          /* a phrase that is all stop-words says nothing */
+          if (g.every(function (x) { return STOP[x]; })) continue;
+          if (STOP[g[0]] || STOP[g[g.length - 1]]) continue;
+          var key = g.join(' ');
+          (cnt[key] = cnt[key] || { p: key, n: 0, len: n, rows: [] });
+          cnt[key].n++; if (cnt[key].rows.indexOf(o) < 0) cnt[key].rows.push(o);
+        }
+      }
+    });
+    var list = Object.keys(cnt).map(function (k) { return cnt[k]; })
+      .filter(function (x) { return x.rows.length >= (minN || 4); })
+      .sort(function (a, b) { return (b.rows.length * b.len) - (a.rows.length * a.len); });
+    /* "extra curricular", "curricular activities" and "extra curricular
+       activities" are one phrase, not three. A shorter run is dropped when a
+       longer one contains it and carries most of its uses. */
+    var keep = [];
+    list.forEach(function (p) {
+      var sub = keep.some(function (q) {
+        return q.len > p.len && q.p.indexOf(p.p) >= 0 && q.rows.length >= p.rows.length * 0.6;
+      });
+      if (!sub) keep.push(p);
+    });
+    return keep.slice(0, limit || 14);
+  }
+
+  /* ── near-duplicate clustering: the complaint many parents wrote separately ── */
+  function jaccard(a, b) {
+    if (!a.length || !b.length) return 0;
+    var s = {}, hit = 0;
+    a.forEach(function (w) { s[w] = 1; });
+    var seen = {};
+    b.forEach(function (w) { if (s[w] && !seen[w]) { hit++; seen[w] = 1; } });
+    var ua = Object.keys(s).length, ub = {}; b.forEach(function (w) { ub[w] = 1; });
+    return hit / (ua + Object.keys(ub).length - hit);
+  }
+  function cluster(list, threshold, minSize) {
+    var items = list.filter(function (o) { return o.sub && o.cwords.length >= 4; });
+    var used = {}, out = [];
+    items.forEach(function (a, i) {
+      if (used[i]) return;
+      var g = [a]; used[i] = 1;
+      items.forEach(function (b, j) {
+        if (j <= i || used[j]) return;
+        if (jaccard(a.cwords, b.cwords) >= (threshold || 0.34)) { g.push(b); used[j] = 1; }
+      });
+      if (g.length >= (minSize || 3)) {
+        /* label the cluster with the words its members share most */
+        var freq = {};
+        g.forEach(function (o) { var s = {}; o.cwords.forEach(function (w) { if (!s[w]) { s[w] = 1; freq[w] = (freq[w] || 0) + 1; } }); });
+        var top = Object.keys(freq).filter(function (w) { return freq[w] >= Math.ceil(g.length * 0.5); })
+          .sort(function (x, y) { return freq[y] - freq[x]; }).slice(0, 5);
+        out.push({ rows: g, n: g.length, terms: top,
+          nps: mean(g.map(function (o) { return o.nps; }).filter(function (v) { return v != null; })),
+          tone: mean(g.map(function (o) { return o.sentScore; })) });
+      }
+    });
+    return out.sort(function (a, b) { return b.n - a.n; });
   }
 
   return { build: build, scope: scope, dimStats: dimStats, themeCounts: themeCounts,
+           distinctiveTerms: distinctiveTerms, phrases: phrases, cluster: cluster,
            npsOf: npsOf, mean: mean, corr: corr, DIMS: DIMS, THEMES: THEMES,
-           gradeRank: gradeRank, band: band, substantive: substantive, readComment: readComment };
+           gradeRank: gradeRank, band: band, substantive: substantive,
+           readComment: readComment, content: content };
 })();
 
 /* ══════════════════════════════════════════════════════════════════════════
    TERM 1 PARENT FEEDBACK — the page
-   Built on window.T1 (the engine above) and the shared .au-* report styles,
-   so it reads as the same report family as School Audit and PTM Feedback.
+
+   Built on window.T1 and the shared .au-* report styles, so it reads as the
+   same report family as School Audit and PTM Feedback.
+
+   SCOPE  The branch comes from the dashboard's own BRANCH control at the top
+   of the page, like every other tab — this page carries no second branch
+   dropdown of its own. Curriculum and grade band are kept here because the
+   global bar has no equivalent for them.
+
+   EVERY FIGURE OPENS  Each number, bar segment and heat cell on this page is a
+   button that opens the responses behind it in the standard drill-down, with
+   the parent's name, class, scores, contact number and full comment. A figure
+   nobody can audit is a figure nobody should act on.
    ══════════════════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -26260,55 +26623,127 @@ window.T1 = (function () {
   var sgn = function (v) { return v == null ? '–' : (v > 0 ? '+' : '') + Math.round(v); };
 
   var COL = { pos: '#059669', neg: '#DC2626', warn: '#D97706', mid: '#64748B', blue: '#1E4FD8' };
-  /* NPS bands as the industry reads them, so a number here means what it means
-     anywhere else: above +50 excellent, 0 to +30 is "work to do", below 0 means
-     more parents are talking the school down than up. */
   function npsCol(v) { return v == null ? COL.mid : v >= 50 ? '#047857' : v >= 30 ? COL.pos : v >= 0 ? COL.warn : COL.neg; }
   function ratCol(v) { return v == null ? COL.mid : v >= 4.3 ? COL.pos : v >= 3.8 ? COL.warn : COL.neg; }
 
-  var M = null, FILT = { branch: 'ALL', curr: 'ALL', band: 'ALL', q: '' };
-
-  /* The roll each branch carries, so a response count can be read as a
-     response RATE. Taken from the same branch-strength figures the rest of the
-     dashboard uses; when one is missing the rate is simply not shown rather
-     than guessed. */
+  var M = null, FILT = { curr: 'ALL', band: 'ALL', q: '' };
+  /* the branch is the dashboard's, not this page's */
+  function curBranch() {
+    try { if (window._BRANCH_LOCK) return window._BRANCH_LOCK; } catch (e) {}
+    try { if (typeof fBranch !== 'undefined' && fBranch) return fBranch; } catch (e) {}
+    return 'ALL';
+  }
   function strengthOf(b) {
-    try {
-      var S = window._STUDENTS_BY_BRANCH;
-      if (S && S[b]) return +S[b];
-    } catch (e) {}
+    try { var S = window._STUDENTS_BY_BRANCH; if (S && S[b]) return +S[b]; } catch (e) {}
     return null;
+  }
+
+  /* ══ click-to-view ══════════════════════════════════════════════════════
+     Every drill-down opens the same record shape, so a reader learns it once. */
+  var DRILLS = [];                       // index → rows, referenced from data-d
+  function drillId(rows) { DRILLS.push(rows || []); return DRILLS.length - 1; }
+  var COLS = [
+    { key: 'parent',  label: 'Parent' },
+    { key: 'student', label: 'Student', maxW: '160px' },
+    { key: 'branch',  label: 'Branch' },
+    { key: 'cls',     label: 'Class' },
+    { key: 'curr',    label: 'Curriculum' },
+    { key: 'overall', label: 'Overall /5' },
+    { key: 'nps',     label: 'Recommend /10' },
+    { key: 'seg',     label: 'Segment' },
+    { key: 'acad',    label: 'Academics' },
+    { key: 'comm',    label: 'Communication' },
+    { key: 'safe',    label: 'Safety' },
+    { key: 'infra',   label: 'Infrastructure' },
+    { key: 'admin',   label: 'Administration' },
+    { key: 'trans',   label: 'Transport' },
+    { key: 'callMe',  label: 'Asked for a call' },
+    { key: 'phone',   label: 'Contact' },
+    { key: 'themes',  label: 'Raised', maxW: '220px' },
+    { key: 'text',    label: 'What they wrote', maxW: '460px' },
+    { key: 'day',     label: 'Submitted' }
+  ];
+  function flat(o) {
+    return {
+      parent: o.parent || '–', student: o.student || '–', branch: o.branch,
+      cls: (o.grade || '') + (o.section ? '-' + o.section : ''), curr: o.curr || '–',
+      overall: o.overall == null ? '–' : o.overall,
+      nps: o.nps == null ? '–' : o.nps,
+      seg: o.seg === 'detractor' ? 'Detractor' : o.seg === 'promoter' ? 'Promoter' : o.seg === 'passive' ? 'Passive' : '–',
+      acad: o.acad == null ? '–' : o.acad, comm: o.comm == null ? '–' : o.comm,
+      safe: o.safe == null ? '–' : o.safe, infra: o.infra == null ? '–' : o.infra,
+      admin: o.admin == null ? '–' : o.admin, trans: o.trans == null ? '–' : o.trans,
+      callMe: o.wants ? (o.phoneOk ? 'Yes' : 'Yes — no usable number') : 'No',
+      phone: o.phoneOk ? o.phone : (o.phone || '–'),
+      themes: o.themes && o.themes.length ? o.themes.join(' · ') : '–',
+      text: o.text || '–', day: o.day || '–'
+    };
+  }
+  function openDrill(title, sub, rows) {
+    if (typeof openModal !== 'function') return;
+    if (!rows || !rows.length) { openModal(title, 'No responses behind this figure', [], COLS); return; }
+    var sorted = rows.slice().sort(function (a, b) {
+      var w = function (o) { return (o.nps == null ? 50 : o.nps) - (o.urgency || 0); };
+      return w(a) - w(b);
+    });
+    openModal(title, sub + ' · ' + rows.length + ' response' + (rows.length === 1 ? '' : 's') +
+      ' · worst first', sorted.map(flat), COLS);
+  }
+  /* one delegated listener for the whole page */
+  function wireDrills(root) {
+    if (root.dataset.wired) return;
+    root.dataset.wired = '1';
+    root.addEventListener('click', function (ev) {
+      var el = ev.target.closest('[data-d]');
+      if (!el || !root.contains(el)) return;
+      ev.preventDefault(); ev.stopPropagation();
+      var rows = DRILLS[+el.getAttribute('data-d')];
+      openDrill(el.getAttribute('data-t') || 'Responses', el.getAttribute('data-s') || '', rows);
+    });
+  }
+  /* mark a value as openable */
+  function K(rows, title, sub, html, style) {
+    if (!rows || !rows.length) return '<span style="color:var(--txl)">' + html + '</span>';
+    return '<span class="t1k" data-d="' + drillId(rows) + '" data-t="' + esc(title) + '" data-s="' + esc(sub) + '"' +
+      (style ? ' style="' + style + '"' : '') + '>' + html + '</span>';
   }
 
   function bar(pct, color, h) {
     return '<div class="au-bar" style="height:' + (h || 9) + 'px"><i style="width:' +
       Math.max(0, Math.min(100, pct || 0)).toFixed(1) + '%;background:' + color + '"></i></div>';
   }
-  /* promoters · passives · detractors as one bar, which is the only honest way
-     to show an NPS: the score alone hides whether it came from enthusiasm or
-     from the absence of complaint */
-  function npsBar(s) {
+  /* promoters · passives · detractors as one bar — each band opens its own list */
+  function npsBar(s, rows, label) {
     if (!s) return '';
-    var seg = function (w, c, t) { return w <= 0 ? '' :
-      '<div style="width:' + w.toFixed(1) + '%;background:' + c + '" title="' + t + '"></div>'; };
+    var g = function (f) { return (rows || []).filter(f); };
+    var seg = function (w, c, t, rs) {
+      if (w <= 0) return '';
+      return '<div class="t1k" data-d="' + drillId(rs) + '" data-t="' + esc(t) + '" data-s="' + esc(label || '') +
+        '" style="width:' + w.toFixed(1) + '%;background:' + c + '" title="' + esc(t) + '"></div>';
+    };
     return '<div style="display:flex;height:11px;border-radius:99px;overflow:hidden;background:#EEF2FF">' +
-      seg(s.prom / s.n * 100, COL.pos, s.prom + ' promoters (9–10)') +
-      seg(s.pass / s.n * 100, '#CBD5E1', s.pass + ' passives (7–8)') +
-      seg(s.detr / s.n * 100, COL.neg, s.detr + ' detractors (0–6)') + '</div>';
+      seg(s.prom / s.n * 100, COL.pos, s.prom + ' promoters (9–10)', g(function (o) { return o.seg === 'promoter'; })) +
+      seg(s.pass / s.n * 100, '#CBD5E1', s.pass + ' passives (7–8)', g(function (o) { return o.seg === 'passive'; })) +
+      seg(s.detr / s.n * 100, COL.neg, s.detr + ' detractors (0–6)', g(function (o) { return o.seg === 'detractor'; })) +
+      '</div>';
   }
-  /* the 1–5 spread as five stacked blocks */
-  function distBar(d) {
+  /* the 1–5 spread; each block opens the parents who gave that score */
+  function distBar(d, rows, key, label) {
     if (!d) return '';
     var tot = d.reduce(function (a, b) { return a + b; }, 0) || 1;
     var cols = ['#B91C1C', '#EF4444', '#F59E0B', '#84CC16', '#059669'];
     return '<div style="display:flex;height:11px;border-radius:99px;overflow:hidden;background:#EEF2FF">' +
-      d.map(function (v, i) { return v <= 0 ? '' :
-        '<div style="width:' + (v / tot * 100).toFixed(1) + '%;background:' + cols[i] + '" title="' +
-        v + ' gave ' + (i + 1) + '"></div>'; }).join('') + '</div>';
+      d.map(function (v, i) {
+        if (v <= 0) return '';
+        var rs = (rows || []).filter(function (o) { return Math.round(o[key]) === i + 1; });
+        return '<div class="t1k" data-d="' + drillId(rs) + '" data-t="' + esc(label + ' rated ' + (i + 1) + '/5') +
+          '" data-s="' + esc(v + ' parents') + '" style="width:' + (v / tot * 100).toFixed(1) + '%;background:' + cols[i] +
+          '" title="' + v + ' gave ' + (i + 1) + '"></div>';
+      }).join('') + '</div>';
   }
-
-  function kpi(v, k, d, color) {
-    return '<div class="au-kpi"><div class="v" style="color:' + (color || 'var(--tx)') + '">' + v + '</div>' +
+  function kpi(v, k, d, color, rows, title) {
+    var val = rows ? K(rows, title || k, 'All responses behind this figure', v) : v;
+    return '<div class="au-kpi"><div class="v" style="color:' + (color || 'var(--tx)') + '">' + val + '</div>' +
       '<div class="k">' + k + '</div><div class="d">' + d + '</div></div>';
   }
 
@@ -26316,77 +26751,103 @@ window.T1 = (function () {
   function build() {
     if (!M) return;
     var el = $('t1-body'); if (!el) return;
-    var R = window.T1.scope(M, FILT.branch, FILT.curr, FILT.band);
+    DRILLS = [];
+    var BR = curBranch();
+    var R = window.T1.scope(M, BR, FILT.curr, FILT.band);
     var ALL = M.rows;
     var branches = Object.keys(ALL.reduce(function (a, o) { a[o.branch] = 1; return a; }, {})).sort();
+    /* the branch cut the global bar is holding, before this page's own filters */
+    var inBranch = function (list) {
+      return list.filter(function (o) {
+        if (FILT.curr !== 'ALL' && o.curr !== FILT.curr) return false;
+        if (FILT.band !== 'ALL' && o.band !== FILT.band) return false;
+        return true;
+      });
+    };
 
     $('t1-scope').innerHTML = '<i></i>' +
-      (FILT.branch === 'ALL' ? 'All branches' : esc(FILT.branch)) + ' · ' +
+      (BR === 'ALL' ? 'All branches' : esc(BR)) + ' · ' +
       (FILT.curr === 'ALL' ? 'both curricula' : esc(FILT.curr)) + ' · ' +
       (FILT.band === 'ALL' ? 'every grade' : esc(FILT.band)) +
       ' <small>' + R.length + ' responses</small>';
 
+    if (!R.length) {
+      el.querySelectorAll('.au-sec, .au-kpis, #t1-warn').forEach(function (n) { n.style.display = 'none'; });
+      var w = $('t1-warn');
+      w.style.display = ''; w.innerHTML = '<div class="pt-warn"><h4>Nothing to show</h4>' +
+        '<p>No survey response matches this selection. Widen the branch, curriculum or grade band.</p></div>';
+      return;
+    }
+    el.querySelectorAll('.au-sec, .au-kpis').forEach(function (n) { n.style.display = ''; });
+
     var nps = window.T1.npsOf(R.map(function (o) { return o.nps; }).filter(function (v) { return v != null; }));
     var ov = window.T1.dimStats(R, 'overall');
     var wants = R.filter(function (o) { return o.wants; });
-    var queue = R.filter(function (o) { return o.wants || o.seg === 'detractor'; });
     var noPhone = wants.filter(function (o) { return !o.phoneOk; });
-    var str = branches.reduce(function (a, b) { var s = strengthOf(b); return a + (s || 0); }, 0);
-    var strScoped = FILT.branch === 'ALL' ? str : (strengthOf(FILT.branch) || 0);
+    var detr = R.filter(function (o) { return o.seg === 'detractor'; });
+    var strScoped = BR === 'ALL'
+      ? branches.reduce(function (a, b) { return a + (strengthOf(b) || 0); }, 0)
+      : (strengthOf(BR) || 0);
 
     /* ── KPIs ── */
     $('t1-kpis').innerHTML =
-      kpi(R.length, 'Responses', M.superseded.length ? M.superseded.length + ' earlier re-submissions set aside' : 'one per student') +
+      kpi(R.length, 'Responses', M.superseded.length ? M.superseded.length + ' earlier re-submissions set aside' : 'one per student',
+          null, R, 'Every response in this selection') +
       kpi(sgn(nps && nps.score), 'Net promoter score',
-          nps ? nps.prom + ' promoters · ' + nps.pass + ' passive · ' + nps.detr + ' detractors' : '–', npsCol(nps && nps.score)) +
+          nps ? nps.prom + ' promoters · ' + nps.pass + ' passive · ' + nps.detr + ' detractors' : '–',
+          npsCol(nps && nps.score), R, 'Every response, by recommend score') +
       kpi(ov ? n1(ov.avg) + '<span style="font-size:15px;color:var(--txm)"> /5</span>' : '–', 'Overall satisfaction',
-          ov ? pc(ov.sat) + ' rated it 4 or 5' : '–', ratCol(ov && ov.avg)) +
+          ov ? pc(ov.sat) + ' rated it 4 or 5' : '–', ratCol(ov && ov.avg),
+          R.filter(function (o) { return o.overall != null; }), 'Overall satisfaction — every rating') +
       kpi(nps ? pc(nps.detrPct) : '–', 'Parents at risk',
-          nps ? nps.detr + ' scored 6 or below' : '–', nps && nps.detrPct > 20 ? COL.neg : COL.warn) +
+          nps ? nps.detr + ' scored 6 or below' : '–', nps && nps.detrPct > 20 ? COL.neg : COL.warn,
+          detr, 'Detractors — scored 6 or below') +
       kpi(wants.length, 'Asked for a call',
-          noPhone.length ? '<b style="color:' + COL.neg + '">' + noPhone.length + ' left no usable number</b>' : 'all reachable',
-          wants.length ? COL.warn : COL.mid) +
+          noPhone.length ? K(noPhone, 'Asked for a call with no usable number', 'these cannot be rung',
+            '<b style="color:' + COL.neg + '">' + noPhone.length + ' left no usable number</b>') : 'all reachable',
+          wants.length ? COL.warn : COL.mid, wants, 'Parents who asked to be contacted') +
       kpi(strScoped ? pc(R.length / strScoped * 100) : '–', 'Response rate',
           strScoped ? R.length + ' of ' + strScoped.toLocaleString('en-IN') + ' families' : 'roll not available',
           strScoped && (R.length / strScoped * 100) < 10 ? COL.neg : COL.warn);
 
     /* ── read this first ── */
-    var flat = R.filter(function (o) { return o.flat; });
+    var flatR = R.filter(function (o) { return o.flat; });
     var warn = [];
     if (strScoped && R.length / strScoped * 100 < 15)
       warn.push('<b>' + pc(R.length / strScoped * 100) + ' of families replied.</b> At this level the page is a ' +
         'reliable read on <em>who answered</em> and a weak read on the parent body as a whole. Parents with ' +
         'something to say answer surveys more often than parents without, so treat the scores as a floor, not an average.');
-    if (flat.length)
-      warn.push('<b>' + flat.length + ' parents (' + pc(flat.length / R.length * 100) + ') gave all seven questions the same score</b> — ' +
-        flat.filter(function (o) { return o.overall >= 4; }).length + ' of them straight 4s or 5s. Those answers say the ' +
+    if (flatR.length)
+      warn.push(K(flatR, 'Gave all seven questions the same score', 'straight-line responses',
+        '<b>' + flatR.length + ' parents (' + pc(flatR.length / R.length * 100) + ') gave all seven questions the same score</b>') +
+        ' — ' + flatR.filter(function (o) { return o.overall >= 4; }).length + ' of them straight 4s or 5s. Those answers say the ' +
         'form was completed, not which part of the school is working. They are left in the totals and counted here.');
     if (M.superseded.length)
-      warn.push('<b>' + M.superseded.length + ' parents filled the form twice.</b> The later answer is the one kept; the ' +
-        'earlier one is set aside so a family is not counted twice.');
+      warn.push(K(M.superseded, 'Superseded re-submissions', 'the earlier answer, set aside',
+        '<b>' + M.superseded.length + ' parents filled the form twice.</b>') +
+        ' The later answer is the one kept; the earlier one is set aside so a family is not counted twice.');
     if (noPhone.length)
-      warn.push('<b style="color:' + COL.neg + '">' + noPhone.length + ' parents asked to be contacted but left no usable number.</b> ' +
-        'They cannot be rung from this data — their names are in the callback queue below so the branch can find them.');
+      warn.push(K(noPhone, 'Asked for a call with no usable number', 'find these families by name',
+        '<b style="color:' + COL.neg + '">' + noPhone.length + ' parents asked to be contacted but left no usable number.</b>') +
+        ' They cannot be rung from this data — open the list to find them by name and class.');
     var days = {}; R.forEach(function (o) { if (o.day) days[o.day] = (days[o.day] || 0) + 1; });
     var dk = Object.keys(days).sort();
     if (dk.length > 1 && days[dk[0]] / R.length > 0.4)
-      warn.push('<b>' + pc(days[dk[0]] / R.length * 100) + ' of all responses arrived on the first day</b> (' + dk[0] + '). ' +
-        'Collection then fell away rather than being worked branch by branch, which is most of why the response rate is where it is.');
+      warn.push(K(R.filter(function (o) { return o.day === dk[0]; }), 'Responses on the first day', dk[0],
+        '<b>' + pc(days[dk[0]] / R.length * 100) + ' of all responses arrived on the first day</b>') +
+        ' (' + dk[0] + '). Collection then fell away rather than being worked branch by branch, which is most of why ' +
+        'the response rate is where it is.');
+    $('t1-warn').style.display = '';
     $('t1-warn').innerHTML = warn.length
       ? '<div class="pt-warn"><h4>Read this before the numbers</h4>' +
-        warn.map(function (w) { return '<p>' + w + '</p>'; }).join('') + '</div>'
-      : '';
+        warn.map(function (w) { return '<p>' + w + '</p>'; }).join('') + '</div>' : '';
 
     /* ── 1 · recommendation, branch by branch ── */
     (function () {
       var rowsH = branches.map(function (b) {
-        var g = ALL.filter(function (o) { return o.branch === b; });
-        if (FILT.curr !== 'ALL') g = g.filter(function (o) { return o.curr === FILT.curr; });
-        if (FILT.band !== 'ALL') g = g.filter(function (o) { return o.band === FILT.band; });
+        var g = inBranch(ALL.filter(function (o) { return o.branch === b; }));
         var s = window.T1.npsOf(g.map(function (o) { return o.nps; }).filter(function (v) { return v != null; }));
-        var o5 = window.T1.dimStats(g, 'overall');
-        var st = strengthOf(b);
-        return { b: b, g: g, s: s, o5: o5, st: st };
+        return { b: b, g: g, s: s, o5: window.T1.dimStats(g, 'overall'), st: strengthOf(b) };
       }).filter(function (x) { return x.g.length; })
         .sort(function (a, b) { return (b.s ? b.s.score : -999) - (a.s ? a.s.score : -999); });
       var thin = rowsH.filter(function (x) { return x.g.length < 30; });
@@ -26395,69 +26856,69 @@ window.T1 = (function () {
         '<th style="min-width:170px">Promoters · passives · detractors</th><th class="n">NPS</th>' +
         '<th class="n">Overall /5</th><th class="n">Detractors</th><th class="n">Want a call</th></tr></thead><tbody>' +
         rowsH.map(function (x) {
-          var w = x.g.filter(function (o) { return o.wants; }).length;
-          return '<tr class="clk" data-br="' + esc(x.b) + '">' +
-            '<td><b>' + esc(x.b) + '</b>' + (x.g.length < 30 ? ' <span style="font-size:10px;color:' + COL.warn + ';font-weight:700">too few to rank</span>' : '') + '</td>' +
-            '<td class="n">' + x.g.length + '</td>' +
+          var w = x.g.filter(function (o) { return o.wants; });
+          var d = x.g.filter(function (o) { return o.seg === 'detractor'; });
+          return '<tr><td><b>' + esc(x.b) + '</b>' +
+              (x.g.length < 30 ? ' <span style="font-size:10px;color:' + COL.warn + ';font-weight:700">too few to rank</span>' : '') + '</td>' +
+            '<td class="n">' + K(x.g, x.b + ' — every response', 'all responses', x.g.length) + '</td>' +
             '<td class="n">' + (x.st ? pc(x.g.length / x.st * 100) : '–') + '</td>' +
-            '<td>' + npsBar(x.s) + '</td>' +
-            '<td class="n"><b style="font-size:14px;color:' + npsCol(x.s && x.s.score) + '">' + sgn(x.s && x.s.score) + '</b></td>' +
-            '<td class="n" style="color:' + ratCol(x.o5 && x.o5.avg) + ';font-weight:700">' + n1(x.o5 && x.o5.avg) + '</td>' +
-            '<td class="n">' + (x.s ? x.s.detr + ' <span style="color:var(--txm)">(' + pc(x.s.detrPct) + ')</span>' : '–') + '</td>' +
-            '<td class="n">' + w + '</td></tr>';
+            '<td>' + npsBar(x.s, x.g, x.b) + '</td>' +
+            '<td class="n">' + K(x.g, x.b + ' — recommend scores', 'NPS ' + sgn(x.s && x.s.score),
+                '<b style="font-size:14px;color:' + npsCol(x.s && x.s.score) + '">' + sgn(x.s && x.s.score) + '</b>') + '</td>' +
+            '<td class="n">' + K(x.g.filter(function (o) { return o.overall != null; }), x.b + ' — overall satisfaction',
+                'average ' + n1(x.o5 && x.o5.avg) + '/5',
+                '<span style="color:' + ratCol(x.o5 && x.o5.avg) + ';font-weight:700">' + n1(x.o5 && x.o5.avg) + '</span>') + '</td>' +
+            '<td class="n">' + K(d, x.b + ' — detractors', 'scored 6 or below',
+                d.length + ' <span style="color:var(--txm)">(' + pc(x.s ? x.s.detrPct : 0) + ')</span>') + '</td>' +
+            '<td class="n">' + K(w, x.b + ' — asked for a call', 'callback list', w.length) + '</td></tr>';
         }).join('') + '</tbody></table>' +
         '<div class="au-legend"><span><i style="background:' + COL.pos + '"></i>promoter 9–10</span>' +
         '<span><i style="background:#CBD5E1"></i>passive 7–8</span>' +
         '<span><i style="background:' + COL.neg + '"></i>detractor 0–6</span>' +
-        '<span>NPS = % promoters − % detractors</span></div>' +
+        '<span>NPS = % promoters − % detractors</span>' +
+        '<span style="margin-left:auto;color:var(--txl)">every figure on this page opens the responses behind it</span></div>' +
         (thin.length ? '<div class="au-note"><b>' + thin.map(function (x) { return esc(x.b) + ' (' + x.g.length + ')'; }).join(', ') +
           '</b> returned too few responses to carry a branch score. They are shown for completeness; a single family ' +
           'moves the number by several points.</div>' : '');
-      Array.prototype.forEach.call(el.querySelectorAll('#t1-nps tr.clk'), function (tr) {
-        tr.addEventListener('click', function () {
-          FILT.branch = FILT.branch === tr.dataset.br ? 'ALL' : tr.dataset.br;
-          var sel = $('t1-branch'); if (sel) sel.value = FILT.branch;
-          build();
-        });
-      });
     })();
 
     /* ── 2 · the seven questions ── */
     (function () {
       var stats = window.T1.DIMS.map(function (d) {
         return { d: d, s: window.T1.dimStats(R, d.k) }; }).filter(function (x) { return x.s; });
-      /* Overall satisfaction is the summary question, not one of the six parts
-         of the school. It stays in the table because its spread is worth
-         seeing, but it is kept out of the best-and-worst comparison: calling
-         the summary score "the weakest area" would be comparing a total with
-         its own components. */
       var areas = stats.filter(function (x) { return x.d.k !== 'overall'; });
       var ranked = areas.slice().sort(function (a, b) { return a.s.avg - b.s.avg; });
       var worst = ranked[0], best = ranked[ranked.length - 1];
       $('t1-dims').innerHTML =
         '<table class="au-tbl"><thead><tr><th>Question</th><th style="min-width:150px">1 → 5</th>' +
         '<th class="n">Average</th><th class="n">Rated 4–5</th><th class="n">Rated 1–2</th>' +
-        '<th class="n">vs best question</th></tr></thead><tbody>' +
+        '<th class="n">vs best area</th></tr></thead><tbody>' +
         stats.map(function (x) {
           var gap = x.s.avg - best.s.avg;
+          var hi = R.filter(function (o) { return o[x.d.k] >= 4; });
+          var lo = R.filter(function (o) { return o[x.d.k] != null && o[x.d.k] <= 2; });
+          var any = R.filter(function (o) { return o[x.d.k] != null; });
           return '<tr' + (x.d.k === 'overall' ? ' style="background:var(--bg)"' : '') + '><td><b>' + esc(x.d.label) + '</b>' +
             (x.d.k === 'overall' ? '<div style="font-size:10.5px;color:var(--txm);font-weight:600">the summary question, not an area</div>' : '') + '</td>' +
-            '<td>' + distBar(x.s.dist) + '</td>' +
-            '<td class="n"><b style="color:' + ratCol(x.s.avg) + '">' + n1(x.s.avg) + '</b></td>' +
-            '<td class="n">' + pc(x.s.sat) + '</td>' +
-            '<td class="n" style="color:' + (x.s.low / x.s.n > 0.1 ? COL.neg : 'inherit') + '">' + x.s.low +
-              ' <span style="color:var(--txm)">(' + pc(x.s.low / x.s.n * 100) + ')</span></td>' +
+            '<td>' + distBar(x.s.dist, R, x.d.k, x.d.label) + '</td>' +
+            '<td class="n">' + K(any, x.d.label + ' — every rating', 'average ' + n1(x.s.avg),
+              '<b style="color:' + ratCol(x.s.avg) + '">' + n1(x.s.avg) + '</b>') + '</td>' +
+            '<td class="n">' + K(hi, x.d.label + ' — rated 4 or 5', 'satisfied parents', pc(x.s.sat)) + '</td>' +
+            '<td class="n">' + K(lo, x.d.label + ' — rated 1 or 2', 'the parents to answer',
+              '<span style="color:' + (x.s.low / x.s.n > 0.1 ? COL.neg : 'inherit') + '">' + x.s.low +
+              ' <span style="color:var(--txm)">(' + pc(x.s.low / x.s.n * 100) + ')</span></span>') + '</td>' +
             '<td class="n" style="color:' + (gap < -0.3 ? COL.neg : 'var(--txm)') + '">' + (gap >= -0.001 ? '—' : gap.toFixed(2)) + '</td></tr>';
         }).join('') + '</tbody></table>' +
-        '<div class="au-flag' + (worst.s.avg < 3.8 ? ' bad' : '') + '"><b>' + esc(best.d.label) + '</b> is this school group\'s ' +
-        'strongest answer at ' + n1(best.s.avg) + ' and <b>' + esc(worst.d.label) + '</b> its weakest at ' + n1(worst.s.avg) +
-        ' — a gap of ' + (best.s.avg - worst.s.avg).toFixed(2) + ' points. ' + worst.s.low + ' parents scored ' +
-        esc(worst.d.label.toLowerCase()) + ' at 1 or 2.</div>';
+        '<div class="au-flag' + (worst.s.avg < 3.8 ? ' bad' : '') + '"><b>' + esc(best.d.label) + '</b> is the strongest ' +
+        'answer at ' + n1(best.s.avg) + ' and <b>' + esc(worst.d.label) + '</b> the weakest at ' + n1(worst.s.avg) +
+        ' — a gap of ' + (best.s.avg - worst.s.avg).toFixed(2) + ' points. ' +
+        K(R.filter(function (o) { return o[worst.d.k] != null && o[worst.d.k] <= 2; }),
+          worst.d.label + ' — rated 1 or 2', 'the weakest area',
+          '<b>' + worst.s.low + ' parents scored ' + esc(worst.d.label.toLowerCase()) + ' at 1 or 2.</b>') + '</div>';
 
-      /* branch × question */
       var cells = branches.map(function (b) {
-        var g = ALL.filter(function (o) { return o.branch === b; });
-        return { b: b, n: g.length, v: window.T1.DIMS.map(function (d) {
+        var g = inBranch(ALL.filter(function (o) { return o.branch === b; }));
+        return { b: b, g: g, n: g.length, v: window.T1.DIMS.map(function (d) {
           var s = window.T1.dimStats(g, d.k); return s ? s.avg : null; }) };
       });
       var flatv = []; cells.forEach(function (c2) { c2.v.forEach(function (v) { if (v != null) flatv.push(v); }); });
@@ -26472,14 +26933,16 @@ window.T1 = (function () {
         '<th class="net">n</th></tr></thead><tbody>' +
         cells.map(function (c2) {
           return '<tr><td class="cat">' + esc(c2.b) + '</td>' +
-            c2.v.map(function (v) {
-              return '<td><div class="au-cell" style="background:' + shade(v) + ';color:#0F172A;display:flex;align-items:center;justify-content:center">' +
-                n1(v) + '</div></td>'; }).join('') +
-            '<td class="net">' + c2.n + '</td></tr>';
+            c2.v.map(function (v, i) {
+              var d = window.T1.DIMS[i];
+              var rs = c2.g.filter(function (o) { return o[d.k] != null; });
+              return '<td><button class="au-cell t1k" data-d="' + drillId(rs) + '" data-t="' +
+                esc(c2.b + ' — ' + d.label) + '" data-s="' + esc('average ' + n1(v) + '/5') +
+                '" style="background:' + shade(v) + ';color:#0F172A">' + n1(v) + '</button></td>'; }).join('') +
+            '<td class="net">' + K(c2.g, c2.b + ' — every response', 'all responses', c2.n) + '</td></tr>';
         }).join('') + '</tbody></table></div>' +
         '<div class="au-note">Shaded within this table only: the greenest cell is the highest score anywhere on it, ' +
-        'the reddest the lowest. Read across a row to see what a branch is strong and weak at, down a column to see ' +
-        'which branch leads on that question.</div>';
+        'the reddest the lowest. Every cell opens the parents behind it.</div>';
     })();
 
     /* ── 3 · drivers ── */
@@ -26488,50 +26951,43 @@ window.T1 = (function () {
         var pair = R.filter(function (o) { return o[d.k] != null && o.overall != null; });
         var lowR = pair.filter(function (o) { return o[d.k] <= 3; });
         var hiR  = pair.filter(function (o) { return o[d.k] >= 4; });
-        var lowM = window.T1.mean(lowR.map(function (o) { return o.overall; }));
-        var hiM  = window.T1.mean(hiR.map(function (o) { return o.overall; }));
         var st = window.T1.dimStats(R, d.k);
-        return { d: d,
-                 r: window.T1.corr(pair.map(function (o) { return o[d.k]; }),
-                                   pair.map(function (o) { return o.overall; })),
-                 lowM: lowM, hiM: hiM, lowN: lowR.length, hiN: hiR.length,
-                 gap: (hiM != null && lowM != null) ? hiM - lowM : null,
-                 score: st ? st.avg : null };
+        return { d: d, pair: pair, lowR: lowR, hiR: hiR,
+          r: window.T1.corr(pair.map(function (o) { return o[d.k]; }), pair.map(function (o) { return o.overall; })),
+          lowM: window.T1.mean(lowR.map(function (o) { return o.overall; })),
+          hiM: window.T1.mean(hiR.map(function (o) { return o.overall; })),
+          score: st ? st.avg : null };
       }).filter(function (z) { return z.r != null; }).sort(function (a, b) { return b.r - a.r; });
-      if (!dr.length) {
-        $('t1-drivers').innerHTML = '<div class="au-empty">Too few responses here to measure what drives the score.</div>';
-        return;
-      }
+      dr.forEach(function (z) { z.gap = (z.hiM != null && z.lowM != null) ? z.hiM - z.lowM : null; });
+      if (!dr.length) { $('t1-drivers').innerHTML = '<div class="au-empty">Too few responses here to measure what drives the score.</div>'; return; }
       var maxR = Math.max.apply(null, dr.map(function (z) { return z.r; }));
-      /* The one to fix is neither the lowest-scoring question nor the strongest
-         driver on its own, but the question that is both: a poor score on
-         something parents barely weigh matters less than a middling score on
-         the thing their whole opinion rests on. */
       var fix = dr.slice().sort(function (a, b) { return (b.r * (5 - b.score)) - (a.r * (5 - a.score)); })[0];
       var least = dr[dr.length - 1];
       $('t1-drivers').innerHTML =
         '<table class="au-tbl"><thead><tr><th>Part of the school</th><th style="min-width:170px">Pull on the overall score</th>' +
         '<th class="n">Correlation</th><th class="n">Its own score</th>' +
-        '<th class="n">Overall when this is 1\u20133</th><th class="n">when 4\u20135</th><th class="n">Swing</th></tr></thead><tbody>' +
+        '<th class="n">Overall when this is 1–3</th><th class="n">when 4–5</th><th class="n">Swing</th></tr></thead><tbody>' +
         dr.map(function (z) {
           return '<tr><td><b>' + esc(z.d.label) + '</b></td>' +
             '<td>' + bar(z.r / maxR * 100, z.d.c) + '</td>' +
             '<td class="n">' + z.r.toFixed(2) + '</td>' +
-            '<td class="n" style="color:' + ratCol(z.score) + ';font-weight:700">' + n1(z.score) + '</td>' +
-            '<td class="n"><span style="color:' + COL.neg + ';font-weight:700">' + n1(z.lowM) + '</span>' +
-              '<div style="font-size:10px;color:var(--txm)">' + z.lowN + ' parents</div></td>' +
-            '<td class="n"><span style="color:' + COL.pos + ';font-weight:700">' + n1(z.hiM) + '</span>' +
-              '<div style="font-size:10px;color:var(--txm)">' + z.hiN + ' parents</div></td>' +
-            '<td class="n"><b style="color:' + COL.blue + '">' + (z.gap != null ? '+' + z.gap.toFixed(2) : '\u2013') + '</b></td></tr>';
-        }).join('') + '</tbody></table>';
-      $('t1-drivers').insertAdjacentHTML('beforeend',
+            '<td class="n">' + K(z.pair, z.d.label + ' — every rating', 'average ' + n1(z.score),
+              '<span style="color:' + ratCol(z.score) + ';font-weight:700">' + n1(z.score) + '</span>') + '</td>' +
+            '<td class="n">' + K(z.lowR, z.d.label + ' rated 1–3', 'these parents give the school ' + n1(z.lowM) + ' overall',
+              '<span style="color:' + COL.neg + ';font-weight:700">' + n1(z.lowM) + '</span>' +
+              '<div style="font-size:10px;color:var(--txm)">' + z.lowR.length + ' parents</div>') + '</td>' +
+            '<td class="n">' + K(z.hiR, z.d.label + ' rated 4–5', 'these parents give the school ' + n1(z.hiM) + ' overall',
+              '<span style="color:' + COL.pos + ';font-weight:700">' + n1(z.hiM) + '</span>' +
+              '<div style="font-size:10px;color:var(--txm)">' + z.hiR.length + ' parents</div>') + '</td>' +
+            '<td class="n"><b style="color:' + COL.blue + '">' + (z.gap != null ? '+' + z.gap.toFixed(2) : '–') + '</b></td></tr>';
+        }).join('') + '</tbody></table>' +
         '<div class="au-flag bad"><b>Fix ' + esc(fix.d.label.toLowerCase()) + ' first.</b> Of everything the form asks ' +
-        'about, this is the one that moves a parent\u2019s overall opinion most (correlation ' + fix.r.toFixed(2) + ') while ' +
-        'also scoring poorly at ' + n1(fix.score) + '/5. The ' + fix.lowN + ' parents who rate it 1\u20133 give the school ' +
-        n1(fix.lowM) + ' overall; the ' + fix.hiN + ' who rate it 4\u20135 give ' + n1(fix.hiM) + '. ' +
-        'At the other end <b>' + esc(least.d.label.toLowerCase()) + '</b> scores ' + n1(least.score) + ' but shifts the ' +
-        'overall least \u2014 parents notice it when it fails and take it for granted when it works, so effort spent there ' +
-        'buys less than effort spent on ' + esc(fix.d.label.toLowerCase()) + '.</div>');
+        'about, this is the one that moves a parent’s overall opinion most (correlation ' + fix.r.toFixed(2) + ') while ' +
+        'also scoring poorly at ' + n1(fix.score) + '/5. The ' +
+        K(fix.lowR, fix.d.label + ' rated 1–3', 'the parents to win back', fix.lowR.length + ' parents') +
+        ' who rate it 1–3 give the school ' + n1(fix.lowM) + ' overall; the ' + fix.hiR.length + ' who rate it 4–5 give ' +
+        n1(fix.hiM) + '. At the other end <b>' + esc(least.d.label.toLowerCase()) + '</b> scores ' + n1(least.score) +
+        ' but shifts the overall least — parents notice it when it fails and take it for granted when it works.</div>';
     })();
 
     /* ── 4 · where satisfaction falls away ── */
@@ -26540,35 +26996,42 @@ window.T1 = (function () {
       R.forEach(function (o) { if (o.grade) (grades[o.grade] = grades[o.grade] || []).push(o); });
       var gl = Object.keys(grades).map(function (g) {
         var gg = grades[g];
-        var s = window.T1.npsOf(gg.map(function (o) { return o.nps; }).filter(function (v) { return v != null; }));
-        return { g: g, n: gg.length, s: s,
-                 ov: window.T1.mean(gg.map(function (o) { return o.overall; }).filter(function (v) { return v != null; })),
-                 ac: window.T1.mean(gg.map(function (o) { return o.acad; }).filter(function (v) { return v != null; })) };
+        return { g: g, gg: gg, n: gg.length,
+          s: window.T1.npsOf(gg.map(function (o) { return o.nps; }).filter(function (v) { return v != null; })),
+          ov: window.T1.mean(gg.map(function (o) { return o.overall; }).filter(function (v) { return v != null; })),
+          ac: window.T1.mean(gg.map(function (o) { return o.acad; }).filter(function (v) { return v != null; })) };
       }).filter(function (x) { return x.n >= 8; })
         .sort(function (a, b) { return window.T1.gradeRank(a.g) - window.T1.gradeRank(b.g); });
       if (!gl.length) { $('t1-grades').innerHTML = '<div class="au-empty">Too few responses in this selection to break down by grade.</div>'; return; }
-      var maxN = Math.max.apply(null, gl.map(function (x) { return x.n; }));
       $('t1-grades').innerHTML =
         '<table class="au-tbl"><thead><tr><th>Grade</th><th class="n">Responses</th>' +
         '<th style="min-width:160px">Promoters · passives · detractors</th><th class="n">NPS</th>' +
         '<th class="n">Overall /5</th><th class="n">Academics /5</th></tr></thead><tbody>' +
         gl.map(function (x) {
           return '<tr><td><b>' + esc(x.g) + '</b> <span style="font-size:10.5px;color:var(--txm)">' + esc(window.T1.band(x.g)) + '</span></td>' +
-            '<td class="n">' + x.n + '</td><td>' + npsBar(x.s) + '</td>' +
-            '<td class="n"><b style="color:' + npsCol(x.s && x.s.score) + '">' + sgn(x.s && x.s.score) + '</b></td>' +
-            '<td class="n" style="color:' + ratCol(x.ov) + ';font-weight:700">' + n1(x.ov) + '</td>' +
-            '<td class="n" style="color:' + ratCol(x.ac) + ';font-weight:700">' + n1(x.ac) + '</td></tr>';
+            '<td class="n">' + K(x.gg, 'Grade ' + x.g + ' — every response', 'all responses', x.n) + '</td>' +
+            '<td>' + npsBar(x.s, x.gg, 'Grade ' + x.g) + '</td>' +
+            '<td class="n">' + K(x.gg, 'Grade ' + x.g + ' — recommend scores', 'NPS ' + sgn(x.s && x.s.score),
+              '<b style="color:' + npsCol(x.s && x.s.score) + '">' + sgn(x.s && x.s.score) + '</b>') + '</td>' +
+            '<td class="n">' + K(x.gg.filter(function (o) { return o.overall != null; }), 'Grade ' + x.g + ' — overall',
+              'average ' + n1(x.ov), '<span style="color:' + ratCol(x.ov) + ';font-weight:700">' + n1(x.ov) + '</span>') + '</td>' +
+            '<td class="n">' + K(x.gg.filter(function (o) { return o.acad != null; }), 'Grade ' + x.g + ' — academics',
+              'average ' + n1(x.ac), '<span style="color:' + ratCol(x.ac) + ';font-weight:700">' + n1(x.ac) + '</span>') + '</td></tr>';
         }).join('') + '</tbody></table>';
       var ey = gl.filter(function (x) { return window.T1.gradeRank(x.g) <= 6; });
       var up = gl.filter(function (x) { return window.T1.gradeRank(x.g) > 6; });
       if (ey.length && up.length) {
         var eyS = window.T1.mean(ey.map(function (x) { return x.s ? x.s.score : 0; }));
         var upS = window.T1.mean(up.map(function (x) { return x.s ? x.s.score : 0; }));
-        var worst = up.slice().sort(function (a, b) { return (a.s ? a.s.score : 0) - (b.s ? b.s.score : 0); })[0];
+        var wg = up.slice().sort(function (a, b) { return (a.s ? a.s.score : 0) - (b.s ? b.s.score : 0); })[0];
         $('t1-grades').insertAdjacentHTML('beforeend',
           '<div class="au-flag' + (upS < 10 ? ' bad' : '') + '"><b>Goodwill is highest at the youngest ages and falls away as children move up.</b> ' +
-          'Early-years grades average an NPS of ' + sgn(eyS) + '; from Grade I upward the average is ' + sgn(upS) +
-          ', with <b>' + esc(worst.g) + '</b> the weakest at ' + sgn(worst.s && worst.s.score) + '. The same families who ' +
+          K([].concat.apply([], ey.map(function (x) { return x.gg; })), 'Early years — every response',
+            'NPS ' + sgn(eyS), 'Early-years grades') + ' average an NPS of ' + sgn(eyS) + '; ' +
+          K([].concat.apply([], up.map(function (x) { return x.gg; })), 'Grade I upward — every response',
+            'NPS ' + sgn(upS), 'from Grade I upward') + ' the average is ' + sgn(upS) + ', with ' +
+          K(wg.gg, 'Grade ' + wg.g + ' — the weakest grade', 'NPS ' + sgn(wg.s && wg.s.score),
+            '<b>' + esc(wg.g) + '</b>') + ' the weakest at ' + sgn(wg.s && wg.s.score) + '. The same families who ' +
           'were enthusiastic in pre-primary are the ones cooling in the middle school, so this is a retention question ' +
           'as much as a satisfaction one.</div>');
       }
@@ -26579,12 +27042,12 @@ window.T1 = (function () {
       var cells = [];
       branches.forEach(function (b) {
         var gs = {};
-        ALL.filter(function (o) { return o.branch === b; }).forEach(function (o) {
+        inBranch(ALL.filter(function (o) { return o.branch === b; })).forEach(function (o) {
           if (o.grade) (gs[o.grade] = gs[o.grade] || []).push(o); });
         Object.keys(gs).forEach(function (g) {
           var gg = gs[g]; if (gg.length < 5) return;
-          var s = window.T1.npsOf(gg.map(function (o) { return o.nps; }).filter(function (v) { return v != null; }));
-          cells.push({ b: b, g: g, n: gg.length, s: s, rows: gg,
+          cells.push({ b: b, g: g, n: gg.length, rows: gg,
+            s: window.T1.npsOf(gg.map(function (o) { return o.nps; }).filter(function (v) { return v != null; })),
             ov: window.T1.mean(gg.map(function (o) { return o.overall; }).filter(function (v) { return v != null; })) });
         });
       });
@@ -26596,163 +27059,234 @@ window.T1 = (function () {
         '<th style="min-width:150px">Mix</th><th class="n">NPS</th><th class="n">Overall /5</th>' +
         '<th class="n">Detractors</th><th class="n">Want a call</th></tr></thead><tbody>' +
         bad.map(function (x) {
-          return '<tr><td><b>' + esc(x.b) + '</b></td><td>' + esc(x.g) + '</td><td class="n">' + x.n + '</td>' +
-            '<td>' + npsBar(x.s) + '</td>' +
-            '<td class="n"><b style="color:' + npsCol(x.s && x.s.score) + '">' + sgn(x.s && x.s.score) + '</b></td>' +
-            '<td class="n" style="color:' + ratCol(x.ov) + ';font-weight:700">' + n1(x.ov) + '</td>' +
-            '<td class="n">' + (x.s ? x.s.detr : '–') + '</td>' +
-            '<td class="n">' + x.rows.filter(function (o) { return o.wants; }).length + '</td></tr>';
+          var lbl = x.b + ' ' + x.g;
+          var d = x.rows.filter(function (o) { return o.seg === 'detractor'; });
+          var w = x.rows.filter(function (o) { return o.wants; });
+          return '<tr><td><b>' + esc(x.b) + '</b></td><td>' + esc(x.g) + '</td>' +
+            '<td class="n">' + K(x.rows, lbl + ' — every response', 'all responses', x.n) + '</td>' +
+            '<td>' + npsBar(x.s, x.rows, lbl) + '</td>' +
+            '<td class="n">' + K(x.rows, lbl + ' — recommend scores', 'NPS ' + sgn(x.s && x.s.score),
+              '<b style="color:' + npsCol(x.s && x.s.score) + '">' + sgn(x.s && x.s.score) + '</b>') + '</td>' +
+            '<td class="n">' + K(x.rows.filter(function (o) { return o.overall != null; }), lbl + ' — overall',
+              'average ' + n1(x.ov), '<span style="color:' + ratCol(x.ov) + ';font-weight:700">' + n1(x.ov) + '</span>') + '</td>' +
+            '<td class="n">' + K(d, lbl + ' — detractors', 'scored 6 or below', d.length) + '</td>' +
+            '<td class="n">' + K(w, lbl + ' — asked for a call', 'callback list', w.length) + '</td></tr>';
         }).join('') + '</tbody></table>' +
-        '<div class="au-note">Groups of five or more responses only, weakest first. These are small enough to act on ' +
-        'as a meeting with one grade team, which a branch average is not.</div>';
+        '<div class="au-note">Groups of five or more responses only, weakest first. Small enough to act on as a ' +
+        'meeting with one grade team, which a branch average is not.</div>';
     })();
 
-    /* ── 6 · what parents wrote ── */
-    (function () {
-      var T = window.T1.themeCounts(R);
-      if (!T.list.length) { $('t1-themes').innerHTML = '<div class="au-empty">No substantive comments in this selection.</div>'; return; }
-      var maxN = T.list[0].n;
-      $('t1-themes').innerHTML =
-        '<div class="au-stats">' +
-        '<div class="au-st"><div class="v">' + T.total + '</div><div class="l">wrote something</div></div>' +
-        '<div class="au-st"><div class="v">' + pc(T.total / R.length * 100) + '</div><div class="l">of responses</div></div>' +
-        '<div class="au-st"><div class="v">' + R.filter(function (o) { return o.sub && o.tone === 'negative'; }).length +
-          '</div><div class="l">lean negative</div></div>' +
-        '<div class="au-st"><div class="v">' + R.filter(function (o) { return o.sub && o.ask; }).length +
-          '</div><div class="l">carry a request</div></div></div>' +
-        '<table class="au-tbl"><thead><tr><th>What they wrote about</th><th style="min-width:170px">Share of comments</th>' +
-        '<th class="n">Comments</th><th class="n">Of those, negative</th><th>Where it would land</th></tr></thead><tbody>' +
-        T.list.map(function (x) {
-          return '<tr class="clk" data-th="' + esc(x.k) + '"><td><b>' + esc(x.k) + '</b></td>' +
-            '<td>' + bar(x.n / maxN * 100, x.c) + '</td>' +
-            '<td class="n">' + x.n + ' <span style="color:var(--txm)">(' + pc(x.n / T.total * 100) + ')</span></td>' +
-            '<td class="n" style="color:' + (x.neg / x.n > 0.35 ? COL.neg : 'inherit') + '">' + x.neg +
-              ' <span style="color:var(--txm)">(' + pc(x.neg / x.n * 100) + ')</span></td>' +
-            '<td style="color:var(--txm)">' + esc(x.owner) + '</td></tr>';
-        }).join('') + '</tbody></table>' +
-        '<div class="au-note">A comment can touch more than one subject, so the shares add to more than 100%. ' +
-        'Click a row to filter the comments at the foot of the page.</div>';
-      Array.prototype.forEach.call(el.querySelectorAll('#t1-themes tr.clk'), function (tr) {
-        tr.addEventListener('click', function () {
-          var q = $('t1-q'); if (q) { q.value = tr.dataset.th; FILT.q = tr.dataset.th; paintVerbatim(R); 
-            var v = $('t1-verbatim'); if (v) v.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
-        });
-      });
-
-      /* theme × branch, shaded by lift rather than raw count */
-      if (FILT.branch === 'ALL' && branches.length > 1) {
-        var perB = {};
-        branches.forEach(function (b) { perB[b] = window.T1.themeCounts(ALL.filter(function (o) { return o.branch === b; })); });
-        var base = {}; T.list.forEach(function (x) { base[x.k] = x.n / T.total; });
-        $('t1-lift').innerHTML = '<div class="au-heat-scroll"><table class="au-heat"><thead><tr><th class="cat">Subject</th>' +
-          branches.map(function (b) { return '<th>' + esc(b) + '<br><span style="font-weight:500;color:var(--txl)">' +
-            (perB[b].total || 0) + '</span></th>'; }).join('') + '<th class="net">All</th></tr></thead><tbody>' +
-          T.list.map(function (x) {
-            return '<tr><td class="cat">' + esc(x.k) + '</td>' +
-              branches.map(function (b) {
-                var p = perB[b], hit = (p.list.filter(function (z) { return z.k === x.k; })[0] || { n: 0 }).n;
-                var share = p.total ? hit / p.total : 0, lift = base[x.k] ? share / base[x.k] : 0;
-                var bg = !p.total ? '#F8FAFC' : lift >= 1.6 ? '#FCA5A5' : lift >= 1.25 ? '#FECACA' :
-                         lift >= 0.8 ? '#F1F5F9' : lift > 0 ? '#DCFCE7' : '#F8FAFC';
-                return '<td><div class="au-cell" style="background:' + bg + ';color:#0F172A;display:flex;align-items:center;justify-content:center" ' +
-                  'title="' + hit + ' of ' + p.total + ' comments — ' + (lift ? lift.toFixed(2) + '× the group rate' : 'none') + '">' +
-                  (p.total ? Math.round(share * 100) + '%' : '–') + '</div></td>';
-              }).join('') + '<td class="net">' + Math.round(base[x.k] * 100) + '%</td></tr>';
-          }).join('') + '</tbody></table></div>' +
-          '<div class="au-legend"><span><i style="background:#FCA5A5"></i>well above the group rate</span>' +
-          '<span><i style="background:#FECACA"></i>above</span><span><i style="background:#F1F5F9"></i>about the same</span>' +
-          '<span><i style="background:#DCFCE7"></i>below</span>' +
-          '<span>Shaded by how far the branch sits from the group rate, so a branch with more comments does not look worse everywhere.</span></div>';
-      } else {
-        $('t1-lift').innerHTML = '<div class="au-empty">Clear the branch filter to compare branches against each other.</div>';
-      }
-    })();
-
-    /* ── 7 · the callback queue ── */
-    (function () {
-      var q = R.filter(function (o) { return o.wants || o.seg === 'detractor'; })
-        .map(function (o) {
-          /* first the parents who asked AND are unhappy, then the unhappy who
-             did not ask (a call is still worth making), then the rest */
-          var p = (o.wants ? 60 : 0) + (o.seg === 'detractor' ? 40 : o.seg === 'passive' ? 10 : 0) +
-                  (o.sub && o.tone === 'negative' ? 12 : 0) + (o.overall != null ? (5 - o.overall) * 3 : 0);
-          return { o: o, p: p };
-        }).sort(function (a, b) { return b.p - a.p; });
-      $('t1-queue-n').textContent = q.length;
-      /* Who would answer each raised subject. A parent who scored the school
-         low but wrote nothing has no subject to route, and folding those into
-         the Principal's pile would have made it look like the largest workload
-         on the page when it is really the opposite — a call whose purpose is
-         to find out what is wrong. They are counted separately. */
-      var byOwner = {}, noReason = 0;
-      q.forEach(function (x) {
-        if (!x.o.themes.length) { noReason++; return; }
-        x.o.themes.forEach(function (t) {
-          var own = (window.T1.THEMES.filter(function (z) { return z.k === t; })[0] || {}).owner;
-          if (!own) return;
-          (byOwner[own] = byOwner[own] || { k: own, n: 0 }).n++;
-        });
-      });
-      window.__t1Queue = q;
-      paintQueue();
-      var ol = Object.keys(byOwner).map(function (k) { return byOwner[k]; }).sort(function (a, b) { return b.n - a.n; });
-      var mx = ol.length ? ol[0].n : 1;
-      $('t1-owners').innerHTML = ol.length
-        ? '<table class="au-tbl"><thead><tr><th>Who would own it</th><th style="min-width:180px"></th><th class="n">Items</th></tr></thead><tbody>' +
-          ol.map(function (x) { return '<tr><td><b>' + esc(x.k) + '</b></td><td>' + bar(x.n / mx * 100, COL.blue) +
-            '</td><td class="n">' + x.n + '</td></tr>'; }).join('') + '</tbody></table>' +
-          '<div class="au-note">Taken from what each parent wrote. A parent who raised two subjects appears under both, ' +
-          'so this counts subjects to answer rather than calls to make.' +
-          (noReason ? ' <b>' + noReason + ' of the ' + q.length + ' parents in the queue wrote nothing</b> — they scored the ' +
-            'school low without saying why, so there is no subject to route and the call itself is how the reason gets found.' : '') +
-          '</div>'
-        : '<div class="au-empty">Nothing in the queue for this selection.</div>';
-    })();
-
+    paintText(R, ALL, branches, inBranch);
+    paintQueue(R);
     paintVerbatim(R);
-
-    /* ── 8 · data quality ── */
-    (function () {
-      var rows = [
-        ['Responses received', M.all.length, 'every row on the form sheet'],
-        ['Counted on this page', R.length, FILT.branch === 'ALL' && FILT.curr === 'ALL' && FILT.band === 'ALL'
-          ? 'after setting aside ' + M.superseded.length + ' earlier re-submissions' : 'in the current selection'],
-        ['Filled the form twice', M.superseded.length, 'later answer kept'],
-        ['Wrote a substantive comment', R.filter(function (o) { return o.sub; }).length,
-          pc(R.filter(function (o) { return o.sub; }).length / R.length * 100) + ' of responses'],
-        ['Gave every question the same score', R.filter(function (o) { return o.flat; }).length,
-          'counted in the totals, but they say nothing about which part of the school is working'],
-        ['Asked to be contacted', R.filter(function (o) { return o.wants; }).length, 'the callback queue above'],
-        ['…of those, no usable number', R.filter(function (o) { return o.wants && !o.phoneOk; }).length,
-          'cannot be rung from this data'],
-        ['Left the contact question blank', R.filter(function (o) { return o.wantsBlank; }).length,
-          'treated as "no" — the form should make it required'],
-        ['Said no but left a number anyway', R.filter(function (o) { return !o.wants && !o.wantsBlank && o.phoneOk; }).length,
-          'not called; they said not to']
-      ];
-      $('t1-quality').innerHTML =
-        '<table class="au-tbl"><thead><tr><th>What was collected</th><th class="n">Count</th><th>Note</th></tr></thead><tbody>' +
-        rows.map(function (r) { return '<tr><td>' + esc(r[0]) + '</td><td class="n"><b>' + r[1] + '</b></td>' +
-          '<td style="color:var(--txm)">' + r[2] + '</td></tr>'; }).join('') + '</tbody></table>' +
-        '<div class="au-flag"><b>The one change that would make this page much stronger:</b> run the next round as a ' +
-        'short, chased collection rather than an open link. ' +
-        (strScoped ? pc(R.length / strScoped * 100) + ' of families replied this time' : 'The reply rate is low') +
-        ', and most of them on the first day. A class-teacher-led push over three days, with each section asked to ' +
-        'reach half its parents, would put the response rate somewhere a branch score can carry weight — and would ' +
-        'bring in the quieter families, who are the ones a satisfaction survey most needs to hear from. ' +
-        'Making the contact question and the phone number required would close the ' +
-        R.filter(function (o) { return o.wants && !o.phoneOk; }).length + ' callbacks that currently cannot be made.</div>';
-    })();
+    paintQuality(R, strScoped);
+    wireDrills(el);
   }
 
-  function paintQueue() {
+  /* ── 6 · what parents wrote ─────────────────────────────────────────── */
+  function paintText(R, ALL, branches, inBranch) {
+    var T = window.T1.themeCounts(R);
+    var sub = R.filter(function (o) { return o.sub; });
+    if (!T.list.length) {
+      $('t1-themes').innerHTML = '<div class="au-empty">No substantive comments in this selection.</div>';
+      $('t1-lift').innerHTML = ''; $('t1-words').innerHTML = ''; $('t1-repeat').innerHTML = '';
+      return;
+    }
+    var maxN = T.list[0].n;
+    var neg = sub.filter(function (o) { return o.tone === 'negative'; });
+    var urg = sub.filter(function (o) { return o.urgency > 0; }).sort(function (a, b) { return b.urgency - a.urgency; });
+    var asks = sub.filter(function (o) { return o.ask; });
+    $('t1-themes').innerHTML =
+      '<div class="au-stats">' +
+      '<div class="au-st"><div class="v">' + K(sub, 'Every substantive comment', 'the written feedback', sub.length) + '</div><div class="l">wrote something</div></div>' +
+      '<div class="au-st"><div class="v">' + pc(sub.length / R.length * 100) + '</div><div class="l">of responses</div></div>' +
+      '<div class="au-st"><div class="v" style="color:' + COL.neg + '">' + K(neg, 'Comments that lean negative', 'read clause by clause', neg.length) + '</div><div class="l">lean negative</div></div>' +
+      '<div class="au-st"><div class="v" style="color:' + COL.warn + '">' + K(urg, 'Comments carrying an urgency signal', 'harm, repetition, escalation or a threat to leave', urg.length) + '</div><div class="l">urgent</div></div>' +
+      '<div class="au-st"><div class="v">' + K(asks, 'Comments that ask for something specific', 'an explicit request', asks.length) + '</div><div class="l">carry a request</div></div></div>' +
+      '<table class="au-tbl"><thead><tr><th>What they wrote about</th><th style="min-width:160px">Share of comments</th>' +
+      '<th class="n">Comments</th><th class="n">Negative about it</th><th class="n">Positive</th>' +
+      '<th class="n">Net tone</th><th>Where it would land</th></tr></thead><tbody>' +
+      T.list.map(function (x) {
+        var net = x.sum / x.n;
+        return '<tr class="t1th" data-th="' + esc(x.k) + '"><td><b>' + esc(x.k) + '</b></td>' +
+          '<td>' + bar(x.n / maxN * 100, x.c) + '</td>' +
+          '<td class="n">' + K(x.rows, x.k + ' — every comment', 'raised by these parents',
+            x.n + ' <span style="color:var(--txm)">(' + pc(x.n / T.total * 100) + ')</span>') + '</td>' +
+          '<td class="n">' + K(x.negRows, x.k + ' — parents unhappy about it',
+            'the clause naming this subject was negative',
+            '<span style="color:' + (x.neg / x.n > 0.3 ? COL.neg : 'inherit') + '">' + x.neg +
+            ' <span style="color:var(--txm)">(' + pc(x.neg / x.n * 100) + ')</span></span>') + '</td>' +
+          '<td class="n">' + K(x.posRows, x.k + ' — parents praising it', 'the clause naming this subject was positive',
+            '<span style="color:' + COL.pos + '">' + x.pos + '</span>') + '</td>' +
+          '<td class="n"><b style="color:' + (net < -0.1 ? COL.neg : net > 0.2 ? COL.pos : COL.mid) + '">' +
+            (net > 0 ? '+' : '') + net.toFixed(2) + '</b></td>' +
+          '<td style="color:var(--txm)">' + esc(x.owner) + '</td></tr>';
+      }).join('') + '</tbody></table>' +
+      '<div class="au-note"><b>Net tone is read clause by clause, not comment by comment.</b> "Teaching is excellent ' +
+      'but the bus is always late" counts as praise for academics and a complaint about transport, rather than ' +
+      'averaging to nothing — which is how the same corpus can show a subject praised at one branch and attacked at ' +
+      'another. A comment can touch several subjects, so the shares add to more than 100%. Click a row name to ' +
+      'filter the comments at the foot of the page.</div>';
+
+    /* theme × branch, shaded by lift */
+    if (branches.length > 1) {
+      var perB = {};
+      branches.forEach(function (b) { perB[b] = window.T1.themeCounts(inBranch(ALL.filter(function (o) { return o.branch === b; }))); });
+      var base = {}; T.list.forEach(function (x) { base[x.k] = x.n / T.total; });
+      $('t1-lift').innerHTML = '<div class="au-heat-scroll"><table class="au-heat"><thead><tr><th class="cat">Subject</th>' +
+        branches.map(function (b) { return '<th>' + esc(b) + '<br><span style="font-weight:500;color:var(--txl)">' +
+          (perB[b].total || 0) + '</span></th>'; }).join('') + '<th class="net">All</th></tr></thead><tbody>' +
+        T.list.map(function (x) {
+          return '<tr><td class="cat">' + esc(x.k) + '</td>' +
+            branches.map(function (b) {
+              var p = perB[b], hit = (p.list.filter(function (z) { return z.k === x.k; })[0] || { n: 0, rows: [] });
+              var share = p.total ? hit.n / p.total : 0, lift = base[x.k] ? share / base[x.k] : 0;
+              var bg = !p.total ? '#F8FAFC' : lift >= 1.6 ? '#FCA5A5' : lift >= 1.25 ? '#FECACA' :
+                       lift >= 0.8 ? '#F1F5F9' : lift > 0 ? '#DCFCE7' : '#F8FAFC';
+              return '<td><button class="au-cell t1k" data-d="' + drillId(hit.rows) + '" data-t="' +
+                esc(b + ' — ' + x.k) + '" data-s="' + esc(hit.n + ' of ' + p.total + ' comments · ' +
+                (lift ? lift.toFixed(2) + '× the group rate' : 'none')) + '" style="background:' + bg + ';color:#0F172A">' +
+                (p.total ? Math.round(share * 100) + '%' : '–') + '</button></td>';
+            }).join('') + '<td class="net">' + Math.round(base[x.k] * 100) + '%</td></tr>';
+        }).join('') + '</tbody></table></div>' +
+        '<div class="au-legend"><span><i style="background:#FCA5A5"></i>well above the group rate</span>' +
+        '<span><i style="background:#FECACA"></i>above</span><span><i style="background:#F1F5F9"></i>about the same</span>' +
+        '<span><i style="background:#DCFCE7"></i>below</span>' +
+        '<span>Shaded by distance from the group rate, so a branch with more comments does not look worse everywhere.</span></div>';
+    } else {
+      $('t1-lift').innerHTML = '<div class="au-empty">Set the branch filter at the top of the page to All Branches to compare branches.</div>';
+    }
+
+    /* distinctive words + phrases */
+    (function () {
+      var groups = branches.length > 1
+        ? branches.map(function (b) { return { k: b, rows: inBranch(ALL.filter(function (o) { return o.branch === b && o.sub; })) }; })
+        : [];
+      var dist = groups.length > 1 ? window.T1.distinctiveTerms(groups, 8, 3) : [];
+      var ph = window.T1.phrases(R, 14, Math.max(3, Math.round(sub.length / 80)));
+      var maxP = ph.length ? ph[0].rows.length : 1;
+      $('t1-words').innerHTML =
+        (dist.length
+          ? '<div class="au-h4">Words each branch uses far more than the others</div>' +
+            '<table class="au-tbl"><thead><tr><th>Branch</th><th class="n">Comments</th><th>Its own vocabulary</th></tr></thead><tbody>' +
+            dist.map(function (g) {
+              var gr = groups.filter(function (x) { return x.k === g.k; })[0];
+              return '<tr><td><b>' + esc(g.k) + '</b></td><td class="n">' +
+                K(gr.rows, g.k + ' — every comment', 'written feedback', g.n) + '</td><td>' +
+                (g.terms.length ? g.terms.map(function (t) {
+                  var rs = gr.rows.filter(function (o) { return o.cwords.indexOf(t.w) >= 0; });
+                  return K(rs, '“' + t.w + '” at ' + g.k, 'used ' + t.n + ' times · ' + t.z.toFixed(1) +
+                    ' standard deviations above the group rate',
+                    esc(t.w) + ' <span style="color:var(--txm);font-weight:500">' + t.n + '</span>',
+                    'display:inline-block;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:99px;' +
+                    'background:#EEF2FF;color:#1E4FD8;margin:0 5px 4px 0');
+                }).join('') : '<span style="color:var(--txl)">too few comments to tell</span>') +
+                '</td></tr>';
+            }).join('') + '</tbody></table>' +
+            '<div class="au-note">Not the most common words — the words this branch uses <em>disproportionately</em>, ' +
+            'measured as a log-odds ratio against the other branches with a prior drawn from the whole corpus. ' +
+            'Plain frequency just returns “school, good, teachers” for everyone; this returns what only they are saying.</div>' +
+            '<div style="height:18px"></div>'
+          : '') +
+        '<div class="au-h4">The phrases parents actually used</div>' +
+        (ph.length
+          ? '<table class="au-tbl"><thead><tr><th>Phrase</th><th style="min-width:170px"></th><th class="n">Comments</th></tr></thead><tbody>' +
+            ph.map(function (p) {
+              return '<tr><td>' + K(p.rows, '“' + p.p + '”', 'comments containing this phrase',
+                '<b>“' + esc(p.p) + '”</b>') + '</td>' +
+                '<td>' + bar(p.rows.length / maxP * 100, '#7C3AED') + '</td>' +
+                '<td class="n">' + K(p.rows, '“' + p.p + '”', 'comments containing this phrase', p.rows.length) + '</td></tr>';
+            }).join('') + '</tbody></table>' +
+            '<div class="au-note">Two- and three-word runs, with a shorter run dropped when a longer one contains it ' +
+            'and carries most of its uses — so “extra curricular activities” appears once, not three times.</div>'
+          : '<div class="au-empty">Too few comments to find repeated phrasing.</div>');
+    })();
+
+    /* repeated complaints */
+    (function () {
+      var cl = window.T1.cluster(R, 0.26, 3);
+      if (!cl.length) {
+        $('t1-repeat').innerHTML = '<div class="au-empty">No group of three or more parents wrote closely enough to the ' +
+          'same thing to be called one complaint. With a larger response count this normally fills up.</div>';
+        return;
+      }
+      var mx = cl[0].n;
+      $('t1-repeat').innerHTML =
+        '<table class="au-tbl"><thead><tr><th class="n">Parents</th><th style="min-width:130px"></th>' +
+        '<th>What they have in common</th><th class="n">Avg recommend</th><th>One of them, in full</th></tr></thead><tbody>' +
+        cl.slice(0, 10).map(function (c) {
+          var worst = c.rows.slice().sort(function (a, b) { return (a.nps == null ? 10 : a.nps) - (b.nps == null ? 10 : b.nps); })[0];
+          return '<tr><td class="n">' + K(c.rows, 'The same point, made by ' + c.n + ' parents',
+              c.terms.join(' · '), '<b>' + c.n + '</b>') + '</td>' +
+            '<td>' + bar(c.n / mx * 100, '#0D9488') + '</td>' +
+            '<td>' + c.terms.map(function (t) { return '<span style="display:inline-block;font-size:11px;font-weight:700;' +
+              'padding:1px 8px;border-radius:99px;background:#CCFBF1;color:#0F766E;margin:0 4px 3px 0">' + esc(t) + '</span>'; }).join('') + '</td>' +
+            '<td class="n"><b style="color:' + (c.nps == null ? COL.mid : c.nps < 7 ? COL.neg : COL.mid) + '">' + n1(c.nps) + '</b></td>' +
+            '<td style="font-size:11.5px;color:var(--txm);line-height:1.5">' +
+              esc(worst.text.length > 150 ? worst.text.slice(0, 149) + '…' : worst.text) + '</td></tr>';
+        }).join('') + '</tbody></table>' +
+        '<div class="au-note">Comments are compared on their content words and grouped above a similarity threshold. ' +
+        'A theme count says 237 parents mentioned academics; this says which <em>particular</em> point several of them ' +
+        'made independently — which is the one worth answering in a circular rather than one call at a time.</div>';
+    })();
+
+    /* theme row → filter the verbatims */
+    var tbl = $('t1-themes');
+    Array.prototype.forEach.call(tbl.querySelectorAll('tr.t1th td:first-child'), function (td) {
+      td.style.cursor = 'pointer';
+      td.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        var th = td.parentNode.getAttribute('data-th');
+        var q = $('t1-q'); if (q) { q.value = th; FILT.q = th; paintQueue(R); paintVerbatim(R);
+          var v = $('t1-verbatim'); if (v) v.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      });
+    });
+  }
+
+  /* ── 7 · the callback queue ──────────────────────────────────────────── */
+  function paintQueue(R) {
+    var q = R.filter(function (o) { return o.wants || o.seg === 'detractor'; })
+      .map(function (o) {
+        var p = (o.wants ? 60 : 0) + (o.seg === 'detractor' ? 40 : o.seg === 'passive' ? 10 : 0) +
+                (o.urgency || 0) + (o.overall != null ? (5 - o.overall) * 3 : 0);
+        return { o: o, p: p };
+      }).sort(function (a, b) { return b.p - a.p; });
+    window.__t1Queue = q;
+    $('t1-queue-n').textContent = q.length;
+
+    var byOwner = {}, noReason = 0, noReasonRows = [];
+    q.forEach(function (x) {
+      if (!x.o.themes.length) { noReason++; noReasonRows.push(x.o); return; }
+      x.o.themes.forEach(function (t) {
+        var own = (window.T1.THEMES.filter(function (z) { return z.k === t; })[0] || {}).owner;
+        if (!own) return;
+        var b = byOwner[own] = byOwner[own] || { k: own, n: 0, rows: [] };
+        b.n++; if (b.rows.indexOf(x.o) < 0) b.rows.push(x.o);
+      });
+    });
+    var ol = Object.keys(byOwner).map(function (k) { return byOwner[k]; }).sort(function (a, b) { return b.n - a.n; });
+    var mx = ol.length ? ol[0].n : 1;
+    $('t1-owners').innerHTML = ol.length
+      ? '<table class="au-tbl"><thead><tr><th>Who would own it</th><th style="min-width:180px"></th><th class="n">Subjects raised</th><th class="n">Parents</th></tr></thead><tbody>' +
+        ol.map(function (x) { return '<tr><td><b>' + esc(x.k) + '</b></td><td>' + bar(x.n / mx * 100, COL.blue) +
+          '</td><td class="n">' + x.n + '</td><td class="n">' +
+          K(x.rows, x.k + ' — parents in the queue', 'raised a subject this role owns', x.rows.length) + '</td></tr>'; }).join('') +
+        '</tbody></table>' +
+        '<div class="au-note">Taken from what each parent wrote. A parent who raised two subjects appears under both, ' +
+        'so this counts subjects to answer rather than calls to make.' +
+        (noReason ? ' ' + K(noReasonRows, 'Scored low, wrote nothing', 'the call is how the reason gets found',
+          '<b>' + noReason + ' of the ' + q.length + ' parents in the queue wrote nothing</b>') +
+          ' — they scored the school low without saying why, so there is no subject to route and the call itself is ' +
+          'how the reason gets found.' : '') + '</div>'
+      : '<div class="au-empty">Nothing in the queue for this selection.</div>';
+
     var box = $('t1-queue'); if (!box) return;
-    var q = window.__t1Queue || [];
     var term = (FILT.q || '').toLowerCase();
     var show = q.filter(function (x) {
       if (!term) return true;
       var o = x.o;
-      return (o.text + ' ' + o.themes.join(' ') + ' ' + o.branch + ' ' + o.grade + ' ' + o.student).toLowerCase().indexOf(term) >= 0;
+      return (o.text + ' ' + o.themes.join(' ') + ' ' + o.branch + ' ' + o.grade + ' ' + o.student + ' ' +
+        (o.urgencyFlags || []).join(' ')).toLowerCase().indexOf(term) >= 0;
     });
     if (!show.length) { box.innerHTML = '<div class="au-empty">Nothing matches.</div>'; return; }
     box.innerHTML = '<table class="au-tbl"><thead><tr><th class="n">#</th><th>Parent &amp; student</th><th>Where</th>' +
@@ -26761,8 +27295,8 @@ window.T1 = (function () {
         var o = x.o;
         var segCol = o.seg === 'detractor' ? COL.neg : o.seg === 'passive' ? COL.warn : COL.pos;
         return '<tr><td class="n" style="color:var(--txm)">' + (i + 1) + '</td>' +
-          '<td><b>' + esc(o.parent || '–') + '</b><div style="font-size:11px;color:var(--txm)">' +
-            esc(o.student || '–') + '</div></td>' +
+          '<td>' + K([o], o.parent || 'This parent', esc(o.branch + ' · ' + o.grade), '<b>' + esc(o.parent || '–') + '</b>') +
+            '<div style="font-size:11px;color:var(--txm)">' + esc(o.student || '–') + '</div></td>' +
           '<td>' + esc(o.branch) + '<div style="font-size:11px;color:var(--txm)">' + esc(o.grade) +
             (o.section ? '-' + esc(o.section) : '') + ' · ' + esc(o.curr) + '</div></td>' +
           '<td class="n" style="color:' + ratCol(o.overall) + ';font-weight:700">' + (o.overall == null ? '–' : o.overall) + '</td>' +
@@ -26772,17 +27306,23 @@ window.T1 = (function () {
             ? (o.phoneOk ? '<b style="color:' + COL.pos + '">Yes</b> <span style="font-variant-numeric:tabular-nums">' + esc(o.phone) + '</span>'
                          : '<b style="color:' + COL.neg + '">Yes — no usable number</b>')
             : '<span style="color:var(--txm)">did not ask</span>') + '</td>' +
-          '<td style="max-width:420px">' + (o.themes.length
-              ? o.themes.map(function (t) {
-                  var c = (window.T1.THEMES.filter(function (z) { return z.k === t; })[0] || {}).c || COL.mid;
-                  return '<span style="display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:99px;' +
-                    'background:' + c + '18;color:' + c + ';margin:0 4px 3px 0">' + esc(t) + '</span>'; }).join('')
-              : '') +
-            (o.sub ? '<div style="font-size:11.5px;color:var(--tx);line-height:1.5;margin-top:2px">' +
-              esc(o.text.length > 260 ? o.text.slice(0, 259) + '…' : o.text) + '</div>'
-                   : '<span style="color:var(--txl);font-size:11.5px">no comment written</span>') + '</td></tr>';
+          '<td style="max-width:430px">' +
+            ((o.urgencyFlags || []).length ? '<div style="font-size:10.5px;font-weight:800;color:' + COL.neg +
+              ';margin-bottom:3px">⚠ ' + esc(o.urgencyFlags.join(' · ')) + '</div>' : '') +
+            (o.themes.length ? o.themes.map(function (t) {
+                var c = (window.T1.THEMES.filter(function (z) { return z.k === t; })[0] || {}).c || COL.mid;
+                var a = o.aspect[t];
+                return '<span style="display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:99px;' +
+                  'background:' + c + '18;color:' + c + ';margin:0 4px 3px 0">' + esc(t) +
+                  (a != null && a < -0.4 ? ' ▾' : a != null && a > 0.4 ? ' ▴' : '') + '</span>'; }).join('') : '') +
+            (o.ask ? '<div style="font-size:11.5px;color:var(--tx);line-height:1.5;margin-top:2px"><b>Asks:</b> ' +
+              esc(o.ask.length > 170 ? o.ask.slice(0, 169) + '…' : o.ask) + '</div>'
+                   : (o.sub ? '<div style="font-size:11.5px;color:var(--tx);line-height:1.5;margin-top:2px">' +
+                      esc(o.text.length > 200 ? o.text.slice(0, 199) + '…' : o.text) + '</div>'
+                            : '<span style="color:var(--txl);font-size:11.5px">no comment written</span>')) + '</td></tr>';
       }).join('') + '</tbody></table>' +
       (show.length > 250 ? '<div class="au-note">Showing the first 250 of ' + show.length + '. Narrow with the search box.</div>' : '');
+    wireDrills(box);
   }
 
   function paintVerbatim(R) {
@@ -26792,8 +27332,7 @@ window.T1 = (function () {
       if (!term) return true;
       return (o.text + ' ' + o.themes.join(' ') + ' ' + o.branch + ' ' + o.grade).toLowerCase().indexOf(term) >= 0;
     }).sort(function (a, b) {
-      var w = function (o) { return (o.tone === 'negative' ? 0 : o.tone === 'mixed' ? 1 : 2) * 100 + (o.nps == null ? 50 : o.nps); };
-      return w(a) - w(b);
+      return (b.urgency || 0) - (a.urgency || 0) || a.sentScore - b.sentScore;
     });
     $('t1-verb-n').textContent = list.length;
     if (!list.length) { box.innerHTML = '<div class="au-empty">No comments match.</div>'; return; }
@@ -26805,46 +27344,86 @@ window.T1 = (function () {
           esc(o.branch) + ' · ' + esc(o.grade) + (o.section ? '-' + esc(o.section) : '') + ' · ' + esc(o.curr) +
           ' · overall ' + (o.overall == null ? '–' : o.overall) + '/5 · recommend ' + (o.nps == null ? '–' : o.nps) + '/10' +
           (o.wants ? ' · <span style="color:' + COL.warn + '">asked for a call</span>' : '') + '</div>' +
+        ((o.urgencyFlags || []).length ? '<div style="font-size:11px;font-weight:800;color:' + COL.neg + ';margin-top:3px">⚠ ' +
+          esc(o.urgencyFlags.join(' · ')) + '</div>' : '') +
         '<div style="font-size:12.5px;line-height:1.6;color:var(--tx);margin-top:4px">' + esc(o.text) + '</div>' +
         (o.themes.length ? '<div style="margin-top:6px">' + o.themes.map(function (t) {
           var tc = (window.T1.THEMES.filter(function (z) { return z.k === t; })[0] || {}).c || COL.mid;
+          var a = o.aspect[t];
           return '<span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:99px;' +
-            'background:' + tc + '18;color:' + tc + ';margin-right:4px">' + esc(t) + '</span>'; }).join('') + '</div>' : '') +
+            'background:' + tc + '18;color:' + tc + ';margin-right:4px">' + esc(t) +
+            (a != null && a < -0.4 ? ' ▾' : a != null && a > 0.4 ? ' ▴' : '') + '</span>'; }).join('') + '</div>' : '') +
         '</div>';
     }).join('') +
     (list.length > 300 ? '<div class="au-note">Showing the first 300 of ' + list.length + '.</div>' : '');
+  }
+
+  /* ── 8 · data quality ── */
+  function paintQuality(R, strScoped) {
+    var sub = R.filter(function (o) { return o.sub; });
+    var rows = [
+      ['Responses received', M.all.length, M.all, 'every row on the form sheet'],
+      ['Counted on this page', R.length, R, 'after setting aside ' + M.superseded.length + ' earlier re-submissions'],
+      ['Filled the form twice', M.superseded.length, M.superseded, 'later answer kept'],
+      ['Wrote a substantive comment', sub.length, sub, pc(sub.length / R.length * 100) + ' of responses'],
+      ['Gave every question the same score', R.filter(function (o) { return o.flat; }).length,
+        R.filter(function (o) { return o.flat; }),
+        'counted in the totals, but they say nothing about which part of the school is working'],
+      ['Asked to be contacted', R.filter(function (o) { return o.wants; }).length,
+        R.filter(function (o) { return o.wants; }), 'the callback queue above'],
+      ['…of those, no usable number', R.filter(function (o) { return o.wants && !o.phoneOk; }).length,
+        R.filter(function (o) { return o.wants && !o.phoneOk; }), 'cannot be rung from this data'],
+      ['Left the contact question blank', R.filter(function (o) { return o.wantsBlank; }).length,
+        R.filter(function (o) { return o.wantsBlank; }), 'treated as "no" — the form should make it required'],
+      ['Said no but left a number anyway', R.filter(function (o) { return !o.wants && !o.wantsBlank && o.phoneOk; }).length,
+        R.filter(function (o) { return !o.wants && !o.wantsBlank && o.phoneOk; }), 'not called; they said not to']
+    ];
+    $('t1-quality').innerHTML =
+      '<table class="au-tbl"><thead><tr><th>What was collected</th><th class="n">Count</th><th>Note</th></tr></thead><tbody>' +
+      rows.map(function (r) { return '<tr><td>' + esc(r[0]) + '</td><td class="n">' +
+        K(r[2], r[0], 'the records behind this figure', '<b>' + r[1] + '</b>') + '</td>' +
+        '<td style="color:var(--txm)">' + r[3] + '</td></tr>'; }).join('') + '</tbody></table>' +
+      '<div class="au-flag"><b>The one change that would make this page much stronger:</b> run the next round as a ' +
+      'short, chased collection rather than an open link. ' +
+      (strScoped ? pc(R.length / strScoped * 100) + ' of families replied this time' : 'The reply rate is low') +
+      ', and most of them on the first day. A class-teacher-led push over three days, with each section asked to ' +
+      'reach half its parents, would put the response rate somewhere a branch score can carry weight — and would ' +
+      'bring in the quieter families, who are the ones a satisfaction survey most needs to hear from. ' +
+      'Making the contact question and the phone number required would close the ' +
+      R.filter(function (o) { return o.wants && !o.phoneOk; }).length + ' callbacks that currently cannot be made.</div>';
   }
 
   /* ══ wiring ══ */
   window.renderTerm1Tab = function (raw) {
     var tab = raw && (raw.term1 || raw);
     M = window.T1.build(tab);
-    var brs = Object.keys(M.rows.reduce(function (a, o) { a[o.branch] = 1; return a; }, {})).sort();
     var curs = Object.keys(M.rows.reduce(function (a, o) { if (o.curr) a[o.curr] = 1; return a; }, {})).sort();
     var sel = function (id, opts, cur) {
       var e = $(id); if (!e) return;
       e.innerHTML = opts.map(function (o) { return '<option value="' + esc(o[0]) + '"' +
         (o[0] === cur ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('');
     };
-    sel('t1-branch', [['ALL', 'All branches']].concat(brs.map(function (b) { return [b, b]; })), FILT.branch);
     sel('t1-curr', [['ALL', 'Both curricula']].concat(curs.map(function (c) { return [c, c]; })), FILT.curr);
     sel('t1-band', [['ALL', 'Every grade'], ['Early years', 'Early years'],
                     ['Primary (I–V)', 'Primary (I–V)'], ['Secondary (VI–XII)', 'Secondary (VI–XII)']], FILT.band);
     var on = function (id, key) { var e = $(id); if (e && !e.dataset.w) { e.dataset.w = '1';
       e.addEventListener('change', function () { FILT[key] = e.value; build(); }); } };
-    on('t1-branch', 'branch'); on('t1-curr', 'curr'); on('t1-band', 'band');
+    on('t1-curr', 'curr'); on('t1-band', 'band');
     var q = $('t1-q');
     if (q && !q.dataset.w) { q.dataset.w = '1';
       q.addEventListener('input', function () { FILT.q = q.value.trim();
-        paintQueue(); paintVerbatim(window.T1.scope(M, FILT.branch, FILT.curr, FILT.band)); }); }
+        var R = window.T1.scope(M, curBranch(), FILT.curr, FILT.band);
+        paintQueue(R); paintVerbatim(R); }); }
     var meta = $('t1-meta');
-    if (meta) meta.textContent = M.all.length + ' responses · ' +
-      (M.rows[0] && M.rows[0].ts ? M.rows.map(function (o) { return o.day; }).filter(Boolean).sort()[0] + ' to ' +
-        M.rows.map(function (o) { return o.day; }).filter(Boolean).sort().pop() : 'Term 1, AY 2026-27');
+    if (meta) {
+      var ds = M.rows.map(function (o) { return o.day; }).filter(Boolean).sort();
+      meta.textContent = M.all.length + ' responses' + (ds.length ? ' · ' + ds[0] + ' to ' + ds[ds.length - 1] : '');
+    }
     build();
   };
+  /* the page follows the dashboard's own branch control */
+  window.__t1Rebuild = function () { if (M) build(); };
 })();
-
 
 /* ══════════════════════════════════════════════════════════════════════════
    TERM 1 FEEDBACK — lazy loader
@@ -26931,6 +27510,15 @@ window.T1 = (function () {
   var _sw = window.switchTab;
   if (typeof _sw === 'function') window.switchTab = function (id) {
     var r = _sw(id); if (id === 'term1') loadTerm1(false); return r; };
+  /* This page has no branch control of its own \u2014 it follows the dashboard's
+     BRANCH dropdown like every other tab, so there is one place to set the
+     scope and no way for the two to disagree. */
+  var _af = window.applyFilters;
+  if (typeof _af === 'function') window.applyFilters = function () {
+    var r = _af.apply(this, arguments);
+    try { if (window.__t1Rebuild) window.__t1Rebuild(); } catch (e) {}
+    return r;
+  };
 })();
 
 </script>
