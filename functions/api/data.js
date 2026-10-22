@@ -13,7 +13,11 @@
 //                     branch filter matters more here than anywhere else.
 //                     Unlike ?section=exams this is RAW sheet data: the browser
 //                     derives the review, so the filtering here is row-level.
-//   Adding a future section needs ONE entry in ALLOWED_SECTIONS below.
+//   ?section=term1  → the raw term-end parent feedback & NPS survey. Carries
+//                     parent names, contact numbers and verbatim comments, so
+//                     it is branch-filtered row by row like ?section=ptm.
+//   Adding a future section needs ONE entry in ALLOWED_SECTIONS below — and, if
+//   it carries personal data, one line in step 4 to filter it by branch.
 //
 // v4 — added LAZY SECTION PASS-THROUGH on top of v3's role-based access.
 //
@@ -30,7 +34,23 @@ const CACHE_TTL_SECONDS = 300; // edge freshness window (Apps Script keep-warm k
 
 // Sections the browser is allowed to request. Anything else is ignored, so a bad
 // or hand-typed ?section= can never be used to probe the upstream script.
-const ALLOWED_SECTIONS = { pt1: 1, audit: 1, ptm: 1, civil: 1, syl: 1, vchk: 1, kptm: 1, sylc: 1 };
+// 22 Oct 2026 — `meet` and `term1` were missing from this list.
+// Anything not named here has its ?section= stripped a few lines down, and the
+// Function then quietly fetches and returns the MAIN payload instead. The
+// caller gets a valid 200 with the wrong body, so the failure looks like "no
+// data in the sheet" rather than a routing fault:
+//   • term1 — the Term 1 Feedback tab reported "No responses returned", because
+//     the main payload carries no TERM1_RAW.
+//   • meet  — meetLoadShared() looks for MEET_RAW.text, found none, and fell
+//     back to its built-in seed transcript. Every transcript uploaded through
+//     /api/meet since has been stored and never read back.
+// `dm` is listed too: it already has a TTL override and a branch-filter branch
+// below, so leaving it out was the same oversight. Adding a future section is
+// still one entry here — plus one line in step 4 if it carries personal data.
+const ALLOWED_SECTIONS = {
+  pt1: 1, audit: 1, ptm: 1, civil: 1, syl: 1, vchk: 1, kptm: 1, sylc: 1,
+  term1: 1, meet: 1, dm: 1
+};
 
 // Heavier than the main payload and most sections change only when marks are
 // entered, so they can sit in the edge cache far longer. The syllabus/notebook
@@ -287,6 +307,11 @@ export async function onRequestGet({ request, env }) {
   if (section === "vchk")  return withCookie(json(filterTablesByBranch(data, userBranch, "VCHK_RAW")));
   if (section === "kptm")  return withCookie(json(filterTablesByBranch(data, userBranch, "KPTM_RAW")));
   if (section === "sylc")  return withCookie(json(filterTablesByBranch(data, userBranch, "SYLC_RAW")));
+  /* The term-end survey is the most sensitive raw feed on the dashboard: it
+     carries parent names, student names, verbatim complaints AND the contact
+     number of every parent who asked to be rung. A principal must receive only
+     their own campus's rows, so this filter is not optional. */
+  if (section === "term1") return withCookie(json(filterTablesByBranch(data, userBranch, "TERM1_RAW")));
   // The meeting transcript is one group-wide document with no branch column;
   // filtering it by branch would blank it for every principal.
   if (section === "meet")  return withCookie(json(data));
