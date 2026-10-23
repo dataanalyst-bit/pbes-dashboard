@@ -195,10 +195,21 @@ body.nav-min .sn-foot{display:none}
 .r2{grid-template-columns:1fr 1fr}.r3{grid-template-columns:1fr 1fr 1fr}
 .r12{grid-template-columns:1fr 2fr}.r21{grid-template-columns:2fr 1fr}.r32{grid-template-columns:3fr 2fr}
 
-/* CHART WRAPPER */
-.cw{position:relative;padding:4px 0}.cw canvas{max-height:250px}
-.cw.tall canvas{max-height:310px}.cw.sm canvas{max-height:190px}
-.cw.xs canvas{max-height:150px}
+/* CHART WRAPPER
+   22 Oct 2026 — these were max-heights on the CANVAS, which let Chart.js keep
+   sizing the canvas from its own width while the wrapper shrink-wrapped
+   whatever the canvas had become. Inside a `1fr` grid track that is a one-way
+   ratchet: narrow the window and the canvas shrinks, widen it again and it
+   stays small, because the track's content is now the smaller canvas. The
+   Care Calls trend chart walked itself down to nothing this way and then
+   redrew at the wrong size on every filter change.
+
+   The wrapper now owns the height and the canvas fills it (mkChart turns off
+   maintainAspectRatio to match). The box is the same height at every window
+   width, so there is no feedback loop left to run. */
+.cw{position:relative;padding:4px 0;height:258px}
+.cw.tall{height:318px}.cw.sm{height:198px}.cw.xs{height:158px}
+.cw canvas{width:100%!important;height:100%!important;display:block}
 
 /* BRANCH BARS */
 .bcb{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bor)}
@@ -3098,6 +3109,16 @@ function mkChart(id,cfg){
   if(CHARTS[id]){CHARTS[id].destroy();delete CHARTS[id];}
   const c=document.getElementById(id);
   if(!c) return null;
+  /* The wrapper sets the height (see .cw in the stylesheet), so the chart must
+     fill its box rather than compute a height from its own width — which is
+     what let these charts resize themselves smaller and never recover. Applied
+     here, once, so every chart on the dashboard behaves the same way and no
+     individual config has to remember. */
+  if(c.parentElement && c.parentElement.classList.contains('cw')){
+    cfg.options = cfg.options || {};
+    cfg.options.responsive = true;
+    cfg.options.maintainAspectRatio = false;
+  }
   CHARTS[id]=new Chart(c,cfg);
   return CHARTS[id];
 }
@@ -8344,7 +8365,13 @@ function renderCareSummary(){
     {topic:'Subject support — Hindi',subj:true,ph:['in hindi','hindi subject','hindi reading','hindi writing'],kw:['hindi']},
     {topic:'Subject support — Telugu',subj:true,ph:['in telugu','telugu subject','telugu reading'],kw:['telugu']},
     {topic:'Subject support — Science',subj:true,ph:['in science','science subject','evs','physics','chemistry','biology'],kw:['science']},
-    {topic:'Subject support — Social',subj:true,ph:['social studies','social science','humanities'],kw:['social']},
+    /* "social" is the Social Studies lesson here, but it is also "social
+       interaction", "social skills" and "socialise" — 195 calls about a shy
+       child mingling with peers were being filed as a Social Studies problem.
+       Those readings disqualify the bucket; Confidence & participation takes
+       them, which is where a coordinator would look for them. */
+    {topic:'Subject support — Social',subj:true,ph:['social studies','social science','humanities','in social','social subject','social marks','social notes','social book','social workbook','social homework','social portion'],kw:['social'],
+      not:['social interaction','social interactions','social skills','socialise','socialize','socialising','socializing','social activities','social anxiety','socially','social behaviour','social behavior','social media','social life']},
     {topic:'Subject support — Computer',subj:true,ph:['computer science','computer class','ict','computing'],kw:['computer']},
     {topic:'Subject support — 2nd/3rd Lang',subj:true,ph:['second language','2nd language','third language','3rd language','french','sanskrit'],kw:[]},
     {topic:'Reading & writing skills',ph:['reading and writing','reading skills','writing skills','improve reading','improve writing','hand writing','handwriting','spelling','dictation','unable to read','slow in writing','letter recognition','phonics'],kw:['reading','writing','handwriting','spellings']},
@@ -8364,11 +8391,28 @@ function renderCareSummary(){
     {topic:'Health & wellbeing',ph:['well being','wellbeing','health','fever','injury','fracture','sick','not well','eye vision','vision','allergy','tooth','stomach'],kw:['health','injury']},
     {topic:'Lunch & water intake',ph:['lunch box','not completing her lunch','not completing his lunch','drink water','drink more water','not drinking water','eating habits','not eating','snack','water bottle'],kw:['lunch']},
     {topic:'Digital learning platforms',ph:['mindspark','cogno space','cognospace','wordsworth','first mile','caca','indfame','badges'],kw:['mindspark']},
-    {topic:'IIT & coaching classes',ph:['iit classes','iit foundation','coaching','olympiad','tuition'],kw:['iit']},
+    /* Narrowed to what the topic actually names. Bare "coaching" was catching
+       "proper coaching in swimming" and "athletics coaching after school";
+       bare "tuition" was catching a Grade 1 parent sending a child to a home
+       tutor, which is a study-support matter, not an IIT stream one. Both now
+       land where they belong — sports coaching under Co-curricular, private
+       tuition under its own topic below. */
+    {topic:'IIT & coaching classes',ph:['iit classes','iit foundation','iit coaching','iit stream','iit batch','iit program','iit programme','iit payment','iit fee','entrance coaching','competitive exam','foundation course'],kw:['iit'],
+      not:['swimming coaching','athletics coaching','sports coaching','dance coaching','skating coaching','cricket coaching']},
+    {topic:'Private tuition & home tutor',ph:['tuition','tutor','home tutor','private tuition','tuition teacher','tuition centre','tuition center'],kw:[]},
+    {topic:'Olympiad & competitive tests',ph:['olympiad','spell bee','spellbee','talent test','scholarship exam','ntse','quiz competition'],kw:[]},
     {topic:'Co-curricular & sports',ph:['sports','games period','dance','music','art and craft','activity class','competition','swimming','skating','badminton'],kw:[]},
     {topic:'Events & school programmes',ph:['annual day','sports day','field trip','picnic','celebration','exhibition','phonics expo','library week','independence day'],kw:[]},
-    {topic:'Transport',ph:['bus','transport','route','pick up','drop','driver','attender'],kw:['bus']},
-    {topic:'Fees & accounts',ph:['fee','fees','payment','receipt','due','concession','refund'],kw:[]},
+    /* "drop" and "pick up" are ordinary English before they are transport
+       words — "drop a message if you have any concern", "has to pick up fast
+       in writing". They are only kept where they name the journey. */
+    {topic:'Transport',ph:['bus','transport','transportation','route','bus stop','bus timing','bus timings','bus route','bus driver','school bus','late bus','pick up point','pick up time','pick up and drop','pickup and drop','drop point','drop off','drop time','dropping the child','driver','attender'],kw:['bus'],
+      not:['drop a message','drop a mail','pick up fast','pick up speed','pick up the pace']},
+    /* "due" was matching "due to" — "hospitalised due to fever", "absent due
+       to journey", "unable to write due to fine motor skills". 219 calls were
+       being reported as fee concerns on the strength of a preposition. The
+       word only means money when it says what is due. */
+    {topic:'Fees & accounts',ph:['fee','fees','fee due','fees due','due date','fee payment','pending fee','pending fees','outstanding','fee receipt','term fee','fee structure','payment','receipt','concession','refund'],kw:[]},
     {topic:'Admission, TC & section',ph:['transfer certificate','tc','admission','section change','changed the section','shift the section'],kw:[]},
     {topic:'Communication & information',ph:['not informed','no information','communication gap','not communicated','no response from school','not aware','circular','message not received','whatsapp'],kw:[]},
     /* Washrooms and water, widened from the misses in the export. Parents and
@@ -8380,9 +8424,18 @@ function renderCareSummary(){
        times and almost all of them are inside the standard teacher-conversation
        template ("...5. Check well being / behaviour / hygiene..."). Matching it
        alone would invent a 120-call problem out of a checklist heading. */
-    {topic:'Washrooms, water & cleanliness',fac:true,ph:['washroom','washrooms','wash room','wash rooms','washroms','toilet','toilets','bathroom','bathrooms','bath room','rest room','restroom','urinal','drinking water','no water','water issue','water isssue','water problem','water supply','water is not','not clean','not cleaned','not neat','not hygienic','not hygiene','not hygenie','unhygienic','uncleaned','cleanliness','neatness','housekeeping','ayamma','ayas are not','helpers near washroom','not in good condition','not in a proper way','unpleasant smell','bad smell'],kw:[]},
+    /* Two words had to go. "neatness" is almost always the neatness of a
+       child's HANDWRITING in this corpus, not of a washroom. And bare
+       "drinking water" is usually about the child — "not drinking water",
+       "take more care in drinking water" — which is an intake matter for the
+       Lunch & water topic, not a facilities fault. It is kept only where it
+       names a problem with the supply. */
+    {topic:'Washrooms, water & cleanliness',fac:true,ph:['washroom','washrooms','wash room','wash rooms','washroms','toilet','toilets','bathroom','bathrooms','bath room','rest room','restroom','urinal','no drinking water','drinking water is not','drinking water not','drinking water facility','drinking water problem','drinking water issue','no water','water issue','water isssue','water problem','water supply','water is not','water is salty','not clean','not cleaned','not neat','not hygienic','not hygiene','not hygenie','unhygienic','uncleaned','cleanliness','housekeeping','ayamma','ayas are not','helpers near washroom','not in good condition','not in a proper way','unpleasant smell','bad smell'],kw:[],
+      not:['neatness of handwriting','neatness of her handwriting','neatness of their handwriting','neatness in writing']},
     {topic:'Classroom & facilities',ph:['fan not working','light not working','ac not working','bench','desk','seating','projector','ventilation','classroom is hot'],kw:[]},
-    {topic:'Teacher / staff conduct',ph:['teacher scold','teacher shouted','staff is rude','misbehaved with','partial','punished','beaten by teacher'],kw:[]},
+    /* "partial" was matching "partial quotient method". The complaint word is
+       partiality. */
+    {topic:'Teacher / staff conduct',ph:['teacher scold','teacher shouted','staff is rude','misbehaved with','partiality','being partial','partial treatment','shows partiality','punished','beaten by teacher','teacher is rude','rude behaviour of teacher'],kw:[]},
     {topic:'Counselling & guidance',ph:['council him','counsel him','council her','counsel her','counselling','counseling','guide the child','warn her','warn him','moral values'],kw:[]},
     {topic:'Speech & communication skills',ph:['communication skills','speech','pronunciation','not speaking','unable to speak','language development','stammer','eye contact','not following instructions'],kw:[]},
     {topic:'Special care requested',ph:['special care','take special care','extra attention','care of the child','look after'],kw:[]},
@@ -8546,13 +8599,64 @@ function renderCareSummary(){
     _topicCache.set(key, out);
     return out;
   };
+  /* ══════════════════════════════════════════════════════════════════
+     THE AGENDA IS NOT A PROBLEM  (22 Oct 2026)
+
+     A care-call remark carries two different kinds of writing. One is what
+     the parent actually said. The other is the agenda the caller read out —
+     "Teacher : Discussed regarding School reopen date/timings, Purchase of
+     books, holiday homework, Uniform" — which is a list of HEADINGS, written
+     the same way on every call whether or not any of it was a problem.
+
+     1,025 calls in this export carry that template, and matching its headings
+     invented problems wholesale: 642 phantom "DC app" concerns, 321 almanac,
+     306 homework, 184 books. One remark reading in full "Teacher : Discussed
+     regarding Academics" was being filed under Subject support — Telugu AND
+     English. Another whose entire parent content was "parent will pick the
+     child at 12:30 pm" was filed as a homework-completion problem, because the
+     word "holiday homework" appeared in the agenda above it.
+
+     So the agenda is cut away before anything is matched. What is kept is the
+     text from the point the parent's own contribution starts — "Parent:",
+     "Parent's concern was", "parents asked", "parent said" and the rest. A
+     remark that is agenda and nothing else yields no problem topic at all,
+     which is the truth: the call happened and nothing was raised.
+
+     The existing note about the word "hygiene" below is the same disease,
+     found earlier and patched one word at a time. This treats the cause. */
+  var _AGENDA = /\bteacher\s*[:\-]?\s*(?:conversation|discussed\s+regarding|discussion)/i;
+  /* the point at which the parent starts speaking, strongest marker first */
+  var _PARENT_MARKERS = [
+    /\bparent'?s?\s*(?:concern|query|feedback|response|point)s?\s*(?:was|were|is|are)?\s*[:\-]/i,
+    /\bparents?\s*[:\-]/i,
+    /\bparents?\s+(?:said|says|asked|informed|told|shared|requested|request|wants?|wanted|reported|expressed|complained|raised|mentioned|replied|responded|conveyed|enquired|queried|felt|feels|is|are|was|were|has|have|will|would|did|does)\b/i
+  ];
+  /* Returns the parent's own words. When the remark carries no agenda it is
+     returned untouched, so the ordinary free-text remark — which is most of
+     them — is read exactly as before. */
+  function _careParentText(raw){
+    var t = String(raw == null ? '' : raw);
+    var ag = t.search(_AGENDA);
+    if(ag < 0) return t;                       // no agenda: nothing to strip
+    var rest = t.slice(ag), best = -1;
+    _PARENT_MARKERS.forEach(function(re){
+      var m = rest.search(re);
+      if(m >= 0 && (best < 0 || m < best)) best = m;
+    });
+    /* agenda with no parent contribution after it: keep whatever came BEFORE
+       the agenda marker (some callers write the real note first) and nothing
+       from the agenda itself */
+    if(best < 0) return t.slice(0, ag);
+    return t.slice(0, ag) + ' ' + rest.slice(best);
+  }
+  window._careParentText = _careParentText;
   function _normTerm(x){ return String(x).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim(); }
   function _reEsc(x){ return x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
   function _careTopicsUncached(r){
     var cat = window._careCatOf(r), rules = TOPIC_RULES[cat];
     if(!rules) return [];
-    var raw = (((r.Remarks&&r.Remarks!=='–')?r.Remarks:'')+' '+
-               ((r.Followup&&r.Followup!=='–')?r.Followup:''));
+    var raw = (_careParentText((r.Remarks&&r.Remarks!=='\u2013')?r.Remarks:'')+' '+
+               _careParentText((r.Followup&&r.Followup!=='\u2013')?r.Followup:''));
     /* pad so \b-style edge matching works on the first and last word too */
     var t = ' ' + String(raw).toLowerCase().replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim() + ' ';
     if(t.trim()==='') { var e = rules.find(function(b){ return !(b.kw&&b.kw.length)&&!(b.ph&&b.ph.length); });
@@ -8573,6 +8677,18 @@ function renderCareSummary(){
           : null;
       }
       if(b.__gate && !b.__gate.test(t)) return { b:b, s:0 };
+      /* DISQUALIFIERS. Some words mean two different things in a school and a
+         term list alone cannot tell them apart: "social interaction" is not the
+         Social Studies lesson, "coaching" in a swimming remark is not IIT
+         coaching, "due to fever" is not a fee due. A bucket carrying `not`
+         terms is skipped outright when one of them is present, which is
+         cheaper and far more legible than trying to out-score the wrong
+         reading with ever-longer phrase lists. */
+      if(b.not && b.not.length){
+        if(!b.__ngate) b.__ngate = new RegExp('(?:^| )(?:' +
+          b.not.map(_normTerm).filter(Boolean).map(_reEsc).join('|') + ')(?: |$)');
+        if(b.__ngate.test(t)) return { b:b, s:0 };
+      }
       var s = 0;
       /* a phrase is far stronger evidence than any single word it contains:
          "not writing homework" says what happened, "work" says nothing */
@@ -23513,6 +23629,8 @@ window.CARE_PROBLEMS = (function () {
     'Lunch & water intake':['🍱','#1E4FD8'],
     'Digital learning platforms':['💡','#1E4FD8'],
     'IIT & coaching classes':['🎓','#1E4FD8'],
+    'Private tuition & home tutor':['📖','#1E4FD8'],
+    'Olympiad & competitive tests':['🏆','#1E4FD8'],
     'Co-curricular & sports':['🏅','#1E4FD8'],
     'Events & school programmes':['🎪','#1E4FD8'],
     'Transport':['🚌','#1E4FD8'],
