@@ -479,6 +479,25 @@ table.auhm tr.au-itemrow td{border-color:#E8EEF2}
 .cp-bar .track i{display:block;height:100%;border-radius:99px}
 .cp-bar .v{width:38px;flex:0 0 38px;font-weight:700;color:var(--tx);font-variant-numeric:tabular-nums}
 .cp-delta{text-align:right;font-size:12.5px;font-weight:800;font-variant-numeric:tabular-nums}
+/* The year panel carries the resolution flow, so it needs more columns than
+   the month-on-month panel beside it. Its own grid, so .cp-row is untouched. */
+.cpy-row2{display:grid;grid-template-columns:minmax(132px,1.5fr) minmax(54px,1fr) 74px 122px;gap:8px;
+  align-items:center;padding:8px 0;border-bottom:1px solid var(--bor)}
+/* the year label is already in the column head, and at this width the bar
+   cannot afford 52px for it */
+.cpy-row2 .cp-bar .v{width:32px;flex:0 0 32px}
+.cpy-row2:last-child{border-bottom:none}
+.cpy-cell{text-align:right;font-size:13px;font-weight:800;font-variant-numeric:tabular-nums;
+  cursor:pointer;border-radius:6px;padding:3px 5px}
+.cpy-cell:hover{background:#EEF2FF;outline:1px solid var(--p)}
+.cpy-cell small{display:block;font-size:10px;font-weight:600;color:var(--txm);margin-top:1px;line-height:1.3}
+.cpy-flag{display:inline-block;background:#FEE2E2;color:#B91C1C;font-size:9.5px;font-weight:800;
+  padding:1px 6px;border-radius:99px;margin-left:5px;vertical-align:middle;letter-spacing:.2px}
+.cpy-how{background:#F8FAFC;border:1px solid var(--bor);border-radius:8px;padding:10px 12px;margin-top:12px}
+.cpy-how b{color:var(--tx)}
+.cpy-how div{font-size:11.5px;line-height:1.55;color:var(--txm);margin-bottom:5px}
+.cpy-stale{background:#FEF2F2;border-left:3px solid #DC2626;padding:7px 11px;font-size:11.5px;
+  color:#991B1B;line-height:1.5;margin-top:10px;border-radius:0 7px 7px 0}
 .cp-delta small{display:block;font-size:9.5px;font-weight:500;color:#94A3B8}
 .cp-roll{cursor:pointer}
 .cp-roll:hover{background:var(--pl)}
@@ -1547,8 +1566,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="cb" style="padding:14px 18px;"><div id="cp-body"></div></div>
   </div>
   <div class="card">
-    <div class="ch"><h3>📅 Top 10 problems — March to date</h3>
-      <span class="fnote" id="cpy-fn">Negative remarks only &mdash; what is BIGGEST, the whole year so far</span>
+    <div class="ch"><h3>📅 Top 10 problems — raised, and how far they are closed</h3>
+      <span class="fnote" id="cpy-fn">Negative remarks only &mdash; raised, closed, and what is still In Progress or Pending</span>
     </div>
     <div class="cb" style="padding:14px 18px;"><div id="cpy-body"></div></div>
   </div>
@@ -25022,6 +25041,60 @@ window.VCHK = (function () {
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 
+  /* One normalised state per call. The Status column carries "Resolved.",
+     "resolved", "in progress" and, in a handful of rows, a pasted remark or a
+     date, so a bare equality test on it mis-states the count. */
+  function stateOf(r){
+    var t=String(r&&r.Status==null?'':r.Status).trim().toLowerCase().replace(/[.\s]+$/,'');
+    if(/^resolved$|^closed$|^completed$/.test(t)) return 'closed';
+    if(/pending/.test(t)) return 'pending';
+    if(/progress/.test(t)) return 'progress';
+    return 'other';
+  }
+  /* How long a concern has been waiting.
+
+     Dates arrive from Code.gs as yyyy-mm-dd, or as the en dash when blank.
+     But in 10% of rows the typed Date contradicts the Month the row is filed
+     under, and 1,651 of them are out by three months or more \u2014 one call
+     filed under September carries 09 Jan 2026, which on the date alone reads
+     as 287 days abandoned when it is really a September call with a mistyped
+     year. Left alone, a typo invents a crisis.
+
+     So the Date is used only when it agrees with the month the branch filed
+     the call under. Where the two contradict each other, the month label wins
+     and the middle of that month is used \u2014 the label is what the branch
+     actually works to, and it cannot be out by a year. */
+  var MNUM={January:0,February:1,March:2,April:3,May:4,June:5,July:6,August:7,
+            September:8,October:9,November:10,December:11};
+  var ACAD_Y=null;                    // calendar year the March of this session belongs to
+  function parseDate(r){
+    var v=String(r&&r.Date==null?'':r.Date).trim();
+    if(!/^\d{4}-\d{2}-\d{2}/.test(v)) return null;
+    var d=new Date(v+'T00:00:00');
+    return isNaN(d)?null:d;
+  }
+  function ageOf(r){
+    var d=parseDate(r), li=MNUM[String(r&&r.Month==null?'':r.Month).trim()];
+    if(d!=null && li!=null){
+      var diff=Math.abs(d.getMonth()-li); if(diff>6) diff=12-diff;
+      if(diff>2) d=null;              // the date contradicts the month it is filed under
+    }
+    if(d==null && li!=null && ACAD_Y!=null){
+      d=new Date((li<=1?ACAD_Y+1:ACAD_Y), li, 15);
+    }
+    if(d==null) return null;
+    return Math.round((Date.now()-d.getTime())/864e5);
+  }
+  function tidy(v){
+    var t=String(v==null?'':v).replace(/\s+/g,' ').trim();
+    t=t.replace(/[\s.,;:\-\u2013]*\b(n\s*\/?\s*a|nil|none|na)\b[\s.]*$/i,'').trim();
+    return /^(\u2013|-|\.)*$/.test(t) ? '' : t;
+  }
+  var OPEN_COLS=[{key:'Branch',label:'Branch'},{key:'Month',label:'Month'},{key:'Class',label:'Class'},
+    {key:'Student',label:'Student',maxW:'160px'},{key:'Date',label:'Raised',date:true},
+    {key:'Grievance',label:'Filed as',pill:true},{key:'Remarks',label:'What the parent said',maxW:'330px'},
+    {key:'Followup',label:'Follow-up action',maxW:'240px'},{key:'Status',label:'Status',pill:true}];
+
   function build(){
     var el=$('cpy-body'); if(!el) return;
     var C=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
@@ -25039,13 +25112,50 @@ window.VCHK = (function () {
     if(!rows.length){ el.innerHTML='<div class="no-data">No calls recorded this academic year.</div>'; return; }
     if(!window.CARE_PROBLEMS){ el.innerHTML='<div class="no-data">Waiting for the topic engine…</div>'; return; }
 
+    /* The academic year runs March \u2192 February, so the March in play is the
+       one belonging to the most recent call that carries a trustworthy date. */
+    (function(){
+      var newest=null;
+      rows.forEach(function(r){ var d=parseDate(r); if(d && (!newest || d>newest)) newest=d; });
+      if(!newest) newest=new Date();
+      ACAD_Y = (newest.getMonth()<=1) ? newest.getFullYear()-1 : newest.getFullYear();
+    })();
     var months={}; rows.forEach(function(r){ months[r.Month]=1; });
     var span=ORDER.filter(function(m){ return months[m]; });
     var T=CARE_PROBLEMS.tally(rows);
+    /* ══ RAISED → CLOSED → STILL OPEN  (added 23 Oct 2026) ══
+       A concern does not sit still: a teacher rings, an issue comes up, the row
+       is marked In Progress or Pending, and days later somebody works it and
+       marks it Resolved. So ranking by what is open TODAY makes a problem
+       vanish from the list precisely because it was handled well, and the list
+       changes every morning.
+
+       Ranking therefore stays on the whole year (volume), and each row now
+       carries the flow beside it: how many were closed, how many are still In
+       Progress or Pending, and how old the oldest open one is. Across the
+       group 94% of concerns close, and every month from March to September
+       sits between 91% and 96% — so a topic closing below 90% is the one not
+       being finished, whatever its size. That is flagged rather than left for
+       the reader to work out. */
     var list=Object.keys(T.by).map(function(k){
-      var e=T.by[k];
-      return { th:e.th, n:e.rows.length, concern:(e.concernRows||[]).length,
-               rows:e.rows, share:rows.length?e.rows.length/rows.length*100:0 };
+      var e=T.by[k], pr=e.rows, closed=0, prog=0, pend=0, oth=0, oldest=0, how='',
+          openRows=[], closedRows=[], oldestRow=null;
+      pr.forEach(function(r){
+        var st=stateOf(r);
+        if(st==='closed'){
+          closed++; closedRows.push(r);
+          if(!how){ var f=tidy(r.Followup); if(f.length>20 && !/^nothing$/i.test(f)) how=f; }
+        } else {
+          openRows.push(r);
+          if(st==='pending') pend++; else if(st==='progress') prog++; else oth++;
+          var a=ageOf(r); if(a!=null && a>oldest){ oldest=a; oldestRow=r; }
+        }
+      });
+      return { th:e.th, n:pr.length, concern:(e.concernRows||[]).length, rows:pr,
+               share:rows.length?pr.length/rows.length*100:0,
+               closed:closed, prog:prog, pend:pend, oth:oth,
+               open:openRows.length, openRows:openRows, closedRows:closedRows,
+               pct:pr.length?closed/pr.length*100:null, oldest:oldest, oldestRow:oldestRow, how:how };
     }).filter(function(x){ return !x.th.isSubjectRoll || true; })
       .sort(function(a,b){ return b.n-a.n; }).slice(0,10);
     if(!list.length){ el.innerHTML='<div class="no-data">No topic matched this year\u2019s remarks.</div>'; return; }
@@ -25054,43 +25164,123 @@ window.VCHK = (function () {
     el.innerHTML=branchSlider({id:'cpy-slide', counts:brc, value:PB})+
       '<div style="background:#F0FDF4;border-left:3px solid #059669;padding:7px 11px;'+
       'font-size:11.5px;color:#065F46;line-height:1.5;margin-bottom:10px;border-radius:0 7px 7px 0">'+
-      '<b>Use this to decide what to fix.</b> The whole year ranked by volume, so a problem reported '+
-      'steadily every month is visible even though it never spikes. The panel on the left shows '+
-      'movement instead.</div>'+
+      '<b>Use this to decide what to fix.</b> A concern moves from In Progress or Pending to Resolved '+
+      'once a branch works it, so a list of what is open <i>today</i> drops a problem precisely because '+
+      'it was handled well. Ranking stays on the whole year, and each row shows the flow beside it: '+
+      'raised, closed, still open. <b>Closed</b> is the column that separates one problem from another '+
+      '\u2014 below <b style="color:#DC2626">90%</b> the branches are not finishing it. '+
+      'Every number opens the records behind it.</div>'+
       '<div style="font-size:12px;color:var(--txm);margin-bottom:12px;line-height:1.6">'+
       '<b>'+esc(span[0])+' \u2013 '+esc(span[span.length-1])+'</b> \u00b7 '+
       rows.length.toLocaleString('en-IN')+' calls'+
-      ((typeof fBranch!=='undefined'&&fBranch!=='ALL')?' \u00b7 '+esc(fBranch):' \u00b7 all branches')+
+      /* the count already honours the panel's own branch chips, so the label
+         beside it has to name the same branch \u2014 it read "10,517 calls \u00b7 all
+         branches" with Bachupally selected */
+      (PB!=='ALL' ? ' \u00b7 '+esc(PB)
+        : (typeof fBranch!=='undefined'&&fBranch!=='ALL') ? ' \u00b7 '+esc(fBranch)
+        : ' \u00b7 all branches')+
       '. Ranked by how often each topic came up across the whole year, so a steady problem is not '+
-      'hidden by one quiet month. Same topics and filters as the panel on the left.</div>'+
+      'hidden by one quiet month. Same topics and filters as the panel on the left.'+
+      (function(){ var tn=0,tc=0,to=0; list.forEach(function(x){ tn+=x.n; tc+=x.closed; to+=x.open; });
+        if(!tn) return '';
+        return ' Across these ten: <b>'+tn.toLocaleString('en-IN')+'</b> raised, <b style="color:#059669">'+
+          Math.round(tc/tn*100)+'%</b> closed, <b style="color:#DC2626">'+to+'</b> still open.'; })()+
+      '</div>'+
+      '<div class="cpy-row2" style="border-bottom:2px solid var(--bor);padding-bottom:5px">'+
+        '<div style="font-size:10px;font-weight:800;color:var(--txm);text-transform:uppercase;letter-spacing:.4px">Problem raised</div>'+
+        '<div style="font-size:10px;font-weight:800;color:var(--txm);text-transform:uppercase;letter-spacing:.4px">Raised this year</div>'+
+        '<div style="font-size:10px;font-weight:800;color:var(--txm);text-transform:uppercase;letter-spacing:.4px;text-align:right">Closed</div>'+
+        '<div style="font-size:10px;font-weight:800;color:var(--txm);text-transform:uppercase;letter-spacing:.4px;text-align:right">Still open</div>'+
+      '</div>'+
       list.map(function(r,i){
-        return '<div class="cp-row cpy-row" data-i="'+i+'" title="Click to view these calls">'+
-          '<div class="cp-name"><i>'+r.th.icon+'</i>'+esc(r.th.label)+'</div>'+
+        var lag = r.pct!=null && r.pct<90;
+        var pc  = r.pct==null ? '\u2013' : Math.round(r.pct)+'%';
+        var pcol= r.pct==null ? 'var(--txm)' : (r.pct>=90?'#059669':r.pct>=80?'#D97706':'#DC2626');
+        var sub = [r.prog?r.prog+' in progress':'', r.pend?r.pend+' pending':'', r.oth?r.oth+' no status':'']
+                    .filter(Boolean).join(' \u00b7 ');
+        return '<div class="cpy-row2" data-i="'+i+'">'+
+          '<div class="cp-name" data-act="all" style="cursor:pointer" title="Click to view every call on this problem">'+
+            '<i>'+r.th.icon+'</i><span>'+esc(r.th.label)+
+            (lag?'<span class="cpy-flag">not closing</span>':'')+'</span></div>'+
           '<div class="cp-bars"><div class="cp-bar">'+
-            '<span class="t">year</span>'+
-            '<span class="track"><i style="width:'+(r.n/max*100)+'%;background:'+(r.th.c||'#1E4FD8')+'"></i></span>'+
+            '<span class="track" data-act="all" title="Click to view every call on this problem"><i style="width:'+(r.n/max*100)+'%;background:'+(r.th.c||'#1E4FD8')+'"></i></span>'+
             '<span class="v">'+r.n+'</span></div></div>'+
-          '<div class="cp-delta" style="color:var(--txm)">'+r.share.toFixed(0)+'%'+
-            '<small>'+(r.concern<r.n ? r.concern+' are concerns' : 'all are concerns')+'</small></div>'+
+          '<div class="cpy-cell" data-act="closed" style="color:'+pcol+'" title="Click to view the calls that were closed">'+pc+
+            '<small>'+r.closed.toLocaleString('en-IN')+' closed</small></div>'+
+          '<div class="cpy-cell" data-act="open" style="color:'+(r.open?'#DC2626':'#059669')+'" title="Click to view the In Progress and Pending records">'+
+            r.open+'<small>'+(sub||'nothing open')+
+            (r.oldest?'<span style="color:'+(r.oldest>150?'#DC2626':r.oldest>60?'#D97706':'var(--txm)')+
+              '"> \u00b7 oldest '+r.oldest+'d</span>':'')+'</small></div>'+
           '</div>';
-      }).join('');
+      }).join('')+
+      (function(){
+        /* How a problem of this kind actually gets closed \u2014 the follow-up a
+           branch itself wrote when it closed one, not a summary of it. */
+        var hw=list.filter(function(x){ return x.how; }).slice(0,3);
+        if(!hw.length) return '';
+        return '<div class="cpy-how"><div style="font-size:10px;font-weight:800;color:var(--txm);'+
+          'text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">How these are actually closed</div>'+
+          hw.map(function(x){ return '<div><b>'+esc(x.th.label)+':</b> '+esc(x.how.slice(0,220))+'</div>'; }).join('')+
+          '<div style="font-size:10.5px;color:var(--txm);margin:0">The follow-up a branch wrote when it closed one of these.</div></div>';
+      })()+
+      (function(){
+        /* Open for months \u2014 not work in hand, work abandoned. */
+        var stale=[]; list.forEach(function(x){ x.openRows.forEach(function(r){ var a=ageOf(r); if(a!=null&&a>150) stale.push(r); }); });
+        var seen={}, uniq=stale.filter(function(r){ var k=r.Branch+'|'+r.Student+'|'+r.Date+'|'+r.Remarks; if(seen[k]) return false; seen[k]=1; return true; });
+        if(!uniq.length) return '';
+        var bym={}; uniq.forEach(function(r){ var m=String(r.Month||'?').trim(); bym[m]=(bym[m]||0)+1; });
+        var worst=Object.keys(bym).sort(function(a,b){ return bym[b]-bym[a]; }).slice(0,2)
+          .map(function(k){ return '<b>'+bym[k]+'</b> from '+esc(k); });
+        window._CPY_STALE=uniq;
+        return '<div class="cpy-stale" id="cpy-stale" style="cursor:pointer" title="Click to view these records">'+
+          '<b>Not work in hand \u2014 work abandoned:</b> <b>'+uniq.length+'</b> concern'+(uniq.length===1?'':'s')+
+          ' still open after more than 150 days ('+worst.join(', ')+'). '+
+          'Nobody is going to close these without being asked to. <u>Click to see them</u>.</div>';
+      })();
 
     var fn=$('cpy-fn');
     if(fn) fn.textContent=span[0]+' \u2013 '+span[span.length-1]+' \u00b7 '+
       ((typeof fBranch!=='undefined'&&fBranch!=='ALL')?fBranch:'all branches');
 
     wireBranchSlider('cpy-slide', function(b){ window._CPY_PANEL_BR=b; safe(); });
-    el.querySelectorAll('.cpy-row').forEach(function(n){
-      n.addEventListener('click',function(){
+    /* Every value opens the records behind it: the name or the bar gives the
+       whole problem, Closed gives the ones already dealt with, Still open
+       gives exactly the In Progress and Pending records management asked to
+       see, and Oldest jumps to the single record that has waited longest. */
+    var WIN=' \u2014 '+span[0]+' to '+span[span.length-1];
+    el.querySelectorAll('.cpy-row2[data-i]').forEach(function(n){
+      n.addEventListener('click',function(ev){
         var r=list[+n.dataset.i];
-        if(typeof openModal!=='function') return;
-        openModal('\ud83d\udcc5 '+r.th.label+' \u2014 '+span[0]+' to '+span[span.length-1],
-          r.rows.length.toLocaleString('en-IN')+' call(s) \u00b7 '+r.concern+' carrying a concern', r.rows,
-          [{key:'Branch',label:'Branch'},{key:'Month',label:'Month'},{key:'Class',label:'Class'},
-           {key:'Student',label:'Student',maxW:'160px'},{key:'Date',label:'Date',date:true},
-           {key:'Grievance',label:'Filed as',pill:true},{key:'Remarks',label:'What the parent said',maxW:'320px'},
-           {key:'Followup',label:'Follow-up',maxW:'220px'},{key:'Status',label:'Status',pill:true}]);
+        if(typeof openModal!=='function'||!r) return;
+        var cell=ev.target.closest?ev.target.closest('[data-act]'):null;
+        var act=cell?cell.getAttribute('data-act'):'all';
+        var where=(typeof fBranch!=='undefined'&&fBranch!=='ALL')?fBranch:(PB!=='ALL'?PB:'All Branches');
+        if(act==='closed'){
+          openModal('\u2705 '+r.th.label+' \u2014 closed'+WIN,
+            r.closed.toLocaleString('en-IN')+' closed of '+r.n.toLocaleString('en-IN')+' raised \u00b7 '+where+
+            ' \u00b7 the follow-up column is how each one was actually closed', r.closedRows, OPEN_COLS);
+        } else if(act==='open'){
+          openModal('\u23f3 '+r.th.label+' \u2014 still open'+WIN,
+            r.open+' record(s) \u00b7 '+where+' \u00b7 In Progress and Pending only'+
+            (r.oldest?' \u00b7 oldest waiting '+r.oldest+' days':''), r.openRows, OPEN_COLS);
+        } else if(act==='oldest'){
+          if(!r.oldestRow){ openModal('\u23f3 '+r.th.label+WIN,'Nothing is open on this problem.',[],OPEN_COLS); return; }
+          openModal('\u23f3 '+r.th.label+' \u2014 the oldest still open',
+            'Raised '+esc(String(r.oldestRow.Date))+' \u00b7 '+r.oldest+' days ago \u00b7 still '+
+            esc(String(r.oldestRow.Status||'open')), [r.oldestRow], OPEN_COLS);
+        } else {
+          openModal('\ud83d\udcc5 '+r.th.label+WIN,
+            r.rows.length.toLocaleString('en-IN')+' call(s) \u00b7 '+r.closed.toLocaleString('en-IN')+' closed \u00b7 '+
+            r.open+' still open \u00b7 '+where, r.rows, OPEN_COLS);
+        }
       });
+    });
+    var stEl=$('cpy-stale');
+    if(stEl) stEl.addEventListener('click',function(){
+      if(typeof openModal!=='function') return;
+      var u=window._CPY_STALE||[];
+      openModal('\u26a0\ufe0f Open more than 150 days',
+        u.length+' concern(s) nobody has come back to \u00b7 still In Progress or Pending', u, OPEN_COLS);
     });
   }
   function safe(){ try{ build(); }catch(e){
