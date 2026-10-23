@@ -24,6 +24,189 @@
   --sh:0 1px 4px rgba(30,79,216,.08),0 4px 16px rgba(30,79,216,.06);
   --shl:0 4px 20px rgba(30,79,216,.14),0 12px 40px rgba(30,79,216,.08);
 }
+/* ═════════════════════════════════════════════════════════════════════
+   DARK MODE  (added 23 Oct 2026) — light stays the default
+
+   The page is driven by CSS variables for its structure (card, border, text,
+   surface), so re-declaring those under [data-theme="dark"] turns over most of
+   the dashboard in one place. What it does not cover is the roughly three
+   thousand hard-coded colours, many of them inside style="" attributes where a
+   class rule cannot reach them.
+
+   Those are handled in three bands:
+     • SEMANTIC colours — the greens, ambers and reds that carry meaning — are
+       left alone. They read correctly on a dark surface and changing them
+       would break the one thing the reader relies on.
+     • PALE TINTS used as chip and panel backgrounds (#ECFDF5, #FEF2F2 …) are
+       remapped to dark equivalents of the same hue, so a green chip stays a
+       green chip.
+     • STRUCTURAL light greys and whites used inline are matched by attribute
+       substring selectors, which is the only way to beat an inline style
+       without editing three thousand of them by hand.
+
+   The toggle writes to localStorage and the choice is applied before first
+   paint, so a reload does not flash white at someone working at night.
+   ═════════════════════════════════════════════════════════════════════ */
+.theme-btn{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.14);
+  border:1px solid rgba(255,255,255,.24);color:#fff;font-family:inherit;font-size:11px;font-weight:600;
+  padding:5px 12px;border-radius:20px;cursor:pointer;transition:.15s}
+.theme-btn:hover{background:rgba(255,255,255,.26)}
+.theme-btn span:first-child{font-size:13px;line-height:1}
+
+:root[data-theme="dark"]{
+  --p:#6E9BFF;--pl:#19243D;--s:#A78BFA;--sl:#241C3C;
+  --g:#34D399;--gl:#0F2A20;--a:#FBBF24;--al:#2C2313;
+  --r:#F87171;--rl:#2E1819;--t:#2DD4BF;--tl:#0F2B29;
+  --o:#FB923C;--ol:#2C1D12;
+  --bg:#0A111E;--sur:#141C2C;--bor:#28354B;
+  --tx:#E8EEF8;--txm:#9DAAC0;--txl:#6E7D95;
+  --sh:0 1px 4px rgba(0,0,0,.45),0 4px 16px rgba(0,0,0,.32);
+  --shl:0 4px 20px rgba(0,0,0,.55),0 12px 40px rgba(0,0,0,.42);
+  --surface:#141C2C;
+  color-scheme:dark;
+}
+:root[data-theme="dark"] body{background:var(--bg);color:var(--tx)}
+
+/* form controls and scrollbars */
+:root[data-theme="dark"] select,:root[data-theme="dark"] input,:root[data-theme="dark"] textarea{
+  background:#101828;color:var(--tx);border-color:var(--bor)}
+:root[data-theme="dark"] option{background:#101828;color:var(--tx)}
+:root[data-theme="dark"] ::-webkit-scrollbar-thumb{background:#2B3A52}
+:root[data-theme="dark"] ::-webkit-scrollbar-track{background:#0E1626}
+
+/* the pale tints that carry meaning: same hue, dark value */
+:root[data-theme="dark"] [style*="#ECFDF5"],:root[data-theme="dark"] [style*="#E3F3E9"],
+:root[data-theme="dark"] [style*="#ECFDF3"],:root[data-theme="dark"] [style*="#E3F6EC"]{background-color:#0F2A20!important}
+:root[data-theme="dark"] [style*="#FEF2F2"],:root[data-theme="dark"] [style*="#F9E1DE"],
+:root[data-theme="dark"] [style*="#FEE2E2"],:root[data-theme="dark"] [style*="#FCE9E8"]{background-color:#2E1819!important}
+:root[data-theme="dark"] [style*="#FFFBEB"],:root[data-theme="dark"] [style*="#FBEFD6"],
+:root[data-theme="dark"] [style*="#FDF2DC"],:root[data-theme="dark"] [style*="#FEF3C7"]{background-color:#2C2313!important}
+:root[data-theme="dark"] [style*="#F5F3FF"],:root[data-theme="dark"] [style*="#EDEAF7"],
+:root[data-theme="dark"] [style*="#F0EAFE"],:root[data-theme="dark"] [style*="#EAEAFE"]{background-color:#241C3C!important}
+:root[data-theme="dark"] [style*="#F0FDFA"],:root[data-theme="dark"] [style*="#E0F5F2"],
+:root[data-theme="dark"] [style*="#E6F1F4"]{background-color:#0F2B29!important}
+:root[data-theme="dark"] [style*="#FFF7ED"],:root[data-theme="dark"] [style*="#FFEDD5"]{background-color:#2C1D12!important}
+
+/* structural whites and light greys used inline */
+:root[data-theme="dark"] [style*="background:#fff"],:root[data-theme="dark"] [style*="background:#FFF"],
+:root[data-theme="dark"] [style*="background:#ffffff"],:root[data-theme="dark"] [style*="background:#FFFFFF"],
+:root[data-theme="dark"] [style*="background:#FBFCFF"],:root[data-theme="dark"] [style*="background:#F8FAFF"],
+:root[data-theme="dark"] [style*="background:#F8FAFC"],:root[data-theme="dark"] [style*="background:#F1F5F9"],
+:root[data-theme="dark"] [style*="background:#EEF2F7"],:root[data-theme="dark"] [style*="background:#F7F6F1"],
+:root[data-theme="dark"] [style*="background-color:#fff"]{background-color:#141C2C!important}
+:root[data-theme="dark"] [style*="background:#EEF2FF"],:root[data-theme="dark"] [style*="background:#E8EFFF"],
+:root[data-theme="dark"] [style*="background:#E0E8FF"]{background-color:#19243D!important}
+
+/* dark text written inline has to lighten or it vanishes */
+:root[data-theme="dark"] [style*="color:#0F172A"],:root[data-theme="dark"] [style*="color:#1F1C16"],
+:root[data-theme="dark"] [style*="color:#14231A"],:root[data-theme="dark"] [style*="color:#16202B"],
+:root[data-theme="dark"] [style*="color:#334155"],:root[data-theme="dark"] [style*="color:#1E293B"]{color:#E8EEF8!important}
+:root[data-theme="dark"] [style*="color:#64748B"],:root[data-theme="dark"] [style*="color:#475569"],
+:root[data-theme="dark"] [style*="color:#5B6B61"],:root[data-theme="dark"] [style*="color:#6D7885"]{color:#9DAAC0!important}
+:root[data-theme="dark"] [style*="color:#94A3B8"],:root[data-theme="dark"] [style*="color:#CBD5E1"]{color:#7F8DA4!important}
+/* borders written inline */
+:root[data-theme="dark"] [style*="#E0E8FF"],:root[data-theme="dark"] [style*="#E2E8F0"],
+:root[data-theme="dark"] [style*="#ECE8DC"]{border-color:#28354B}
+
+/* tables, panels and chrome declared in the stylesheet */
+:root[data-theme="dark"] table.t th{background:#111A29;color:#9DAAC0;border-bottom-color:#28354B}
+:root[data-theme="dark"] table.t td{border-bottom-color:#232F43}
+:root[data-theme="dark"] table.t tr:hover td{background:#19243D}
+:root[data-theme="dark"] .ovd{background:#111A29}
+:root[data-theme="dark"] .ovg-row{background:#141C2C}
+:root[data-theme="dark"] .ovg-sub{background:#0E1626}
+:root[data-theme="dark"] .no-data,:root[data-theme="dark"] .empty{color:#9DAAC0}
+:root[data-theme="dark"] .kc-ico{box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+:root[data-theme="dark"] .kc.blue .kc-ico{background:#19243D}
+:root[data-theme="dark"] .kc.green .kc-ico{background:#0F2A20}
+:root[data-theme="dark"] .kc.teal .kc-ico{background:#0F2B29}
+:root[data-theme="dark"] .kc.indigo .kc-ico{background:#1C1F3E}
+:root[data-theme="dark"] .kc.purple .kc-ico{background:#241C3C}
+:root[data-theme="dark"] .kc.red .kc-ico{background:#2E1819}
+:root[data-theme="dark"] .kc.amber .kc-ico{background:#2C2313}
+:root[data-theme="dark"] .modal{background:#141C2C}
+:root[data-theme="dark"] #modal-thead th{background:#111A29!important;color:#8FA6D8!important;
+  border-bottom-color:#28354B!important}
+:root[data-theme="dark"] #modal-tbody td{border-bottom-color:#232F43!important;color:#E8EEF8}
+:root[data-theme="dark"] #modal-tbody tr:hover td{background:#19243D!important}
+:root[data-theme="dark"] .theme-btn{background:rgba(255,255,255,.1)}
+/* charts read their colours from JS, so the grid lines are set there */
+/* ── dark mode, second pass: the light values that live in CLASS rules ──
+   Found by walking every text node on each tab in dark mode and flagging any
+   whose contrast against its real background fell under 2.2:1. Grouped by the
+   colour family they came from, so a green panel stays green. */
+:root[data-theme="dark"] .ccr tbody tr:nth-child(even) td,
+:root[data-theme="dark"] .ccr th,:root[data-theme="dark"] .audt th,
+:root[data-theme="dark"] .aw-t th,:root[data-theme="dark"] .kpt th,
+:root[data-theme="dark"] .mt-tbl th,:root[data-theme="dark"] .ph-th,
+:root[data-theme="dark"] .auhm tr.lvl-c td,:root[data-theme="dark"] .cpy-how,
+:root[data-theme="dark"] .cv-srow .bar,:root[data-theme="dark"] .pt-jump,
+:root[data-theme="dark"] .ph-img{background:#111A29!important;color:var(--tx)}
+:root[data-theme="dark"] .auhm tr.lvl-b td{background:#16222C!important}
+:root[data-theme="dark"] .ccr tbody tr:hover td,
+:root[data-theme="dark"] .ccr td.ccr-c:hover{background:#172C22!important}
+:root[data-theme="dark"] .au-bar,:root[data-theme="dark"] .aw-bar,
+:root[data-theme="dark"] .kp-bar,:root[data-theme="dark"] .cp-bar .track,
+:root[data-theme="dark"] .cpy-cell:hover,
+:root[data-theme="dark"] .exm-refresh:hover{background:#19243D!important}
+:root[data-theme="dark"] .cdt .best,:root[data-theme="dark"] .mt-ev,
+:root[data-theme="dark"] .pt-callout .best{background:#0F2A20!important}
+:root[data-theme="dark"] .cdt .worst,:root[data-theme="dark"] .mt-none,
+:root[data-theme="dark"] .cpy-stale,:root[data-theme="dark"] .cpy-flag,
+:root[data-theme="dark"] .pt-callout .focus{background:#2E1819!important}
+:root[data-theme="dark"] .mt-part,:root[data-theme="dark"] .kp-flag{background:#2C2313!important}
+
+/* Backgrounds written by JS come back as rgb(), not hex, so the hex selectors
+   above never matched them — 20 IT table headers stayed white. */
+:root[data-theme="dark"] [style*="rgb(255, 255, 255)"],
+:root[data-theme="dark"] [style*="rgb(248, 250, 255)"],
+:root[data-theme="dark"] [style*="rgb(250, 253, 251)"],
+:root[data-theme="dark"] [style*="rgb(248, 250, 252)"],
+:root[data-theme="dark"] [style*="rgb(241, 245, 249)"]{background-color:#111A29!important;color:var(--tx)}
+:root[data-theme="dark"] [style*="rgb(239, 246, 255)"],
+:root[data-theme="dark"] [style*="rgb(238, 242, 255)"]{background-color:#19243D!important}
+
+/* dark greys used inline for text */
+:root[data-theme="dark"] [style*="color:#1F2937"],:root[data-theme="dark"] [style*="color:#111827"],
+:root[data-theme="dark"] [style*="color:#374151"],:root[data-theme="dark"] [style*="color:#0B4D2C"],
+:root[data-theme="dark"] [style*="color:#065F46"],:root[data-theme="dark"] [style*="color:#3F2E10"],
+:root[data-theme="dark"] [style*="color:#1E293B"],:root[data-theme="dark"] [style*="color:#0F3D2E"]{color:#DCE5F2!important}
+
+/* Brand colours used as text sit on a near-black page once the translucent
+   chip behind them composites down; lifted so they stay legible. */
+:root[data-theme="dark"] [style*="color:#1E4FD8"]{color:#7AA2FF!important}
+:root[data-theme="dark"] [style*="color:#7C3AED"]{color:#B79BFF!important}
+:root[data-theme="dark"] [style*="color:#0369A1"]{color:#5CB8E8!important}
+:root[data-theme="dark"] [style*="color:#0D9488"]{color:#45D6C6!important}
+:root[data-theme="dark"] [style*="color:#059669"]{color:#43D9A0!important}
+:root[data-theme="dark"] [style*="color:#B91C1C"],:root[data-theme="dark"] [style*="color:#DC2626"],
+:root[data-theme="dark"] [style*="color:#B3402F"]{color:#FF8A82!important}
+:root[data-theme="dark"] [style*="color:#D97706"],:root[data-theme="dark"] [style*="color:#B0781A"]{color:#FFBB45!important}
+/* ── dark mode, third pass ── */
+/* the Term-1 panels carry their own warm palette in class rules */
+:root[data-theme="dark"] .sg-flag,:root[data-theme="dark"] .pt-warn p,
+:root[data-theme="dark"] .pt-scope{color:#E3D7BE!important}
+/* pale green and blue tints written inline, including as a gradient — a
+   gradient is a background-image, so it has to be cleared, not recoloured */
+:root[data-theme="dark"] [style*="#F0FDF4"],:root[data-theme="dark"] [style*="#ECFDF3"],
+:root[data-theme="dark"] [style*="#DCFCE7"]{background-color:#0F2A20!important;background-image:none!important}
+:root[data-theme="dark"] [style*="#EFF6FF"],:root[data-theme="dark"] [style*="#DBEAFE"]{
+  background-color:#19243D!important;background-image:none!important}
+:root[data-theme="dark"] [style*="#BBF7D0"]{border-color:#1E5B43!important}
+:root[data-theme="dark"] [style*="#BFDBFE"]{border-color:#2A4374!important}
+/* ── dark mode, final pass ── */
+:root[data-theme="dark"] .cpy-stale{color:#FF9A92!important}
+:root[data-theme="dark"] .cpy-stale b{color:#FFB4AC!important}
+:root[data-theme="dark"] [style*="#D1FAE5"],:root[data-theme="dark"] [style*="#A7F3D0"]{
+  background-color:#13362A!important;background-image:none!important}
+:root[data-theme="dark"] [style*="#FDE68A"],:root[data-theme="dark"] [style*="#FEF08A"]{
+  background-color:#33290F!important;background-image:none!important}
+:root[data-theme="dark"] [style*="#FECACA"],:root[data-theme="dark"] [style*="#FCA5A5"]{
+  background-color:#3A1D1E!important;background-image:none!important}
+
+
+
+
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);font-size:13px;line-height:1.5}
 
 /* HEADER */
@@ -486,6 +669,67 @@ table.auhm tr.au-itemrow td{border-color:#E8EEF2}
 .ovd-k{font-size:10.5px;font-weight:800;color:var(--txm);text-transform:uppercase;letter-spacing:.4px}
 .ovd-v{font-size:25px;font-weight:800;line-height:1.15;margin:3px 0 1px;font-variant-numeric:tabular-nums}
 .ovd-s{font-size:10.5px;color:var(--txm);line-height:1.4}
+/* ══ Executive Overview — richer KPI cards and drill-down panels (23 Oct 2026) ══
+   The icon used to be a 12%-opacity watermark in the corner, so every card
+   read as the same grey rectangle. It is now a coloured badge that belongs to
+   the card's own accent, the number is bigger, and a card that opens something
+   says so with an arrow that moves on hover. */
+.kc{position:relative}
+.kc-ico{position:absolute;right:13px;top:13px;font-size:20px;opacity:1;width:38px;height:38px;
+  display:flex;align-items:center;justify-content:center;border-radius:11px;
+  background:var(--pl);box-shadow:inset 0 0 0 1px rgba(255,255,255,.5);transition:transform .18s}
+.kc:hover .kc-ico{transform:scale(1.08) rotate(-4deg)}
+.kc.blue   .kc-ico{background:#E8EFFF}
+.kc.green  .kc-ico{background:#E3F6EC}
+.kc.teal   .kc-ico{background:#E0F5F2}
+.kc.indigo .kc-ico{background:#EAEAFE}
+.kc.purple .kc-ico{background:#F0EAFE}
+.kc.red    .kc-ico{background:#FCE9E8}
+.kc.amber  .kc-ico{background:#FDF2DC}
+.kc-val{font-size:31px;letter-spacing:-.6px}
+.kc-lbl{padding-right:46px}
+.kc.clickable::after{content:'\2197';position:absolute;right:14px;bottom:11px;font-size:13px;
+  color:var(--txl);opacity:0;transform:translate(-3px,3px);transition:.16s}
+.kc.clickable:hover::after{opacity:1;transform:translate(0,0)}
+.kc.clickable:hover{transform:translateY(-3px)}
+.kc::before{height:4px}
+
+/* snapshot tiles */
+.ovd{position:relative;overflow:hidden}
+.ovd::after{content:'';position:absolute;inset:0 auto 0 0;width:3px;background:var(--p);opacity:.55}
+.ovd-go{cursor:pointer}
+.ovd-go:hover{transform:translateY(-2px)}
+.ovd-k{padding-left:2px}
+
+/* the breakdown panel inside the record modal */
+.ovpanel{padding:4px 2px 10px}
+.ovg{border:1px solid var(--bor);border-radius:11px;overflow:hidden}
+.ovg-row{display:grid;grid-template-columns:168px minmax(70px,1fr) 78px 210px;gap:12px;align-items:center;
+  padding:11px 14px;border-bottom:1px solid var(--bor);background:var(--sur)}
+.ovg-row:last-of-type{border-bottom:none}
+.ovg-can{cursor:pointer}
+.ovg-can:hover{background:var(--pl)}
+.ovg-nm{display:flex;align-items:center;gap:7px;font-size:13.5px}
+.ovg-car{color:var(--txl);font-size:11px;width:10px;display:inline-block}
+.ovg-track{display:block;height:11px;background:var(--bor);border-radius:99px;overflow:hidden}
+.ovg-track i{display:block;height:100%;border-radius:99px}
+.ovg-v{text-align:right;font-size:19px;font-weight:800;font-variant-numeric:tabular-nums}
+.ovg-s{font-size:11px;color:var(--txm);line-height:1.4}
+.ovg-sub{padding:10px 14px 14px;background:var(--bg);border-bottom:1px solid var(--bor)}
+.ovg-t{width:100%;border-collapse:collapse;font-size:12px}
+.ovg-t th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--txm);
+  padding:5px 8px;border-bottom:1px solid var(--bor)}
+.ovg-t td{padding:5px 8px;border-bottom:1px solid var(--bor);color:var(--tx)}
+.ovg-t tr:last-child td{border-bottom:none}
+.ovg-note{font-size:11px;color:var(--txm);margin-top:7px}
+.ovg-foot{margin-top:11px;font-size:12.5px;color:var(--tx);background:var(--pl);
+  border-radius:9px;padding:9px 13px;line-height:1.5}
+.ovg-btn{background:var(--p);color:#fff;border:0;border-radius:8px;padding:7px 14px;
+  font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+.ovg-btn:hover{filter:brightness(1.08)}
+@media(max-width:820px){.ovg-row{grid-template-columns:1fr auto;gap:6px}
+  .ovg-bar,.ovg-s{grid-column:1/-1}}
+
 /* The year panel carries the resolution flow, so it needs more columns than
    the month-on-month panel beside it. Its own grid, so .cp-row is untouched. */
 .cpy-row2{display:grid;grid-template-columns:minmax(132px,1.5fr) minmax(54px,1fr) 74px 122px;gap:8px;
@@ -1355,6 +1599,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 </script>
+<script>
+/* Theme, read before first paint. Light is the default: a saved value is the
+   only thing that turns dark on, so the system preference is deliberately not
+   consulted — a shared management laptop set to dark would otherwise hand
+   everyone a dark dashboard nobody asked for. */
+(function(){
+  try{
+    var t=localStorage.getItem('pbes_theme');
+    if(t==='dark') document.documentElement.setAttribute('data-theme','dark');
+  }catch(e){}
+})();
+</script>
 </head>
 <body>
 <header class="hdr">
@@ -1368,6 +1624,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
     </div>
     <div class="hdr-right">
+      <button id="themeBtn" class="theme-btn" type="button" onclick="toggleTheme()"
+              title="Switch between light and dark" aria-label="Switch between light and dark">
+        <span id="themeIco">🌙</span><span id="themeTxt">Dark</span></button>
       <div id="role-badge" class="role-badge"></div>
       <div class="live-pill"><span class="ldot"></span> Active</div>
       <!-- Staff Operations Portal. Open to every employee at every branch, so it
@@ -1467,16 +1726,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="kc blue clickable" onclick="viewStudentsByBranch()" title="Click to view branch-wise student count"><div class="kc-ico">👦</div><div class="kc-lbl">Total Students</div><div class="kc-val" id="ov-stu">—</div><div class="kc-sub">5 active campuses + Akshara · click to view</div></div>
     <div class="kc green clickable" onclick="viewCallsByBranch()" title="Click to view branch-wise calls made"><div class="kc-ico">📞</div><div class="kc-lbl">Avg Calls / Month</div><div class="kc-val" id="ov-calls">–</div><div class="kc-sub" id="ov-calls-s">–</div></div>
     <div class="kc teal clickable" onclick="viewConfirmedAdmissions()" title="Click to view admissions by branch"><div class="kc-ico">🎓</div><div class="kc-lbl">Confirmed Admissions</div><div class="kc-val" id="ov-adm-portal">–</div><div class="kc-sub" id="ov-adm-portal-s">Portal confirmed</div></div>
-    <div class="kc indigo"><div class="kc-ico">👁️</div><div class="kc-lbl">Teacher Observations</div><div class="kc-val" id="ov-obs">–</div><div class="kc-sub" id="ov-obs-s">Total recorded</div></div>
-    <div class="kc purple clickable" onclick="switchTab('admin')"><div class="kc-ico">🏗️</div><div class="kc-lbl">Admin Tasks</div><div class="kc-val" id="ov-admin">–</div><div class="kc-sub" id="ov-admin-s">In Progress · Hold/Open</div></div>
+    <div class="kc indigo clickable" onclick="ovObs()" title="Click for the branch-wise split"><div class="kc-ico">👁️</div><div class="kc-lbl">Teacher Observations</div><div class="kc-val" id="ov-obs">–</div><div class="kc-sub" id="ov-obs-s">Total recorded</div></div>
+    <div class="kc purple clickable" onclick="ovCount('admin')" title="Click for the branch-wise split"><div class="kc-ico">🏗️</div><div class="kc-lbl">Admin Tasks</div><div class="kc-val" id="ov-admin">–</div><div class="kc-sub" id="ov-admin-s">In Progress · Hold/Open</div></div>
   </div>
 
   <!-- Row 2: Cross-domain KPIs -->
   <div class="krow k5">
-    <div class="kc red clickable" onclick="switchTab('vigilance')"><div class="kc-ico">🛡️</div><div class="kc-lbl">Vigilance Open Issues</div><div class="kc-val" id="ov-vig">–</div><div class="kc-sub" id="ov-vig-s">Closed</div></div>
-    <div class="kc blue clickable" onclick="switchTab('purchase')"><div class="kc-ico">🛒</div><div class="kc-lbl">Purchase In Progress &amp; Ordered</div><div class="kc-val" id="ov-pur">–</div><div class="kc-sub" id="ov-pur-s">Delivered</div></div>
-    <div class="kc amber clickable" onclick="switchTab('hr')"><div class="kc-ico">👔</div><div class="kc-lbl">HR Open Positions</div><div class="kc-val" id="ov-hr">–</div><div class="kc-sub" id="ov-hr-s">Closed positions</div></div>
-    <div class="kc red clickable" onclick="switchTab('grievance')"><div class="kc-ico">📣</div><div class="kc-lbl">Grievance Open Cases</div><div class="kc-val" id="ov-griev">–</div><div class="kc-sub" id="ov-griev-s">Not yet resolved</div></div>
+    <div class="kc red clickable" onclick="ovCount('vig')" title="Click for the branch-wise split"><div class="kc-ico">🛡️</div><div class="kc-lbl">Vigilance Open Issues</div><div class="kc-val" id="ov-vig">–</div><div class="kc-sub" id="ov-vig-s">Closed</div></div>
+    <div class="kc blue clickable" onclick="ovCount('pur')" title="Click for the branch-wise split"><div class="kc-ico">🛒</div><div class="kc-lbl">Purchase In Progress &amp; Ordered</div><div class="kc-val" id="ov-pur">–</div><div class="kc-sub" id="ov-pur-s">Delivered</div></div>
+    <div class="kc amber clickable" onclick="ovCount('hr')" title="Click for the branch-wise split"><div class="kc-ico">👔</div><div class="kc-lbl">HR Open Positions</div><div class="kc-val" id="ov-hr">–</div><div class="kc-sub" id="ov-hr-s">Closed positions</div></div>
+    <div class="kc red clickable" onclick="ovCount('griev')" title="Click for the branch-wise split"><div class="kc-ico">📣</div><div class="kc-lbl">Grievance Open Cases</div><div class="kc-val" id="ov-griev">–</div><div class="kc-sub" id="ov-griev-s">Not yet resolved</div></div>
     <div class="kc teal"><div class="kc-ico">😊</div><div class="kc-lbl">Parents Satisfied</div><div class="kc-val" id="ov-sat">–</div><div class="kc-sub" id="ov-sat-s">Satisfaction rate</div></div>
   </div>
 
@@ -3486,6 +3745,323 @@ function setHtml(id,val){ var el=document.getElementById(id); if(el) el.innerHTM
    the newest month that actually has audit rows and names it, rather than
    showing an empty chart under a "previous month" heading.
    ═════════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════════
+   ANSWER ON THE PAGE, DO NOT SEND THE READER AWAY  (23 Oct 2026)
+
+   Several Executive Overview cards used to call switchTab(): clicking "HR Open
+   Positions" threw the reader into the HR tab, where they then had to find the
+   number they had just clicked. An overview should answer the question where
+   it is asked, so each card now opens a breakdown over the page and the reader
+   lands back on the overview when they close it.
+
+   ovGroup_ is the shared shape: a branch-wise summary that expands a level
+   when a row is tapped. It is used for buses (branch → route), observations
+   (branch → observer role) and the plain counters.
+   ═════════════════════════════════════════════════════════════════════════ */
+function _ovEsc(v){ return String(v==null?'':v).replace(/[&<>"']/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function _ovNum(n){ return (typeof fi==='function')?fi(n):String(n); }
+
+/* A panel modal: free HTML instead of the record table, so a breakdown can
+   carry bars, chips and expandable rows. Reuses the record modal's shell so it
+   closes, scrolls and looks the same. */
+function ovPanel(title, sub, html){
+  _ovHook();
+  var t=document.getElementById('modal-title'), u=document.getElementById('modal-sub');
+  if(!t){ return; }
+  _ovResetModal();                      // clear any panel still on screen
+  if(typeof openModal==='function') openModal(title, sub, [], [{key:'_',label:''}]);
+  t.textContent=title; if(u) u.textContent=sub;
+  var tb=document.getElementById('modal-tbody');
+  if(tb){
+    var tbl=tb.closest('table');
+    var host=tbl?tbl.parentNode:tb.parentNode;
+    if(tbl) tbl.style.display='none';
+    var old=host.querySelector('.ovpanel'); if(old) old.remove();
+    var d=document.createElement('div'); d.className='ovpanel'; d.innerHTML=html;
+    host.appendChild(d);
+    /* the record table has to come back for the next ordinary drill-down */
+    var mo=document.getElementById('modal-search');
+    if(mo) mo.style.display='none';
+  }
+  /* hide the paging/footer chrome that belongs to the record table */
+  ['modal-count','modal-pager','modal-foot'].forEach(function(id){
+    var e=document.getElementById(id); if(e){ e.dataset.ovHidden='1'; e.style.display='none'; }
+  });
+}
+/* Put the record table back whenever an ordinary modal opens after a panel.
+
+   This used to wrap openModal in an IIFE at load time. openModal is declared
+   in a later <script> block, so at that moment it did not exist, the wrap
+   silently did nothing, and a record drill-down opened behind the leftover
+   panel with its table still hidden. The wrap is now installed on first use,
+   by which point the declaration has certainly run. */
+function _ovResetModal(){
+  var tb=document.getElementById('modal-tbody');
+  if(tb){
+    var tbl=tb.closest('table'); if(tbl) tbl.style.display='';
+    var host=tbl?tbl.parentNode:tb.parentNode;
+    var p=host&&host.querySelector('.ovpanel'); if(p) p.remove();
+  }
+  var ms=document.getElementById('modal-search'); if(ms) ms.style.display='';
+  ['modal-count','modal-pager','modal-foot'].forEach(function(id){
+    var e=document.getElementById(id); if(e&&e.dataset.ovHidden){ e.style.display=''; delete e.dataset.ovHidden; }
+  });
+}
+function _ovHook(){
+  if(window.__ovHooked) return;
+  var _om=window.openModal;
+  if(typeof _om!=='function') return;      // not defined yet; try again next time
+  window.__ovHooked=1;
+  window.openModal=function(){ _ovResetModal(); return _om.apply(this, arguments); };
+}
+
+/* One expandable branch row. `sub` is the HTML revealed on tap. */
+function _ovRow(o){
+  var id='ovx'+Math.random().toString(36).slice(2,9);
+  return '<div class="ovg-row'+(o.sub?' ovg-can':'')+'"'+(o.sub?' data-x="'+id+'"':'')+'>'+
+      '<div class="ovg-nm">'+(o.sub?'<span class="ovg-car">\u25b8</span>':'<span class="ovg-car" style="opacity:0">\u25b8</span>')+
+        '<b>'+_ovEsc(o.name)+'</b></div>'+
+      '<div class="ovg-bar">'+(o.pct==null?'':'<span class="ovg-track"><i style="width:'+Math.max(0,Math.min(100,o.pct))+'%;background:'+(o.col||'#1E4FD8')+'"></i></span>')+'</div>'+
+      '<div class="ovg-v" style="color:'+(o.col||'var(--tx)')+'">'+o.val+'</div>'+
+      '<div class="ovg-s">'+(o.sub2||'')+'</div>'+
+    '</div>'+
+    (o.sub?'<div class="ovg-sub" id="'+id+'" hidden>'+o.sub+'</div>':'');
+}
+function _ovWire(){
+  document.querySelectorAll('.ovpanel .ovg-can').forEach(function(r){
+    if(r.dataset.wired) return; r.dataset.wired='1';
+    r.addEventListener('click',function(){
+      var el=document.getElementById(r.dataset.x); if(!el) return;
+      var open=!el.hasAttribute('hidden');
+      if(open){ el.setAttribute('hidden',''); r.querySelector('.ovg-car').textContent='\u25b8'; }
+      else { el.removeAttribute('hidden'); r.querySelector('.ovg-car').textContent='\u25be'; }
+    });
+  });
+}
+function ovGroup(title, sub, rows, foot){
+  ovPanel(title, sub, '<div class="ovg">'+rows.map(_ovRow).join('')+'</div>'+
+    (foot?'<div class="ovg-foot">'+foot+'</div>':''));
+  _ovWire();
+}
+
+/* ── Bus seats: branch → each bus on its route ── */
+function ovBuses(){
+  var T=window._TRANSPORT; if(!T) return ovPanel('Bus seats used','No transport data loaded','');
+  var BR=(typeof BRANCHES!=='undefined')?BRANCHES:[];
+  var scope=(typeof fBranch!=='undefined'&&fBranch!=='ALL')?[fBranch]:BR;
+  var all=[], rows=[];
+  scope.forEach(function(b){
+    var rs=_trBusRows(T,b); all=all.concat(rs);
+    var o=_trOcc(rs);
+    var buses=rs.filter(function(x){ return x.active; })
+      .sort(function(x,y){ return (y.seats?y.riders/y.seats:0)-(x.seats?x.riders/x.seats:0); });
+    var sub='<table class="ovg-t"><tr><th>Route</th><th>Vehicle</th><th>Seats</th><th>Riders</th><th>Used</th></tr>'+
+      buses.map(function(x){
+        var p=x.seats?Math.round(x.riders/x.seats*100):null;
+        var c=p==null?'var(--txm)':p>=90?'#DC2626':p>=70?'#059669':p>=45?'#D97706':'#DC2626';
+        return '<tr><td>'+_ovEsc(x.v.RouteNo==null?'\u2013':'Route '+x.v.RouteNo)+'</td>'+
+          '<td>'+_ovEsc(x.v.VehicleNo||'\u2013')+'</td><td>'+(x.seats||'\u2013')+'</td>'+
+          '<td>'+(x.known?x.riders:'<span style="color:var(--txl)">not listed</span>')+'</td>'+
+          '<td style="color:'+c+';font-weight:800">'+(p==null?'\u2013':p+'%')+'</td></tr>'; }).join('')+
+      '</table>'+(o.spare?'<div class="ovg-note">'+o.spare+' spare bus'+(o.spare===1?'':'es')+' not counted</div>':'')+
+      (o.noData?'<div class="ovg-note">'+o.noData+' active bus'+(o.noData===1?'':'es')+' have no rider list, so they are left out of the percentage</div>':'');
+    rows.push({name:b, pct:o.seats?o.pct:null, col:o.pct>=80?'#059669':o.pct>=65?'#D97706':'#DC2626',
+      val:(o.seats?o.pct+'%':'\u2014'),
+      sub2:_ovNum(o.riders)+' of '+_ovNum(o.seats)+' seats \u00b7 '+o.active+' bus'+(o.active===1?'':'es'),
+      sub:sub});
+  });
+  var tot=_trOcc(all);
+  ovGroup('\ud83d\ude8c Bus seats used', (scope.length>1?'All branches':scope[0])+' \u00b7 students only, staff riders excluded \u00b7 tap a branch for its routes',
+    rows, '<b>'+_ovNum(tot.riders)+'</b> pupils in <b>'+_ovNum(tot.seats)+'</b> seats across <b>'+tot.active+'</b> buses \u2014 <b>'+tot.pct+'%</b> used'+
+      (tot.staff?' \u00b7 '+_ovNum(tot.staff)+' staff riders counted separately':''));
+}
+
+/* ── Vehicle documents: only the ones expired or close to it ── */
+function ovDocs(){
+  var T=window._TRANSPORT; if(!T) return;
+  _ovHook();
+  var BR=(typeof BRANCHES!=='undefined')?BRANCHES:[];
+  var scope=(typeof fBranch!=='undefined'&&fBranch!=='ALL')?[fBranch]:BR;
+  var out=[];
+  (T.vehicles||[]).filter(function(v){ return scope.indexOf(v.Branch)>=0; }).forEach(function(v){
+    _trDocList(v).forEach(function(d){
+      if(d.state!=='expired' && d.state!=='soon' && d.state!=='missing') return;
+      out.push({ Branch:v.Branch, Vehicle:v.VehicleNo||'\u2013',
+        Route:(v.RouteNo==null||v.RouteNo==='')?'\u2013':'Route '+v.RouteNo,
+        Driver:v.Driver||'\u2013', Document:d.label, Number:d.no||'\u2013',
+        Expiry:d.raw||'\u2013',
+        Status:d.state==='expired'?('EXPIRED '+Math.abs(d.days)+'d ago')
+              :d.state==='soon'?('due in '+d.days+'d'):'not recorded' });
+    });
+  });
+  out.sort(function(a,b){
+    var r=function(x){ return /EXPIRED/.test(x.Status)?0:/due/.test(x.Status)?1:2; };
+    return r(a)-r(b);
+  });
+  openModal('\ud83d\udcc4 Vehicle documents needing action',
+    out.length+' document(s) \u00b7 '+(scope.length>1?'all branches':scope[0])+' \u00b7 expired first, then due within 30 days',
+    out, [{key:'Branch',label:'Branch'},{key:'Vehicle',label:'Vehicle'},{key:'Route',label:'Route'},
+      {key:'Driver',label:'Driver',maxW:'170px'},{key:'Document',label:'Document'},
+      {key:'Number',label:'Number'},{key:'Expiry',label:'Expiry'},{key:'Status',label:'Status',pill:true}]);
+}
+
+/* ── Observations this month: branch → observer role ── */
+function ovObs(){
+  var OB=(typeof OBS_DATA!=='undefined'&&Array.isArray(OBS_DATA))?OBS_DATA:[];
+  var BR=(typeof BRANCHES!=='undefined')?BRANCHES:[];
+  var scope=(typeof fBranch!=='undefined'&&fBranch!=='ALL')?[fBranch]:BR;
+  var now=new Date(), ym=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  var pm=new Date(now.getFullYear(),now.getMonth()-1,1);
+  var ypm=pm.getFullYear()+'-'+String(pm.getMonth()+1).padStart(2,'0');
+  var MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var mOf=function(r){ return String(r.Date||'').slice(0,7); };
+  var roleOf=function(t){ t=String(t||'').trim();
+    if(/principal/i.test(t)) return 'Principal';
+    if(/^vp$|vice/i.test(t)) return 'VP';
+    if(/^hm$|head\s*m/i.test(t)) return 'HM';
+    if(/incharge/i.test(t)) return 'Incharge';
+    if(/co-?ord/i.test(t)) return 'Coordinator';
+    if(/hod/i.test(t)) return 'HOD';
+    return t||'Not recorded'; };
+  var rows=[], tN=0, tP=0;
+  scope.forEach(function(b){
+    var mine=OB.filter(function(r){ return r.Branch===b; });
+    var cur=mine.filter(function(r){ return mOf(r)===ym; });
+    var prv=mine.filter(function(r){ return mOf(r)===ypm; });
+    tN+=cur.length; tP+=prv.length;
+    var byR={}; cur.forEach(function(r){ var k=roleOf(r.ObsType); (byR[k]=byR[k]||[]).push(r); });
+    var byRp={}; prv.forEach(function(r){ var k=roleOf(r.ObsType); byRp[k]=(byRp[k]||0)+1; });
+    var keys=Object.keys(byR).concat(Object.keys(byRp).filter(function(k){ return !byR[k]; }));
+    keys.sort(function(x,y){ return (byR[y]?byR[y].length:0)-(byR[x]?byR[x].length:0); });
+    var sub=keys.length
+      ? '<table class="ovg-t"><tr><th>Observer role</th><th>'+MN[now.getMonth()]+'</th><th>'+MN[pm.getMonth()]+'</th><th>Avg score</th></tr>'+
+        keys.map(function(k){
+          var l=byR[k]||[], sc=l.map(function(r){ return parseFloat(r.Score); }).filter(function(n){ return !isNaN(n); });
+          var av=sc.length?(sc.reduce(function(a,c){return a+c;},0)/sc.length):null;
+          return '<tr><td>'+_ovEsc(k)+'</td><td><b>'+l.length+'</b></td>'+
+            '<td style="color:var(--txm)">'+(byRp[k]||0)+'</td>'+
+            '<td>'+(av==null?'\u2013':av.toFixed(2))+'</td></tr>'; }).join('')+'</table>'
+      : '<div class="ovg-note">No observation recorded at this branch in '+MN[now.getMonth()]+'.</div>';
+    var pct=prv.length?Math.round(cur.length/prv.length*100):(cur.length?100:0);
+    rows.push({name:b, pct:Math.min(pct,100), col:pct>=80?'#059669':pct>=40?'#D97706':'#DC2626',
+      val:String(cur.length),
+      sub2:'last month '+prv.length+(prv.length?' \u00b7 '+pct+'% of that pace':''),
+      sub:sub});
+  });
+  ovGroup('\ud83d\udc41\ufe0f Observations \u2014 '+MN[now.getMonth()],
+    (scope.length>1?'All branches':scope[0])+' \u00b7 against the same count last month \u00b7 tap a branch for observer roles',
+    rows, '<b>'+_ovNum(tN)+'</b> recorded so far in '+MN[now.getMonth()]+
+      ' against <b>'+_ovNum(tP)+'</b> in '+MN[pm.getMonth()]+'.');
+}
+
+/* ── The plain counters: a branch-wise split instead of a tab jump ── */
+function ovCount(kind){
+  var BR=(typeof BRANCHES!=='undefined')?BRANCHES:[];
+  var scope=(typeof fBranch!=='undefined'&&fBranch!=='ALL')?[fBranch]:BR;
+  var CFG={
+    admin:{t:'\ud83c\udfd7\ufe0f Admin tasks',src:function(){ return (typeof ADMIN_DATA!=='undefined'&&ADMIN_DATA)||[]; },
+      open:function(r){ return !/done|complete/i.test(String(r.Status||'')); },
+      cols:[{key:'Branch',label:'Branch'},{key:'TaskID',label:'ID'},{key:'Task',label:'Task',maxW:'320px'},
+        {key:'Department',label:'Dept'},{key:'Priority',label:'Priority',pill:true},{key:'Deadline',label:'Target',date:true},
+        {key:'Remarks',label:'Remarks',maxW:'260px'},{key:'Status',label:'Status',pill:true}],
+      what:'open tasks'},
+    vig:{t:'\ud83d\udee1\ufe0f Vigilance issues',src:function(){ return (typeof VIG_DATA!=='undefined'&&VIG_DATA)||[]; },
+      open:function(r){ return !/closed|resolved|done/i.test(String(r.Status||'')); },
+      cols:[{key:'Branch',label:'Branch'},{key:'Area',label:'Area'},{key:'Issue',label:'Issue',maxW:'320px'},
+        {key:'RiskLevel',label:'Risk',pill:true},{key:'Owner',label:'Owner'},{key:'TargetDate',label:'Target',date:true},
+        {key:'BranchRemarks',label:'Remarks',maxW:'240px'},{key:'Status',label:'Status',pill:true}],
+      what:'open issues'},
+    hr:{t:'\ud83d\udc54 HR open positions',src:function(){ return (typeof HR_RECORDS!=='undefined'&&HR_RECORDS)||[]; },
+      open:function(r){ return /^open$/i.test(String(r.Status||'').trim()); },
+      cols:[{key:'Branch',label:'Branch'},{key:'Position',label:'Position',maxW:'220px'},{key:'Department',label:'Dept'},
+        {key:'PostDate',label:'Posted',date:true},{key:'HR',label:'Recruiter'},{key:'Status',label:'Status',pill:true}],
+      what:'open positions'},
+    /* the purchase sheet names its column PurchaseStatus, not Status; read as
+       Status every row looked open and every branch read 0% closed */
+    pur:{t:'\ud83d\uded2 Purchase requests',src:function(){ return (typeof PUR_DATA!=='undefined'&&PUR_DATA)||[]; },
+      open:function(r){ return !/delivered|closed|cancel|complete/i.test(String(r.PurchaseStatus||r.Status||'')); },
+      cols:[{key:'Branch',label:'Branch'},{key:'Item',label:'Item',maxW:'220px'},{key:'Spec',label:'Specification',maxW:'300px'},
+        {key:'Qty',label:'Qty'},{key:'Dept',label:'Dept'},{key:'RaisedBy',label:'Raised by'},
+        {key:'Date',label:'Raised',date:true},{key:'Priority',label:'Priority',pill:true},
+        {key:'Remarks',label:'Remarks',maxW:'240px'},{key:'PurchaseStatus',label:'Status',pill:true}],
+      what:'not yet delivered'},
+    griev:{t:'\ud83d\udce3 Grievance cases',src:function(){ return (typeof GRIEVANCE_DATA!=='undefined'&&GRIEVANCE_DATA)||[]; },
+      open:function(r){ return !/resolved|closed/i.test(String(r.Status||'')); },
+      cols:[{key:'Branch',label:'Branch'},{key:'Category',label:'Category'},{key:'Description',label:'What was raised',maxW:'330px'},
+        {key:'Severity',label:'Severity',pill:true},{key:'AssignedTo',label:'With'},{key:'TargetDate',label:'Target',date:true},
+        {key:'ActionTaken',label:'Action taken',maxW:'260px'},{key:'Status',label:'Status',pill:true}],
+      what:'open cases'}
+  };
+  var c=CFG[kind]; if(!c) return;
+  var all=(c.src()||[]).filter(function(r){ return scope.indexOf(r.Branch)>=0; });
+  var open=all.filter(c.open);
+  var rows=scope.map(function(b){
+    var mine=all.filter(function(r){ return r.Branch===b; });
+    var o=mine.filter(c.open);
+    var pct=mine.length?Math.round((mine.length-o.length)/mine.length*100):null;
+    return {name:b, pct:pct, col:o.length?(pct!=null&&pct>=85?'#059669':pct!=null&&pct>=70?'#D97706':'#DC2626'):'#059669',
+      val:String(o.length), sub2:(pct==null?'nothing recorded':pct+'% of '+_ovNum(mine.length)+' closed')};
+  }).sort(function(x,y){ return (+y.val)-(+x.val); });
+  ovGroup(c.t, open.length+' '+c.what+' \u00b7 '+(scope.length>1?'all branches':scope[0])+
+    ' \u00b7 tap the button below for every record', rows,
+    '<button class="ovg-btn" onclick="ovCountRows(\''+kind+'\')">Open all '+open.length+' '+c.what+'</button>');
+  window.__OV_CNT=window.__OV_CNT||{}; window.__OV_CNT[kind]={rows:open,cols:c.cols,t:c.t,what:c.what};
+}
+function ovCountRows(kind){
+  var o=(window.__OV_CNT||{})[kind]; if(!o) return;
+  _ovHook();
+  openModal(o.t, o.rows.length+' '+o.what, o.rows, o.cols);
+}
+
+
+/* ── theme switching ── */
+function _themeIsDark(){ return document.documentElement.getAttribute('data-theme')==='dark'; }
+function _themePaintBtn(){
+  var i=document.getElementById('themeIco'), t=document.getElementById('themeTxt');
+  var d=_themeIsDark();
+  if(i) i.textContent = d ? '\u2600\ufe0f' : '\ud83c\udf19';
+  if(t) t.textContent = d ? 'Light' : 'Dark';
+}
+/* Chart.js reads its text and grid colours once, at construction, so every
+   chart on the page has to be told again when the theme flips. */
+function _themeCharts(){
+  if(typeof Chart==='undefined'||!Chart.defaults) return;
+  var d=_themeIsDark();
+  Chart.defaults.color = d ? '#9DAAC0' : '#64748B';
+  Chart.defaults.borderColor = d ? '#28354B' : '#E0E8FF';
+  try{
+    var reg = Chart.instances || (Chart.registry && Chart.registry.instances) || null;
+    var list = [];
+    if(reg){ Object.keys(reg).forEach(function(k){ list.push(reg[k]); }); }
+    else if(window._CHARTS){ list = Object.keys(window._CHARTS).map(function(k){ return window._CHARTS[k]; }); }
+    list.forEach(function(c){
+      if(!c||!c.options) return;
+      var sc=c.options.scales||{};
+      Object.keys(sc).forEach(function(k){
+        var a=sc[k]; if(!a) return;
+        if(a.ticks) a.ticks.color = Chart.defaults.color;
+        if(a.grid)  a.grid.color  = Chart.defaults.borderColor;
+      });
+      if(c.options.plugins&&c.options.plugins.legend&&c.options.plugins.legend.labels)
+        c.options.plugins.legend.labels.color = Chart.defaults.color;
+      c.update('none');
+    });
+  }catch(e){}
+}
+function applyTheme(mode){
+  if(mode==='dark') document.documentElement.setAttribute('data-theme','dark');
+  else document.documentElement.removeAttribute('data-theme');
+  try{ localStorage.setItem('pbes_theme', mode==='dark'?'dark':'light'); }catch(e){}
+  _themePaintBtn();
+  _themeCharts();
+}
+function toggleTheme(){ applyTheme(_themeIsDark() ? 'light' : 'dark'); }
+document.addEventListener('DOMContentLoaded', function(){
+  _themePaintBtn();
+  setTimeout(_themeCharts, 1200);     // after the first charts are built
+});
+
 function renderOvAudit(){
   var box=document.getElementById('ov-audit-bars'); if(!box) return;
   var fn=document.getElementById('ov-audit-fn');
@@ -3502,7 +4078,20 @@ function renderOvAudit(){
   /* the newest month that carries audit rows, and the one before it */
   var mths=(D.months||[]);
   if(!mths.length){ box.innerHTML='<div class="no-data">No audit months recorded yet</div>'; return; }
-  var m=mths[mths.length-1], mPrev=mths.length>1?mths[mths.length-2]:null;
+  /* The previous calendar month, worked out from today's date so it rolls on
+     its own: in October this reads September, in November it reads October.
+     The audit sheet keys months as "Sep-2026". If that month genuinely has no
+     rows yet the newest audited month is used instead and the caption says so,
+     rather than showing an empty panel. */
+  var _MS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var _n=new Date(), _pm=new Date(_n.getFullYear(), _n.getMonth()-1, 1);
+  var want=_MS[_pm.getMonth()]+'-'+_pm.getFullYear();
+  var _b4=new Date(_n.getFullYear(), _n.getMonth()-2, 1);
+  var want0=_MS[_b4.getMonth()]+'-'+_b4.getFullYear();
+  var m = mths.indexOf(want)>=0 ? want : mths[mths.length-1];
+  var fellBack = (m!==want);
+  var mPrev = mths.indexOf(want0)>=0 && !fellBack ? want0
+            : (mths.indexOf(m)>0 ? mths[mths.indexOf(m)-1] : null);
   var BR=(typeof BRANCHES!=='undefined'&&BRANCHES.length)?BRANCHES:(D.branches||[]);
   var out='';
   BR.forEach(function(b){
@@ -3531,7 +4120,7 @@ function renderOvAudit(){
   });
   box.innerHTML=out||'<div class="no-data">No audit data</div>';
   if(fn) fn.textContent=String(m)+' \u00b7 marked Yes \u00f7 parameters scored'+
-    (String(m)!==getPrevCalendarMonth()?' \u00b7 newest month audited':'');
+    (fellBack?' \u00b7 '+want+' not audited yet, showing the newest month':' \u00b7 previous month');
 }
 window.__renderOvAudit=function(){ try{ renderOvAudit(); }catch(e){} };
 
@@ -3554,7 +4143,8 @@ function renderOvDept(){
   var scope=(typeof fBranch!=='undefined'&&fBranch!=='ALL')?[fBranch]:BR;
   var t=[];
   var tile=function(o){
-    t.push('<div class="ovd"'+(o.tab?' onclick="switchTab(\''+o.tab+'\')" style="cursor:pointer" title="Open the '+o.tab+' tab"':'')+'>'+
+    var go = o.act ? o.act : (o.tab?'switchTab(\''+o.tab+'\')':'');
+    t.push('<div class="ovd'+(go?' ovd-go':'')+'"'+(go?' onclick="'+go+'" title="Click for the detail"':'')+'>'+
       '<div class="ovd-k">'+o.icon+' '+o.label+'</div>'+
       '<div class="ovd-v" style="color:'+(o.col||'var(--tx)')+'">'+o.val+'</div>'+
       '<div class="ovd-s">'+(o.sub||'')+'</div></div>');
@@ -3567,7 +4157,7 @@ function renderOvDept(){
     var rows=[]; scope.forEach(function(b){ rows=rows.concat(_trBusRows(T,b)); });
     var occ=_trOcc(rows);
     tile({icon:'\ud83d\ude8c',label:'Bus seats used',val:occ.seats?occ.pct+'%':'\u2014',
-      col:col(occ.seats?occ.pct:null,80,65),tab:'transport',
+      col:col(occ.seats?occ.pct:null,80,65),act:'ovBuses()',
       sub:occ.seats?fi(occ.riders)+' of '+fi(occ.seats)+' seats \u00b7 '+occ.active+' bus'+(occ.active===1?'':'es')+' running':'no fleet data'});
     if(typeof _trDocList==='function'){
       var exp=0,soon=0;
@@ -3575,7 +4165,7 @@ function renderOvDept(){
         _trDocList(v).forEach(function(d){ if(d.state==='expired') exp++; else if(d.state==='soon') soon++; });
       });
       tile({icon:'\ud83d\udcc4',label:'Vehicle documents',val:exp?String(exp):(soon?String(soon):'0'),
-        col:exp?'#DC2626':soon?'#D97706':'#059669',tab:'transport',
+        col:exp?'#DC2626':soon?'#D97706':'#059669',act:(exp||soon)?'ovDocs()':'',
         sub:exp?'expired \u00b7 '+soon+' more due in 30 days':soon?'due within 30 days':'all valid beyond 30 days'});
     }
   }
@@ -3622,7 +4212,7 @@ function renderOvDept(){
     var n=mineO.filter(function(r){ return dOf(r)===ym; }).length;
     var n0=mineO.filter(function(r){ return dOf(r)===ypm; }).length;
     tile({icon:'\ud83d\udc41\ufe0f',label:'Observations this month',val:fi(n),
-      col:n>=n0?'#059669':'#D97706',tab:'observations',
+      col:n>=n0?'#059669':'#D97706',act:'ovObs()',
       sub:n0?fi(n)+' so far \u00b7 last month '+fi(n0):'no comparison month'});
   }
 
