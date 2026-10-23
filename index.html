@@ -479,6 +479,13 @@ table.auhm tr.au-itemrow td{border-color:#E8EEF2}
 .cp-bar .track i{display:block;height:100%;border-radius:99px}
 .cp-bar .v{width:38px;flex:0 0 38px;font-weight:700;color:var(--tx);font-variant-numeric:tabular-nums}
 .cp-delta{text-align:right;font-size:12.5px;font-weight:800;font-variant-numeric:tabular-nums}
+/* Executive Overview — department snapshot tiles */
+.ovd-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(176px,1fr));gap:10px}
+.ovd{background:#FBFCFF;border:1px solid var(--bor);border-radius:10px;padding:11px 13px;transition:.12s}
+.ovd:hover{border-color:var(--p);box-shadow:0 2px 10px rgba(30,79,216,.09)}
+.ovd-k{font-size:10.5px;font-weight:800;color:var(--txm);text-transform:uppercase;letter-spacing:.4px}
+.ovd-v{font-size:25px;font-weight:800;line-height:1.15;margin:3px 0 1px;font-variant-numeric:tabular-nums}
+.ovd-s{font-size:10.5px;color:var(--txm);line-height:1.4}
 /* The year panel carries the resolution flow, so it needs more columns than
    the month-on-month panel beside it. Its own grid, so .cp-row is untouched. */
 .cpy-row2{display:grid;grid-template-columns:minmax(132px,1.5fr) minmax(54px,1fr) 74px 122px;gap:8px;
@@ -1473,14 +1480,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div class="kc teal"><div class="kc-ico">😊</div><div class="kc-lbl">Parents Satisfied</div><div class="kc-val" id="ov-sat">–</div><div class="kc-sub" id="ov-sat-s">Satisfaction rate</div></div>
   </div>
 
-  <div class="row r2">
-    <div class="card"><div class="ch"><h3>🏫 Branch Completion Rate</h3><span class="fnote" id="ov-bcb-fn">Previous month · calls made ÷ total students</span></div><div class="cb" id="ov-branch-bars"></div></div>
-    <div class="card"><div class="ch"><h3>📊 Call Status Breakdown</h3></div><div class="cb"><div class="cw sm"><canvas id="ov-status"></canvas></div></div></div>
+    <div class="card" style="margin-bottom:16px;">
+    <div class="ch"><h3>🧭 Department snapshot</h3>
+      <span class="fnote" id="ov-dept-fn">Transport, IT and the care-call backlog · follows the Branch dropdown · click a tile for its tab</span></div>
+    <div class="cb" style="padding:14px 18px;"><div id="ov-dept" class="ovd-grid"></div></div>
   </div>
-  <div class="row r3">
-    <div class="card"><div class="ch"><h3>📊 Observer Completion by Type — Required vs Done</h3><span class="fnote">Working Days × quota (2/day leadership · 1/day HOD) · follows Branch &amp; Month dropdowns</span></div>
-      <div class="cb"><div class="cw tall"><canvas id="ov-obstype"></canvas></div></div>
-    </div>
+<div class="row r2">
+    <div class="card"><div class="ch"><h3>🏫 Branch Completion Rate</h3><span class="fnote" id="ov-bcb-fn">Previous month · calls made ÷ total students</span></div><div class="cb" id="ov-branch-bars"></div></div>
+    <div class="card"><div class="ch"><h3>📋 School Audit Score</h3><span class="fnote" id="ov-audit-fn">Previous month · marked Yes ÷ parameters scored</span></div><div class="cb" id="ov-audit-bars"></div></div>
+  </div>
+  <!-- two cards since Observer Completion by Type was removed on 23 Oct 2026;
+       left as r3 the pair sat in two thirds of the width with a gap beside them -->
+  <div class="row r2">
     <div class="card"><div class="ch"><h3>🏗️ Admin Task Status</h3><span class="fnote">Click a slice to view tasks</span></div><div class="cb"><div class="cw sm"><canvas id="ov-admin-chart"></canvas></div></div></div>
     <div class="card"><div class="ch"><h3>🛒 Purchase · 🛡️ Vigilance</h3><span class="fnote">Click a slice to view</span></div><div class="cb">
       <div style="font-size:10.5px;font-weight:700;color:var(--txm);text-transform:uppercase;margin-bottom:6px">Purchase Status</div>
@@ -1519,11 +1530,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       </table>
     </div>
   </div>
-  <div class="card"><div class="ch"><h3>🎯 Key Management Insights</h3><span class="fnote">Computed live from every department on each data refresh · updates automatically</span></div><div class="cb">
-    <div id="ov-insights" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      <div class="ins ins-i"><span>⏳</span><p>Computing insights from live data…</p></div>
-    </div>
-  </div></div>
+
 </div>
 
 <!-- ═══ CARE CALLS ═══ -->
@@ -3466,6 +3473,171 @@ const _PUR_COLS=[
   {key:'PurchaseStatus',label:'Purchase Status',pill:true},{key:'Remarks',label:'Remarks',maxW:'180px'}
 ];
 function setHtml(id,val){ var el=document.getElementById(id); if(el) el.innerHTML=val; }
+/* ═════════════════════════════════════════════════════════════════════════
+   SCHOOL AUDIT SCORE, BRANCH BY BRANCH  (added 23 Oct 2026)
+
+   Sits beside Branch Completion Rate and reads the same way: the previous
+   month, one bar per branch. The audit lives in a lazily loaded section, so
+   if it has not been fetched yet this asks for it and paints when it lands
+   (loadAudit calls back through window.__renderOvAudit).
+
+   The month is not assumed. Audits are written up after the month closes, so
+   the previous calendar month is often not in the sheet yet; the panel uses
+   the newest month that actually has audit rows and names it, rather than
+   showing an empty chart under a "previous month" heading.
+   ═════════════════════════════════════════════════════════════════════════ */
+function renderOvAudit(){
+  var box=document.getElementById('ov-audit-bars'); if(!box) return;
+  var fn=document.getElementById('ov-audit-fn');
+  var D=window.__AUDIT_D, A=window.AUDIT;
+  if(!D || !A){
+    box.innerHTML='<div class="no-data">Loading the audit\u2026</div>';
+    if(fn) fn.textContent='fetching the School Audit sheet';
+    if(typeof loadAudit==='function' && !window.__ovAuditAsked){
+      window.__ovAuditAsked=1;
+      try{ loadAudit(); }catch(e){ box.innerHTML='<div class="no-data">Audit not available</div>'; }
+    }
+    return;
+  }
+  /* the newest month that carries audit rows, and the one before it */
+  var mths=(D.months||[]);
+  if(!mths.length){ box.innerHTML='<div class="no-data">No audit months recorded yet</div>'; return; }
+  var m=mths[mths.length-1], mPrev=mths.length>1?mths[mths.length-2]:null;
+  var BR=(typeof BRANCHES!=='undefined'&&BRANCHES.length)?BRANCHES:(D.branches||[]);
+  var out='';
+  BR.forEach(function(b){
+    var cur=A.branchScore(D,b,m), was=mPrev?A.branchScore(D,b,mPrev):null;
+    if(cur==null){
+      out+='<div class="bcb"><div class="bcb-name"><span class="bd b'+b+'"></span>'+b+'</div>'+
+        '<div class="bcb-track"><div class="bcb-fill" style="width:0"></div></div>'+
+        '<div class="bcb-val" style="color:#94A3B8">\u2014</div>'+
+        '<div class="bcb-sub" style="color:#94A3B8">not audited in '+String(m).slice(0,3)+'</div></div>';
+      return;
+    }
+    var p=Math.round(cur*10)/10;
+    var pc=p>=85?'pbg':p>=70?'pba':'pbr';
+    var mv='';
+    if(was!=null){
+      var d=cur-was;
+      mv = Math.abs(d)<0.5 ? ' \u00b7 level on '+String(mPrev).slice(0,3)
+         : (d>0 ? ' \u00b7 <b style="color:#059669">\u25b2 '+d.toFixed(1)+'</b> on '+String(mPrev).slice(0,3)
+                : ' \u00b7 <b style="color:#DC2626">\u25bc '+Math.abs(d).toFixed(1)+'</b> on '+String(mPrev).slice(0,3));
+    }
+    out+='<div class="bcb" style="cursor:pointer" onclick="switchTab(\'audit\')" title="Open the School Audit tab">'+
+      '<div class="bcb-name"><span class="bd b'+b+'"></span>'+b+'</div>'+
+      '<div class="bcb-track"><div class="bcb-fill '+pc+'" style="width:'+Math.min(p,100)+'%"></div></div>'+
+      '<div class="bcb-val">'+pillPct(p)+'</div>'+
+      '<div class="bcb-sub">'+String(m).slice(0,3)+mv+'</div></div>';
+  });
+  box.innerHTML=out||'<div class="no-data">No audit data</div>';
+  if(fn) fn.textContent=String(m)+' \u00b7 marked Yes \u00f7 parameters scored'+
+    (String(m)!==getPrevCalendarMonth()?' \u00b7 newest month audited':'');
+}
+window.__renderOvAudit=function(){ try{ renderOvAudit(); }catch(e){} };
+
+/* ═════════════════════════════════════════════════════════════════════════
+   THE DEPARTMENTS THE OVERVIEW DID NOT COVER  (added 23 Oct 2026)
+
+   The ten KPI cards carry students, calls, admissions, observations, admin,
+   vigilance, purchase, HR, grievance and satisfaction. Three departments that
+   run every day were nowhere on this page — transport, IT and the state of
+   the care-call concerns themselves — so a director had to open three more
+   tabs to answer "is anything on fire this morning".
+
+   Every figure here comes from data the page has already loaded, so the card
+   costs nothing to draw and cannot be stale against the tab it links to. Each
+   tile opens its own tab.
+   ═════════════════════════════════════════════════════════════════════════ */
+function renderOvDept(){
+  var box=document.getElementById('ov-dept'); if(!box) return;
+  var BR=(typeof BRANCHES!=='undefined'&&BRANCHES.length)?BRANCHES:[];
+  var scope=(typeof fBranch!=='undefined'&&fBranch!=='ALL')?[fBranch]:BR;
+  var t=[];
+  var tile=function(o){
+    t.push('<div class="ovd"'+(o.tab?' onclick="switchTab(\''+o.tab+'\')" style="cursor:pointer" title="Open the '+o.tab+' tab"':'')+'>'+
+      '<div class="ovd-k">'+o.icon+' '+o.label+'</div>'+
+      '<div class="ovd-v" style="color:'+(o.col||'var(--tx)')+'">'+o.val+'</div>'+
+      '<div class="ovd-s">'+(o.sub||'')+'</div></div>');
+  };
+  var col=function(v,good,warn){ return v==null?'var(--txm)':v>=good?'#059669':v>=warn?'#D97706':'#DC2626'; };
+
+  /* \u2500\u2500 Transport: seats used, and the documents that expire \u2500\u2500 */
+  var T=window._TRANSPORT||null;          // the loader stashes it here, not as TRANSPORT
+  if(T && typeof _trBusRows==='function' && typeof _trOcc==='function'){
+    var rows=[]; scope.forEach(function(b){ rows=rows.concat(_trBusRows(T,b)); });
+    var occ=_trOcc(rows);
+    tile({icon:'\ud83d\ude8c',label:'Bus seats used',val:occ.seats?occ.pct+'%':'\u2014',
+      col:col(occ.seats?occ.pct:null,80,65),tab:'transport',
+      sub:occ.seats?fi(occ.riders)+' of '+fi(occ.seats)+' seats \u00b7 '+occ.active+' bus'+(occ.active===1?'':'es')+' running':'no fleet data'});
+    if(typeof _trDocList==='function'){
+      var exp=0,soon=0;
+      (T.vehicles||[]).filter(function(v){ return scope.indexOf(v.Branch)>=0; }).forEach(function(v){
+        _trDocList(v).forEach(function(d){ if(d.state==='expired') exp++; else if(d.state==='soon') soon++; });
+      });
+      tile({icon:'\ud83d\udcc4',label:'Vehicle documents',val:exp?String(exp):(soon?String(soon):'0'),
+        col:exp?'#DC2626':soon?'#D97706':'#059669',tab:'transport',
+        sub:exp?'expired \u00b7 '+soon+' more due in 30 days':soon?'due within 30 days':'all valid beyond 30 days'});
+    }
+  }
+
+  /* \u2500\u2500 IT assets: this month's check \u2500\u2500 */
+  var IT=window._IT||null;                // likewise — not IT_DATA_ALL
+  if(IT && IT.health && IT.health.length){
+    var hs=IT.health.filter(function(r){ return scope.indexOf(r.Branch)>=0; });
+    var mx=''; hs.forEach(function(r){ var d=String(r.Date||'').slice(0,7); if(d>mx) mx=d; });
+    var cur=hs.filter(function(r){ return String(r.Date||'').slice(0,7)===mx; });
+    var tot=0,wk=0,dn=0,pd=0;
+    cur.forEach(function(r){ tot+=(+r.Total||0); wk+=(+r.Working||0); dn+=(+r.NotWorking||0); pd+=(+r.Pending||0); });
+    var p=tot?Math.round(wk/tot*100):null;
+    tile({icon:'\ud83d\udcbb',label:'IT assets working',val:p==null?'\u2014':p+'%',col:col(p,95,85),tab:'it',
+      sub:tot?fi(wk)+' of '+fi(tot)+' checked'+(dn?' \u00b7 '+dn+' down':'')+(pd?' \u00b7 '+pd+' pending':''):'nothing checked yet'});
+  }
+
+  /* \u2500\u2500 Care-call concerns still open \u2500\u2500
+     The KPI row counts calls made and satisfaction; neither says how many
+     raised problems are still sitting unresolved. */
+  var C=(typeof CARE_DATA!=='undefined'&&Array.isArray(CARE_DATA))?CARE_DATA:[];
+  if(C.length && typeof window._careIsConcern==='function'){
+    var st=function(r){ var x=String(r.Status==null?'':r.Status).trim().toLowerCase().replace(/[.\s]+$/,'');
+      return /^resolved$|^closed$|^completed$/.test(x)?'closed':/pending/.test(x)?'pending':/progress/.test(x)?'progress':'other'; };
+    var mine=C.filter(function(r){ return scope.indexOf(r.Branch)>=0 && window._careAnswerable(r) && window._careIsConcern(r); });
+    var open=mine.filter(function(r){ return st(r)!=='closed'; });
+    var ip=open.filter(function(r){ return st(r)==='progress'; }).length;
+    var pe=open.filter(function(r){ return st(r)==='pending'; }).length;
+    var pct=mine.length?Math.round((mine.length-open.length)/mine.length*100):null;
+    tile({icon:'\ud83d\udcde',label:'Concerns still open',val:fi(open.length),
+      col:open.length?'#D97706':'#059669',tab:'care',
+      sub:(ip?ip+' in progress':'')+(ip&&pe?' \u00b7 ':'')+(pe?pe+' pending':'')+
+          (pct!=null?' \u00b7 '+pct+'% of all concerns closed':'')});
+  }
+
+  /* \u2500\u2500 Teacher observations this month \u2500\u2500 */
+  var OB=(typeof OBS_DATA!=='undefined'&&Array.isArray(OBS_DATA))?OBS_DATA:[];
+  if(OB.length){
+    var now=new Date(), ym=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+    var pm=new Date(now.getFullYear(),now.getMonth()-1,1);
+    var ypm=pm.getFullYear()+'-'+String(pm.getMonth()+1).padStart(2,'0');
+    var dOf=function(r){ return String(r.Date||r.ObsDate||'').slice(0,7); };
+    var mineO=OB.filter(function(r){ return scope.indexOf(r.Branch)>=0; });
+    var n=mineO.filter(function(r){ return dOf(r)===ym; }).length;
+    var n0=mineO.filter(function(r){ return dOf(r)===ypm; }).length;
+    tile({icon:'\ud83d\udc41\ufe0f',label:'Observations this month',val:fi(n),
+      col:n>=n0?'#059669':'#D97706',tab:'observations',
+      sub:n0?fi(n)+' so far \u00b7 last month '+fi(n0):'no comparison month'});
+  }
+
+  /* \u2500\u2500 Vehicle repairs not yet completed \u2500\u2500 */
+  if(T && T.repair && T.repair.length){
+    var rp=T.repair.filter(function(r){ return scope.indexOf(r.Branch)>=0 &&
+      !/complete|done|closed/i.test(String(r.Status||'')); });
+    tile({icon:'\ud83d\udd27',label:'Vehicle repairs open',val:fi(rp.length),
+      col:rp.length?'#D97706':'#059669',tab:'transport',
+      sub:rp.length?'not marked completed':'every job closed'});
+  }
+
+  box.innerHTML=t.length?t.join(''):'<div class="no-data">No departmental data loaded yet</div>';
+}
+
 function renderOverview(){
   // Overview shows the full picture (all branches) — UNLESS the viewer is branch-locked
   // (a principal), in which case their own branch is shown. The Head-to-Head scorecard
@@ -3583,70 +3755,9 @@ function renderOverview(){
   { const _f=document.getElementById('ov-bcb-fn');
     if(_f) _f.textContent=getPrevCalendarMonth()+' \u00b7 calls made \u00f7 total students'; }
 
-  mkChart('ov-status',dnutCfg(['Resolved','In Progress','Pending'],[s.resolved,s.ip,s.pending],['#059669','#3B82F6','#D97706']));
+  try{ renderOvAudit(); }catch(e){ console.error('ov audit:', e && e.message); }
+  try{ renderOvDept(); }catch(e){ console.error('ov dept:', e && e.message); }
 
-  // ── Observer COMPLETION by Type — Required vs Done (Executive Overview) ──
-  // Required = Working Days × quota × number of observers of that role in the branch.
-  // Quota: 2 obs/working day for leadership (Principal/VP/HM/Incharge/Coordinators), 1/day for HODs.
-  // Follows the BRANCH + MONTH dropdowns. Click a bar to view the observations done.
-  {
-    const _mmOV={March:'Mar-2026',April:'Apr-2026',May:'May-2026',June:'Jun-2026',July:'Jul-2026',August:'Aug-2026',September:'Sep-2026',October:'Oct-2026',November:'Nov-2026',December:'Dec-2026',January:'Jan-2027',February:'Feb-2027'};
-    const ALLOBS=(typeof OBS_DATA!=='undefined'&&Array.isArray(OBS_DATA))?OBS_DATA:[];
-    function roleOf(t){
-      t=(t||'').trim();
-      if(/principal/i.test(t)) return 'Principal';
-      if(/^vp$|vice/i.test(t)) return 'VP';
-      if(/^hm$|head\s*mistress|head\s*master/i.test(t)) return 'HM';
-      if(/incharge/i.test(t)) return 'Incharge';
-      if(/coordinator|^ac$/i.test(t)) return 'Coordinators';
-      if(/hod|head of dep/i.test(t)) return 'HODs';
-      return 'Other';
-    }
-    const quotaOfRole=k=>k==='HODs'?1:2;
-    const ROLE_ORDER=['Principal','VP','HM','Incharge','Coordinators','HODs','Other'];
-    const MC_OV=(typeof MONTH_CONFIG!=='undefined'&&MONTH_CONFIG)?MONTH_CONFIG:{};
-    const cfgBranches=(fBranch==='ALL')?Object.keys(MC_OV):[fBranch];
-    const agg={}; ROLE_ORDER.forEach(k=>agg[k]={required:0,actual:0});
-    cfgBranches.forEach(b=>{
-      const cfg=MC_OV[b]||{};
-      const monthKeys=(fMonth!=='ALL'&&_mmOV[fMonth])?[_mmOV[fMonth]]:Object.keys(cfg);
-      // distinct exact observer types per role present in this branch (any month)
-      const branchRoleTypes={}; ROLE_ORDER.forEach(k=>branchRoleTypes[k]=new Set());
-      ALLOBS.filter(r=>r.Branch===b).forEach(r=>{
-        const t=String(r.ObsType||'').trim(); if(!t||t==='–'||/^nan$/i.test(t))return;
-        branchRoleTypes[roleOf(t)].add(t);
-      });
-      monthKeys.forEach(mk=>{
-        if(mcMaxWD(cfg,mk)<=0)return;
-        const obsHere=ALLOBS.filter(r=>r.Branch===b&&r.Month===mk);
-        ROLE_ORDER.forEach(k=>{
-          if(branchRoleTypes[k].size===0)return;
-          // v6: Required uses each observer type's OWN working days from Month_Config
-          branchRoleTypes[k].forEach(t=>{
-            const wdT=mcRoleWD(cfg,mk,t); if(wdT<=0)return;
-            agg[k].required+=wdT*quotaOfRole(k);
-          });
-          agg[k].actual+=obsHere.filter(r=>roleOf(r.ObsType)===k).length;
-        });
-      });
-    });
-    const roles=ROLE_ORDER.filter(k=>agg[k].required>0);
-    const pct=roles.map(k=>Math.min(100,Math.round(agg[k].actual/agg[k].required*100)));
-    window._OV_OBSROLES=roles;
-    mkChart('ov-obstype',{type:'bar',
-      data:{labels:roles,datasets:[{label:'Completion %',
-        data:pct,
-        backgroundColor:pct.map(p=>p>=80?'#059669':p>=50?'#D97706':'#DC2626'),
-        borderRadius:6,maxBarThickness:48}]},
-      options:{responsive:true,maintainAspectRatio:false,
-        onClick:(evt,els)=>{ if(!els||!els.length)return; viewObsByRole(window._OV_OBSROLES[els[0].index]); },
-        plugins:{legend:{display:false},
-          tooltip:{callbacks:{label:c=>{const k=roles[c.dataIndex];return `${agg[k].actual} done / ${agg[k].required} required (${quotaOfRole(k)}/day per observer)`;}}},
-          datalabels:{display:true,anchor:'end',align:'top',color:'#1E293B',font:{size:12,weight:'bold'},
-            formatter:v=>v+'%'}},
-        scales:{y:{beginAtZero:true,max:110,title:{display:true,text:'Completion % (done ÷ required)'},grid:{color:'#E0E8FF'},ticks:{callback:v=>v+'%'}},
-          x:{ticks:{font:{size:11,weight:'600'}},grid:{display:false}}}}});
-  }
 
   // ── Admin Task Status (live doughnut, click-to-view) ──
   {
@@ -16165,6 +16276,9 @@ window.AUDIT = (function () {
   window.renderAuditTab = function (raw) {
     D = A.build(raw);
     window.__AUDIT_D = D;
+    /* the Executive Overview borrows this score, so it repaints once the
+       lazily loaded audit section finally arrives */
+    if (window.__renderOvAudit) window.__renderOvAudit();
     /* rows in the sheet = audit lines + stray rows (a branch-month too thin to be
        an audit), so the count reconciles with the sheet's own row count */
     var strayN = (D.stray || []).reduce(function (s, x) { return s + (x.rows || 0); }, 0);
