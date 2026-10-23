@@ -8976,11 +8976,15 @@ function renderCareSummary(){
       +'<div><div style="font-size:12px;font-weight:800;color:#0F172A;margin-bottom:2px;">The problems parents raise, month by month</div>'
       +'<div style="font-size:11px;color:#64748B;margin-bottom:8px;">Read from each call\u2019s remarks, follow-up action and grievance category \u00b7 share of answered calls'
       +(fBranch==='ALL'?' \u00b7 all branches':' \u00b7 '+_cEsc(fBranch))+' \u00b7 click a point for those calls</div>'
-      +'<div style="height:270px;position:relative;"><canvas id="care-summary-trend"></canvas></div>'
-      +'<div style="font-size:12px;font-weight:800;color:#0F172A;margin:14px 0 2px;">Most common words in '+_cEsc(_focus)+'\u2019s concern calls</div>'
-      +'<div style="font-size:11px;color:#64748B;margin-bottom:8px;">From the remarks and follow-up actions \u2014 words that mark a problem, not stock phrases \u00b7 size = how often \u00b7 '
-      +'<span style="color:#B91C1C;font-weight:700">red \u25b2</span> more than '+(_prev?_cEsc(_prev):'last month')+', <span style="color:#047857;font-weight:700">green \u25bc</span> less \u00b7 click a word for the calls</div>'
-      +'<div>'+(chips||'<span style="font-size:12px;color:#94A3B8">Not enough remark text yet.</span>')+'</div></div>'
+      /* 270px when the keyword chips sat underneath; with those gone the left
+         column was mostly white space beside the problem list, so the chart
+         takes the room back. */
+      +'<div style="height:430px;position:relative;"><canvas id="care-summary-trend"></canvas></div>'
+      /* The "Most common words in <month>'s concern calls" chips were removed
+         on 23 Oct 2026 at management's request. The word list is still built
+         above and _careTrendDrill('kw', ...) still works, so nothing else that
+         depends on it breaks. */
+      +'</div>'
       +'<div><div style="font-size:12px;font-weight:800;color:#0F172A;margin-bottom:2px;">Top problems in '+_cEsc(_focus)+'</div>'
       +'<div style="font-size:11px;color:#64748B;margin-bottom:8px;">'+(_prev?'Change is against '+_cEsc(_prev)+'. ':'')
       +'\u25b2 means more parents raised it \u2014 worse.</div>'+list+'</div></div>'
@@ -23963,8 +23967,25 @@ window.CARE_PROBLEMS = (function () {
     var rows = which === 'prev' ? r.prevRows : r.curRows;
     var mon = which === 'prev' ? C.M.prev : C.M.cur;
     if (typeof openModal !== 'function') return;
+    /* Open records first, oldest at the top \u2014 the same order as the panel
+       beside this one, so the two never disagree on what to look at first. */
+    var _rank=function(x){
+      var t=String(x&&x.Status==null?'':x.Status).trim().toLowerCase().replace(/[.\s]+$/,'');
+      if(/progress/.test(t)) return 0;
+      if(/pending/.test(t)) return 1;
+      if(/^resolved$|^closed$|^completed$/.test(t)) return 3;
+      return 2;
+    };
+    var _age=function(x){
+      var v=String(x&&x.Date==null?'':x.Date).trim();
+      if(!/^\d{4}-\d{2}-\d{2}/.test(v)) return 0;
+      var d=new Date(v+'T00:00:00'); return isNaN(d)?0:(Date.now()-d.getTime());
+    };
+    var _open=rows.filter(function(x){ return _rank(x)<3; }).length;
+    rows=rows.slice().sort(function(a,b){ return _rank(a)-_rank(b) || _age(b)-_age(a); });
     openModal(r.th.icon + '  ' + r.th.label + ' \u2014 ' + mon,
-      rows.length.toLocaleString('en-IN') + ' call(s) whose remark carries this problem',
+      rows.length.toLocaleString('en-IN') + ' call(s) whose remark carries this problem'+
+        (_open?' \u00b7 '+_open+' still open, listed first':' \u00b7 all closed'),
       rows, [{key:'Branch',label:'Branch'},{key:'Month',label:'Month'},{key:'Class',label:'Class'},
         {key:'Student',label:'Student',maxW:'160px'},{key:'Date',label:'Date',date:true},
         {key:'Grievance',label:'Filed as',pill:true},{key:'Remarks',label:'What the parent said',maxW:'320px'},
@@ -25090,6 +25111,16 @@ window.VCHK = (function () {
     t=t.replace(/[\s.,;:\-\u2013]*\b(n\s*\/?\s*a|nil|none|na)\b[\s.]*$/i,'').trim();
     return /^(\u2013|-|\.)*$/.test(t) ? '' : t;
   }
+  /* Management reads these lists to find what still needs doing, so the In
+     Progress and Pending records come first \u2014 oldest at the top within each
+     group \u2014 and the Resolved ones follow as the record of what was done. */
+  function openFirst(list){
+    var rank=function(r){ var s=stateOf(r);
+      return s==='progress'?0 : s==='pending'?1 : s==='other'?2 : 3; };
+    return (list||[]).slice().sort(function(a,b){
+      return rank(a)-rank(b) || ((ageOf(b)||0)-(ageOf(a)||0));
+    });
+  }
   var OPEN_COLS=[{key:'Branch',label:'Branch'},{key:'Month',label:'Month'},{key:'Class',label:'Class'},
     {key:'Student',label:'Student',maxW:'160px'},{key:'Date',label:'Raised',date:true},
     {key:'Grievance',label:'Filed as',pill:true},{key:'Remarks',label:'What the parent said',maxW:'330px'},
@@ -25262,7 +25293,7 @@ window.VCHK = (function () {
         } else if(act==='open'){
           openModal('\u23f3 '+r.th.label+' \u2014 still open'+WIN,
             r.open+' record(s) \u00b7 '+where+' \u00b7 In Progress and Pending only'+
-            (r.oldest?' \u00b7 oldest waiting '+r.oldest+' days':''), r.openRows, OPEN_COLS);
+            (r.oldest?' \u00b7 oldest waiting '+r.oldest+' days':''), openFirst(r.openRows), OPEN_COLS);
         } else if(act==='oldest'){
           if(!r.oldestRow){ openModal('\u23f3 '+r.th.label+WIN,'Nothing is open on this problem.',[],OPEN_COLS); return; }
           openModal('\u23f3 '+r.th.label+' \u2014 the oldest still open',
@@ -25270,8 +25301,8 @@ window.VCHK = (function () {
             esc(String(r.oldestRow.Status||'open')), [r.oldestRow], OPEN_COLS);
         } else {
           openModal('\ud83d\udcc5 '+r.th.label+WIN,
-            r.rows.length.toLocaleString('en-IN')+' call(s) \u00b7 '+r.closed.toLocaleString('en-IN')+' closed \u00b7 '+
-            r.open+' still open \u00b7 '+where, r.rows, OPEN_COLS);
+            r.rows.length.toLocaleString('en-IN')+' call(s) \u00b7 '+r.open+' still open (listed first) \u00b7 '+
+            r.closed.toLocaleString('en-IN')+' closed \u00b7 '+where, openFirst(r.rows), OPEN_COLS);
         }
       });
     });
@@ -25280,7 +25311,7 @@ window.VCHK = (function () {
       if(typeof openModal!=='function') return;
       var u=window._CPY_STALE||[];
       openModal('\u26a0\ufe0f Open more than 150 days',
-        u.length+' concern(s) nobody has come back to \u00b7 still In Progress or Pending', u, OPEN_COLS);
+        u.length+' concern(s) nobody has come back to \u00b7 still In Progress or Pending', openFirst(u), OPEN_COLS);
     });
   }
   function safe(){ try{ build(); }catch(e){
