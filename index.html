@@ -1409,6 +1409,7 @@ function applyLiveData(data){
     if (data.OWNER_QUALITY)    OWNER_QUALITY    = data.OWNER_QUALITY;
     if (data.AVIS_DATA)        AVIS_DATA        = data.AVIS_DATA;
     if (data.TRANSPORT)        window._TRANSPORT = data.TRANSPORT;
+    if (data.DM_GOOGLE)        window._DM_GOOGLE  = data.DM_GOOGLE;
     if (data.IT_DATA_ALL)      window._IT = data.IT_DATA_ALL;
     /* On hold is taken out here, once, for every department (see _dropHold).
        Only arrays this payload actually carried are touched, so a partial
@@ -2404,6 +2405,12 @@ document.addEventListener('DOMContentLoaded', async () => {
          background, like Care Calls and Teacher Observations. -->
     <span class="exm-status" id="dm-status"></span>
   </div>
+  <div class="card" style="margin-bottom:16px;">
+    <div class="ch"><h3>&#129517; Where the money went</h3>
+      <span class="fnote" id="dmw-fn">Meta and Google together, branch by branch</span></div>
+    <div class="cb" style="padding:14px 18px"><div id="dm-where"></div></div>
+  </div>
+
   <div class="card" style="margin-bottom:16px;">
     <div class="ch"><h3>&#128202; Spend, leads and admissions by branch and platform</h3>
       <span class="fnote">Amount spent and leads come from the ad platform; admissions are counted from
@@ -22680,6 +22687,26 @@ function dmIsLead(r){
   return DM_LEAD_TYPES.test(String(r.resultType || ''));
 }
 
+/* ══ GOOGLE ADS ══
+   Meta and Google answer different halves of the question and are not summed:
+   Meta reports leads, Google reports clicks and (so far) no conversions at
+   all. They sit side by side, each judged on what it actually measures. */
+function dmGoogle(){ return window._DM_GOOGLE || null; }
+function dmGoogleBranch(b){
+  var g=dmGoogle(); if(!g||!g.present) return null;
+  var o=(g.byBranch||{})[b]; if(!o) return null;
+  return { cost:o.cost, clicks:o.clicks, impr:o.impr, conv:o.conv, campaigns:o.campaigns,
+           cpc:o.clicks?o.cost/o.clicks:null, ctr:o.impr?o.clicks/o.impr*100:null };
+}
+/* The shared Google Business Profile account funds two campuses and cannot be
+   split by branch. It is shown as its own line rather than halved silently. */
+function dmGoogleShared(b){
+  var g=dmGoogle(); if(!g||!g.present) return null;
+  var sh=g.shared||{};
+  if(!sh.cost || (sh.branches||[]).indexOf(b)<0) return null;
+  return sh;
+}
+
 function dmRecords(){
   const rows = (typeof DM_DATA !== 'undefined' && Array.isArray(DM_DATA)) ? DM_DATA : [];
   /* Set once, so every table on this page and the panel below agree. */
@@ -22864,6 +22891,7 @@ function renderDmSummary(){
   const NA  = '<span style="color:#94A3B8">N/A</span>';
 
   let body = '', tSpend = 0, tLeads = 0, tImpr = 0, anyFallback = false;
+  let tGCost = 0, tGClicks = 0, tGImpr = 0;
 
   branches.forEach(b => {
     ['Google', 'Meta'].forEach((plat, pi) => {
@@ -22873,10 +22901,31 @@ function renderDmSummary(){
         : '';
 
       if (plat === 'Google'){
-        /* No Google export exists in the workbook. Not zero — absent. */
+        var G = dmGoogleBranch(b), GS = dmGoogleShared(b);
+        if (!G || (!G.cost && !GS)){
+          body += '<tr>' + first + '<td style="text-align:left">Google</td>' +
+            '<td colspan="6" style="text-align:center;color:#94A3B8;font-size:11.5px">' +
+            (dmGoogle() && dmGoogle().present ? 'no Google Ads account for this branch'
+                                              : 'no Google Ads data in the system') +
+            '</td></tr>';
+          return;
+        }
+        var shNote = GS ? '<div style="font-size:10.5px;color:#94A3B8">+ ' + inr(GS.cost) +
+            ' on the shared account, not split by branch</div>' : '';
+        /* Google reports no leads here: conversions are its lead column, and
+           every campaign reports zero. A dash says that; a 0 would read as a
+           result. */
+        var noConv = !G.conv;
         body += '<tr>' + first + '<td style="text-align:left">Google</td>' +
-          '<td colspan="6" style="text-align:center;color:#94A3B8;font-size:11.5px">' +
-          'no Google Ads data in the system</td></tr>';
+          '<td style="text-align:right;font-weight:700">' + inr(G.cost) + shNote + '</td>' +
+          '<td style="text-align:right">' + (noConv
+              ? '<span style="color:#B3402F" title="Conversion tracking is not recording">not tracked</span>'
+              : Math.round(G.conv).toLocaleString('en-IN')) + '</td>' +
+          '<td style="text-align:right">' + (noConv ? NA : inr(G.cost / G.conv)) + '</td>' +
+          '<td style="text-align:right">' + Math.round(G.impr).toLocaleString('en-IN') + '</td>' +
+          '<td style="text-align:right">' + NA + '</td>' +
+          '<td style="text-align:right">' + NA + '</td></tr>';
+        tGCost += G.cost; tGClicks += G.clicks; tGImpr += G.impr;
         return;
       }
 
@@ -23307,12 +23356,136 @@ function dmRenderActions(){
     '</div>').join('') + '</div>';
 }
 
+/* ═════════════════════════════════════════════════════════════════════
+   WHERE THE MONEY WENT
+
+   One bar a branch, split by what the money actually bought. The split is the
+   point: two branches spend more than anyone else and neither has run an
+   admissions campaign on Meta at all, which no table of totals shows.
+
+   Only Meta LEAD-FORM campaigns are counted as leads. Meta's Results column
+   also carries video plays, reach, profile visits and pixel events, and one
+   Bachupally campaign reports 33,547 "results" that are video plays. Summing
+   that column produces a number that means nothing.
+   ═════════════════════════════════════════════════════════════════════ */
+var DMW_CUTS=[
+  {k:'adm',  label:'Meta — admissions', c:'#1E4FD8'},
+  {k:'hire', label:'Meta — hiring',     c:'#7C3AED'},
+  {k:'awar', label:'Meta — awareness',  c:'#0D9488'},
+  {k:'goog', label:'Google Ads',         c:'#D97706'}
+];
+function dmIsAwarenessRec(r){
+  var t=String(r.resultType||'').toLowerCase(), n=String(r.name||'').toLowerCase();
+  return /video|reach|profile visit|thruplay/.test(t) ||
+         /awareness|thruplay|dusshera|indday|engagement|traffic/.test(n);
+}
+function dmWhereRows(){
+  var recs=dmRecords().filter(function(r){ return r.level==='Campaign'; });
+  var GROUP=['Bachupally','Boduppal','Keesara','Pocharam','Gowdavalli'];
+  var out={}; GROUP.forEach(function(b){ out[b]={branch:b,adm:0,hire:0,awar:0,goog:0,leads:0,leadSpend:0}; });
+  var untagged=0;
+  recs.forEach(function(r){
+    var list=(r.servedList&&r.servedList.length)?r.servedList.filter(function(b){return out[b];}):[];
+    if(!list.length){ untagged+=(r.spend||0); return; }
+    var share=list.length;
+    list.forEach(function(b){
+      var o=out[b], sp=(r.spend||0)/share;
+      if(dmIsHiringName(r.name)) o.hire+=sp;
+      else if(dmIsAwarenessRec(r)) o.awar+=sp;
+      else {
+        o.adm+=sp;
+        /* A lead only where Meta's own result column is an INSTANT FORM lead,
+           which Code.gs writes as "Instant form lead". Website (pixel) leads
+           are deliberately excluded: across this export they report one lead
+           at \u20b99,680 in one campaign and \u20b99 a lead in another, and hundreds of
+           leads against a reach of zero, so they cannot be compared with
+           anything. They still appear in the table below, which counts both. */
+        if(/instant form/i.test(String(r.resultType||''))){
+          o.leads+=(r.results||0)/share; o.leadSpend+=sp;
+        }
+      }
+    });
+  });
+  GROUP.forEach(function(b){ var G=dmGoogleBranch(b); if(G) out[b].goog=G.cost; });
+  return { rows:GROUP.map(function(b){ var o=out[b];
+             o.total=o.adm+o.hire+o.awar+o.goog;
+             o.cpl=o.leads?o.leadSpend/o.leads:null; return o; })
+             .sort(function(a,b){ return b.total-a.total; }), untagged:untagged };
+}
+function renderDmWhere(){
+  var el=document.getElementById('dm-where'); if(!el) return;
+  var R=dmWhereRows(), rows=R.rows;
+  if(!rows.some(function(r){return r.total;})){
+    el.innerHTML='<div class="no-data">No ad spend in this payload.</div>'; return;
+  }
+  var inr=function(v){ return '\u20b9'+Math.round(v).toLocaleString('en-IN'); };
+  var g=dmGoogle();
+  var max=Math.max.apply(null,rows.map(function(r){return r.total;}));
+  var tot=rows.reduce(function(t,r){return t+r.total;},0);
+  var leads=rows.reduce(function(t,r){return t+r.leads;},0);
+  var leadSpend=rows.reduce(function(t,r){return t+r.leadSpend;},0);
+  var dead=rows.filter(function(r){return !r.leads;}).reduce(function(t,r){return t+r.total;},0);
+  var deadNames=rows.filter(function(r){return !r.leads&&r.total;}).map(function(r){return r.branch;});
+
+  var tiles=[
+    ['Total spend',inr(tot),'Meta and Google together'],
+    ['Admission leads',Math.round(leads).toLocaleString('en-IN'),'Meta lead forms only'],
+    ['Cost per lead',leads?inr(leadSpend/leads):'\u2014','Lead-form spend \u00f7 leads'],
+    ['Spent with no lead',inr(dead),deadNames.length?deadNames.join(' and '):'\u2014'],
+    ['Google conversions',(g&&g.present)?Math.round(g.totalConv).toLocaleString('en-IN'):'\u2014',
+       (g&&g.present&&g.tracking)?'tracking is not recording':'across every campaign']
+  ];
+  var h='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px">'+
+    tiles.map(function(t,i){
+      var bad=(i===3&&dead>0)||(i===4&&g&&g.present&&!g.totalConv);
+      return '<div style="background:#FBFCFF;border:1px solid var(--bor);border-radius:10px;padding:11px 13px">'+
+        '<div style="font-size:10.5px;font-weight:800;color:var(--txm);text-transform:uppercase;letter-spacing:.4px">'+t[0]+'</div>'+
+        '<div style="font-size:23px;font-weight:800;margin:3px 0 1px;color:'+(bad?'#DC2626':'var(--tx)')+'">'+t[1]+'</div>'+
+        '<div style="font-size:10.5px;color:var(--txm);line-height:1.4">'+t[2]+'</div></div>'; }).join('')+'</div>';
+
+  h+='<div>'+rows.map(function(r){
+    var seg=DMW_CUTS.map(function(c){
+      var v=r[c.k]; if(v<=0) return '';
+      return '<span title="'+c.label+' '+inr(v)+'" style="display:block;height:100%;width:'+
+        (v/max*100)+'%;background:'+c.c+'"></span>'; }).join('');
+    var tag=r.leads?('<b style="color:#059669">'+Math.round(r.leads).toLocaleString('en-IN')+' leads</b> at '+inr(r.cpl)+' each')
+                   :'<b style="color:#DC2626">no admission lead</b>';
+    return '<div style="display:grid;grid-template-columns:110px 1fr 92px;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--bor)">'+
+      '<div style="font-size:12.5px;font-weight:700"><span class="bd b'+r.branch+'"></span> '+r.branch+'</div>'+
+      '<div><div style="display:flex;height:15px;border-radius:8px;overflow:hidden;background:var(--bor)">'+seg+'</div>'+
+        '<div style="font-size:10.5px;color:var(--txm);margin-top:3px">'+tag+'</div></div>'+
+      '<div style="text-align:right;font-weight:800;font-size:13px">'+inr(r.total)+'</div></div>'; }).join('')+'</div>';
+
+  h+='<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;font-size:11px;color:var(--txm)">'+
+    DMW_CUTS.map(function(c){ return '<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:'+
+      c.c+';margin-right:5px"></span>'+c.label+'</span>'; }).join('')+'</div>';
+
+  var notes=[];
+  if(R.untagged>0) notes.push(inr(R.untagged)+' of Meta spend carries no branch tag and is not in any bar.');
+  if(g&&g.present&&g.shared&&g.shared.cost) notes.push(inr(g.shared.cost)+
+    ' sits on the shared Google account ('+(g.shared.campaigns||[]).join(', ')+
+    '), which funds '+(g.shared.branches||[]).join(' and ')+' together and is not split between them.');
+  if(g&&g.present&&g.tracking) notes.push(g.tracking);
+  notes.push('Leads here are Meta <b>lead-form</b> results only. Pixel-event campaigns are left out: '+
+    'they report one lead at \u20b99,680 in one campaign and \u20b99 a lead in another, and hundreds of leads '+
+    'against a reach of zero. <b>The table below counts both kinds</b>, so its lead counts are higher '+
+    'than these \u2014 that gap is the pixel.');
+  if(g&&g.present&&g.start) notes.push('Google covers '+g.start+' to '+g.end+'; Meta covers whatever its export holds.');
+  h+='<div class="note" style="margin-top:10px;line-height:1.6">'+notes.map(function(n){return '\u00b7 '+n;}).join('<br>')+'</div>';
+  el.innerHTML=h;
+
+  var fn=document.getElementById('dmw-fn');
+  if(fn) fn.textContent='Meta and Google together, branch by branch'+
+    ((g&&g.present&&g.start)?(' \u00b7 Google '+g.start+' to '+g.end):'');
+}
+
 function renderDm(){
   const recs = dmRecords();
   const meta = document.getElementById('dm-meta');
   if (meta) meta.textContent = recs.length
     ? recs.length + ' rows · ' + recs.filter(r => r.level === 'Campaign').length + ' campaigns'
     : 'no Meta data in this payload';
+  try { renderDmWhere(); }    catch(e){ console.error('dm where:', e && e.message); }
   try { renderDmSummary(); } catch(e){ console.error('dm summary:', e && e.message); }
   try { dmRenderPast(); }     catch(e){ console.error('dm past:', e && e.message); }
   try { dmRenderMedia(); }    catch(e){ console.error('dm media:', e && e.message); }
