@@ -87,6 +87,18 @@
 :root[data-theme="dark"] [style*="#E6F1F4"]{background-color:#0F2B29!important}
 :root[data-theme="dark"] [style*="#FFF7ED"],:root[data-theme="dark"] [style*="#FFEDD5"]{background-color:#2C1D12!important}
 
+/* Deep text colours used inside those tinted callouts. The background flips to
+   a dark tint above, but an almost-black amber or maroon written inline stays
+   put and drops to roughly 2:1 against it — legible on cream, not on brown.
+   These lift the same hues to the light end of their own ramp. */
+:root[data-theme="dark"] [style*="color:#92400E"],:root[data-theme="dark"] [style*="color:#78350F"],
+:root[data-theme="dark"] [style*="color:#B45309"]{color:#FBBF24!important}
+:root[data-theme="dark"] [style*="color:#991B1B"],:root[data-theme="dark"] [style*="color:#7F1D1D"],
+:root[data-theme="dark"] [style*="color:#B3402F"]{color:#FCA5A5!important}
+:root[data-theme="dark"] [style*="color:#1D4ED8"]{color:#93C5FD!important}
+:root[data-theme="dark"] [style*="color:#334155"]{color:#CBD5E1!important}
+:root[data-theme="dark"] [style*="color:#1B5E34"]{color:#6EE7B7!important}
+
 /* structural whites and light greys used inline */
 :root[data-theme="dark"] [style*="background:#fff"],:root[data-theme="dark"] [style*="background:#FFF"],
 :root[data-theme="dark"] [style*="background:#ffffff"],:root[data-theme="dark"] [style*="background:#FFFFFF"],
@@ -102,7 +114,7 @@
 :root[data-theme="dark"] [style*="color:#14231A"],:root[data-theme="dark"] [style*="color:#16202B"],
 :root[data-theme="dark"] [style*="color:#334155"],:root[data-theme="dark"] [style*="color:#1E293B"]{color:#E8EEF8!important}
 :root[data-theme="dark"] [style*="color:#64748B"],:root[data-theme="dark"] [style*="color:#475569"],
-:root[data-theme="dark"] [style*="color:#5B6B61"],:root[data-theme="dark"] [style*="color:#6D7885"]{color:#9DAAC0!important}
+:root[data-theme="dark"] [style*="color:#5B6B61"],:root[data-theme="dark"] [style*="color:#6D7885"]{color:#AAB7CB!important}
 :root[data-theme="dark"] [style*="color:#94A3B8"],:root[data-theme="dark"] [style*="color:#CBD5E1"]{color:#7F8DA4!important}
 /* borders written inline */
 :root[data-theme="dark"] [style*="#E0E8FF"],:root[data-theme="dark"] [style*="#E2E8F0"],
@@ -163,6 +175,21 @@
 :root[data-theme="dark"] [style*="rgb(250, 253, 251)"],
 :root[data-theme="dark"] [style*="rgb(248, 250, 252)"],
 :root[data-theme="dark"] [style*="rgb(241, 245, 249)"]{background-color:#111A29!important;color:var(--tx)}
+/* Chromium rewrites an inline style attribute into rgb() form, so a selector
+   written against the hex never matches what is actually in the DOM. These are
+   the rgb() twins of the text-colour rules above — without them the footnote
+   under every table stays near-black on a dark card. */
+:root[data-theme="dark"] [style*="rgb(71, 85, 105)"],
+:root[data-theme="dark"] [style*="rgb(100, 116, 139)"],
+:root[data-theme="dark"] [style*="rgb(51, 65, 85)"]{color:#AAB7CB!important}
+:root[data-theme="dark"] [style*="rgb(146, 64, 14)"],
+:root[data-theme="dark"] [style*="rgb(120, 53, 15)"],
+:root[data-theme="dark"] [style*="rgb(180, 83, 9)"]{color:#FBBF24!important}
+:root[data-theme="dark"] [style*="rgb(153, 27, 27)"],
+:root[data-theme="dark"] [style*="rgb(127, 29, 29)"],
+:root[data-theme="dark"] [style*="rgb(179, 64, 47)"]{color:#FCA5A5!important}
+:root[data-theme="dark"] [style*="rgb(29, 78, 216)"]{color:#93C5FD!important}
+:root[data-theme="dark"] [style*="rgb(27, 94, 52)"]{color:#6EE7B7!important}
 :root[data-theme="dark"] [style*="rgb(239, 246, 255)"],
 :root[data-theme="dark"] [style*="rgb(238, 242, 255)"]{background-color:#19243D!important}
 
@@ -1410,6 +1437,8 @@ function applyLiveData(data){
     if (data.AVIS_DATA)        AVIS_DATA        = data.AVIS_DATA;
     if (data.TRANSPORT)        window._TRANSPORT = data.TRANSPORT;
     if (data.DM_GOOGLE)        window._DM_GOOGLE  = data.DM_GOOGLE;
+    if (data.DM_DIAG)          window._DM_DIAG    = data.DM_DIAG;
+    if (data.DM_ROLL)          window._DM_ROLL    = data.DM_ROLL;
     if (data.IT_DATA_ALL)      window._IT = data.IT_DATA_ALL;
     /* On hold is taken out here, once, for every department (see _dropHold).
        Only arrays this payload actually carried are touched, so a partial
@@ -2406,9 +2435,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     <span class="exm-status" id="dm-status"></span>
   </div>
   <div class="card" style="margin-bottom:16px;">
-    <div class="ch"><h3>&#129517; Where the money went</h3>
-      <span class="fnote" id="dmw-fn">Meta and Google together, branch by branch</span></div>
+    <div class="ch"><h3>&#127919; Which admission year the money is buying</h3>
+      <span class="fnote" id="dmw-fn">Meta by admission year</span></div>
     <div class="cb" style="padding:14px 18px"><div id="dm-where"></div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <div class="ch"><h3>&#128269; Google Ads — account health</h3>
+      <span class="fnote" id="dmg-fn">What the search money actually bought</span></div>
+    <div class="cb" style="padding:14px 18px"><div id="dm-gh"></div></div>
   </div>
 
   <div class="card" style="margin-bottom:16px;">
@@ -22681,10 +22716,23 @@ var _dmReady=false, _dmSent=false;
    failed the test and the table reported "no admission campaign in this
    export" for all five branches while the data was sitting right there. */
 const DM_LEAD_TYPES = /instant form lead|website lead|lead form|leadgen|fb_pixel_lead|offsite_lead/i;
+/* `leadKind` is set by Code.gs from Meta's own result indicator and is the one
+   authority: 'form' is a lead-form submission, 'pixel' an on-site pixel event,
+   'none' a video play, a reach figure or a profile visit. The text match below
+   is only a fallback for a payload written before that field existed. Only a
+   form counts as a lead anywhere on this page \u2014 pixel counts are carried
+   separately and never divided into spend, because the same export reports one
+   at \u20b99,680 in one campaign and hundreds against a reach of zero in another. */
 function dmIsLead(r){
   if (!r) return false;
+  if (r.leadKind) return r.leadKind === 'form';
   if (typeof r.isLead === 'boolean') return r.isLead;
   return DM_LEAD_TYPES.test(String(r.resultType || ''));
+}
+function dmIsPixel(r){
+  if (!r) return false;
+  if (r.leadKind) return r.leadKind === 'pixel';
+  return /pixel|offsite_conversion/i.test(String(r.resultType || ''));
 }
 
 /* ══ GOOGLE ADS ══
@@ -22710,7 +22758,7 @@ function dmGoogleShared(b){
 function dmRecords(){
   const rows = (typeof DM_DATA !== 'undefined' && Array.isArray(DM_DATA)) ? DM_DATA : [];
   /* Set once, so every table on this page and the panel below agree. */
-  rows.forEach(r => { if (typeof r.isLead !== 'boolean') r.isLead = dmIsLead(r); });
+  rows.forEach(r => { r.isLead = dmIsLead(r); r.isPixel = dmIsPixel(r); });
   return rows;
 }
 
@@ -22848,34 +22896,33 @@ function dmAdmissions(branch, platform){
 function dmIsHiringName(n){ return /hiring|recruit|vacancy/i.test(String(n || '')); }
 function dmIsBrandName(n){ return /awareness|follower|chess|brand|engagement|thruplay|traffic/i.test(String(n || '')); }
 
-/* Admission spend and leads for one branch, campaign level first. */
-function dmAdmissionFigures(branch){
-  const recs = dmRecords();
-  const inBranch = r => ((r.servedList && r.servedList.length) ? r.servedList : [r.served]).indexOf(branch) >= 0;
-  const share = r => (((r.servedList && r.servedList.length) ? r.servedList.length : 1) || 1);
+/* Admission spend and leads for one branch.
 
-  const camps = recs.filter(r => r.level === 'Campaign' && inBranch(r) &&
-    r.isLead && !dmIsHiringName(r.name) && !dmIsBrandName(r.name));
-  if (camps.length){
-    return {
-      level: 'campaign',
-      spend: camps.reduce((t, r) => t + (r.spend || 0) / share(r), 0),
-      leads: camps.reduce((t, r) => t + (r.results || 0) / share(r), 0),
-      impr:  camps.reduce((t, r) => t + (r.impr || 0) / share(r), 0),
-      rows: camps
-    };
+   This reads the single rollup Code.gs builds, rather than re-deciding what
+   counts. It used to run its own campaign-level filter with an ad-set fallback,
+   which is how this table came to disagree with the cards above it \u2014 it
+   reported its own subtotal as the group total, and told management that
+   Pocharam and Gowdavalli ran "no admission campaign in this export" when both
+   were in fact running AY 2027\u201328 admissions ad sets inside a campaign named
+   for recruitment. One source, one answer. */
+function dmAdmissionFigures(branch){
+  var R = dmRoll();
+  if (R && R.branchCycles){
+    var rows = R.branchCycles.filter(function(b){ return b.branch === branch; });
+    if (rows.length){
+      var spend = 0, leads = 0, formSpend = 0, pixel = 0, pixelSpend = 0, blocked = 0, lifted = false;
+      rows.forEach(function(b){
+        spend += b.admissions || 0; leads += b.leads || 0; formSpend += b.formSpend || 0;
+        pixel += b.pixel || 0; pixelSpend += b.pixelSpend || 0; blocked += b.blocked || 0;
+        (b.items || []).forEach(function(i){ if (i.lifted) lifted = true; });
+      });
+      return { level: lifted ? 'adset' : 'campaign', spend: spend, leads: leads,
+               formSpend: formSpend, pixel: pixel, pixelSpend: pixelSpend,
+               blocked: blocked, impr: 0, rows: [] };
+    }
   }
-  /* Nothing identifiable at campaign level — look one level down. */
-  const sets = recs.filter(r => r.level === 'Ad set' && inBranch(r) &&
-    r.isLead && !dmIsHiringName(r.name) && !dmIsBrandName(r.name));
-  if (!sets.length) return { level: 'none', spend: 0, leads: 0, impr: 0, rows: [] };
-  return {
-    level: 'adset',
-    spend: sets.reduce((t, r) => t + (r.spend || 0) / share(r), 0),
-    leads: sets.reduce((t, r) => t + (r.results || 0) / share(r), 0),
-    impr:  sets.reduce((t, r) => t + (r.impr || 0) / share(r), 0),
-    rows: sets
-  };
+  return { level: 'none', spend: 0, leads: 0, formSpend: 0, pixel: 0,
+           pixelSpend: 0, blocked: 0, impr: 0, rows: [] };
 }
 
 function renderDmSummary(){
@@ -22890,7 +22937,7 @@ function renderDmSummary(){
   const inr = v => '\u20b9' + Math.round(v).toLocaleString('en-IN');
   const NA  = '<span style="color:#94A3B8">N/A</span>';
 
-  let body = '', tSpend = 0, tLeads = 0, tImpr = 0, anyFallback = false;
+  let body = '', tSpend = 0, tLeads = 0, tImpr = 0, tFormSpend = 0, anyFallback = false;
   let tGCost = 0, tGClicks = 0, tGImpr = 0;
 
   branches.forEach(b => {
@@ -22937,12 +22984,27 @@ function renderDmSummary(){
         return;
       }
       if (f.level === 'adset') anyFallback = true;
-      tSpend += f.spend; tLeads += f.leads; tImpr += (f.impr || 0);
+      /* The rollup carries money and leads, not impressions, so those are read
+         back off the records for this branch. */
+      if (!f.impr){
+        f.impr = dmRecords().reduce(function(t, r){
+          if (r.level !== 'Campaign') return t;
+          var bl = (r.servedList && r.servedList.length) ? r.servedList : [r.served];
+          if (bl.indexOf(b) < 0) return t;
+          if (dmIsHiringName(r.name) || dmIsBrandName(r.name)) return t;
+          return t + (r.impr || 0) / (bl.length || 1);
+        }, 0);
+      }
+      tSpend += f.spend; tLeads += f.leads; tImpr += (f.impr || 0); tFormSpend += (f.formSpend || 0);
 
       const mark = f.level === 'adset'
         ? '<sup style="color:#B3402F;font-weight:800" title="Taken at ad-set level — see the note below">&dagger;</sup>'
         : '';
-      const cpl = f.leads ? f.spend / f.leads : null;
+      /* Cost per lead divides only the spend that sat on a lead form. Dividing
+         the branch's whole admissions budget by its leads would charge the
+         lead form for money spent on video and pixel objectives that could
+         never have returned an enquiry, and quietly overstate the real CPL. */
+      const cpl = f.leads ? ((f.formSpend || f.spend) / f.leads) : null;
       const q = "'" + b.replace(/'/g, "\\'") + "'";
 
       body += '<tr>' +
@@ -22966,7 +23028,7 @@ function renderDmSummary(){
        advertising achieved by whatever the conversion rate happens to be, and
        that rate is currently unknown. The two are separate columns. */
     '<thead><tr><th style="text-align:left">Branch</th><th style="text-align:left">Digital marketing</th>' +
-    '<th style="text-align:right">Amount spent</th>' +
+    '<th style="text-align:right" title="Admissions campaigns only \u2014 hiring and brand spend is not in this column">Spent on admissions</th>' +
     '<th style="text-align:right" title="Enquiries from admission campaigns — a parent who filled the lead form. Not an enrolment.">Admission leads</th>' +
     '<th style="text-align:right" title="Amount spent \u00f7 admission leads">CPL</th>' +
     '<th style="text-align:right">Impressions</th>' +
@@ -22976,7 +23038,7 @@ function renderDmSummary(){
     '<td colspan="2" style="text-align:left">All branches</td>' +
     '<td style="text-align:right">' + inr(tSpend) + '</td>' +
     '<td style="text-align:right">' + Math.round(tLeads).toLocaleString('en-IN') + '</td>' +
-    '<td style="text-align:right">' + (tLeads ? inr(tSpend / tLeads) : NA) + '</td>' +
+    '<td style="text-align:right">' + (tLeads ? inr((tFormSpend || tSpend) / tLeads) : NA) + '</td>' +
     '<td style="text-align:right">' + Math.round(tImpr).toLocaleString('en-IN') + '</td>' +
     '<td style="text-align:right">' + NA + '</td><td style="text-align:right">' + NA + '</td>' +
     '</tr></tbody>' +
@@ -23053,6 +23115,9 @@ function dmSplit(){
       branch: b, agency: r.agency || '–', purpose: dmPurposeOf(r.name),
       spend: (r.spend || 0) / n,
       leads: r.isLead ? (r.results || 0) / n : 0,
+      pixel: r.isPixel ? (r.results || 0) / n : 0,
+      pixelSpend: r.isPixel ? (r.spend || 0) / n : 0,
+      cycle: r.cycle || 'Not stated',
       impr: (r.impr || 0) / n, reach: (r.reach || 0) / n,
       isLead: !!r.isLead, name: r.name, delivery: r.delivery, rec: r
     }));
@@ -23062,73 +23127,95 @@ function dmSplit(){
 
 const dmINR = v => '\u20b9' + Math.round(v).toLocaleString('en-IN');
 
+/* \u2500\u2500 What happened \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+   Purpose crossed with admission year, read off the same rollup as the cards
+   above. This table used to classify at ad-set level with its own keyword list,
+   which put a Ganesh-festival video ad set under Admissions because its name
+   says neither "awareness" nor "hiring" \u2014 and then reported a cost per lead
+   against it. Campaign level is where the purpose is actually declared.      */
 function dmRenderPast(){
   const el = document.getElementById('dm-past'); if (!el) return;
-  const A = dmSplit();
-  if (!A.length){ el.innerHTML = '<div style="padding:18px;color:#64748B">No ad data loaded.</div>'; return; }
+  const R = dmRoll();
+  if (!R || !R.cycles || !R.cycles.length){
+    el.innerHTML = '<div style="padding:18px;color:#64748B">No ad data loaded.</div>'; return;
+  }
+  const ORDER = ['2027-28', '2026-27', 'Not stated'];
+  const cyc = R.cycles.slice().sort((a,b) => ORDER.indexOf(a.cycle) - ORDER.indexOf(b.cycle));
+  const lbl = c => c === '2027-28' ? 'AY 2027\u201328' : c === '2026-27' ? 'AY 2026\u201327' : 'No year in the name';
 
-  const sum = rows => ({
-    spend: rows.reduce((t, r) => t + r.spend, 0),
-    leads: rows.reduce((t, r) => t + r.leads, 0)
-  });
-  const purposes = ['Admissions', 'Hiring', 'Brand'];
-  let pr = '';
-  purposes.forEach(p => {
-    const g = sum(A.filter(r => r.purpose === p));
-    if (!g.spend) return;
-    const cpl = g.leads ? g.spend / g.leads : null;
-    pr += '<tr><td style="text-align:left;font-weight:700">' + p + '</td>' +
-      '<td style="text-align:right">' + dmINR(g.spend) + '</td>' +
-      '<td style="text-align:right">' + Math.round(g.leads).toLocaleString('en-IN') + '</td>' +
+  let rows = '';
+  cyc.forEach(c => {
+    const formSpend = Math.max(0, (c.admissions || 0) - (c.blocked || 0) - (c.pixelSpend || 0));
+    const cpl = c.leads ? formSpend / c.leads : null;
+    rows += '<tr><td style="text-align:left;font-weight:700">' + lbl(c.cycle) + '</td>' +
+      '<td style="text-align:right">' + dmINR(c.admissions || 0) + '</td>' +
+      '<td style="text-align:right">' + dmINR(c.hiring || 0) + '</td>' +
+      '<td style="text-align:right">' + dmINR(c.brand || 0) + '</td>' +
+      '<td style="text-align:right;font-weight:700;color:' + (c.leads ? '#059669' : '#DC2626') + '">' +
+        Math.round(c.leads || 0).toLocaleString('en-IN') + '</td>' +
       '<td style="text-align:right;font-weight:700;color:' +
-        (cpl === null ? '#DC2626' : cpl > 200 ? '#DC2626' : cpl > 120 ? '#D97706' : '#059669') + '">' +
+        (cpl === null ? '#94A3B8' : cpl > 400 ? '#DC2626' : cpl > 250 ? '#D97706' : '#059669') + '">' +
         (cpl === null ? 'no leads' : dmINR(cpl)) + '</td></tr>';
   });
+  const T = cyc.reduce((t, c) => ({
+    adm: t.adm + (c.admissions||0), hir: t.hir + (c.hiring||0), brd: t.brd + (c.brand||0),
+    leads: t.leads + (c.leads||0), blocked: t.blocked + (c.blocked||0),
+    pix: t.pix + (c.pixelSpend||0)
+  }), {adm:0,hir:0,brd:0,leads:0,blocked:0,pix:0});
+  const tForm = Math.max(0, T.adm - T.blocked - T.pix);
 
-  /* Admissions only, by agency and by branch — the comparison that decides budget. */
-  const adm = A.filter(r => r.purpose === 'Admissions');
-  const byKey = (rows, key) => {
-    const m = {};
-    rows.forEach(r => { const k = r[key]; (m[k] = m[k] || { spend: 0, leads: 0 }); m[k].spend += r.spend; m[k].leads += r.leads; });
-    return Object.keys(m).map(k => ({ k: k, spend: m[k].spend, leads: m[k].leads,
-      cpl: m[k].leads ? m[k].spend / m[k].leads : null })).sort((x, y) => (x.cpl ?? 9e9) - (y.cpl ?? 9e9));
-  };
-  const agRows = byKey(adm, 'agency'), brRows = byKey(adm, 'branch');
-  const tbl = (title, rows, label) =>
-    '<div style="flex:1;min-width:280px"><div style="font-weight:800;color:#1B5E34;font-size:12.5px;margin-bottom:6px">' +
-    title + '</div><table class="dt"><thead><tr><th style="text-align:left">' + label + '</th>' +
-    '<th style="text-align:right">Spent</th><th style="text-align:right">Leads</th>' +
-    '<th style="text-align:right">Cost per lead</th></tr></thead><tbody>' +
-    rows.map(r => '<tr><td style="text-align:left">' + r.k + '</td>' +
-      '<td style="text-align:right">' + dmINR(r.spend) + '</td>' +
-      '<td style="text-align:right">' + Math.round(r.leads) + '</td>' +
-      '<td style="text-align:right;font-weight:700;color:' +
-      (r.cpl === null ? '#94A3B8' : r.cpl > 200 ? '#DC2626' : r.cpl > 120 ? '#D97706' : '#059669') + '">' +
-      (r.cpl === null ? '\u2013' : dmINR(r.cpl)) + '</td></tr>').join('') + '</tbody></table></div>';
+  /* by branch, admissions only, across every live year */
+  const B = {};
+  (R.branchCycles||[]).forEach(b => {
+    const e = B[b.branch] || (B[b.branch] = {spend:0, leads:0, formSpend:0, blocked:0, pixelSpend:0});
+    e.spend += b.admissions||0; e.leads += b.leads||0; e.formSpend += b.formSpend||0;
+    e.blocked += b.blocked||0; e.pixelSpend += b.pixelSpend||0;
+  });
+  const brRows = Object.keys(B).map(k => Object.assign({k:k}, B[k]))
+    .map(r => Object.assign(r, {cpl: r.leads ? r.formSpend/r.leads : null}))
+    .sort((x,y) => (x.cpl===null?9e9:x.cpl) - (y.cpl===null?9e9:y.cpl));
 
-  const tot = sum(A);
-  const dead = A.filter(r => r.spend > 0 && !r.isLead);
-  const idle = dmRecords().filter(r => r.level === 'Ad set' && !(r.spend > 0)).length;
+  const idle = dmRecords().filter(r => r.level === 'Ad set' && !(r.spend > 0) && r.cycle !== '2025-26').length;
 
   el.innerHTML =
     '<div style="padding:14px 16px">' +
-      '<table class="dt" style="margin-bottom:14px"><thead><tr><th style="text-align:left">Spent on</th>' +
-      '<th style="text-align:right">Amount</th><th style="text-align:right">Leads</th>' +
-      '<th style="text-align:right">Cost per lead</th></tr></thead><tbody>' + pr +
+      '<table class="dt" style="margin-bottom:14px"><thead><tr>' +
+      '<th style="text-align:left">Admission year</th>' +
+      '<th style="text-align:right">Admissions</th><th style="text-align:right">Hiring</th>' +
+      '<th style="text-align:right">Brand</th>' +
+      '<th style="text-align:right">Real leads</th><th style="text-align:right">Cost per lead</th>' +
+      '</tr></thead><tbody>' + rows +
       '<tr style="background:#F8FAFF;font-weight:800"><td style="text-align:left">All</td>' +
-      '<td style="text-align:right">' + dmINR(tot.spend) + '</td>' +
-      '<td style="text-align:right">' + Math.round(tot.leads).toLocaleString('en-IN') + '</td>' +
-      '<td style="text-align:right">' + (tot.leads ? dmINR(tot.spend / tot.leads) : '\u2013') + '</td></tr>' +
+      '<td style="text-align:right">' + dmINR(T.adm) + '</td>' +
+      '<td style="text-align:right">' + dmINR(T.hir) + '</td>' +
+      '<td style="text-align:right">' + dmINR(T.brd) + '</td>' +
+      '<td style="text-align:right">' + Math.round(T.leads).toLocaleString('en-IN') + '</td>' +
+      '<td style="text-align:right">' + (T.leads ? dmINR(tForm / T.leads) : '\u2013') + '</td></tr>' +
       '</tbody></table>' +
-      '<div style="display:flex;gap:18px;flex-wrap:wrap">' + tbl('Admissions leads by agency', agRows, 'Agency') +
-      tbl('Admissions leads by branch', brRows, 'Branch') + '</div>' +
-      (dead.length ? '<p style="margin-top:12px;color:#B3402F;font-size:12.5px">' +
-        dmINR(dead.reduce((t, r) => t + r.spend, 0)) + ' went to ' + dead.length +
-        ' ad sets not optimised for leads at all (video views, reach, profile visits). They bought attention, not enquiries.</p>' : '') +
+      '<div style="font-weight:800;color:#1B5E34;font-size:12.5px;margin-bottom:6px">Admissions money by branch, cheapest lead first</div>' +
+      '<table class="dt"><thead><tr><th style="text-align:left">Branch</th>' +
+      '<th style="text-align:right">Spent on admissions</th><th style="text-align:right">Real leads</th>' +
+      '<th style="text-align:right">Cost per lead</th>' +
+      '<th style="text-align:right" title="Money on a video, reach or pixel objective that cannot return a countable enquiry">Cannot return a lead</th>' +
+      '</tr></thead><tbody>' +
+      brRows.map(r => '<tr><td style="text-align:left"><span class="bd b' + r.k + '"></span> ' + r.k + '</td>' +
+        '<td style="text-align:right">' + dmINR(r.spend) + '</td>' +
+        '<td style="text-align:right;font-weight:600">' + Math.round(r.leads).toLocaleString('en-IN') + '</td>' +
+        '<td style="text-align:right;font-weight:700;color:' +
+        (r.cpl === null ? '#94A3B8' : r.cpl > 250 ? '#DC2626' : r.cpl > 180 ? '#D97706' : '#059669') + '">' +
+        (r.cpl === null ? '\u2013' : dmINR(r.cpl)) + '</td>' +
+        '<td style="text-align:right;color:' + ((r.blocked + r.pixelSpend) > 0 ? '#B3402F' : '#94A3B8') + '">' +
+        dmINR(r.blocked + r.pixelSpend) + '</td></tr>').join('') +
+      '</tbody></table>' +
+      ((T.blocked + T.pix) > 0 ? '<p style="margin-top:12px;color:#B3402F;font-size:12.5px">' +
+        dmINR(T.blocked + T.pix) + ' of admissions money sits on an objective that cannot hand back an enquiry \u2014 ' +
+        dmINR(T.blocked) + ' on video views, reach or profile visits, and ' + dmINR(T.pix) +
+        ' on a pixel event the export contradicts itself about. Switching those to a lead form is a setting, not a budget.</p>' : '') +
       (idle ? '<p style="margin-top:6px;color:#64748B;font-size:12px">' + idle +
-        ' ad sets carry no spend in this period and are not counted anywhere above.</p>' : '') +
+        ' ad sets carry no spend in this period and are not counted anywhere above' +
+        ((R.hygiene && R.hygiene.adsets) ? ', and a further ' + R.hygiene.adsets +
+          ' are left over from AY 2025\u201326' : '') + '.</p>' : '') +
     '</div>';
-  window._DM_A = A;
 }
 
 /* ── Media efficiency, from Meta's own columns ──
@@ -23230,119 +23317,195 @@ function dmRenderMedia(){
 }
 function esc2(v){ return String(v == null ? '' : v).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 
+/* \u2500\u2500 What it takes to fill AY 2027\u201328 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+   Arithmetic, not a model. The previous version of this table divided by a cost
+   per lead that two branches do not have, printed "no basis" in one column
+   while still filling the next one in, and then subtracted a total missing two
+   branches from a total containing all five \u2014 which is how it came to report
+   that matching the best rate would cost NEGATIVE eighteen lakh less.
+
+   Here a branch with no measurable cost per lead is carried at the group rate
+   and SAYS so, so both columns cover the same five branches and the comparison
+   between them means something.                                              */
 function dmRenderForecast(){
   const el = document.getElementById('dm-forecast'); if (!el) return;
-  const A = window._DM_A || dmSplit();
-  const adm = A.filter(r => r.purpose === 'Admissions');
-  if (!adm.length){ el.innerHTML = '<div style="padding:18px;color:#64748B">No admissions spend to project from.</div>'; return; }
+  const R = dmRoll();
+  if (!R || !R.branchCycles){ el.innerHTML = '<div style="padding:18px;color:#64748B">No ad data loaded.</div>'; return; }
 
   const TARGETS = { Gowdavalli: 600, Bachupally: 800, Boduppal: 650, Pocharam: 800, Keesara: 500 };
-  const m = {};
-  adm.forEach(r => { (m[r.branch] = m[r.branch] || { spend: 0, leads: 0 }); m[r.branch].spend += r.spend; m[r.branch].leads += r.leads; });
-  const cpls = Object.keys(m).filter(b => m[b].leads).map(b => m[b].spend / m[b].leads);
-  const best = cpls.length ? Math.min.apply(null, cpls) : null;
+  const LEADS_PER = 8;
 
-  let rows = '', totNow = 0, totBest = 0;
-  Object.keys(TARGETS).forEach(b => {
-    const e = m[b];
-    const cpl = (e && e.leads) ? e.spend / e.leads : null;
-    const need = TARGETS[b] * DM_LEADS_PER_ADMISSION;
-    const costNow = cpl === null ? null : need * cpl;
-    const costBest = best === null ? null : need * best;
-    if (costNow !== null) totNow += costNow;
-    if (costBest !== null) totBest += costBest;
-    rows += '<tr><td style="text-align:left;font-weight:700"><span class="bd b' + b + '"></span> ' + b + '</td>' +
-      '<td style="text-align:right">' + TARGETS[b] + '</td>' +
-      '<td style="text-align:right">' + (cpl === null ? '\u2013' : dmINR(cpl)) + '</td>' +
-      '<td style="text-align:right">' + need.toLocaleString('en-IN') + '</td>' +
-      '<td style="text-align:right;font-weight:700">' + (costNow === null ? 'no basis' : dmINR(costNow)) + '</td>' +
-      '<td style="text-align:right;color:#059669">' + (costBest === null ? '\u2013' : dmINR(costBest)) + '</td></tr>';
+  /* cost per lead per branch, across every live year, lead-form money only */
+  const B = {};
+  R.branchCycles.forEach(b => {
+    const e = B[b.branch] || (B[b.branch] = { formSpend: 0, leads: 0 });
+    e.formSpend += b.formSpend || 0; e.leads += b.leads || 0;
   });
+  const gForm = Object.keys(B).reduce((t,k) => t + B[k].formSpend, 0);
+  const gLeads = Object.keys(B).reduce((t,k) => t + B[k].leads, 0);
+  const groupCPL = gLeads ? gForm / gLeads : null;
+
+  const rows = Object.keys(TARGETS).map(k => {
+    const e = B[k] || { formSpend: 0, leads: 0 };
+    const own = e.leads ? e.formSpend / e.leads : null;
+    return { k: k, target: TARGETS[k], leads: TARGETS[k] * LEADS_PER,
+             cpl: own, used: own !== null ? own : groupCPL, measured: own !== null };
+  });
+  const measured = rows.filter(r => r.measured).map(r => r.cpl);
+  const best = measured.length ? Math.min.apply(null, measured) : null;
+  const totNow  = rows.reduce((t,r) => t + (r.used||0) * r.leads, 0);
+  const totBest = best === null ? null : rows.reduce((t,r) => t + best * r.leads, 0);
+  const bestBranch = best === null ? '' : (rows.filter(r => r.cpl === best)[0]||{}).k || '';
+
+  let body = rows.map(r =>
+    '<tr><td style="text-align:left"><span class="bd b' + r.k + '"></span> <b>' + r.k + '</b></td>' +
+    '<td style="text-align:right">' + r.target.toLocaleString('en-IN') + '</td>' +
+    '<td style="text-align:right;font-weight:700">' + (r.measured ? dmINR(r.cpl) :
+       '<span style="color:#B45309" title="This branch has no lead form running, so it has no measured rate. The group average is used instead.">' +
+       dmINR(r.used) + ' (group rate)</span>') + '</td>' +
+    '<td style="text-align:right">' + r.leads.toLocaleString('en-IN') + '</td>' +
+    '<td style="text-align:right;font-weight:700">' + dmINR(r.used * r.leads) + '</td>' +
+    '<td style="text-align:right">' + (best === null ? '\u2013' : dmINR(best * r.leads)) + '</td></tr>').join('');
 
   el.innerHTML =
     '<div style="padding:14px 16px">' +
-      '<div style="background:#FFFBEA;border:1px solid #F2E4B8;border-radius:8px;padding:10px 12px;' +
-        'font-size:12.5px;color:#5A4B1E;margin-bottom:12px">' +
-        '<b>Assumptions, stated.</b> Leads needed per admission is set at <b>' + DM_LEADS_PER_ADMISSION +
-        '</b> — the enquiry tracker does not yet record which platform an admission came from, so the true ' +
-        'lead-to-admission rate is unknown. Cost per lead is held at what each branch actually paid this period. ' +
-        'Change either and the totals move proportionally; this is arithmetic, not a forecast model.' +
+      '<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;line-height:1.65;color:#78350F">' +
+        '<b>Assumptions, stated.</b> ' + LEADS_PER + ' leads per admission \u2014 the enquiry tracker does not record ' +
+        'which platform an admission came from, so the real lead-to-admission rate is unknown. Cost per lead is ' +
+        'what each branch actually paid on a lead form this period. ' +
+        (rows.some(r => !r.measured) ? '<b>' + rows.filter(r=>!r.measured).map(r=>r.k).join(' and ') +
+          ' have no lead form running at all</b>, so they have no rate of their own and are carried at the group ' +
+          'average of ' + dmINR(groupCPL) + '. ' : '') +
+        'Change either number and the totals move in proportion; this is arithmetic, not a forecast.' +
       '</div>' +
       '<table class="dt"><thead><tr><th style="text-align:left">Branch</th>' +
-      '<th style="text-align:right">AY 27-28 target</th><th style="text-align:right">Its cost per lead</th>' +
-      '<th style="text-align:right">Leads needed</th><th style="text-align:right">Spend at its own rate</th>' +
-      '<th style="text-align:right">At the best rate</th></tr></thead><tbody>' + rows +
-      '<tr style="background:#F8FAFF;font-weight:800"><td colspan="4" style="text-align:left">Group</td>' +
+      '<th style="text-align:right">AY 27\u201328 target</th><th style="text-align:right">Its cost per lead</th>' +
+      '<th style="text-align:right">Leads needed</th><th style="text-align:right">At its own rate</th>' +
+      '<th style="text-align:right">At the best rate</th></tr></thead><tbody>' + body +
+      '<tr style="background:#F8FAFF;font-weight:800"><td style="text-align:left">Group</td>' +
+      '<td style="text-align:right">' + Object.keys(TARGETS).reduce((t,k)=>t+TARGETS[k],0).toLocaleString('en-IN') + '</td>' +
+      '<td></td><td style="text-align:right">' + rows.reduce((t,r)=>t+r.leads,0).toLocaleString('en-IN') + '</td>' +
       '<td style="text-align:right">' + dmINR(totNow) + '</td>' +
-      '<td style="text-align:right;color:#059669">' + dmINR(totBest) + '</td></tr></tbody></table>' +
-      '<p style="margin-top:10px;font-size:12.5px;color:#1F2937">' +
-      'If every branch bought leads at the cheapest rate already being achieved inside this group — ' +
-      dmINR(best) + ' — the same admission targets would cost <b>' + dmINR(totNow - totBest) +
-      ' less</b>. That gap is the whole argument for looking at what the cheaper branches do differently.</p>' +
+      '<td style="text-align:right">' + (totBest === null ? '\u2013' : dmINR(totBest)) + '</td></tr>' +
+      '</tbody></table>' +
+      ((totBest !== null && totNow > totBest) ?
+        '<p style="margin-top:11px;font-size:12.5px;color:#334155;line-height:1.65">If every branch bought leads at ' +
+        'the cheapest rate already being achieved inside this group \u2014 <b>' + dmINR(best) + '</b>, ' + bestBranch +
+        '\u2019s \u2014 the same targets would cost <b>' + dmINR(totNow - totBest) + ' less</b>. That gap is the ' +
+        'argument for asking what ' + bestBranch + ' does differently, before asking for more budget.</p>' : '') +
+      '<p style="margin-top:8px;font-size:12px;color:#64748B;line-height:1.6">Against these targets the group has ' +
+      '<b>' + Math.round((R.cycles.filter(c=>c.cycle==="2027-28")[0]||{leads:0}).leads).toLocaleString('en-IN') +
+      ' AY 2027\u201328 leads</b> so far. Every other lead counted on this page was raised for an earlier year.</p>' +
     '</div>';
-  window._DM_FC = { best: best, totNow: totNow, totBest: totBest, byBranch: m, TARGETS: TARGETS };
+  window._DM_FC = { best: best, totNow: totNow, totBest: totBest, TARGETS: TARGETS, groupCPL: groupCPL };
 }
 
+/* ── Decisions this data supports ────────────────────────────────────────────
+   Each one names the figure it rests on and what it is worth, and each is a
+   change someone can make this week. Nothing here is an opinion about the
+   creative — these are structural faults that no amount of better artwork
+   fixes.
+
+   The previous version opened with "Stop –'s hiring campaigns", because it
+   printed an agency name the Meta export does not carry, and claimed another
+   agency was delivering hiring leads more cheaply when in fact none is
+   delivering any. A recommendation resting on a number nobody can check is
+   worse than no recommendation.                                              */
 function dmRenderActions(){
   const el = document.getElementById('dm-actions'); if (!el) return;
-  const A = window._DM_A || dmSplit();
-  const fc = window._DM_FC || {};
+  const R = dmRoll(), g = dmGoogle(), fc = window._DM_FC || {};
+  if (!R || !R.cycles){ el.innerHTML = '<div style="padding:18px;color:#64748B">No ad data loaded.</div>'; return; }
   const acts = [];
+  const next = (R.cycles.filter(c => c.cycle === '2027-28')[0]) || null;
+  const curr = (R.cycles.filter(c => c.cycle === '2026-27')[0]) || null;
 
-  /* 1. hiring spend that produced almost nothing */
-  const hire = A.filter(r => r.purpose === 'Hiring');
-  const hByAg = {};
-  hire.forEach(r => { (hByAg[r.agency] = hByAg[r.agency] || { spend: 0, leads: 0 }); hByAg[r.agency].spend += r.spend; hByAg[r.agency].leads += r.leads; });
-  Object.keys(hByAg).forEach(ag => {
-    const e = hByAg[ag];
-    if (e.spend > 5000 && (!e.leads || e.spend / e.leads > 1000))
-      acts.push({ worth: e.spend,
-        head: 'Stop ' + ag + '\'s hiring campaigns until they are rebuilt',
-        body: dmINR(e.spend) + ' produced ' + Math.round(e.leads) + ' hiring lead(s) — ' +
-          (e.leads ? dmINR(e.spend / e.leads) + ' each' : 'none at all') +
-          '. Another agency in this same group is delivering hiring leads far cheaper, so the money is not the problem.' });
-  });
-
-  /* 2. spend on ad sets that cannot produce a lead */
-  const dead = A.filter(r => r.spend > 0 && !r.isLead);
-  const deadSpend = dead.reduce((t, r) => t + r.spend, 0);
-  if (deadSpend > 2000)
-    acts.push({ worth: deadSpend,
-      head: 'Re-point ' + dmINR(deadSpend) + ' of brand spend at lead forms',
-      body: dead.length + ' ad sets are optimised for video views, reach or profile visits. They cannot return an ' +
-        'enquiry however well they perform. If awareness is the intent, say so and budget it separately; if not, ' +
-        'switch the objective.' });
-
-  /* 3. the branch cost gap */
-  if (fc.best && fc.totNow && fc.totBest && (fc.totNow - fc.totBest) > 0){
-    const byB = fc.byBranch || {};
-    const worst = Object.keys(byB).filter(b => byB[b].leads)
-      .map(b => ({ b: b, cpl: byB[b].spend / byB[b].leads })).sort((x, y) => y.cpl - x.cpl)[0];
-    if (worst && worst.cpl > fc.best * 1.5)
-      acts.push({ worth: fc.totNow - fc.totBest,
-        head: 'Find out what the cheap branches do differently, before adding budget',
-        body: worst.b + ' pays ' + dmINR(worst.cpl) + ' a lead against ' + dmINR(fc.best) +
-          ' at the best branch — the same group, the same product. Closing that gap is worth ' +
-          dmINR(fc.totNow - fc.totBest) + ' against the AY 27-28 targets. Adding budget at the current rate ' +
-          'buys the gap at scale instead of closing it.' });
+  /* 1. next year's money on an objective that cannot return an enquiry */
+  if (next && (next.blocked + next.pixelSpend) > 0){
+    const bad = (R.branchCycles||[]).filter(b => b.cycle === '2027-28' && (b.blocked + b.pixelSpend) > 0)
+                  .sort((a,b) => (b.blocked+b.pixelSpend)-(a.blocked+a.pixelSpend));
+    const formCPL = next.leads ? (next.admissions - next.blocked - next.pixelSpend) / next.leads : null;
+    acts.push({ worth: next.blocked + next.pixelSpend,
+      head: 'Switch ' + bad.length + ' branches’ AY 2027–28 campaigns to a lead form',
+      body: bad.map(b => '<b>' + b.branch + '</b> ' + dmINR(b.blocked + b.pixelSpend)).join(' · ') +
+        '. These are booked against next year’s intake but set to a video, reach or pixel objective, so they ' +
+        'cannot hand back a name and a phone number however well they perform. ' +
+        (formCPL ? 'The one branch running a lead form for AY 2027–28 is returning enquiries at ' +
+           dmINR(formCPL) + ' each on the same scale of budget. ' : '') +
+        'This is an objective setting inside the campaigns that already exist, not new money.' });
   }
 
-  /* 4. the measurement gap that blocks everything else */
+  /* 2. the cycle split itself */
+  if (next && curr && curr.admissions > next.admissions){
+    const seats = fc.TARGETS ? Object.keys(fc.TARGETS).reduce((t,k)=>t+fc.TARGETS[k],0) : 3350;
+    acts.push({ worth: curr.admissions,
+      head: 'Decide how much should still be chasing AY 2026–27',
+      body: dmINR(curr.admissions) + ' of admissions money is working the year that began in June, against ' +
+        dmINR(next.admissions) + ' on the intake being sold now. Mid-year joiners are real, and that spend is ' +
+        'returning the cheapest leads in the account at ' + dmINR(curr.admissions/Math.max(1,curr.leads)) +
+        ' — so this is a question, not an error. But it is currently nobody’s decision: it is simply what the ' +
+        'campaigns were left set to. With ' + seats.toLocaleString('en-IN') + ' seats to fill for 2027–28 and <b>' +
+        Math.round(next.leads).toLocaleString('en-IN') + ' leads raised so far</b>, the split deserves a ' +
+        'deliberate answer before the season moves on.' });
+  }
+
+  /* 3. Google has no conversion tracking */
+  if (g && g.present && !g.totalConv && (g.campaigns||[]).length){
+    acts.push({ worth: g.totalCost,
+      head: 'Fit conversion tracking on Google before spending another rupee there',
+      body: 'All ' + g.campaigns.length + ' campaigns report zero conversions, so ' + dmINR(g.totalCost) +
+        ' cannot be tied to a single enquiry — and Google’s own bidding is optimising against nothing. ' +
+        'This is one tag on the enquiry form’s thank-you page. Until it is fitted, every Google figure on ' +
+        'this page is a cost and never a result.' });
+  }
+
+  /* 4. search money going to other schools, and to ourselves */
+  if (g && g.present && g.searchTerms && g.searchTerms.buckets){
+    const w = g.searchTerms.buckets.filter(b => b.bucket === 'Another school, by name' ||
+                                                b.bucket === 'Another Pallavi branch');
+    const amt = w.reduce((t,b) => t + b.cost, 0);
+    if (amt > 0){
+      const self = (w.filter(b => b.bucket === 'Another Pallavi branch')[0] || {cost:0}).cost;
+      acts.push({ worth: amt,
+        head: 'Add negative keywords for competitors and for our own other branches',
+        body: dmINR(amt) + ' of the ' + dmINR(g.searchTerms.covered) + ' visible in the search-terms report went ' +
+          'on parents who named a different school. ' + (self > 0 ? dmINR(self) +
+          ' of that was <b>another Pallavi campus</b> — one branch’s budget paying to intercept a parent ' +
+          'already looking for another, who then lands on the wrong campus page. The group pays for the click ' +
+          'and loses the fit. ' : '') +
+          'Negative keyword lists are a same-day change with no downside, and the search-terms report names ' +
+          'exactly which ones to add.' });
+    }
+  }
+
+  /* 5. hiring money returning nothing countable */
+  const hiring = R.cycles.reduce((t,c) => t + (c.hiring||0), 0);
+  if (hiring > 0){
+    acts.push({ worth: hiring,
+      head: 'Put the teacher-recruitment campaigns on a lead form too',
+      body: dmINR(hiring) + ' went to hiring campaigns and none of it sits on a lead form, so the group has no ' +
+        'countable applications from any of it. Whether recruitment advertising is working cannot be answered ' +
+        'from this data at all — which is itself the reason to change it.' });
+  }
+
+  /* 6. naming, so next month needs no footnotes */
+  const unnamed = R.cycles.reduce((t,c) => t + (c.cycle === 'Not stated' ? c.spend : 0), 0);
+  acts.push({ worth: 0,
+    head: 'Fix two naming habits, and this page stops needing footnotes',
+    body: '<b>Put the academic year in every campaign name.</b> ' + dmINR(unnamed) +
+      ' cannot be assigned to a year at all, so it sits in a column of its own above instead of counting ' +
+      'towards either intake. <b>And keep one purpose per campaign:</b> two branches’ admissions ad sets are ' +
+      'filed inside a campaign named for teacher recruitment, which is why a campaign-level read showed them ' +
+      'advertising nothing for next year. A convention of Branch_Purpose_Year_Month removes both problems.' +
+      ((R.hygiene && R.hygiene.adsets) ? ' While there, archive the ' + R.hygiene.adsets +
+        ' ad sets still left over from AY 2025–26.' : '') });
+
+  /* 7. the attribution gap that blocks everything else */
   acts.push({ worth: 0,
     head: 'Record the platform on every enquiry, starting this week',
     body: 'Cost per lead is measurable today; cost per admission is not, because the enquiry tracker collapses ' +
       'every digital source to "Digital". Until a lead carries "Meta" or "Google", nobody can say which spend ' +
-      'produced students rather than enquiries — and every budget decision here rests on a lead count instead ' +
-      'of an admission count.' });
-
-  /* 5. nothing running */
-  const live = dmRecords().filter(r => r.level === 'Ad set' &&
-    !/inactive|not_delivering|completed|archived|paused/i.test(String(r.delivery || '')));
-  if (!live.length)
-    acts.push({ worth: 0,
-      head: 'Nothing is delivering right now',
-      body: 'Every ad set in this export is off, completed or archived. If admissions are open, no money is ' +
-        'working for the group today.' });
+      'produced students rather than enquiries — and every budget decision on this page rests on a lead ' +
+      'count instead of an admission count.' });
 
   acts.sort((x, y) => y.worth - x.worth);
   el.innerHTML = '<div style="padding:6px 0">' + acts.map((a, i) =>
@@ -23412,80 +23575,226 @@ function dmWhereRows(){
              o.cpl=o.leads?o.leadSpend/o.leads:null; return o; })
              .sort(function(a,b){ return b.total-a.total; }), untagged:untagged };
 }
+function dmRoll(){ return (window._DM_ROLL)||null; }
+
+/* ── Which admission year the money is buying ────────────────────────────
+   Everything on this card is cut from the one agreed set of totals built in
+   Code.gs, so it cannot disagree with the tables below it. The page previously
+   carried three different spend totals and two different lead counts because
+   three sections each summed a different subset.
+
+   The question this answers is the one admissions actually turns on: an
+   enquiry taken in October 2026 is for the intake that starts in June 2027.
+   Money still pointed at AY 2026-27 is filling seats in a year already
+   running; money pointed at AY 2027-28 is building next year's roll. Both are
+   legitimate, but management has never been able to see the split.          */
 function renderDmWhere(){
   var el=document.getElementById('dm-where'); if(!el) return;
-  var R=dmWhereRows(), rows=R.rows;
-  if(!rows.some(function(r){return r.total;})){
-    el.innerHTML='<div class="no-data">No ad spend in this payload.</div>'; return;
+  var R=dmRoll(), g=dmGoogle();
+  if(!R || !R.cycles || !R.cycles.length){
+    var _w=window._DM_DIAG;
+    el.innerHTML='<div class="no-data">'+(
+       (_w && _w.problem) ? _w.problem
+       : _w ? 'the Meta and Google Ads tabs held no usable spend rows'
+       : 'no ad data in this payload \u2014 this payload predates the update; re-deploy Apps Script, then reload the dashboard once with ?flush=1')
+       +'</div>'; return;
   }
-  var inr=function(v){ return '\u20b9'+Math.round(v).toLocaleString('en-IN'); };
-  var g=dmGoogle();
-  var max=Math.max.apply(null,rows.map(function(r){return r.total;}));
-  var tot=rows.reduce(function(t,r){return t+r.total;},0);
-  var leads=rows.reduce(function(t,r){return t+r.leads;},0);
-  var leadSpend=rows.reduce(function(t,r){return t+r.leadSpend;},0);
-  var dead=rows.filter(function(r){return !r.leads;}).reduce(function(t,r){return t+r.total;},0);
-  var deadNames=rows.filter(function(r){return !r.leads&&r.total;}).map(function(r){return r.branch;});
+  var inr=function(v){ return '\u20b9'+Math.round(v||0).toLocaleString('en-IN'); };
+  var num=function(v){ return Math.round(v||0).toLocaleString('en-IN'); };
+  var find=function(c){ for(var i=0;i<R.cycles.length;i++) if(R.cycles[i].cycle===c) return R.cycles[i]; return null; };
 
-  var tiles=[
-    ['Total spend',inr(tot),'Meta and Google together'],
-    ['Admission leads',Math.round(leads).toLocaleString('en-IN'),'Meta lead forms only'],
-    ['Cost per lead',leads?inr(leadSpend/leads):'\u2014','Lead-form spend \u00f7 leads'],
-    ['Spent with no lead',inr(dead),deadNames.length?deadNames.join(' and '):'\u2014'],
-    ['Google conversions',(g&&g.present)?Math.round(g.totalConv).toLocaleString('en-IN'):'\u2014',
-       (g&&g.present&&g.tracking)?'tracking is not recording':'across every campaign']
-  ];
-  var h='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px">'+
-    tiles.map(function(t,i){
-      var bad=(i===3&&dead>0)||(i===4&&g&&g.present&&!g.totalConv);
-      return '<div style="background:#FBFCFF;border:1px solid var(--bor);border-radius:10px;padding:11px 13px">'+
-        '<div style="font-size:10.5px;font-weight:800;color:var(--txm);text-transform:uppercase;letter-spacing:.4px">'+t[0]+'</div>'+
-        '<div style="font-size:23px;font-weight:800;margin:3px 0 1px;color:'+(bad?'#DC2626':'var(--tx)')+'">'+t[1]+'</div>'+
-        '<div style="font-size:10.5px;color:var(--txm);line-height:1.4">'+t[2]+'</div></div>'; }).join('')+'</div>';
+  var NEXT=find('2027-28'), CURR=find('2026-27'), NA=find('Not stated');
+  var metaTot=R.metaTotal||0;
+  var gTot=(g&&g.present)?(g.totalCost||0):0;
 
-  h+='<div>'+rows.map(function(r){
-    var seg=DMW_CUTS.map(function(c){
-      var v=r[c.k]; if(v<=0) return '';
-      return '<span title="'+c.label+' '+inr(v)+'" style="display:block;height:100%;width:'+
-        (v/max*100)+'%;background:'+c.c+'"></span>'; }).join('');
-    var tag=r.leads?('<b style="color:#059669">'+Math.round(r.leads).toLocaleString('en-IN')+' leads</b> at '+inr(r.cpl)+' each')
-                   :'<b style="color:#DC2626">no admission lead</b>';
-    return '<div style="display:grid;grid-template-columns:110px 1fr 92px;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--bor)">'+
-      '<div style="font-size:12.5px;font-weight:700"><span class="bd b'+r.branch+'"></span> '+r.branch+'</div>'+
-      '<div><div style="display:flex;height:15px;border-radius:8px;overflow:hidden;background:var(--bor)">'+seg+'</div>'+
-        '<div style="font-size:10.5px;color:var(--txm);margin-top:3px">'+tag+'</div></div>'+
-      '<div style="text-align:right;font-weight:800;font-size:13px">'+inr(r.total)+'</div></div>'; }).join('')+'</div>';
+  /* the three columns, in the order management should read them */
+  var cols=[
+    {k:NEXT, t:'AY 2027\u201328', s:'the intake being filled now', hero:true},
+    {k:CURR, t:'AY 2026\u201327', s:'the year already running'},
+    {k:NA,   t:'No year in the name', s:'cannot be told apart'}
+  ].filter(function(c){ return c.k; });
 
-  h+='<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;font-size:11px;color:var(--txm)">'+
-    DMW_CUTS.map(function(c){ return '<span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:'+
-      c.c+';margin-right:5px"></span>'+c.label+'</span>'; }).join('')+'</div>';
+  var h='';
+
+  /* headline */
+  var nextSpend=NEXT?NEXT.admissions:0, currSpend=CURR?CURR.admissions:0;
+  var blocked=NEXT?(NEXT.blocked||0):0, pix=NEXT?(NEXT.pixelSpend||0):0;
+  var usable=Math.max(0,nextSpend-blocked-pix);
+  h+='<div style="background:linear-gradient(135deg,#FEF3C7,#FFF7ED);border:1px solid #FCD34D;'+
+     'border-radius:10px;padding:13px 15px;margin-bottom:14px">'+
+     '<div style="font-size:13px;font-weight:800;color:#92400E;margin-bottom:5px">'+
+     'Of every \u20b9100 of admissions money on Meta, '+
+     Math.round(nextSpend/Math.max(1,nextSpend+currSpend+(NA?NA.admissions:0))*100)+
+     ' is pointed at the intake you are selling today.</div>'+
+     '<div style="font-size:12px;color:#78350F;line-height:1.65">'+
+     inr(nextSpend)+' is booked against AY 2027\u201328. Of that, only <b>'+inr(usable)+'</b> sits on a lead '+
+     'form that can hand back a name and a phone number \u2014 '+inr(blocked)+' is on a video or reach '+
+     'objective that cannot return an enquiry however well it performs, and '+inr(pix)+' is on a pixel '+
+     'event the same export contradicts itself about. Meanwhile '+inr(currSpend)+' is still working '+
+     'AY 2026\u201327, the year that began in June.</div></div>';
+
+  /* cycle columns */
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:11px;margin-bottom:15px">';
+  cols.forEach(function(c){
+    var k=c.k, cpl=k.leads?(k.admissions-(k.blocked||0)-(k.pixelSpend||0))/k.leads:null;
+    var bar=[['#2563EB',k.admissions,'Admissions'],['#7C3AED',k.hiring,'Hiring'],['#0D9488',k.brand,'Brand']];
+    var tt=k.spend||1;
+    h+='<div style="border:1px solid '+(c.hero?'#2563EB':'var(--bor)')+';border-radius:10px;padding:12px 13px;'+
+       'background:'+(c.hero?'#EFF6FF':'#FBFCFF')+'">'+
+       '<div style="font-size:12.5px;font-weight:800;color:'+(c.hero?'#1D4ED8':'var(--tx)')+'">'+c.t+'</div>'+
+       '<div style="font-size:10.5px;color:var(--txm);margin-bottom:7px">'+c.s+'</div>'+
+       '<div style="font-size:24px;font-weight:800;line-height:1.1">'+inr(k.spend)+'</div>'+
+       '<div style="display:flex;height:9px;border-radius:5px;overflow:hidden;background:var(--bor);margin:8px 0 7px">'+
+         bar.map(function(b){ return b[1]>0?('<span title="'+b[2]+' '+inr(b[1])+'" style="width:'+(b[1]/tt*100)+'%;background:'+b[0]+'"></span>'):''; }).join('')+
+       '</div>'+
+       '<div style="font-size:11px;line-height:1.7;color:var(--txm)">'+
+         '<div>Admissions <b style="color:var(--tx)">'+inr(k.admissions)+'</b></div>'+
+         '<div>Real leads <b style="color:'+(k.leads?'#059669':'#DC2626')+'">'+num(k.leads)+'</b>'+
+           (cpl?(' at <b style="color:var(--tx)">'+inr(cpl)+'</b> each'):'')+'</div>'+
+         ((k.blocked>0)?('<div style="color:#DC2626">On a no-lead objective <b>'+inr(k.blocked)+'</b></div>'):'')+
+         ((k.pixelSpend>0)?('<div style="color:#B45309">On pixel only <b>'+inr(k.pixelSpend)+'</b></div>'):'')+
+       '</div></div>';
+  });
+  h+='</div>';
+
+  /* AY 27-28 branch readiness */
+  var bc=(R.branchCycles||[]).filter(function(b){ return b.cycle==='2027-28'; })
+          .sort(function(a,b){ return b.admissions-a.admissions; });
+  var GROUP=['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam'];
+  var have={}; bc.forEach(function(b){ have[b.branch]=1; });
+  h+='<div style="font-size:12.5px;font-weight:800;margin:4px 0 7px">Is each branch actually set up to collect an AY 2027\u201328 enquiry?</div>';
+  h+='<table class="dt" style="margin-bottom:4px"><thead><tr>'+
+     '<th>BRANCH</th><th style="text-align:right">BOOKED FOR 27\u201328</th><th>WHAT IT IS SET TO DO</th>'+
+     '<th style="text-align:right">REAL LEADS</th><th style="text-align:right">COST PER LEAD</th></tr></thead><tbody>';
+  GROUP.forEach(function(br){
+    var b=null; for(var i=0;i<bc.length;i++) if(bc[i].branch===br) b=bc[i];
+    if(!b){
+      h+='<tr><td><span class="bd b'+br+'"></span> <b>'+br+'</b></td>'+
+         '<td style="text-align:right;color:#DC2626;font-weight:800">nothing</td>'+
+         '<td colspan="3" style="color:#DC2626">No AY 2027\u201328 campaign is running at all</td></tr>'; return;
+    }
+    var canLead=b.leads>0 || b.formSpend>0;
+    var what=b.items.map(function(it){
+      var lab=it.kind==='form'?'<span style="color:#059669;font-weight:700">lead form</span>'
+             :it.kind==='pixel'?'<span style="color:#B45309;font-weight:700">pixel event only</span>'
+             :'<span style="color:#DC2626;font-weight:700">video / reach \u2014 cannot return an enquiry</span>';
+      return lab+' <span style="color:var(--txm)">\u00b7 '+it.name.replace(/</g,'&lt;')+'</span>'+
+             (it.lifted?' <span class="fnote" style="color:#B45309">\u2020</span>':'');
+    }).join('<br>');
+    h+='<tr><td><span class="bd b'+br+'"></span> <b>'+br+'</b></td>'+
+       '<td style="text-align:right;font-weight:800">'+inr(b.admissions)+'</td>'+
+       '<td style="font-size:11.5px;line-height:1.6">'+what+'</td>'+
+       '<td style="text-align:right;font-weight:800;color:'+(b.leads?'#059669':'#DC2626')+'">'+(b.leads?num(b.leads):'0')+'</td>'+
+       '<td style="text-align:right;font-weight:700">'+(b.leads?inr(b.formSpend/b.leads):'<span style="color:var(--txm)">not measurable</span>')+'</td></tr>';
+  });
+  var tN=bc.reduce(function(t,b){return t+b.admissions;},0), tL=bc.reduce(function(t,b){return t+b.leads;},0);
+  h+='<tr style="background:var(--bor)"><td><b>All branches</b></td>'+
+     '<td style="text-align:right;font-weight:800">'+inr(tN)+'</td><td></td>'+
+     '<td style="text-align:right;font-weight:800">'+num(tL)+'</td>'+
+     '<td style="text-align:right;font-weight:800">'+(tL?inr(bc.reduce(function(t,b){return t+b.formSpend;},0)/tL):'\u2014')+'</td></tr>';
+  h+='</tbody></table>';
 
   var notes=[];
-  if(R.untagged>0) notes.push(inr(R.untagged)+' of Meta spend carries no branch tag and is not in any bar.');
-  if(g&&g.present&&g.shared&&g.shared.cost) notes.push(inr(g.shared.cost)+
-    ' sits on the shared Google account ('+(g.shared.campaigns||[]).join(', ')+
-    '), which funds '+(g.shared.branches||[]).join(' and ')+' together and is not split between them.');
-  if(g&&g.present&&g.tracking) notes.push(g.tracking);
-  notes.push('Leads here are Meta <b>lead-form</b> results only. Pixel-event campaigns are left out: '+
-    'they report one lead at \u20b99,680 in one campaign and \u20b99 a lead in another, and hundreds of leads '+
-    'against a reach of zero. <b>The table below counts both kinds</b>, so its lead counts are higher '+
-    'than these \u2014 that gap is the pixel.');
-  if(g&&g.present&&g.start) notes.push('Google covers '+g.start+' to '+g.end+'; Meta covers whatever its export holds.');
+  if(bc.some(function(b){ return b.items.some(function(i){return i.lifted;}); }))
+    notes.push('\u2020 This ad set is filed inside a campaign whose name says it is doing something else, so a '+
+      'campaign-level read shows the branch advertising nothing for AY 2027\u201328. It is counted here at ad-set '+
+      'level and taken off its account\u2019s other campaigns, so no rupee is counted twice.');
+  if(R.hygiene && R.hygiene.adsets)
+    notes.push(R.hygiene.adsets+' ad sets from <b>AY 2025\u201326</b> are still sitting in the accounts ('+
+      Object.keys(R.hygiene.branches||{}).map(function(k){return k+' '+R.hygiene.branches[k];}).join(', ')+
+      '). They spend nothing and that year is over, so they are in no figure on this page \u2014 but they are '+
+      'why campaign lists look longer than the work actually running.');
+  notes.push('A <b>real lead</b> is a Meta lead-form submission. Pixel events are shown separately and never '+
+      'divided into spend: the same export reports one at \u20b99,680 in one campaign and hundreds against a '+
+      'reach of zero in another.');
+  notes.push('Meta '+inr(metaTot)+' + Google '+inr(gTot)+' = <b>'+inr(metaTot+gTot)+'</b> for the period. '+
+      'Every figure on this page is cut from that one total.');
   h+='<div class="note" style="margin-top:10px;line-height:1.6">'+notes.map(function(n){return '\u00b7 '+n;}).join('<br>')+'</div>';
   el.innerHTML=h;
 
   var fn=document.getElementById('dmw-fn');
-  if(fn) fn.textContent='Meta and Google together, branch by branch'+
-    ((g&&g.present&&g.start)?(' \u00b7 Google '+g.start+' to '+g.end):'');
+  if(fn) fn.textContent='Meta by admission year'+((g&&g.present&&g.start)?(' \u00b7 Google '+g.start+' to '+g.end):'');
+}
+
+/* \u2500\u2500 Google Ads account health \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+   The Meta half of this tab can at least count a lead. The Google half cannot,
+   because not one of the campaigns reports a conversion \u2014 so the only honest
+   read of Google is a structural one: what the search money bought, as against
+   what it was meant to buy. The Search Terms report answers that, because it
+   records what the parent actually typed rather than the keyword bid on.     */
+function renderDmGoogleHealth(){
+  var el=document.getElementById('dm-gh'); if(!el) return;
+  var g=dmGoogle();
+  if(!g || !g.present){
+    el.innerHTML='<div class="no-data">'+((g&&g.problem)?g.problem:'no Google Ads data in this payload')+'</div>'; return;
+  }
+  var inr=function(v){ return '\u20b9'+Math.round(v||0).toLocaleString('en-IN'); };
+  var tracked=(g.campaigns||[]).filter(function(c){ return c.conv>0; }).length;
+  var nC=(g.campaigns||[]).length;
+
+  var h='';
+  if(!tracked && nC){
+    h+='<div style="background:#FEF2F2;border:1px solid #FCA5A5;border-radius:10px;padding:12px 14px;margin-bottom:13px">'+
+      '<div style="font-size:13px;font-weight:800;color:#991B1B;margin-bottom:4px">'+
+      inr(g.totalCost)+' of Google spend cannot be tied to a single enquiry.</div>'+
+      '<div style="font-size:12px;color:#7F1D1D;line-height:1.65">Conversion tracking reports zero on all '+nC+
+      ' campaigns. That is a tag that was never fitted, not an audience that never converted \u2014 '+
+      (g.totalClicks?Math.round(g.totalClicks).toLocaleString('en-IN'):'thousands of')+
+      ' people clicked through. Until the enquiry form fires a conversion, no one can say which half of this '+
+      'money works, and Google\u2019s own bidding is optimising blind.</div></div>';
+  }
+
+  /* where the search money went */
+  var st=g.searchTerms;
+  if(st && st.buckets && st.buckets.length){
+    var COL={'Another school, by name':'#DC2626','Another Pallavi branch':'#B45309',
+             'Our name, no area':'#2563EB','Our name and our area':'#059669',
+             'Parents with no school in mind':'#7C3AED'};
+    var WHY={
+      'Parents with no school in mind':'\u201cschools near me\u201d and the like. This is the only bucket buying genuinely new demand.',
+      'Our name, no area':'Parents already searching for Pallavi. Cheap to win, but these are people who had the name already.',
+      'Our name and our area':'Our name plus our own locality \u2014 the strongest intent on the list.',
+      'Another Pallavi branch':'This branch paid for a click from a parent who typed another Pallavi campus. The group pays twice and the parent still lands in the wrong place.',
+      'Another school, by name':'A parent searching for a competitor by name. Occasionally worth it, rarely at this share.'};
+    h+='<div style="font-size:12.5px;font-weight:800;margin:2px 0 7px">What the search money actually bought</div>';
+    h+='<div style="display:flex;height:17px;border-radius:9px;overflow:hidden;background:var(--bor);margin-bottom:11px">'+
+       st.buckets.map(function(b){ return '<span title="'+b.bucket+' '+inr(b.cost)+'" style="width:'+
+         (b.share*100)+'%;background:'+(COL[b.bucket]||'#94A3B8')+'"></span>'; }).join('')+'</div>';
+    h+='<table class="dt" style="margin-bottom:4px"><thead><tr><th>WHAT THE PARENT TYPED</th>'+
+       '<th style="text-align:right">SPEND</th><th style="text-align:right">SHARE</th><th>THE BIGGEST ONES</th></tr></thead><tbody>';
+    st.buckets.forEach(function(b){
+      h+='<tr><td><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:'+
+         (COL[b.bucket]||'#94A3B8')+';margin-right:6px"></span><b>'+b.bucket+'</b>'+
+         '<div class="fnote" style="margin-top:2px">'+(WHY[b.bucket]||'')+'</div></td>'+
+         '<td style="text-align:right;font-weight:800">'+inr(b.cost)+'</td>'+
+         '<td style="text-align:right;font-weight:700">'+(b.share*100).toFixed(1)+'%</td>'+
+         '<td style="font-size:11.5px;line-height:1.65">'+b.top.slice(0,3).map(function(t){
+            return '<span style="color:var(--txm)">'+t.branch+'</span> \u201c'+String(t.term).replace(/</g,'&lt;')+'\u201d '+inr(t.cost);
+         }).join('<br>')+'</td></tr>';
+    });
+    h+='</tbody></table>';
+    var waste=st.buckets.filter(function(b){ return b.bucket==='Another school, by name'||b.bucket==='Another Pallavi branch'; })
+                        .reduce(function(t,b){ return t+b.cost; },0);
+    h+='<div class="note" style="margin-top:9px;line-height:1.6">'+
+       '\u00b7 <b>'+inr(waste)+'</b> of the '+inr(st.covered)+' visible here went on a parent who named a different '+
+       'school \u2014 a competitor, or another Pallavi campus. Adding those as negative keywords is a same-day change '+
+       'with no downside.<br>'+
+       '\u00b7 These rows are a cut of money already counted above, not spend on top of it.</div>';
+  }
+  el.innerHTML=h;
 }
 
 function renderDm(){
   const recs = dmRecords();
   const meta = document.getElementById('dm-meta');
+  var _d = window._DM_DIAG;
   if (meta) meta.textContent = recs.length
-    ? recs.length + ' rows · ' + recs.filter(r => r.level === 'Campaign').length + ' campaigns'
-    : 'no Meta data in this payload';
-  try { renderDmWhere(); }    catch(e){ console.error('dm where:', e && e.message); }
+    ? recs.length + ' rows · ' + recs.filter(r => r.level === 'Campaign').length + ' campaigns' +
+      ((_d && _d.googlePresent) ? ' · Google Ads loaded' : '')
+    : (_d && _d.problem) ? _d.problem
+    : _d ? 'the Meta tabs held no usable rows'
+    : 'no Meta data in this payload — this payload predates the update; re-deploy, then reload with ?flush=1';
+  try { renderDmWhere(); renderDmGoogleHealth(); }    catch(e){ console.error('dm where:', e && e.message); }
   try { renderDmSummary(); } catch(e){ console.error('dm summary:', e && e.message); }
   try { dmRenderPast(); }     catch(e){ console.error('dm past:', e && e.message); }
   try { dmRenderMedia(); }    catch(e){ console.error('dm media:', e && e.message); }
