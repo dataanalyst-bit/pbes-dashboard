@@ -1535,7 +1535,7 @@ try{ localStorage.removeItem('pbes_cache_v1'); localStorage.removeItem('pbes_cac
 //                     branches) + Care, Observations, Admissions, AVIS, Grievance,
 //                     Transport, IT — everything else LOCKED to their own branch.
 // Edit ROLE_TABS below to change which tabs a role can open.
-// Tab ids in use: overview · pt1 · observations · audit · ptm · term1 · care · grievance ·
+// Tab ids in use: overview · pt1 · observations · audit · naa · ptm · term1 · care · grievance ·
 // admissions · admin · vigilance · purchase · transport · it · hr
 // A role mapped to null sees every tab. A role absent from this table, but whose
 // account carries a branch, falls back to `principal`.
@@ -1545,24 +1545,24 @@ const ROLE_TABS = {
   auditor:           null,   // Academic Auditor — every tab, every branch
   /* 28 Sep 2026: Consolidated Glance added to every role. management and
      auditor already see every tab; principal already had it. */
-  admin_manager:     ['glance','admin','vigilance','civil','purchase','transport','it'],
-  vigilance_officer: ['glance','admin','vigilance','civil'],
+  admin_manager:     ['glance','admin','vigilance','civil','purchase','transport','it','naa'],
+  vigilance_officer: ['glance','admin','vigilance','civil','naa'],
   // ── branch roles ──
-  hr:                ['glance','hr','observations'],
-  admin:             ['glance','admin','vigilance','civil'],
+  hr:                ['glance','hr','observations','naa'],
+  admin:             ['glance','admin','vigilance','civil','naa'],
   /* Grievance officers — all three grievance roles — also get Syllabus &
      Notebook (28 Sep 2026). */
-  grievance_officer: ['glance','care','grievance','ptm','term1','syl'],
+  grievance_officer: ['glance','care','grievance','ptm','term1','syl','naa'],
   /* Same as grievance_officer, plus Admissions. Kept as its own role rather
      than widening grievance_officer, because that would silently hand
      Admissions to every other grievance officer at the same time. */
-  grievance_admissions: ['glance','care','grievance','ptm','term1','admissions','kptm','syl'],
-  hr_grievance:      ['glance','hr','observations','care','grievance','ptm','term1','syl'],
+  grievance_admissions: ['glance','care','grievance','ptm','term1','admissions','kptm','syl','naa'],
+  hr_grievance:      ['glance','hr','observations','care','grievance','ptm','term1','syl','naa'],
   /* Academic coordinators, own branch only. 28 Sep 2026: Admin Tracker, School
      Audit, Teacher Observations and Consolidated Glance added on request.
      Still NOT given Vigilance, Purchase, HR, Transport or Admissions. */
   coordinator:       ['glance','care','pt1','ptm','term1','grievance','syl','kptm',
-                      'admin','audit','observations'],
+                      'admin','audit','observations','naa'],
   /* 'glance' and 'activity' were added after this table was written, so they
      were invisible to principals — including the Team Activity tab they are
      expected to file their own observations into. Both are branch-filtered
@@ -1572,7 +1572,11 @@ const ROLE_TABS = {
                       /* A principal is accountable for admin tasks, safety issues and vacancies at
                          their own campus, so they need these three. All are branch-filtered
                          server-side, so they still see only their own. */
-                      'admin','vigilance','hr']
+                      'admin','vigilance','hr',
+                      /* Non-academic audit — own campus. Added 27 Oct 2026 along with
+                         admin, hr, coordinator and the grievance roles; the senior admin
+                         manager and vigilance officer get it across every campus. */
+                      'naa']
 };
 // Roles that span every campus. Everyone else with a branch on their account is
 // pinned to it, and the payload is filtered to that branch server-side.
@@ -17551,7 +17555,13 @@ function _naHeat(rows) {
 function _naSystemic(rows) {
   var el = document.getElementById('na-sys'); if (!el) return;
   var brs = NA_BRANCHES.filter(function (b) { return rows.some(function (r) { return r.branch === b; }); });
-  if (brs.length < 2) { el.innerHTML = '<div class="au-empty">This comparison needs more than one branch in view.</div>'; return; }
+  /* This card compares one campus against the others, so it has nothing to
+     say to a reader who can only see their own. For a principal, admin,
+     coordinator or grievance officer the whole card is hidden rather than
+     left standing with an explanation in it. */
+  var card = el.closest ? el.closest('.au-sec') : null;
+  if (brs.length < 2) { if (card) card.style.display = 'none'; el.innerHTML = ''; return; }
+  if (card) card.style.display = '';
   var by = {};
   rows.forEach(function (r) {
     var e = by[r.item] = by[r.item] || { item: r.item, section: r.section, seen: [], bad: [] };
