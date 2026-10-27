@@ -170,6 +170,27 @@ export async function onRequestGet({ request, env }) {
   const role = (user?.app_metadata?.role || "").toLowerCase().trim();
   const userBranch = user?.app_metadata?.branch || null;
 
+  // ── 1a. A section this deployment does not serve ──
+  // A caller that names a section this deployment does not know used to be
+  // handed the MAIN dashboard payload with a 200, because an unknown name was
+  // quietly mapped to "". The tab that asked then received a valid response
+  // with none of its data in it and could only report "no rows" — which reads
+  // as a problem with the spreadsheet when the real cause is that this file is
+  // older than the dashboard calling it. Saying no plainly costs nothing and
+  // names the fix. An absent section parameter still means the main payload.
+  // Checked after authentication: the reply names the sections this build
+  // serves, which is for the signed-in operator, not for anonymous callers.
+  if (rawSection && !ALLOWED_SECTIONS[rawSection]) {
+    return json({
+      error: true,
+      message: 'This deployment of /api/data does not know the section "' + rawSection +
+        '". It serves: ' + Object.keys(ALLOWED_SECTIONS).join(", ") +
+        '. Add it to ALLOWED_SECTIONS in functions/api/data.js and redeploy Pages.',
+      section: rawSection,
+      allowed: Object.keys(ALLOWED_SECTIONS),
+    }, 400);
+  }
+
   // Mint the photo cookie for this caller. Failure here is not fatal: the rest
   // of the dashboard works, only the vigilance photographs would not load.
   let photoCookie = null;
