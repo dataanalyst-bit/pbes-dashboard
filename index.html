@@ -190,6 +190,12 @@
 :root[data-theme="dark"] [style*="rgb(179, 64, 47)"]{color:#FCA5A5!important}
 :root[data-theme="dark"] [style*="rgb(29, 78, 216)"]{color:#93C5FD!important}
 :root[data-theme="dark"] [style*="rgb(27, 94, 52)"]{color:#6EE7B7!important}
+/* The "who already has a format" callout: a deep green on a mint tint, which
+   inverts to a deep green on a dark green and loses all contrast. */
+:root[data-theme="dark"] [style*="rgb(6, 95, 70)"],
+:root[data-theme="dark"] [style*="rgb(4, 120, 87)"],
+:root[data-theme="dark"] [style*="color:#065F46"],
+:root[data-theme="dark"] [style*="color:#047857"]{color:#6EE7B7!important}
 /* Non-academic audit: the purple evidence callout and the status pills. The
    pills set both colours inline from one hue, which reads on white and goes
    muddy on a dark card, so the tint is neutralised and the ink lifted. */
@@ -17906,6 +17912,54 @@ function _naRecTable(rows, showBranch) {
   return h + '</tbody></table>';
 }
 
+/* ── Where to get a missing record from ──────────────────────────────
+   All five campuses are audited against the same checklist, so when one has no
+   document behind a check it is worth knowing whether another already keeps
+   one. If it does, the fix is a phone call for a copy of a register that is
+   already in use — not a template somebody has to invent.
+
+   Read ACROSS every branch in the sheet, not just the ones in view: a
+   principal seeing only their own campus still needs to be told which other
+   campus to ask. _NA_ALL holds every row the payload carried, which for a
+   branch-scoped user is already only their own campus — so this quietly says
+   nothing to them rather than naming a campus whose data they cannot see.
+
+   The source branch is judged on whether it HOLDS the document, not on whether
+   it passed the check. A campus can keep a proper register and still score
+   half marks on the check it supports; the register is still the one to copy. */
+function _naDocSource(rec) {
+  var all = window._NA_ALL || [];
+  var month = window._NA_MONTH;
+  var peers = all.filter(function (r) {
+    return r.month === month && r.item === rec.item && r.branch !== rec.branch;
+  });
+  var have = [], blank = [];
+  peers.forEach(function (r) {
+    if (r.doc === 'Yes') have.push(r.branch);
+    else if (!r.doc || r.doc === '') blank.push(r.branch);
+  });
+  have = have.filter(function (v, i2, a) { return a.indexOf(v) === i2; }).sort();
+  blank = blank.filter(function (v, i2, a) { return a.indexOf(v) === i2; }).sort();
+
+  if (have.length) {
+    return { kind: 'have', colour: '#059669', branches: have,
+      text: '→ Get the format from <b>' + have.join('</b>, <b>') + '</b>' +
+            (have.length > 1 ? ' — all keep this record' : ' — the only campus that keeps it') };
+  }
+  if (!peers.length) {
+    /* a branch-scoped reader has no other campus in their payload */
+    return { kind: 'ask', colour: '#B45309',
+      text: '→ Ask the other campuses — this view covers your branch only' };
+  }
+  if (blank.length) {
+    return { kind: 'ask', colour: '#B45309', branches: blank,
+      text: '→ Not recorded either way at <b>' + blank.join('</b>, <b>') +
+            '</b> — worth asking before assuming nobody has it' };
+  }
+  return { kind: 'none', colour: '#DC2626', branches: [],
+    text: '→ No campus keeps this — the format has to be written once for the group' };
+}
+
 /* ── KPI drill-downs ──────────────────────────────────────────────────────
    Each tile answers the same two questions: how does this break down by
    branch, and which records is it made of. */
@@ -17978,6 +18032,31 @@ function naOpenKpi(kind) {
     '. Group figure: <b style="color:var(--tx)">' + g.txt + '</b>' + (g.note ? ' (' + g.note + ')' : '') +
     '. Tap a branch for the checks behind its number.</div>';
 
+  /* Who to ask, before the detail. Counting how many of the group's gaps each
+     campus could close turns a long list of missing records into a short list
+     of people to ring. */
+  if (kind === 'nodoc') {
+    var supply = {}, pool = { have: 0, ask: 0, none: 0 };
+    all.filter(function (r) { return r.doc === 'No'; }).forEach(function (r) {
+      var sx = _naDocSource(r); pool[sx.kind]++;
+      if (sx.kind === 'have') (sx.branches || []).forEach(function (bb) { supply[bb] = (supply[bb] || 0) + 1; });
+    });
+    var sup = Object.keys(supply).map(function (bb) { return { b: bb, n: supply[bb] }; })
+                .sort(function (x, y) { return y.n - x.n; });
+    if (sup.length) {
+      h += '<div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:10px;padding:11px 13px;margin-bottom:12px">' +
+        '<div style="font-size:12.5px;font-weight:800;color:#065F46;margin-bottom:5px">Who already has a format to copy</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px">' +
+          sup.map(function (x) { return '<span class="na-pill" style="background:#059669;color:#fff">' +
+            '<span class="bd b' + x.b + '"></span> ' + x.b + ' · ' + x.n + '</span>'; }).join('') + '</div>' +
+        '<div style="font-size:11.5px;color:#047857;line-height:1.65">The number is how many of the group’s ' +
+        'missing records that campus already keeps and could hand over. <b>' + pool.have + '</b> of the ' +
+        (pool.have + pool.ask + pool.none) + ' gaps can be closed this way. ' +
+        'The remaining <b>' + pool.none + '</b> are held by no campus at all and need the format written once, ' +
+        'centrally — copying is not an option for those.</div></div>';
+    }
+  }
+
   data.forEach(function (d) {
     var col = isPct ? (kind === 'nodoc' ? '#7C3AED' : _naColor(d.v.n)) : (d.v.n ? '#DC2626' : '#059669');
     if (kind === 'ip') col = d.v.n ? '#D97706' : '#059669';
@@ -18012,18 +18091,54 @@ function naOpenKpi(kind) {
         '<div style="margin-top:10px">' + _naRecTable(d.rows.filter(function (r) {
           return r.status === 'No' || r.status === 'IP'; }), false) + '</div>';
     } else if (kind === 'nodoc') {
-      /* the records themselves are the point here: which documents are missing */
-      var byS = {}; d.rows.forEach(function (r) { (byS[r.section] = byS[r.section] || []).push(r); });
-      body = Object.keys(byS).sort(function (a, b2) { return byS[b2].length - byS[a].length; })
+      /* Where a missing record already exists somewhere in the group, name the
+         campus holding it. A format that one campus has already written and is
+         already using beats a blank template every time, and it is a phone call
+         rather than a project.
+
+         Three outcomes, kept apart because they need different actions and
+         because collapsing them would overstate what is available: a campus
+         recorded Yes and can supply it; nobody recorded Yes but somebody left
+         the column blank, so it is worth asking before assuming; or every
+         campus recorded No, and the format has to be written once for the
+         group. Only the first is a suggestion — the other two say so plainly. */
+      var sourced = d.rows.map(function (r) { return _naDocSource(r); });
+      var nFrom = sourced.filter(function (x) { return x.kind === 'have'; }).length;
+      var nAsk  = sourced.filter(function (x) { return x.kind === 'ask'; }).length;
+      var nNone = sourced.filter(function (x) { return x.kind === 'none'; }).length;
+
+      /* A reader who can only see their own campus has no peer rows to compare
+         against, so the three-way split would read as a finding about the group
+         when it is only a fact about their payload. Say which it is. */
+      var peerSeen = {};
+      (window._NA_ALL || []).forEach(function (r) { if (r.month === window._NA_MONTH) peerSeen[r.branch] = 1; });
+      var multiBranch = Object.keys(peerSeen).length > 1;
+      body = '<div style="background:var(--pl);border-radius:9px;padding:10px 12px;margin-bottom:10px;' +
+        'font-size:12px;line-height:1.7">' + (multiBranch
+          ? ('Of these ' + d.rows.length + ' missing records: ' +
+             '<b style="color:#059669">' + nFrom + '</b> can be copied from a campus that already keeps one, ' +
+             '<b style="color:#B45309">' + nAsk + '</b> are worth asking about (no campus recorded the column either way), ' +
+             'and <b style="color:#DC2626">' + nNone + '</b> exist nowhere in the group — those need the format ' +
+             'written once, centrally.')
+          : ('<b>' + d.rows.length + ' records with nothing on file.</b> This view covers your own campus, so ' +
+             'it cannot say which of the other four already keep a format for these — ask them, or ask the ' +
+             'senior admin manager, who sees all five.')) + '</div>';
+
+      var byS = {}; d.rows.forEach(function (r, ix) { (byS[r.section] = byS[r.section] || []).push([r, sourced[ix]]); });
+      body += Object.keys(byS).sort(function (a, b2) { return byS[b2].length - byS[a].length; })
         .map(function (sName) {
-          return '<div style="margin-bottom:9px"><div style="font-weight:800;font-size:12px;margin-bottom:3px">' +
+          return '<div style="margin-bottom:11px"><div style="font-weight:800;font-size:12px;margin-bottom:4px">' +
             _naEsc(sName) + ' <span style="color:var(--txm);font-weight:600">— ' + byS[sName].length + '</span></div>' +
-            '<div style="font-size:12px;line-height:1.75;color:var(--txm)">' +
-            byS[sName].map(function (r) {
-              return '· ' + _naEsc(r.item) +
+            byS[sName].map(function (pair) {
+              var r = pair[0], src = pair[1];
+              var line = '<div style="padding:4px 0 4px 10px;border-left:2px solid ' + src.colour + ';margin-bottom:4px">' +
+                '<div style="font-size:12px;color:var(--tx)">' + _naEsc(r.item) +
                 ' <span class="na-pill" style="background:' + (NA_STCOL[r.status] || '#94A3B8') + '1A;color:' +
-                (NA_STCOL[r.status] || '#94A3B8') + '">' + (NA_STLAB[r.status] || r.status) + '</span>'; }).join('<br>') +
-            '</div></div>'; }).join('');
+                (NA_STCOL[r.status] || '#94A3B8') + '">' + (NA_STLAB[r.status] || r.status) + '</span></div>' +
+                '<div style="font-size:11.5px;margin-top:2px;color:' + src.colour + ';font-weight:600">' + src.text + '</div>';
+              if (r.remark) line += '<div style="font-size:11.5px;color:var(--txm);margin-top:2px">“' + _naEsc(r.remark) + '”</div>';
+              return line + '</div>';
+            }).join('') + '</div>'; }).join('');
     } else {
       body = _naRecTable(d.rows, false);
     }
