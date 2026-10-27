@@ -49,7 +49,7 @@ const CACHE_TTL_SECONDS = 300; // edge freshness window (Apps Script keep-warm k
 // still one entry here — plus one line in step 4 if it carries personal data.
 const ALLOWED_SECTIONS = {
   pt1: 1, audit: 1, ptm: 1, civil: 1, syl: 1, vchk: 1, kptm: 1, sylc: 1,
-  term1: 1, meet: 1, dm: 1
+  term1: 1, meet: 1, dm: 1, naa: 1
 };
 
 // Heavier than the main payload and most sections change only when marks are
@@ -59,7 +59,7 @@ const ALLOWED_SECTIONS = {
 const SECTION_TTL_SECONDS = 1800;
 // meet changes the instant somebody uploads a transcript, and every other user
 // needs that on their next load rather than half an hour later.
-const SECTION_TTL_OVERRIDE = { syl: 120, sylc: 120, meet: 30, dm: 120 };
+const SECTION_TTL_OVERRIDE = { syl: 120, sylc: 120, meet: 30, dm: 120, naa: 300 };
 
 // Column headers that carry the campus name, in the order they are looked for.
 // The three PT-1 tabs all use "Branch", but this keeps a rename from silently
@@ -307,6 +307,12 @@ export async function onRequestGet({ request, env }) {
   if (section === "vchk")  return withCookie(json(filterTablesByBranch(data, userBranch, "VCHK_RAW")));
   if (section === "kptm")  return withCookie(json(filterTablesByBranch(data, userBranch, "KPTM_RAW")));
   if (section === "sylc")  return withCookie(json(filterTablesByBranch(data, userBranch, "SYLC_RAW")));
+  /* The non-academic audit names staff and vendors in its remarks, so a
+     principal sees only their own campus. The document register inside the
+     same payload carries no Branch column and is passed through whole: it
+     is the list of records every campus is expected to hold, not a record
+     of any one campus. */
+  if (section === "naa")   return withCookie(json(filterTablesByBranch(data, userBranch, "NAA_RAW")));
   /* The term-end survey is the most sensitive raw feed on the dashboard: it
      carries parent names, student names, verbatim complaints AND the contact
      number of every parent who asked to be rung. A principal must receive only
