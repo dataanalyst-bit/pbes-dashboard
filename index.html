@@ -984,6 +984,22 @@ table.vckt tr.vck-c td.nm{font-weight:600;color:var(--tx)}
 .na-card{border:1px solid var(--bor);border-radius:12px;padding:13px 14px;background:var(--sur)}
 .na-rem{border-left:3px solid var(--bor);padding:7px 0 7px 11px;margin:9px 0;font-size:12.5px;line-height:1.6}
 .na-rem b{font-weight:800}
+/* A KPI tile is a button now. It must still look like the School Audit tile
+   beside it, so only the affordances are added — a hover lift and a quiet
+   "click to view" line that appears on hover or focus. */
+.na-kpi-b{cursor:pointer;width:100%;transition:transform .1s,box-shadow .12s;position:relative}
+.na-kpi-b:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.10);border-color:#9CB4E8}
+.na-kpi-b .na-click{font-size:10.5px;font-weight:700;color:#2563EB;margin-top:7px;opacity:0;transition:opacity .12s}
+.na-kpi-b:hover .na-click,.na-kpi-b:focus-visible .na-click{opacity:1}
+/* A figure in the scorecard that opens exactly what it counts. */
+.na-num{background:none;border:0;padding:0;font:inherit;font-weight:700;font-variant-numeric:tabular-nums;
+  cursor:pointer;border-bottom:1px dashed transparent}
+.na-num:hover{border-bottom-color:currentColor}
+.na-barbtn{background:none;border:0;padding:0;width:100%;cursor:pointer;display:block}
+.na-barbtn .au-bar{display:block}
+.na-secbtn{background:none;border:0;padding:0;font:inherit;font-weight:600;color:inherit;cursor:pointer;
+  text-align:left;display:inline-flex;gap:6px;align-items:center}
+.na-secbtn:hover{color:#2563EB}
 .au-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
 .au-ctl{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
 .au-ctl .f{display:flex;flex-direction:column;gap:4px}
@@ -3286,15 +3302,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div class="au-kpis" id="na-kpis"></div>
 
       <div class="au-sec">
-        <h3>⚠️ Child safety and statutory checks</h3>
-        <div class="sub">The subset of the checklist that carries a legal or child-safety duty — fire and
-          evacuation drills, bus safety, police verification, POSH, POCSO, child protection, first aid, CCTV and
-          hazardous material. These are separated out because an average over the whole checklist lets a weak
-          score here hide behind a strong one on stationery registers.</div>
-        <div id="na-crit"></div>
-      </div>
-
-      <div class="au-sec">
         <h3>🏫 Branch scorecard</h3>
         <div class="sub">Compliance is <b>(Yes + ½ × In Progress) ÷ (Yes + No + In Progress)</b>.
           In Progress earns half credit: started but not finished is neither a pass nor the same as never having
@@ -3309,6 +3316,15 @@ document.addEventListener('DOMContentLoaded', async () => {
           that campus this month — which is itself worth seeing, and is not the same as a zero.</div>
         <div class="au-heat-scroll"><table class="au-heat" id="na-heat"></table></div>
         <div class="au-legend" id="na-heat-legend"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>⚠️ Child safety and statutory checks</h3>
+        <div class="sub">The subset of the checklist that carries a legal or child-safety duty — fire and
+          evacuation drills, bus safety, police verification, POSH, POCSO, child protection, first aid, CCTV and
+          hazardous material. These are separated out because an average over the whole checklist lets a weak
+          score here hide behind a strong one on stationery registers.</div>
+        <div id="na-crit"></div>
       </div>
 
       <div class="au-sec">
@@ -17215,17 +17231,51 @@ async function loadNaa(force) {
 
     var res = await _lazyFetch('naa', force, session, 55000);
     if (res.status === 401) { await sb.auth.signOut(); window.location.href = 'login.html'; return; }
-    if (!res.ok) throw new Error('HTTP ' + res.status + ' from /api/data. A 404 means the Apps Script ' +
-      'deployment URL is stale — in Apps Script use Deploy → Manage deployments → edit the ' +
-      'EXISTING deployment → New version, so the /exec URL stays the same.');
+    if (!res.ok) {
+      /* /api/data answers a section it does not serve with a 400 that names it
+         and lists what it does serve. That body is the whole diagnosis, so it
+         is read before falling back to the status code. */
+      var why = '';
+      try { var ej = await res.json(); why = (ej && ej.message) || ''; } catch (e) {}
+      if (why) throw new Error(why);
+      throw new Error('HTTP ' + res.status + ' from /api/data. A 404 means the Apps Script ' +
+        'deployment URL is stale — in Apps Script use Deploy → Manage deployments → edit the ' +
+        'EXISTING deployment → New version, so the /exec URL stays the same.');
+    }
     var d = await res.json();
     if (d && d.error) throw new Error(d.message || 'Upstream error');
 
     var raw = (d && d.NAA_RAW) ? d.NAA_RAW : (d && d.audit ? d : null);
+
+    /* A section that neither hop recognises is not an error anywhere along the
+       way: the Pages Function maps an unknown name to "" and doGet falls
+       through, so both hand back the MAIN dashboard payload with a 200. The
+       response is valid, it just has no NAA_RAW in it. Detect that case by what
+       the payload actually is, and use the SECTIONS list the main payload now
+       carries to say WHICH deployment is behind — otherwise the only honest
+       message is "no rows", which reads as a fault in the sheet. */
+    if (!raw && d && (d.SECTIONS || d.CARE_DATA || d.OBS_DATA || d.generatedAt)) {
+      var known = d.SECTIONS || null;
+      if (known && known.indexOf('naa') >= 0) {
+        throw new Error('Apps Script has this section, but /api/data did not forward the request for it — ' +
+          'the main dashboard payload came back instead. The Cloudflare Pages Function is still the old ' +
+          'version: update functions/api/data.js so naa appears in its ALLOWED_SECTIONS list, and add the ' +
+          'line that filters NAA_RAW by branch. Then redeploy Pages and reload.');
+      }
+      if (known) {
+        throw new Error('The Apps Script deployment that answered has no "naa" section — it knows only: ' +
+          known.join(', ') + '. Paste the new Code.gs, then Deploy → Manage deployments → edit the ' +
+          'EXISTING deployment → New version, so the /exec URL stays the same.');
+      }
+      throw new Error('The main dashboard payload came back instead of this section, and it is old enough ' +
+        'not to list which sections it has. Both halves need updating: paste the new Code.gs and deploy it ' +
+        'as a New version of the existing deployment, and push the new functions/api/data.js to Pages. ' +
+        'Then reload once with ?flush=1.');
+    }
     if (raw && raw.problem) throw new Error(raw.problem);
     if (!raw || !raw.audit || !raw.audit.rows || !raw.audit.rows.length)
-      throw new Error('No rows returned. Check that the "Non Academic Audit" tab exists and that ' +
-                      '/api/data forwards ?section=naa — it needs naa in its ALLOWED_SECTIONS list.');
+      throw new Error('The section loaded but carried no audit rows. Check the workbook tab is named ' +
+                      'exactly "Non Academic Audit" and has rows below its header.');
 
     var changed = _liveMark('naa', raw.generatedAt, function () { loadNaa(true); }, function () { return _naLoading; }) || !_naRaw;
     _naRaw = raw; _naLoaded = true; _naNetAt = Date.now();
@@ -17330,24 +17380,28 @@ function _naKpis(rows) {
   var na = rows.filter(function (r) { return !r.scored; }).length;
 
   var tiles = [
-    { ic: '⚖️', bg: '#EFF6FF', fg: '#1D4ED8', v: pct === null ? '–' : pct.toFixed(1) + '%',
+    { kind: 'overall', ic: '⚖️', bg: '#EFF6FF', fg: '#1D4ED8', v: pct === null ? '–' : pct.toFixed(1) + '%',
       k: 'Overall compliance', d: 'Yes + ½×In&nbsp;Progress, over everything that applies', c: _naColor(pct) },
-    { ic: '🛡️', bg: '#FEF2F2', fg: '#B91C1C', v: critPct === null ? '–' : critPct.toFixed(1) + '%',
+    { kind: 'critical', ic: '🛡️', bg: '#FEF2F2', fg: '#B91C1C', v: critPct === null ? '–' : critPct.toFixed(1) + '%',
       k: 'Child safety & statutory', d: crit.length + ' checks carrying a legal or safety duty', c: _naColor(critPct) },
-    { ic: '❌', bg: '#FEF2F2', fg: '#B91C1C', v: fails.toLocaleString('en-IN'),
+    { kind: 'failed', ic: '❌', bg: '#FEF2F2', fg: '#B91C1C', v: fails.toLocaleString('en-IN'),
       k: 'Outright failures', d: critFail + ' of them on a safety or statutory check', c: fails ? '#DC2626' : '#059669' },
-    { ic: '⏳', bg: '#FFFBEB', fg: '#B45309', v: ip.toLocaleString('en-IN'),
+    { kind: 'ip', ic: '⏳', bg: '#FFFBEB', fg: '#B45309', v: ip.toLocaleString('en-IN'),
       k: 'Started, not finished', d: 'Scored at half credit, not as a pass', c: '#D97706' },
-    { ic: '📁', bg: '#F5F3FF', fg: '#6D28D9', v: docRec.length ? Math.round(100 * docNo / docRec.length) + '%' : '–',
+    { kind: 'nodoc', ic: '📁', bg: '#F5F3FF', fg: '#6D28D9', v: docRec.length ? Math.round(100 * docNo / docRec.length) + '%' : '–',
       k: 'No document on file', d: docNo + ' of ' + docRec.length + ' checks where this was recorded', c: '#7C3AED' },
-    { ic: '➖', bg: '#F8FAFC', fg: '#475569', v: na.toLocaleString('en-IN'),
+    { kind: 'na', ic: '➖', bg: '#F8FAFC', fg: '#475569', v: na.toLocaleString('en-IN'),
       k: 'Not applicable', d: 'Left out of the denominator, not counted as failures', c: 'var(--txm)' }
   ];
+  /* Every tile is a button: the figure on its face is the group number, and
+     opening it gives the same figure branch by branch, then the records. */
   el.innerHTML = tiles.map(function (t) {
-    return '<div class="au-kpi">' +
+    return '<button class="au-kpi na-kpi-b" onclick="naOpenKpi(\'' + t.kind + '\')" ' +
+      'title="Click for the branch-wise breakdown">' +
       '<div class="na-kh"><span class="na-ico" style="background:' + t.bg + ';color:' + t.fg + '">' + t.ic + '</span>' +
       '<span class="v" style="color:' + t.c + '">' + t.v + '</span></div>' +
-      '<div class="k">' + t.k + '</div><div class="d">' + t.d + '</div></div>';
+      '<div class="k">' + t.k + '</div><div class="d">' + t.d + '</div>' +
+      '<div class="na-click">Click to view ›</div></button>';
   }).join('');
 }
 
@@ -17405,30 +17459,43 @@ function _naBranch(rows) {
     var rs = rows.filter(function (r) { return r.branch === b; });
     var crit = rs.filter(function (r) { return r.critical; });
     return { b: b, n: rs.length, p: _naPct(rs), cp: _naPct(crit),
+             pass: rs.filter(function (r) { return r.status === 'Yes'; }).length,
              fail: rs.filter(function (r) { return r.status === 'No'; }).length,
              ip: rs.filter(function (r) { return r.status === 'IP'; }).length,
              na: rs.filter(function (r) { return !r.scored; }).length };
   }).sort(function (x, y) { return (y.p === null ? -1 : y.p) - (x.p === null ? -1 : x.p); });
 
+  /* Each number opens exactly what it counts. The compliance bar opens
+     everything still open, because that is the work the score represents. */
+  var cell = function (b, status, n, colour) {
+    return '<td class="n"><button class="na-num" onclick="naOpenStatus(\'' + b.replace(/'/g, "\\'") +
+      '\',\'' + status + '\')" style="color:' + colour + '" title="Show only these">' + n + '</button></td>';
+  };
+
   var h = '<table class="au-tbl"><thead><tr><th>Branch</th><th style="min-width:190px">Compliance</th>' +
-    '<th class="n">Overall</th><th class="n">Safety &amp; statutory</th><th class="n">Failed</th>' +
-    '<th class="n">In progress</th><th class="n">N/A</th><th class="n">Checks</th></tr></thead><tbody>';
+    '<th class="n">Overall</th><th class="n">Safety &amp; statutory</th><th class="n">Compliant</th>' +
+    '<th class="n">Failed</th><th class="n">In progress</th><th class="n">N/A</th><th class="n">Checks</th></tr></thead><tbody>';
   data.forEach(function (d) {
-    h += '<tr class="clk" onclick="naOpenBranch(\'' + d.b.replace(/'/g, "\\'") + '\')">' +
+    h += '<tr>' +
       '<td><b><span class="bd b' + d.b + '"></span> ' + d.b + '</b></td>' +
-      '<td><div class="au-bar"><i style="width:' + (d.p || 0) + '%;background:' + _naColor(d.p) + '"></i>' +
+      '<td><button class="na-barbtn" onclick="naOpenStatus(\'' + d.b.replace(/'/g, "\\'") + '\',\'OPEN\')" ' +
+        'title="Everything not yet compliant"><span class="au-bar"><i style="width:' + (d.p || 0) + '%;background:' +
+        _naColor(d.p) + '"></i>' +
         (group === null ? '' : '<span class="tgt" style="left:' + group + '%" title="group average ' + group.toFixed(1) + '%"></span>') +
-        '</div></td>' +
-      '<td class="n" style="font-weight:800;color:' + _naColor(d.p) + '">' + (d.p === null ? '–' : d.p.toFixed(1) + '%') + '</td>' +
+        '</span></button></td>' +
+      '<td class="n"><button class="na-num" onclick="naOpenStatus(\'' + d.b.replace(/'/g, "\\'") + '\',\'ALL\')" ' +
+        'style="font-weight:800;color:' + _naColor(d.p) + '">' + (d.p === null ? '–' : d.p.toFixed(1) + '%') + '</button></td>' +
       '<td class="n" style="font-weight:700;color:' + _naColor(d.cp) + '">' + (d.cp === null ? '–' : d.cp.toFixed(0) + '%') + '</td>' +
-      '<td class="n" style="color:' + (d.fail ? '#DC2626' : 'var(--txm)') + ';font-weight:700">' + d.fail + '</td>' +
-      '<td class="n" style="color:#D97706">' + d.ip + '</td>' +
-      '<td class="n" style="color:var(--txl)">' + d.na + '</td>' +
-      '<td class="n">' + d.n + '</td></tr>';
+      cell(d.b, 'Yes', d.pass, '#059669') +
+      cell(d.b, 'No', d.fail, d.fail ? '#DC2626' : 'var(--txm)') +
+      cell(d.b, 'IP', d.ip, d.ip ? '#D97706' : 'var(--txm)') +
+      cell(d.b, 'NA', d.na, 'var(--txl)') +
+      '<td class="n" style="color:var(--txm)">' + d.n + '</td></tr>';
   });
   h += '</tbody></table>';
   h += '<p class="au-note">The marker on each bar is the group average (' +
-    (group === null ? '–' : group.toFixed(1) + '%') + '). ' +
+    (group === null ? '–' : group.toFixed(1) + '%') + '). <b>Every number here opens only what it counts</b> — ' +
+    'In progress shows in-progress checks alone, N/A shows only the checks that do not apply.<br>' +
     'The <b>Risk</b> column in the sheet is not used anywhere on this tab: it was filled at two campuses and ' +
     'left blank at three, and at one of those it was recorded against checks that PASSED, so it grades the ' +
     'checklist item rather than the finding. Severity here comes from the status, which every campus records ' +
@@ -17441,13 +17508,18 @@ function _naHeat(rows) {
   var brs = NA_BRANCHES.filter(function (b) { return rows.some(function (r) { return r.branch === b; }); });
   var secs = {}; rows.forEach(function (r) { secs[r.section] = 1; });
   var list = Object.keys(secs).map(function (s) {
-    return { s: s, p: _naPct(rows.filter(function (r) { return r.section === s; })) };
+    var rs = rows.filter(function (r) { return r.section === s; });
+    return { s: s, p: _naPct(rs), n: rs.length };
   }).sort(function (a, b) { return (a.p === null ? 999 : a.p) - (b.p === null ? 999 : b.p); });
 
   var h = '<thead><tr><th class="cat">Section</th>' + brs.map(function (b) { return '<th>' + b + '</th>'; }).join('') +
-          '<th class="net">Group</th></tr></thead><tbody>';
-  list.forEach(function (x) {
-    h += '<tr><td class="cat">' + _naEsc(x.s) + '</td>';
+          '<th class="net">Overall</th></tr></thead><tbody>';
+  list.forEach(function (x, i) {
+    var rid = 'nahr' + i;
+    h += '<tr><td class="cat"><button class="na-secbtn" onclick="naToggleSec(' + i + ')" ' +
+      'id="' + rid + '-b" aria-expanded="false" title="Expand this section">' +
+      '<span id="' + rid + '-car" style="display:inline-block;transition:transform .12s;color:var(--txm);font-size:10px">▶</span> ' +
+      _naEsc(x.s) + '</button></td>';
     brs.forEach(function (b) {
       var rs = rows.filter(function (r) { return r.section === x.s && r.branch === b; });
       var p = _naPct(rs);
@@ -17457,15 +17529,23 @@ function _naHeat(rows) {
         'onclick="naOpenCell(\'' + x.s.replace(/'/g, "\\'") + '\',\'' + b + '\')">' +
         (p === null ? '–' : p.toFixed(0)) + '</button></td>';
     });
-    h += '<td class="net" style="color:' + _naColor(x.p) + '">' + (x.p === null ? '–' : x.p.toFixed(0) + '%') + '</td></tr>';
+    h += '<td class="net" style="color:' + _naColor(x.p) + '">' + (x.p === null ? '–' : x.p.toFixed(0) + '%') +
+      '<div style="font-size:10px;color:var(--txm);font-weight:600">' + x.n + ' checks</div></td></tr>';
+    /* the expansion: one row per check in this section, with each campus's
+       mark side by side, so a section's score can be read back to the checks
+       that produced it rather than taken on trust */
+    h += '<tr id="' + rid + '" style="display:none"><td class="cat" colspan="' + (brs.length + 2) + '" ' +
+      'style="padding:0 0 12px"><div id="' + rid + '-c"></div></td></tr>';
   });
   h += '</tbody>';
   el.innerHTML = h;
+  window._NA_SECS = list.map(function (x) { return x.s; });
+
   var lg = document.getElementById('na-heat-legend');
   if (lg) lg.innerHTML = [[95, '90%+'], [80, '75–89%'], [67, '60–74%'], [52, '45–59%'], [30, 'under 45%']]
     .map(function (x) { return '<span><i style="background:' + _naColor(x[0]) + '"></i>' + x[1] + '</span>'; }).join('') +
     '<span><i style="background:var(--bor)"></i>not audited</span>' +
-    '<span style="margin-left:auto">Click a cell for the checks behind it</span>';
+    '<span style="margin-left:auto">Tap a section name to expand it · tap a cell for that branch’s checks</span>';
 }
 
 function _naSystemic(rows) {
@@ -17701,18 +17781,270 @@ function _naList(title, sub, rows) {
      renders its own table, while this panel is already built markup. */
   if (typeof openHTMLModal === 'function') openHTMLModal(title, sub, h);
 }
-function naOpenBranch(b) {
-  var rows = (window._NA_ROWS || []).filter(function (r) { return r.branch === b && (r.status === 'No' || r.status === 'IP'); });
-  rows.sort(function (x, y) { return (x.status === 'No' ? 0 : 1) - (y.status === 'No' ? 0 : 1); });
-  _naList(b + ' — everything not yet compliant',
-    rows.length + ' checks failed or in progress · ' + (window._NA_MONTH || ''), rows);
-}
 function naOpenCell(sec, b) {
   var rows = (window._NA_ROWS || []).filter(function (r) { return r.section === sec && r.branch === b; });
   var p = _naPct(rows);
   _naList(sec + ' — ' + b, rows.length + ' checks · ' + (p === null ? 'nothing scored' : p.toFixed(1) + '% compliant'), rows);
 }
 
+function naToggleSec(i) {
+  var rid = 'nahr' + i;
+  var tr = document.getElementById(rid), box = document.getElementById(rid + '-c'),
+      car = document.getElementById(rid + '-car'), btn = document.getElementById(rid + '-b');
+  if (!tr || !box) return;
+  var open = tr.style.display !== 'none';
+  tr.style.display = open ? 'none' : '';
+  if (car) car.style.transform = open ? 'rotate(0deg)' : 'rotate(90deg)';
+  if (btn) btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+  if (open || box.getAttribute('data-built')) return;
+  box.setAttribute('data-built', '1');
+
+  var sec = (window._NA_SECS || [])[i];
+  var rows = (window._NA_ROWS || []).filter(function (r) { return r.section === sec; });
+  var brs = NA_BRANCHES.filter(function (b) { return (window._NA_ROWS || []).some(function (r) { return r.branch === b; }); });
+  var items = {};
+  rows.forEach(function (r) { (items[r.item] = items[r.item] || {})[r.branch] = r; });
+  var names = Object.keys(items).sort(function (a, b) {
+    var bad = function (k) { return brs.filter(function (x) { var q = items[k][x];
+      return q && (q.status === 'No' || q.status === 'IP'); }).length; };
+    return bad(b) - bad(a);
+  });
+
+  var dot = function (r) {
+    if (!r) return '<span style="color:var(--txl)">–</span>';
+    var c = NA_STCOL[r.status] || '#94A3B8';
+    var t = r.status === 'Yes' ? '✓' : r.status === 'No' ? '✗' : r.status === 'IP' ? '½' : '–';
+    var tip = (NA_STLAB[r.status] || r.status) + (r.remark ? ' — ' + r.remark : '');
+    return '<span title="' + _naEsc(tip) + '" style="display:inline-flex;width:22px;height:22px;border-radius:6px;' +
+      'align-items:center;justify-content:center;font-weight:800;font-size:12px;background:' + c + '1F;color:' + c + '">' +
+      t + '</span>';
+  };
+
+  var h = '<div style="background:var(--pl);border-radius:10px;padding:11px 13px">' +
+    '<div style="font-size:12px;color:var(--txm);margin-bottom:8px">Every check in <b style="color:var(--tx)">' +
+      _naEsc(sec) + '</b>, campus by campus. <span style="color:#059669;font-weight:700">✓</span> compliant · ' +
+      '<span style="color:#D97706;font-weight:700">½</span> in progress · ' +
+      '<span style="color:#DC2626;font-weight:700">✗</span> failed · – not applicable or not audited. ' +
+      'Hover a mark for the observation.</div>' +
+    '<table class="au-tbl"><thead><tr><th>Check</th>' +
+      brs.map(function (b) { return '<th class="n" style="text-align:center">' + b.slice(0, 4) + '</th>'; }).join('') +
+      '<th class="n">Overall</th></tr></thead><tbody>';
+  names.forEach(function (nm) {
+    var set = brs.map(function (b) { return items[nm][b]; }).filter(Boolean);
+    var p = _naPct(set);
+    h += '<tr><td style="max-width:52ch">' + _naEsc(nm) + '</td>' +
+      brs.map(function (b) { return '<td class="n" style="text-align:center">' + dot(items[nm][b]) + '</td>'; }).join('') +
+      '<td class="n" style="font-weight:800;color:' + _naColor(p) + '">' + (p === null ? '–' : p.toFixed(0) + '%') + '</td></tr>';
+  });
+  var secP = _naPct(rows);
+  h += '</tbody><tfoot><tr><td style="font-weight:800">Section overall</td>' +
+    brs.map(function (b) {
+      var q = _naPct(rows.filter(function (r) { return r.branch === b; }));
+      return '<td class="n" style="text-align:center;font-weight:800;color:' + _naColor(q) + '">' +
+        (q === null ? '–' : q.toFixed(0) + '%') + '</td>'; }).join('') +
+    '<td class="n" style="font-weight:800;color:' + _naColor(secP) + '">' +
+      (secP === null ? '–' : secP.toFixed(1) + '%') + '</td></tr></tfoot></table></div>';
+  box.innerHTML = h;
+}
+
+/* ── Shared drill-down furniture ───────────────────────────────────────────
+   Every panel on this tab opens the same two-level view: a branch-wise row you
+   can read at a glance, and the records behind it one tap further in. Written
+   once here so the KPI tiles, the scorecard and the heatmap cannot drift apart
+   in how they present the same numbers. */
+var _naAccN = 0;
+function naAccToggle(id) {
+  var b = document.getElementById(id), c = document.getElementById(id + '-c');
+  if (!b || !c) return;
+  var open = c.style.display !== 'none';
+  c.style.display = open ? 'none' : 'block';
+  b.setAttribute('aria-expanded', open ? 'false' : 'true');
+  var car = document.getElementById(id + '-car');
+  if (car) car.style.transform = open ? 'rotate(0deg)' : 'rotate(90deg)';
+}
+/* One collapsible block: a header row that is always visible, and a body that
+   is built up front but hidden until asked for. */
+function _naAcc(headHtml, bodyHtml) {
+  var id = 'naacc' + (++_naAccN);
+  return '<div style="border:1px solid var(--bor);border-radius:10px;margin-bottom:8px;overflow:hidden">' +
+    '<button id="' + id + '" aria-expanded="false" onclick="naAccToggle(\'' + id + '\')" ' +
+      'style="width:100%;border:0;background:var(--sur);padding:10px 12px;cursor:pointer;font:inherit;' +
+      'color:inherit;text-align:left;display:flex;align-items:center;gap:10px">' +
+      '<span id="' + id + '-car" style="display:inline-block;transition:transform .12s;color:var(--txm);font-size:11px">▶</span>' +
+      '<span style="flex:1">' + headHtml + '</span></button>' +
+    '<div id="' + id + '-c" style="display:none;padding:2px 12px 12px;border-top:1px solid var(--bor)">' +
+      bodyHtml + '</div></div>';
+}
+
+var NA_STLAB = { 'Yes': 'Compliant', 'No': 'Failed', 'IP': 'In progress', 'NA': 'Not applicable' };
+var NA_STCOL = { 'Yes': '#059669', 'No': '#DC2626', 'IP': '#D97706', 'NA': '#94A3B8' };
+
+/* The records table used inside every expansion. */
+function _naRecTable(rows, showBranch) {
+  if (!rows.length) return '<div class="au-empty">Nothing here.</div>';
+  var h = '<table class="au-tbl"><thead><tr>' + (showBranch ? '<th>Branch</th>' : '') +
+    '<th>Check</th><th>Section</th><th>Status</th><th>Doc on file</th><th>Observation</th></tr></thead><tbody>';
+  rows.forEach(function (r) {
+    h += '<tr>' + (showBranch ? '<td><span class="bd b' + r.branch + '"></span> ' + r.branch + '</td>' : '') +
+      '<td style="max-width:44ch">' + _naEsc(r.item) + '</td>' +
+      '<td style="color:var(--txm)">' + _naEsc(r.section) + '</td>' +
+      '<td><span class="na-pill" style="background:' + (NA_STCOL[r.status] || '#94A3B8') + '1A;color:' +
+        (NA_STCOL[r.status] || '#94A3B8') + '">' + (NA_STLAB[r.status] || r.status) + '</span></td>' +
+      '<td style="color:' + (r.doc === 'No' ? '#6D28D9' : 'var(--txm)') + '">' + _naEsc(r.doc || '–') + '</td>' +
+      '<td style="color:var(--txm);max-width:38ch">' + (r.remark ? '“' + _naEsc(r.remark) + '”' : '') + '</td></tr>';
+  });
+  return h + '</tbody></table>';
+}
+
+/* ── KPI drill-downs ──────────────────────────────────────────────────────
+   Each tile answers the same two questions: how does this break down by
+   branch, and which records is it made of. */
+var NA_KPI = {
+  overall: {
+    title: 'Overall compliance', unit: '%',
+    pick: function (rows) { return rows; },
+    sub: 'Yes + ½×In Progress, over every check that applies'
+  },
+  critical: {
+    title: 'Child safety and statutory checks', unit: '%',
+    pick: function (rows) { return rows.filter(function (r) { return r.critical; }); },
+    sub: 'The checks carrying a legal or child-safety duty'
+  },
+  failed: {
+    title: 'Outright failures', unit: 'n',
+    pick: function (rows) { return rows.filter(function (r) { return r.status === 'No'; }); },
+    sub: 'Checks recorded as not done'
+  },
+  ip: {
+    title: 'Started, not finished', unit: 'n',
+    pick: function (rows) { return rows.filter(function (r) { return r.status === 'IP'; }); },
+    sub: 'Scored at half credit, not as a pass'
+  },
+  nodoc: {
+    title: 'Checks with no document on file', unit: '%',
+    pick: function (rows) { return rows.filter(function (r) { return r.doc === 'No'; }); },
+    den: function (rows) { return rows.filter(function (r) { return r.doc === 'Yes' || r.doc === 'No'; }); },
+    sub: 'Of the checks where Doc on file? was recorded either way'
+  },
+  na: {
+    title: 'Not applicable', unit: 'n',
+    pick: function (rows) { return rows.filter(function (r) { return !r.scored; }); },
+    sub: 'Left out of the denominator — never counted as failures'
+  }
+};
+
+function naOpenKpi(kind) {
+  var K = NA_KPI[kind]; if (!K) return;
+  var all = window._NA_ROWS || [];
+  var brs = NA_BRANCHES.filter(function (b) { return all.some(function (r) { return r.branch === b; }); });
+
+  /* the one figure this tile shows, per branch */
+  var val = function (rows) {
+    if (K.unit === 'n') return { n: K.pick(rows).length, txt: K.pick(rows).length.toLocaleString('en-IN') };
+    if (kind === 'nodoc') {
+      var den = K.den(rows), no = K.pick(rows).length;
+      return { n: den.length ? 100 * no / den.length : null,
+               txt: den.length ? Math.round(100 * no / den.length) + '%' : '–',
+               note: no + ' of ' + den.length + ' recorded' };
+    }
+    var p = _naPct(K.pick(rows));
+    return { n: p, txt: p === null ? '–' : p.toFixed(1) + '%', note: K.pick(rows).length + ' checks' };
+  };
+
+  var g = val(all);
+  var isPct = K.unit === '%';
+  var data = brs.map(function (b) {
+    var rows = all.filter(function (r) { return r.branch === b; });
+    return { b: b, v: val(rows), rows: K.pick(rows) };
+  });
+  /* best first for a percentage, worst first for a count of problems */
+  data.sort(function (x, y) {
+    var a = x.v.n === null ? -1 : x.v.n, c = y.v.n === null ? -1 : y.v.n;
+    return isPct && kind !== 'nodoc' ? c - a : c - a;
+  });
+
+  var max = Math.max.apply(null, data.map(function (d) { return d.v.n || 0; })) || 1;
+  var h = '<div style="font-size:12.5px;color:var(--txm);line-height:1.6;margin-bottom:12px">' + K.sub +
+    '. Group figure: <b style="color:var(--tx)">' + g.txt + '</b>' + (g.note ? ' (' + g.note + ')' : '') +
+    '. Tap a branch for the checks behind its number.</div>';
+
+  data.forEach(function (d) {
+    var col = isPct ? (kind === 'nodoc' ? '#7C3AED' : _naColor(d.v.n)) : (d.v.n ? '#DC2626' : '#059669');
+    if (kind === 'ip') col = d.v.n ? '#D97706' : '#059669';
+    if (kind === 'na') col = 'var(--txm)';
+    var head =
+      '<span style="display:inline-flex;align-items:center;gap:7px;min-width:150px">' +
+        '<span class="bd b' + d.b + '"></span><b style="font-size:13px">' + d.b + '</b></span>' +
+      '<span style="display:inline-block;width:46%;max-width:330px;vertical-align:middle;margin:0 12px">' +
+        '<span class="au-bar" style="display:block"><i style="width:' +
+          (isPct ? (d.v.n || 0) : (100 * (d.v.n || 0) / max)) + '%;background:' + col + '"></i></span></span>' +
+      '<b style="font-size:15px;color:' + col + '">' + d.v.txt + '</b>' +
+      (d.v.note ? '<span style="font-size:11px;color:var(--txm);margin-left:8px">' + d.v.note + '</span>' : '');
+
+    /* what the number is made of */
+    var body;
+    if (kind === 'overall' || kind === 'critical') {
+      var secs = {}; d.rows.forEach(function (r) { secs[r.section] = 1; });
+      var sl = Object.keys(secs).map(function (sName) {
+        var rs = d.rows.filter(function (r) { return r.section === sName; });
+        return { s: sName, p: _naPct(rs), n: rs.length,
+                 bad: rs.filter(function (r) { return r.status === 'No' || r.status === 'IP'; }).length };
+      }).sort(function (a, b2) { return (a.p === null ? 999 : a.p) - (b2.p === null ? 999 : b2.p); });
+      body = '<table class="au-tbl"><thead><tr><th>Section</th><th style="min-width:150px"></th>' +
+        '<th class="n">Compliance</th><th class="n">Not clear</th><th class="n">Checks</th></tr></thead><tbody>' +
+        sl.map(function (x) {
+          return '<tr><td>' + _naEsc(x.s) + '</td>' +
+            '<td><div class="au-bar"><i style="width:' + (x.p || 0) + '%;background:' + _naColor(x.p) + '"></i></div></td>' +
+            '<td class="n" style="font-weight:800;color:' + _naColor(x.p) + '">' + (x.p === null ? '–' : x.p.toFixed(0) + '%') + '</td>' +
+            '<td class="n" style="color:' + (x.bad ? '#DC2626' : 'var(--txm)') + '">' + x.bad + '</td>' +
+            '<td class="n" style="color:var(--txm)">' + x.n + '</td></tr>'; }).join('') +
+        '</tbody></table>' +
+        '<div style="margin-top:10px">' + _naRecTable(d.rows.filter(function (r) {
+          return r.status === 'No' || r.status === 'IP'; }), false) + '</div>';
+    } else if (kind === 'nodoc') {
+      /* the records themselves are the point here: which documents are missing */
+      var byS = {}; d.rows.forEach(function (r) { (byS[r.section] = byS[r.section] || []).push(r); });
+      body = Object.keys(byS).sort(function (a, b2) { return byS[b2].length - byS[a].length; })
+        .map(function (sName) {
+          return '<div style="margin-bottom:9px"><div style="font-weight:800;font-size:12px;margin-bottom:3px">' +
+            _naEsc(sName) + ' <span style="color:var(--txm);font-weight:600">— ' + byS[sName].length + '</span></div>' +
+            '<div style="font-size:12px;line-height:1.75;color:var(--txm)">' +
+            byS[sName].map(function (r) {
+              return '· ' + _naEsc(r.item) +
+                ' <span class="na-pill" style="background:' + (NA_STCOL[r.status] || '#94A3B8') + '1A;color:' +
+                (NA_STCOL[r.status] || '#94A3B8') + '">' + (NA_STLAB[r.status] || r.status) + '</span>'; }).join('<br>') +
+            '</div></div>'; }).join('');
+    } else {
+      body = _naRecTable(d.rows, false);
+    }
+    h += _naAcc(head, body);
+  });
+
+  if (typeof openHTMLModal === 'function')
+    openHTMLModal(K.title, (window._NA_MONTH || '') + ' · ' + brs.length + ' branches', h);
+}
+
+/* ── one branch, one status ───────────────────────────────────────────────
+   The scorecard's numbers each open exactly what they count and nothing else.
+   They used to share a single handler that returned failed AND in-progress
+   together, so clicking "In progress" listed rows that were not in progress. */
+function naOpenStatus(branch, status) {
+  var rows = (window._NA_ROWS || []).filter(function (r) { return r.branch === branch; });
+  var sel, title;
+  if (status === 'ALL') { sel = rows; title = 'every check'; }
+  else if (status === 'OPEN') {
+    sel = rows.filter(function (r) { return r.status === 'No' || r.status === 'IP'; });
+    title = 'everything not yet compliant';
+  } else {
+    sel = rows.filter(function (r) { return r.status === status; });
+    title = (NA_STLAB[status] || status).toLowerCase();
+  }
+  sel.sort(function (a, b) { return a.section < b.section ? -1 : a.section > b.section ? 1 : 0; });
+  var sub = sel.length + ' of ' + rows.length + ' checks · ' + (window._NA_MONTH || '');
+  if (status !== 'ALL' && status !== 'OPEN') sub += ' · showing only ' + (NA_STLAB[status] || status);
+  if (typeof openHTMLModal === 'function')
+    openHTMLModal(branch + ' — ' + title, sub, _naRecTable(sel, false));
+}
 async function loadAudit(force){
   if(_auLoading){ if(force){ _auQueued=true; _auStatus('Reading the sheet… (after the load already running)'); } return; }
   if(_auLoaded && !force){
