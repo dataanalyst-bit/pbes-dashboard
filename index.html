@@ -190,6 +190,25 @@
 :root[data-theme="dark"] [style*="rgb(179, 64, 47)"]{color:#FCA5A5!important}
 :root[data-theme="dark"] [style*="rgb(29, 78, 216)"]{color:#93C5FD!important}
 :root[data-theme="dark"] [style*="rgb(27, 94, 52)"]{color:#6EE7B7!important}
+/* Non-academic audit: the purple evidence callout and the status pills. The
+   pills set both colours inline from one hue, which reads on white and goes
+   muddy on a dark card, so the tint is neutralised and the ink lifted. */
+:root[data-theme="dark"] [style*="rgb(91, 33, 182)"],
+:root[data-theme="dark"] [style*="rgb(109, 40, 217)"],
+:root[data-theme="dark"] [style*="rgb(124, 58, 237)"],
+:root[data-theme="dark"] [style*="color:#5B21B6"],
+:root[data-theme="dark"] [style*="color:#6D28D9"],
+:root[data-theme="dark"] [style*="color:#7C3AED"]{color:#C4B5FD!important}
+:root[data-theme="dark"] [style*="rgb(245, 243, 255)"],
+:root[data-theme="dark"] [style*="background:#F5F3FF"]{background-color:#241C3C!important;border-color:#3B2F63!important}
+:root[data-theme="dark"] .na-pill{background:#1E2A3D!important}
+:root[data-theme="dark"] .na-pill[style*="rgb(220, 38, 38)"],
+:root[data-theme="dark"] .na-pill[style*="#DC2626"]{color:#FCA5A5!important}
+:root[data-theme="dark"] .na-pill[style*="rgb(217, 119, 6)"],
+:root[data-theme="dark"] .na-pill[style*="#D97706"]{color:#FBBF24!important}
+:root[data-theme="dark"] .na-pill[style*="rgb(5, 150, 105)"],
+:root[data-theme="dark"] .na-pill[style*="#059669"]{color:#6EE7B7!important}
+:root[data-theme="dark"] .na-card{background:#131C2B!important}
 :root[data-theme="dark"] [style*="rgb(239, 246, 255)"],
 :root[data-theme="dark"] [style*="rgb(238, 242, 255)"]{background-color:#19243D!important}
 
@@ -952,7 +971,19 @@ table.vckt tr.vck-c td.nm{font-weight:600;color:var(--tx)}
 .mt-meta{font-size:10px;color:#94A3B8;margin-top:3px}
 
 /* ═══ SCHOOL AUDIT TAB ═══ */
-#pane-audit .au-wrap{display:flex;flex-direction:column;gap:16px}
+#pane-audit .au-wrap,#pane-naa .au-wrap{display:flex;flex-direction:column;gap:16px}
+/* The non-academic audit reuses the School Audit furniture on purpose: it is
+   the same kind of report and should read the same way. Only the few things
+   it has that the academic audit does not are new. */
+.na-pill{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:800;
+  padding:3px 8px;border-radius:99px;letter-spacing:.03em;white-space:nowrap}
+.na-ico{width:30px;height:30px;border-radius:9px;display:inline-flex;align-items:center;
+  justify-content:center;font-size:15px;flex:none}
+.na-kh{display:flex;align-items:center;gap:9px}
+.na-sev{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:11px}
+.na-card{border:1px solid var(--bor);border-radius:12px;padding:13px 14px;background:var(--sur)}
+.na-rem{border-left:3px solid var(--bor);padding:7px 0 7px 11px;margin:9px 0;font-size:12.5px;line-height:1.6}
+.na-rem b{font-weight:800}
 .au-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
 .au-ctl{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
 .au-ctl .f{display:flex;flex-direction:column;gap:4px}
@@ -1100,6 +1131,7 @@ window._liveDue=_liveDue; window._liveMark=_liveMark; window._liveLabel=_liveLab
 var LIVE_SECTIONS = [
   { tab:'pt1',       run:function(){ return window.loadPT1Review && loadPT1Review(false); } },
   { tab:'audit',     run:function(){ return window.loadAudit && loadAudit(false); } },
+  { tab:'naa',       run:function(){ return window.loadNaa && loadNaa(false); } },
   { tab:'ptm',       run:function(){ return window.loadPTM && loadPTM(false); } },
   { tab:'civil',     run:function(){ return window.loadCivil && loadCivil(false); } },
   { tab:'vigilance', also:['glance','overview'], run:function(){ return window.loadVchk && loadVchk(false); } },
@@ -1734,6 +1766,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     <button class="tb" onclick="showTab('admissions',this)" title="Admissions 2026-27"><span class="ic">🎓</span><span class="lb">Admissions 2026-27</span></button>
     <button class="tb" onclick="showTab('dm',this)" title="Digital Marketing"><span class="ic">📣</span><span class="lb">Digital Marketing</span></button>
     <div class="sn-grp">Operations</div>
+    <button class="tb" onclick="showTab('naa',this)" title="Non Academic Audit"><span class="ic">🧯</span><span class="lb">Non Academic Audit</span></button>
     <button class="tb" onclick="showTab('admin',this)" title="Admin Tracker"><span class="ic">🏗️</span><span class="lb">Admin Tracker</span></button>
     <button class="tb" onclick="showTab('civil',this)" title="Civil Work"><span class="ic">🧱</span><span class="lb">Civil Work</span></button>
     <button class="tb" onclick="showTab('vigilance',this)" title="Vigilance"><span class="ic">🛡️</span><span class="lb">Vigilance</span></button>
@@ -3231,6 +3264,94 @@ document.addEventListener('DOMContentLoaded', async () => {
 </div>
 
 <!-- ═══ SCHOOL AUDIT ═══ -->
+<div id="pane-naa" class="pane">
+  <div class="au-wrap">
+
+    <div class="au-head">
+      <div>
+        <h2 style="margin:0;font-size:20px;font-weight:800">🧯 Non-Academic Audit</h2>
+        <div style="font-size:12.5px;color:var(--txm);margin-top:3px" id="na-meta">Loading…</div>
+      </div>
+      <div class="au-ctl">
+        <span class="scope-chip" id="na-scope"><i></i>All branches</span>
+        <span class="exm-status" id="na-status"></span>
+      </div>
+    </div>
+
+    <div id="na-loader" class="exm-loader"><div class="sp"></div>
+      <div>Reading the non-academic audit…<br><span>Transport, security, canteen, fire, POSH and the rest</span></div></div>
+
+    <div id="na-body" style="display:none;flex-direction:column;gap:16px">
+
+      <div class="au-kpis" id="na-kpis"></div>
+
+      <div class="au-sec">
+        <h3>⚠️ Child safety and statutory checks</h3>
+        <div class="sub">The subset of the checklist that carries a legal or child-safety duty — fire and
+          evacuation drills, bus safety, police verification, POSH, POCSO, child protection, first aid, CCTV and
+          hazardous material. These are separated out because an average over the whole checklist lets a weak
+          score here hide behind a strong one on stationery registers.</div>
+        <div id="na-crit"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>🏫 Branch scorecard</h3>
+        <div class="sub">Compliance is <b>(Yes + ½ × In Progress) ÷ (Yes + No + In Progress)</b>.
+          In Progress earns half credit: started but not finished is neither a pass nor the same as never having
+          begun. <b>NA is left out of the denominator</b>, so a check that does not apply to a campus — no
+          swimming pool, no LPG — neither helps nor hurts it. Click any branch for its failed checks in full.</div>
+        <div id="na-branch"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>🧭 Where each branch stands, section by section</h3>
+        <div class="sub">Every section crossed with every branch. A dash means that section was not audited at
+          that campus this month — which is itself worth seeing, and is not the same as a zero.</div>
+        <div class="au-heat-scroll"><table class="au-heat" id="na-heat"></table></div>
+        <div class="au-legend" id="na-heat-legend"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>🔁 The same gap at every branch, or only at one?</h3>
+        <div class="sub">All five campuses are audited against an identical checklist, so a check can be compared
+          across them. A check failing everywhere is a group-level gap — one decision fixes five campuses. A
+          check failing at one campus is that campus’s own to close. Treating the two the same way is how group
+          problems get delegated to branches and never close.</div>
+        <div id="na-sys"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>📁 Evidence on file</h3>
+        <div class="sub">A check can pass on the day and still leave nothing behind. This is what the audit
+          recorded against <b>Doc on file?</b>, set beside the workbook’s own Document Register — the list of
+          records each campus is expected to hold.</div>
+        <div id="na-docs"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>🗒️ Every observation the auditors wrote</h3>
+        <div class="sub">The remarks column in full, not summarised and not reduced to keywords. Filter by branch
+          or section, or search the text.</div>
+        <div class="au-ctl" style="margin-bottom:12px">
+          <div class="f"><label>Branch</label><select id="na-f-branch"></select></div>
+          <div class="f"><label>Section</label><select id="na-f-sec"></select></div>
+          <div class="f"><label>Status</label><select id="na-f-st"></select></div>
+          <div class="f"><label>Search the remarks</label><input id="na-f-q" placeholder="e.g. verification, drill, register"></div>
+        </div>
+        <div id="na-rem"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>✅ Closing the loop — CAPA</h3>
+        <div class="sub">The workbook’s CAPA tracker: where an observation is supposed to get an owner, a target
+          date and a closure. What it holds today is reported as it stands.</div>
+        <div id="na-capa"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <div id="pane-audit" class="pane">
   <div class="au-wrap">
 
@@ -17028,6 +17149,570 @@ function _auAge(gen){
   return 'read from the sheet at '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+
     ' ('+(mins<2?'just now':mins<60?mins+' min ago':Math.round(mins/60)+' h ago')+')';
 }
+/* ═══════════════════════════════════════════════════════════════════════════
+   NON-ACADEMIC AUDIT
+
+   The operational twin of the School Audit tab, and deliberately built the same
+   way: same lazy fetch, same IndexedDB cache, same furniture. It covers the
+   departments that keep a campus running rather than the ones that teach —
+   transport, security, canteen and water, fire, housekeeping, POSH, child
+   protection, registers.
+
+   Two things about this data decide how the tab reads, and both were checked
+   against the sheet before anything here was written:
+
+   1. The RISK column cannot be summed. One branch's auditor filled it on 86 of
+      152 rows — including 43 rows the same auditor marked as PASSED — while
+      three branches never filled it at all. Read as "major findings" it would
+      report Bachupally as the worst campus by a distance and the other three as
+      having no risks whatever, both of which are artefacts of who typed what.
+      Severity here therefore comes from STATUS, which all five branches record
+      the same way, and the Risk column is reported for what it is.
+
+   2. NA is not a zero. A campus with no swimming pool scores NA on nine pool
+      checks; counting those as failures would punish it for not having a pool.
+      NA is excluded from the denominator everywhere on this tab.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+var _naRaw = null, _naLoaded = false, _naLoading = false, _naQueued = false, _naNetAt = 0;
+
+var NA_SCORE = { 'Yes': 1, 'IP': 0.5, 'No': 0 };          // NA / NR / blank: not scored
+var NA_BRANCHES = ['Bachupally', 'Boduppal', 'Gowdavalli', 'Keesara', 'Pocharam'];
+
+/* The checks that carry a legal or child-safety duty. Matched on the wording of
+   the checklist item, so a new item lands in the right bucket without anybody
+   maintaining a list of row numbers. */
+var NA_CRITICAL = /pocso|posh|child|police|background verif|fire|evacuat|emergenc|drill|ambulance|first aid|lifeguard|cctv|hazard|safety|abuse|committee|minor/i;
+
+function _naStatus(t, bad) {
+  var e = document.getElementById('na-status'); if (!e) return;
+  e.textContent = t || ''; e.style.color = bad ? 'var(--r)' : '';
+}
+function _naShow(on) {
+  var l = document.getElementById('na-loader'), b = document.getElementById('na-body');
+  if (l) l.style.display = on ? 'none' : 'flex';
+  if (b) b.style.display = on ? 'flex' : 'none';
+}
+
+async function loadNaa(force) {
+  if (_naLoading) { _naQueued = true; return; }
+  if (!force && _naLoaded) {
+    if (!_liveDue('naa')) return;
+  }
+  _naLoading = true; if (!_naLoaded) _naStatus('Loading…');
+  try {
+    if (!force && !_naLoaded) {
+      try {
+        var c = await idbGet('pbes_naa');
+        if (c && c.data && c.data.audit && (Date.now() - c.t) < 24 * 3600 * 1000) {
+          _naRaw = c.data; _naLoaded = true; _naPaint(); _naStatus('Cached · refreshing in background');
+        }
+      } catch (e) {}
+    }
+    var session = null;
+    try { var sx = await sb.auth.getSession(); session = sx && sx.data && sx.data.session; } catch (e) {}
+    if (!session) { window.location.href = 'login.html'; return; }
+
+    var res = await _lazyFetch('naa', force, session, 55000);
+    if (res.status === 401) { await sb.auth.signOut(); window.location.href = 'login.html'; return; }
+    if (!res.ok) throw new Error('HTTP ' + res.status + ' from /api/data. A 404 means the Apps Script ' +
+      'deployment URL is stale — in Apps Script use Deploy → Manage deployments → edit the ' +
+      'EXISTING deployment → New version, so the /exec URL stays the same.');
+    var d = await res.json();
+    if (d && d.error) throw new Error(d.message || 'Upstream error');
+
+    var raw = (d && d.NAA_RAW) ? d.NAA_RAW : (d && d.audit ? d : null);
+    if (raw && raw.problem) throw new Error(raw.problem);
+    if (!raw || !raw.audit || !raw.audit.rows || !raw.audit.rows.length)
+      throw new Error('No rows returned. Check that the "Non Academic Audit" tab exists and that ' +
+                      '/api/data forwards ?section=naa — it needs naa in its ALLOWED_SECTIONS list.');
+
+    var changed = _liveMark('naa', raw.generatedAt, function () { loadNaa(true); }, function () { return _naLoading; }) || !_naRaw;
+    _naRaw = raw; _naLoaded = true; _naNetAt = Date.now();
+    try { idbSet('pbes_naa', { t: Date.now(), data: raw }); } catch (e) {}
+    if (changed) _naPaint();
+    _naStatus(_liveLabel(raw.generatedAt));
+  } catch (err) {
+    if (!_naLoaded) {
+      _naShow(false);
+      var l = document.getElementById('na-loader');
+      if (l) l.innerHTML = '<div style="color:var(--r);font-weight:700">Could not load the non-academic audit</div>' +
+        '<div style="font-size:11px;color:var(--txm);max-width:460px">' + String(err && err.message || err) + '</div>';
+      _naStatus(String(err && err.message || err), true);
+    }
+  } finally {
+    _naLoading = false;
+    if (_naQueued) { _naQueued = false; setTimeout(function () { loadNaa(true); }, 50); }
+  }
+}
+
+/* ── reading the rows ─────────────────────────────────────────────────────── */
+function _naRows() {
+  if (!_naRaw || !_naRaw.audit) return [];
+  var H = {}; (_naRaw.audit.hdr || []).forEach(function (h, i) { H[String(h).trim()] = i; });
+  var get = function (r, n) { var i = H[n]; return i === undefined ? '' : String(r[i] == null ? '' : r[i]).trim(); };
+  var out = [];
+  (_naRaw.audit.rows || []).forEach(function (r) {
+    var br = get(r, 'Branch'); if (!br) return;
+    var st = get(r, 'Status');
+    var item = get(r, 'Parameter / Checklist Item');
+    out.push({
+      branch: br, month: get(r, 'Month'), section: get(r, 'Section'),
+      dept: get(r, 'Department'), item: item, status: st,
+      scored: NA_SCORE[st] !== undefined, pts: NA_SCORE[st] !== undefined ? NA_SCORE[st] : null,
+      doc: get(r, 'Doc on file?'), risk: get(r, 'Risk'),
+      remark: get(r, 'Remarks / Observations'),
+      critical: NA_CRITICAL.test(item)
+    });
+  });
+  /* The sheet carries a stub row for each month still to come so the dropdowns
+     work; those have no checklist item and are not audit findings. */
+  return out.filter(function (r) { return r.item; });
+}
+function _naLatestMonth(rows) {
+  var m = {}; rows.forEach(function (r) { m[r.month] = (m[r.month] || 0) + 1; });
+  var best = '', n = 0;
+  Object.keys(m).forEach(function (k) { if (m[k] > n) { n = m[k]; best = k; } });
+  return best;
+}
+function _naPct(rows) {
+  var sc = rows.filter(function (r) { return r.scored; });
+  if (!sc.length) return null;
+  return 100 * sc.reduce(function (t, r) { return t + r.pts; }, 0) / sc.length;
+}
+function _naColor(p) {
+  if (p === null) return 'var(--bor)';
+  return p >= 90 ? '#059669' : p >= 75 ? '#65A30D' : p >= 60 ? '#D97706' : p >= 45 ? '#EA580C' : '#DC2626';
+}
+function _naEsc(v) { return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) {
+  return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
+
+/* ── paint ────────────────────────────────────────────────────────────────── */
+function _naPaint() {
+  var all = _naRows();
+  if (!all.length) { _naShow(false); return; }
+  var month = _naLatestMonth(all);
+  var rows = all.filter(function (r) { return r.month === month; });
+  if (typeof fBranch !== 'undefined' && fBranch !== 'ALL') rows = rows.filter(function (r) { return r.branch === fBranch; });
+  if (window._USER_BRANCH) rows = rows.filter(function (r) { return r.branch === window._USER_BRANCH; });
+  if (!rows.length) rows = all.filter(function (r) { return r.month === month; });
+  window._NA_ROWS = rows; window._NA_ALL = all; window._NA_MONTH = month;
+
+  var meta = document.getElementById('na-meta');
+  var months = {}; all.forEach(function (r) { months[r.month] = 1; });
+  if (meta) meta.textContent = rows.length.toLocaleString('en-IN') + ' checks · ' + month +
+    ' · ' + Object.keys(months).length + ' month' + (Object.keys(months).length === 1 ? '' : 's') + ' in the sheet';
+  var sc = document.getElementById('na-scope');
+  if (sc) sc.innerHTML = '<i></i>' + ((window._USER_BRANCH || (typeof fBranch !== 'undefined' && fBranch !== 'ALL' ? fBranch : '')) || 'All branches') + ' · ' + month;
+
+  _naKpis(rows);
+  _naCritical(rows);
+  _naBranch(rows);
+  _naHeat(rows);
+  _naSystemic(rows);
+  _naDocs(rows);
+  _naFilters(rows);
+  _naRemarks();
+  _naCapa();
+  _naShow(true);
+}
+
+function _naKpis(rows) {
+  var el = document.getElementById('na-kpis'); if (!el) return;
+  var pct = _naPct(rows);
+  var fails = rows.filter(function (r) { return r.status === 'No'; }).length;
+  var ip = rows.filter(function (r) { return r.status === 'IP'; }).length;
+  var crit = rows.filter(function (r) { return r.critical; });
+  var critPct = _naPct(crit);
+  var critFail = crit.filter(function (r) { return r.status === 'No'; }).length;
+  var docRec = rows.filter(function (r) { return r.doc === 'Yes' || r.doc === 'No'; });
+  var docNo = docRec.filter(function (r) { return r.doc === 'No'; }).length;
+  var na = rows.filter(function (r) { return !r.scored; }).length;
+
+  var tiles = [
+    { ic: '⚖️', bg: '#EFF6FF', fg: '#1D4ED8', v: pct === null ? '–' : pct.toFixed(1) + '%',
+      k: 'Overall compliance', d: 'Yes + ½×In&nbsp;Progress, over everything that applies', c: _naColor(pct) },
+    { ic: '🛡️', bg: '#FEF2F2', fg: '#B91C1C', v: critPct === null ? '–' : critPct.toFixed(1) + '%',
+      k: 'Child safety & statutory', d: crit.length + ' checks carrying a legal or safety duty', c: _naColor(critPct) },
+    { ic: '❌', bg: '#FEF2F2', fg: '#B91C1C', v: fails.toLocaleString('en-IN'),
+      k: 'Outright failures', d: critFail + ' of them on a safety or statutory check', c: fails ? '#DC2626' : '#059669' },
+    { ic: '⏳', bg: '#FFFBEB', fg: '#B45309', v: ip.toLocaleString('en-IN'),
+      k: 'Started, not finished', d: 'Scored at half credit, not as a pass', c: '#D97706' },
+    { ic: '📁', bg: '#F5F3FF', fg: '#6D28D9', v: docRec.length ? Math.round(100 * docNo / docRec.length) + '%' : '–',
+      k: 'No document on file', d: docNo + ' of ' + docRec.length + ' checks where this was recorded', c: '#7C3AED' },
+    { ic: '➖', bg: '#F8FAFC', fg: '#475569', v: na.toLocaleString('en-IN'),
+      k: 'Not applicable', d: 'Left out of the denominator, not counted as failures', c: 'var(--txm)' }
+  ];
+  el.innerHTML = tiles.map(function (t) {
+    return '<div class="au-kpi">' +
+      '<div class="na-kh"><span class="na-ico" style="background:' + t.bg + ';color:' + t.fg + '">' + t.ic + '</span>' +
+      '<span class="v" style="color:' + t.c + '">' + t.v + '</span></div>' +
+      '<div class="k">' + t.k + '</div><div class="d">' + t.d + '</div></div>';
+  }).join('');
+}
+
+function _naCritical(rows) {
+  var el = document.getElementById('na-crit'); if (!el) return;
+  var crit = rows.filter(function (r) { return r.critical; });
+  if (!crit.length) { el.innerHTML = '<div class="au-empty">No safety or statutory checks in this view.</div>'; return; }
+  var brs = NA_BRANCHES.filter(function (b) { return crit.some(function (r) { return r.branch === b; }); });
+
+  var h = '<div class="na-sev">' + brs.map(function (b) {
+    var rs = crit.filter(function (r) { return r.branch === b; });
+    var p = _naPct(rs), f = rs.filter(function (r) { return r.status === 'No'; }).length;
+    return '<div class="na-card" style="border-left:4px solid ' + _naColor(p) + '">' +
+      '<div style="display:flex;justify-content:space-between;align-items:baseline">' +
+      '<b style="font-size:13px"><span class="bd b' + b + '"></span> ' + b + '</b>' +
+      '<b style="font-size:19px;color:' + _naColor(p) + '">' + (p === null ? '–' : p.toFixed(0) + '%') + '</b></div>' +
+      '<div style="font-size:11.5px;color:var(--txm);margin-top:5px">' + rs.length + ' safety checks · ' +
+      '<b style="color:' + (f ? '#DC2626' : '#059669') + '">' + f + ' failing</b></div></div>';
+  }).join('') + '</div>';
+
+  /* which safety checks fail, and at how many campuses */
+  var by = {};
+  crit.forEach(function (r) {
+    if (r.status !== 'No') return;
+    (by[r.item] = by[r.item] || { item: r.item, section: r.section, brs: [] }).brs.push(r.branch);
+  });
+  var list = Object.keys(by).map(function (k) { return by[k]; })
+               .sort(function (a, b) { return b.brs.length - a.brs.length; });
+  if (list.length) {
+    h += '<div style="font-weight:800;font-size:12.5px;margin:16px 0 7px">Safety and statutory checks that failed outright</div>';
+    h += '<table class="au-tbl"><thead><tr><th>Check</th><th>Section</th><th>Failing at</th><th class="n">Campuses</th></tr></thead><tbody>';
+    list.forEach(function (x) {
+      var every = x.brs.length >= brs.length && brs.length > 1;
+      h += '<tr><td style="max-width:48ch">' + _naEsc(x.item) + '</td>' +
+        '<td style="color:var(--txm)">' + _naEsc(x.section) + '</td>' +
+        '<td>' + x.brs.map(function (b) { return '<span class="bd b' + b + '"></span> ' + b; }).join(', ') + '</td>' +
+        '<td class="n"><span class="na-pill" style="background:' + (every ? '#FEE2E2' : '#FEF3C7') +
+        ';color:' + (every ? '#991B1B' : '#92400E') + '">' + x.brs.length + (every ? ' · every campus' : '') + '</span></td></tr>';
+    });
+    h += '</tbody></table>';
+    var everyN = list.filter(function (x) { return x.brs.length >= brs.length && brs.length > 1; }).length;
+    if (everyN) h += '<p class="au-note"><b>' + everyN + ' of these fail at every campus audited.</b> ' +
+      'A drill that has not been run, a notice that is not displayed and a verification that has not been done ' +
+      'are group-level omissions — they are not evidence that five branches independently chose the same ' +
+      'shortcut. One instruction and one deadline closes all five.</p>';
+  }
+  el.innerHTML = h;
+}
+
+function _naBranch(rows) {
+  var el = document.getElementById('na-branch'); if (!el) return;
+  var brs = NA_BRANCHES.filter(function (b) { return rows.some(function (r) { return r.branch === b; }); });
+  var group = _naPct(rows);
+  var data = brs.map(function (b) {
+    var rs = rows.filter(function (r) { return r.branch === b; });
+    var crit = rs.filter(function (r) { return r.critical; });
+    return { b: b, n: rs.length, p: _naPct(rs), cp: _naPct(crit),
+             fail: rs.filter(function (r) { return r.status === 'No'; }).length,
+             ip: rs.filter(function (r) { return r.status === 'IP'; }).length,
+             na: rs.filter(function (r) { return !r.scored; }).length };
+  }).sort(function (x, y) { return (y.p === null ? -1 : y.p) - (x.p === null ? -1 : x.p); });
+
+  var h = '<table class="au-tbl"><thead><tr><th>Branch</th><th style="min-width:190px">Compliance</th>' +
+    '<th class="n">Overall</th><th class="n">Safety &amp; statutory</th><th class="n">Failed</th>' +
+    '<th class="n">In progress</th><th class="n">N/A</th><th class="n">Checks</th></tr></thead><tbody>';
+  data.forEach(function (d) {
+    h += '<tr class="clk" onclick="naOpenBranch(\'' + d.b.replace(/'/g, "\\'") + '\')">' +
+      '<td><b><span class="bd b' + d.b + '"></span> ' + d.b + '</b></td>' +
+      '<td><div class="au-bar"><i style="width:' + (d.p || 0) + '%;background:' + _naColor(d.p) + '"></i>' +
+        (group === null ? '' : '<span class="tgt" style="left:' + group + '%" title="group average ' + group.toFixed(1) + '%"></span>') +
+        '</div></td>' +
+      '<td class="n" style="font-weight:800;color:' + _naColor(d.p) + '">' + (d.p === null ? '–' : d.p.toFixed(1) + '%') + '</td>' +
+      '<td class="n" style="font-weight:700;color:' + _naColor(d.cp) + '">' + (d.cp === null ? '–' : d.cp.toFixed(0) + '%') + '</td>' +
+      '<td class="n" style="color:' + (d.fail ? '#DC2626' : 'var(--txm)') + ';font-weight:700">' + d.fail + '</td>' +
+      '<td class="n" style="color:#D97706">' + d.ip + '</td>' +
+      '<td class="n" style="color:var(--txl)">' + d.na + '</td>' +
+      '<td class="n">' + d.n + '</td></tr>';
+  });
+  h += '</tbody></table>';
+  h += '<p class="au-note">The marker on each bar is the group average (' +
+    (group === null ? '–' : group.toFixed(1) + '%') + '). ' +
+    'The <b>Risk</b> column in the sheet is not used anywhere on this tab: it was filled at two campuses and ' +
+    'left blank at three, and at one of those it was recorded against checks that PASSED, so it grades the ' +
+    'checklist item rather than the finding. Severity here comes from the status, which every campus records ' +
+    'the same way.</p>';
+  el.innerHTML = h;
+}
+
+function _naHeat(rows) {
+  var el = document.getElementById('na-heat'); if (!el) return;
+  var brs = NA_BRANCHES.filter(function (b) { return rows.some(function (r) { return r.branch === b; }); });
+  var secs = {}; rows.forEach(function (r) { secs[r.section] = 1; });
+  var list = Object.keys(secs).map(function (s) {
+    return { s: s, p: _naPct(rows.filter(function (r) { return r.section === s; })) };
+  }).sort(function (a, b) { return (a.p === null ? 999 : a.p) - (b.p === null ? 999 : b.p); });
+
+  var h = '<thead><tr><th class="cat">Section</th>' + brs.map(function (b) { return '<th>' + b + '</th>'; }).join('') +
+          '<th class="net">Group</th></tr></thead><tbody>';
+  list.forEach(function (x) {
+    h += '<tr><td class="cat">' + _naEsc(x.s) + '</td>';
+    brs.forEach(function (b) {
+      var rs = rows.filter(function (r) { return r.section === x.s && r.branch === b; });
+      var p = _naPct(rs);
+      if (!rs.length) { h += '<td><button class="au-cell" style="background:var(--bor);color:var(--txl)" title="not audited at ' + b + '" disabled>–</button></td>'; return; }
+      h += '<td><button class="au-cell" style="background:' + _naColor(p) + ';color:#fff" ' +
+        'title="' + _naEsc(x.s) + ' · ' + b + ' — ' + rs.length + ' checks" ' +
+        'onclick="naOpenCell(\'' + x.s.replace(/'/g, "\\'") + '\',\'' + b + '\')">' +
+        (p === null ? '–' : p.toFixed(0)) + '</button></td>';
+    });
+    h += '<td class="net" style="color:' + _naColor(x.p) + '">' + (x.p === null ? '–' : x.p.toFixed(0) + '%') + '</td></tr>';
+  });
+  h += '</tbody>';
+  el.innerHTML = h;
+  var lg = document.getElementById('na-heat-legend');
+  if (lg) lg.innerHTML = [[95, '90%+'], [80, '75–89%'], [67, '60–74%'], [52, '45–59%'], [30, 'under 45%']]
+    .map(function (x) { return '<span><i style="background:' + _naColor(x[0]) + '"></i>' + x[1] + '</span>'; }).join('') +
+    '<span><i style="background:var(--bor)"></i>not audited</span>' +
+    '<span style="margin-left:auto">Click a cell for the checks behind it</span>';
+}
+
+function _naSystemic(rows) {
+  var el = document.getElementById('na-sys'); if (!el) return;
+  var brs = NA_BRANCHES.filter(function (b) { return rows.some(function (r) { return r.branch === b; }); });
+  if (brs.length < 2) { el.innerHTML = '<div class="au-empty">This comparison needs more than one branch in view.</div>'; return; }
+  var by = {};
+  rows.forEach(function (r) {
+    var e = by[r.item] = by[r.item] || { item: r.item, section: r.section, seen: [], bad: [] };
+    if (e.seen.indexOf(r.branch) < 0) e.seen.push(r.branch);
+    if ((r.status === 'No' || r.status === 'IP') && e.bad.indexOf(r.branch) < 0) e.bad.push(r.branch);
+  });
+  var items = Object.keys(by).map(function (k) { return by[k]; })
+                .filter(function (x) { return x.seen.length === brs.length && x.bad.length; });
+  var every = items.filter(function (x) { return x.bad.length === brs.length; })
+                   .sort(function (a, b) { return a.section < b.section ? -1 : 1; });
+  var most  = items.filter(function (x) { return x.bad.length === brs.length - 1; });
+  var one   = items.filter(function (x) { return x.bad.length === 1; });
+  var oneBy = {}; one.forEach(function (x) { (oneBy[x.bad[0]] = oneBy[x.bad[0]] || []).push(x); });
+
+  var h = '<div class="na-sev" style="margin-bottom:15px">' +
+    '<div class="na-card" style="border-left:4px solid #DC2626"><div style="font-size:26px;font-weight:800;color:#DC2626">' +
+      every.length + '</div><div style="font-size:12px;font-weight:700;margin-top:2px">fail at every campus</div>' +
+      '<div style="font-size:11.5px;color:var(--txm);margin-top:4px">A group decision, not five branch decisions</div></div>' +
+    '<div class="na-card" style="border-left:4px solid #EA580C"><div style="font-size:26px;font-weight:800;color:#EA580C">' +
+      most.length + '</div><div style="font-size:12px;font-weight:700;margin-top:2px">fail at all but one</div>' +
+      '<div style="font-size:11.5px;color:var(--txm);margin-top:4px">One campus has solved it — copy what they did</div></div>' +
+    '<div class="na-card" style="border-left:4px solid #D97706"><div style="font-size:26px;font-weight:800;color:#D97706">' +
+      one.length + '</div><div style="font-size:12px;font-weight:700;margin-top:2px">fail at one campus only</div>' +
+      '<div style="font-size:11.5px;color:var(--txm);margin-top:4px">That campus’s own to close</div></div></div>';
+
+  if (every.length) {
+    h += '<div style="font-weight:800;font-size:12.5px;margin:4px 0 7px">Not compliant anywhere — fix once, fixes everywhere</div>';
+    h += '<table class="au-tbl"><thead><tr><th>Check</th><th>Section</th><th>Department</th></tr></thead><tbody>';
+    every.forEach(function (x) {
+      var dep = (rows.filter(function (r) { return r.item === x.item; })[0] || {}).dept || '';
+      h += '<tr><td style="max-width:60ch">' + _naEsc(x.item) + '</td>' +
+        '<td style="color:var(--txm)">' + _naEsc(x.section) + '</td>' +
+        '<td style="color:var(--txm)">' + _naEsc(dep) + '</td></tr>';
+    });
+    h += '</tbody></table>';
+  }
+  if (most.length) {
+    h += '<div style="font-weight:800;font-size:12.5px;margin:16px 0 7px">Solved at one campus and nowhere else</div>';
+    h += '<table class="au-tbl"><thead><tr><th>Check</th><th>Section</th><th>Already clear at</th></tr></thead><tbody>';
+    most.forEach(function (x) {
+      var ok = brs.filter(function (b) { return x.bad.indexOf(b) < 0; });
+      h += '<tr><td style="max-width:56ch">' + _naEsc(x.item) + '</td>' +
+        '<td style="color:var(--txm)">' + _naEsc(x.section) + '</td>' +
+        '<td><b style="color:#059669"><span class="bd b' + ok[0] + '"></span> ' + ok.join(', ') + '</b></td></tr>';
+    });
+    h += '</tbody></table>';
+  }
+  if (Object.keys(oneBy).length) {
+    h += '<div style="font-weight:800;font-size:12.5px;margin:16px 0 7px">Only this campus — local to close</div><div class="na-sev">';
+    NA_BRANCHES.forEach(function (b) {
+      if (!oneBy[b]) return;
+      h += '<div class="na-card"><b style="font-size:12.5px"><span class="bd b' + b + '"></span> ' + b +
+        ' <span style="color:var(--txm);font-weight:600">— ' + oneBy[b].length + '</span></b>' +
+        '<div style="font-size:11.5px;line-height:1.6;margin-top:6px;color:var(--txm)">' +
+        oneBy[b].slice(0, 6).map(function (x) { return '· ' + _naEsc(x.item.slice(0, 68)); }).join('<br>') +
+        (oneBy[b].length > 6 ? '<br>· …and ' + (oneBy[b].length - 6) + ' more' : '') + '</div></div>';
+    });
+    h += '</div>';
+  }
+  el.innerHTML = h;
+}
+
+function _naDocs(rows) {
+  var el = document.getElementById('na-docs'); if (!el) return;
+  var rec = rows.filter(function (r) { return r.doc === 'Yes' || r.doc === 'No'; });
+  var blank = rows.length - rec.length - rows.filter(function (r) { return r.doc === 'NA'; }).length;
+  var h = '';
+  if (rec.length) {
+    var no = rec.filter(function (r) { return r.doc === 'No'; }).length;
+    h += '<div style="background:#F5F3FF;border:1px solid #DDD6FE;border-radius:10px;padding:12px 14px;margin-bottom:13px">' +
+      '<div style="font-size:13px;font-weight:800;color:#5B21B6">' + no.toLocaleString('en-IN') + ' of ' +
+      rec.length.toLocaleString('en-IN') + ' checks have no document behind them.</div>' +
+      '<div style="font-size:12px;color:#6D28D9;line-height:1.65;margin-top:4px">A check can be satisfied on the ' +
+      'day and still leave no record. That is the difference between a campus that is compliant and a campus ' +
+      'that can <i>show</i> it was compliant — which is the only version that survives an inspection.</div></div>';
+    var bySec = {};
+    rec.forEach(function (r) {
+      var e = bySec[r.section] = bySec[r.section] || { s: r.section, n: 0, no: 0 };
+      e.n++; if (r.doc === 'No') e.no++;
+    });
+    var list = Object.keys(bySec).map(function (k) { return bySec[k]; })
+                 .filter(function (x) { return x.no; })
+                 .sort(function (a, b) { return (b.no / b.n) - (a.no / a.n); }).slice(0, 12);
+    h += '<table class="au-tbl"><thead><tr><th>Section</th><th style="min-width:170px">Share with nothing on file</th>' +
+      '<th class="n">Missing</th><th class="n">Recorded</th></tr></thead><tbody>';
+    list.forEach(function (x) {
+      var p = 100 * x.no / x.n;
+      h += '<tr><td>' + _naEsc(x.s) + '</td>' +
+        '<td><div class="au-bar"><i style="width:' + p + '%;background:#7C3AED"></i></div></td>' +
+        '<td class="n" style="font-weight:800;color:#6D28D9">' + x.no + '</td>' +
+        '<td class="n" style="color:var(--txm)">' + x.n + '</td></tr>';
+    });
+    h += '</tbody></table>';
+  }
+  var docs = _naRaw && _naRaw.docs;
+  if (docs && docs.rows && docs.rows.length) {
+    var H = {}; (docs.hdr || []).forEach(function (x, i) { H[String(x).trim()] = i; });
+    var cust = H['Custodian'], loc = H['Location / Link'], val = H['Valid Till / Last Updated'];
+    var filled = function (ci) {
+      if (ci === undefined) return 0;
+      return docs.rows.filter(function (r) { return String(r[ci] == null ? '' : r[ci]).trim() !== ''; }).length;
+    };
+    h += '<p class="au-note" style="margin-top:14px"><b>The Document Register lists ' + docs.rows.length +
+      ' records each campus is expected to hold</b>, by department and frequency. Of those, <b>' + filled(cust) +
+      '</b> name a custodian, <b>' + filled(loc) + '</b> say where the record lives and <b>' + filled(val) +
+      '</b> carry a valid-till date. Until those three columns are filled, the register lists what ought to ' +
+      'exist but cannot be used to find anything — and the audit above has to take "no document" on trust ' +
+      'rather than checking a location.</p>';
+  } else if (blank > 0) {
+    h += '<p class="au-note" style="margin-top:12px">' + blank + ' checks have the <b>Doc on file?</b> column ' +
+      'left blank, so they are not counted either way above.</p>';
+  }
+  el.innerHTML = h || '<div class="au-empty">Nothing recorded against Doc on file? in this view.</div>';
+}
+
+/* ── remarks, in full ─────────────────────────────────────────────────────── */
+function _naFilters(rows) {
+  var mk = function (id, vals, label) {
+    var el = document.getElementById(id); if (!el) return;
+    var cur = el.value;
+    el.innerHTML = '<option value="">' + label + '</option>' +
+      vals.map(function (v) { return '<option' + (v === cur ? ' selected' : '') + '>' + _naEsc(v) + '</option>'; }).join('');
+    el.onchange = _naRemarks;
+  };
+  var u = function (k) { var m = {}; rows.forEach(function (r) { if (r[k]) m[r[k]] = 1; }); return Object.keys(m).sort(); };
+  mk('na-f-branch', u('branch'), 'All branches');
+  mk('na-f-sec', u('section'), 'All sections');
+  mk('na-f-st', ['No', 'IP', 'Yes', 'NA'], 'Any status');
+  var q = document.getElementById('na-f-q');
+  if (q && !q._wired) { q._wired = 1; q.oninput = function () { clearTimeout(q._t); q._t = setTimeout(_naRemarks, 180); }; }
+}
+
+function _naRemarks() {
+  var el = document.getElementById('na-rem'); if (!el) return;
+  var rows = (window._NA_ROWS || []).filter(function (r) { return r.remark; });
+  var v = function (id) { var e = document.getElementById(id); return e ? e.value : ''; };
+  var fb = v('na-f-branch'), fs = v('na-f-sec'), fst = v('na-f-st'), q = (v('na-f-q') || '').toLowerCase();
+  var out = rows.filter(function (r) {
+    if (fb && r.branch !== fb) return false;
+    if (fs && r.section !== fs) return false;
+    if (fst && r.status !== fst) return false;
+    if (q && (r.remark + ' ' + r.item).toLowerCase().indexOf(q) < 0) return false;
+    return true;
+  });
+  /* failures first: a remark against a failed check is the one that needs doing */
+  var ord = { 'No': 0, 'IP': 1, 'NA': 2, 'Yes': 3 };
+  out.sort(function (a, b) {
+    var d = (ord[a.status] === undefined ? 9 : ord[a.status]) - (ord[b.status] === undefined ? 9 : ord[b.status]);
+    return d || (a.branch < b.branch ? -1 : a.branch > b.branch ? 1 : 0);
+  });
+  if (!out.length) { el.innerHTML = '<div class="au-empty">No observation matches those filters.</div>'; return; }
+
+  var COL = { 'No': '#DC2626', 'IP': '#D97706', 'Yes': '#059669', 'NA': '#94A3B8' };
+  var LAB = { 'No': 'Failed', 'IP': 'In progress', 'Yes': 'Passed, with a note', 'NA': 'Not applicable' };
+  var h = '<div style="font-size:11.5px;color:var(--txm);margin-bottom:9px">Showing <b>' + out.length +
+    '</b> of ' + rows.length + ' observations. Failed checks first.</div>';
+  out.forEach(function (r) {
+    var c = COL[r.status] || 'var(--bor)';
+    h += '<div class="na-rem" style="border-left-color:' + c + '">' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:3px">' +
+        '<span class="na-pill" style="background:' + c + '1A;color:' + c + '">' + (LAB[r.status] || r.status) + '</span>' +
+        '<b><span class="bd b' + r.branch + '"></span> ' + r.branch + '</b>' +
+        '<span style="color:var(--txm);font-size:11.5px">' + _naEsc(r.section) + ' · ' + _naEsc(r.dept) + '</span>' +
+        (r.critical ? '<span class="na-pill" style="background:#FEE2E2;color:#991B1B">safety / statutory</span>' : '') +
+        (r.doc === 'No' ? '<span class="na-pill" style="background:#F5F3FF;color:#6D28D9">no document</span>' : '') +
+      '</div>' +
+      '<div style="color:var(--tx)">' + _naEsc(r.item) + '</div>' +
+      '<div style="margin-top:4px;color:var(--txm)">“' + _naEsc(r.remark) + '”</div></div>';
+  });
+  el.innerHTML = h;
+}
+
+function _naCapa() {
+  var el = document.getElementById('na-capa'); if (!el) return;
+  var c = _naRaw && _naRaw.capa;
+  var rows = (c && c.rows) ? c.rows : [];
+  var H = {}; ((c && c.hdr) || []).forEach(function (x, i) { H[String(x).trim()] = i; });
+  var get = function (r, n) { var i = H[n]; return i === undefined ? '' : String(r[i] == null ? '' : r[i]).trim(); };
+  /* The sheet keeps three counter rows below the real ones; a CAPA row is a row
+     that actually names a branch. */
+  var real = rows.filter(function (r) { return get(r, 'Branch'); });
+
+  var open = (window._NA_ROWS || []).filter(function (r) { return r.status === 'No' || r.status === 'IP'; }).length;
+  if (!real.length) {
+    el.innerHTML = '<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:13px 15px">' +
+      '<div style="font-size:13px;font-weight:800;color:#92400E">The CAPA tracker is not being used yet.</div>' +
+      '<div style="font-size:12px;color:#78350F;line-height:1.65;margin-top:4px">It holds ' +
+      (rows.length ? 'one worked example and nothing else' : 'no rows') + ', while this month’s audit raised <b>' +
+      open.toLocaleString('en-IN') + ' observations</b> that are not yet closed. Until each one carries an owner ' +
+      'and a target date, the audit produces a score every month and nothing changes between them — the next ' +
+      'audit simply finds the same gaps again. This panel fills itself the moment rows are entered.</div></div>';
+    return;
+  }
+  var h = '<table class="au-tbl"><thead><tr><th>Branch</th><th>Observation</th><th>Section</th>' +
+    '<th>Owner</th><th class="n">Progress</th><th class="n">Overdue</th></tr></thead><tbody>';
+  real.forEach(function (r) {
+    var pr = get(r, 'Progress %'), od = parseFloat(get(r, 'Days Overdue')) || 0;
+    var pn = parseFloat(pr); if (pn <= 1 && pn > 0) pn = pn * 100;
+    h += '<tr><td><b><span class="bd b' + get(r, 'Branch') + '"></span> ' + _naEsc(get(r, 'Branch')) + '</b></td>' +
+      '<td style="max-width:46ch">' + _naEsc(get(r, 'Observation / Gap')) + '</td>' +
+      '<td style="color:var(--txm)">' + _naEsc(get(r, 'Section')) + '</td>' +
+      '<td style="color:var(--txm)">' + _naEsc(get(r, 'Owner')) + '</td>' +
+      '<td class="n">' + (isNaN(pn) ? '–' : Math.round(pn) + '%') + '</td>' +
+      '<td class="n" style="font-weight:800;color:' + (od > 0 ? '#DC2626' : 'var(--txm)') + '">' +
+        (od > 0 ? od + ' days' : '–') + '</td></tr>';
+  });
+  h += '</tbody></table>';
+  h += '<p class="au-note">' + real.length + ' observation' + (real.length === 1 ? '' : 's') +
+    ' tracked here, against <b>' + open.toLocaleString('en-IN') + '</b> raised by this month’s audit.</p>';
+  el.innerHTML = h;
+}
+
+/* ── drill-downs ──────────────────────────────────────────────────────────── */
+function _naList(title, sub, rows) {
+  var COL = { 'No': '#DC2626', 'IP': '#D97706', 'Yes': '#059669', 'NA': '#94A3B8' };
+  var h = '<table class="au-tbl"><thead><tr><th>Check</th><th>Section</th><th>Status</th><th>Doc</th><th>Observation</th></tr></thead><tbody>';
+  rows.forEach(function (r) {
+    h += '<tr><td style="max-width:44ch">' + _naEsc(r.item) + '</td>' +
+      '<td style="color:var(--txm)">' + _naEsc(r.section) + '</td>' +
+      '<td><span class="na-pill" style="background:' + (COL[r.status] || '#94A3B8') + '1A;color:' +
+        (COL[r.status] || '#94A3B8') + '">' + _naEsc(r.status) + '</span></td>' +
+      '<td style="color:' + (r.doc === 'No' ? '#6D28D9' : 'var(--txm)') + '">' + _naEsc(r.doc || '–') + '</td>' +
+      '<td style="color:var(--txm);max-width:40ch">' + (r.remark ? '“' + _naEsc(r.remark) + '”' : '') + '</td></tr>';
+  });
+  h += '</tbody></table>';
+  /* openHTMLModal, not openModal: that one takes rows + a column spec and
+     renders its own table, while this panel is already built markup. */
+  if (typeof openHTMLModal === 'function') openHTMLModal(title, sub, h);
+}
+function naOpenBranch(b) {
+  var rows = (window._NA_ROWS || []).filter(function (r) { return r.branch === b && (r.status === 'No' || r.status === 'IP'); });
+  rows.sort(function (x, y) { return (x.status === 'No' ? 0 : 1) - (y.status === 'No' ? 0 : 1); });
+  _naList(b + ' — everything not yet compliant',
+    rows.length + ' checks failed or in progress · ' + (window._NA_MONTH || ''), rows);
+}
+function naOpenCell(sec, b) {
+  var rows = (window._NA_ROWS || []).filter(function (r) { return r.section === sec && r.branch === b; });
+  var p = _naPct(rows);
+  _naList(sec + ' — ' + b, rows.length + ' checks · ' + (p === null ? 'nothing scored' : p.toFixed(1) + '% compliant'), rows);
+}
+
 async function loadAudit(force){
   if(_auLoading){ if(force){ _auQueued=true; _auStatus('Reading the sheet… (after the load already running)'); } return; }
   if(_auLoaded && !force){
@@ -17082,9 +17767,11 @@ async function loadAudit(force){
 
 (function(){
   var _s=window.showTab, _w=window.switchTab;
-  window.showTab=function(id,btn){ _s(id,btn); if(id==='audit') loadAudit(false); };
-  window.switchTab=function(id){ _w(id); if(id==='audit') loadAudit(false); };
+  var open=function(id){ if(id==='audit') loadAudit(false); if(id==='naa') loadNaa(false); };
+  window.showTab=function(id,btn){ _s(id,btn); open(id); };
+  window.switchTab=function(id){ _w(id); open(id); };
 })();
+window.loadNaa=loadNaa;
 </script>
 
 
