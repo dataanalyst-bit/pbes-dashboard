@@ -62,7 +62,9 @@ const SECTION_TTL_SECONDS = 1800;
 /* The biometric sheets are replaced once a month, so a long edge copy is right
    — but a short one the day they are pasted in matters more than saving a
    fetch, hence the same 5 minutes the audit uses. */
-const SECTION_TTL_OVERRIDE = { syl: 120, sylc: 120, meet: 30, dm: 120, naa: 300, bio: 300 };
+/* dm is a 1.3 MB payload rebuilt from six tabs that are replaced once a month,
+   so a two-minute edge copy was costing a full rebuild for no freshness. */
+const SECTION_TTL_OVERRIDE = { syl: 120, sylc: 120, meet: 30, dm: 900, naa: 300, bio: 300 };
 
 // Column headers that carry the campus name, in the order they are looked for.
 // The three PT-1 tabs all use "Branch", but this keeps a rename from silently
@@ -416,12 +418,8 @@ export async function onRequestGet({ request, env }) {
   // that rather than on the ad account.
   if (section === "dm") {
     const dm = data && data.DM_RAW;
-    if (!dm || !Array.isArray(dm.recs)) return withCookie(json(data));
-    const keep = dm.recs.filter((r) => {
-      const list = Array.isArray(r.servedList) ? r.servedList : [r.served];
-      return list.some((b) => sameBranch(b, userBranch));
-    });
-    return withCookie(json({ ...data, DM_RAW: { ...dm, recs: keep } }));
+    if (!dm || !Array.isArray(dm.scorecard)) return withCookie(json(data));
+    return withCookie(json({ ...data, DM_RAW: filterDmByBranch(dm, userBranch) }));
   }
 
   //   Cross-branch aggregates needed by the Head-to-Head scorecard stay full.
@@ -449,6 +447,44 @@ export async function onRequestGet({ request, env }) {
    punched on each date, and whether that made it a working day. Those are
    counts with no names in them, and the working-day verdict is sounder computed
    over the whole group than over eighteen people at one campus. */
+/* ── the Digital Marketing payload's own branch filter ─────────────────────
+   This tab is a cross-branch comparison, and today only the group-wide roles
+   can open it — so in practice this never runs. It is written properly anyway,
+   because the day someone adds 'dm' to a principal's tab list, the difference
+   between "the filter was never needed" and "the filter does not exist" is
+   every other campus's ad spend and post captions arriving in their browser.
+
+   Every array in the payload is either keyed by a branch field or is a global
+   lookup. The branch-keyed ones are filtered; the model's topics, drivers and
+   the hour-of-day curve are group-level shapes with no branch in them and are
+   passed through. */
+const DM_BRANCH_KEYS = {
+  Branch: 1, branch: 1,          // Google blocks use Branch, organic/Meta use branch
+};
+function filterDmByBranch(dm, branch) {
+  const keepRow = (r) => {
+    if (!r || typeof r !== "object") return true;
+    for (const k in DM_BRANCH_KEYS) {
+      if (Object.prototype.hasOwnProperty.call(r, k)) return sameBranch(r[k], branch);
+    }
+    return true;                 // no branch field: a group-level row, keep it
+  };
+  const out = {};
+  for (const k of Object.keys(dm)) {
+    const v = dm[k];
+    out[k] = Array.isArray(v) ? v.filter(keepRow) : v;
+  }
+  /* branch_terms is keyed BY branch rather than carrying one */
+  if (dm.branch_terms && typeof dm.branch_terms === "object") {
+    const bt = {};
+    for (const b of Object.keys(dm.branch_terms)) {
+      if (sameBranch(b, branch)) bt[b] = dm.branch_terms[b];
+    }
+    out.branch_terms = bt;
+  }
+  return out;
+}
+
 function filterBioByBranch(data, branch) {
   const R = data && data.BIO_RAW;
   if (!R || !Array.isArray(R.staff) || !Array.isArray(R.recs)) return data;
