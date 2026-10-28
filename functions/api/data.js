@@ -49,7 +49,7 @@ const CACHE_TTL_SECONDS = 300; // edge freshness window (Apps Script keep-warm k
 // still one entry here — plus one line in step 4 if it carries personal data.
 const ALLOWED_SECTIONS = {
   pt1: 1, audit: 1, ptm: 1, civil: 1, syl: 1, vchk: 1, kptm: 1, sylc: 1,
-  term1: 1, meet: 1, dm: 1, naa: 1
+  term1: 1, meet: 1, dm: 1, naa: 1, bio: 1
 };
 
 // Heavier than the main payload and most sections change only when marks are
@@ -59,7 +59,10 @@ const ALLOWED_SECTIONS = {
 const SECTION_TTL_SECONDS = 1800;
 // meet changes the instant somebody uploads a transcript, and every other user
 // needs that on their next load rather than half an hour later.
-const SECTION_TTL_OVERRIDE = { syl: 120, sylc: 120, meet: 30, dm: 120, naa: 300 };
+/* The biometric sheets are replaced once a month, so a long edge copy is right
+   — but a short one the day they are pasted in matters more than saving a
+   fetch, hence the same 5 minutes the audit uses. */
+const SECTION_TTL_OVERRIDE = { syl: 120, sylc: 120, meet: 30, dm: 120, naa: 300, bio: 300 };
 
 // Column headers that carry the campus name, in the order they are looked for.
 // The three PT-1 tabs all use "Branch", but this keeps a rename from silently
@@ -333,6 +336,29 @@ export async function onRequestGet({ request, env }) {
     return withCookie(json(filterTablesByBranch(naaData, userBranch, "NAA_RAW")));
   }
 
+  /* ── 2c. The biometric report has its own access rule ──
+     Group-wide: management, auditor and the senior admin manager. Everyone
+     else carrying a branch sees their own campus only — `hr` included, which
+     is why this sits ABOVE the full-access passthrough: branch HR is sent the
+     whole payload for HR Analytics, and that must not also hand them every
+     campus's punch records. */
+  const BIO_ALL_BRANCH = { management: 1, auditor: 1, admin_manager: 1 };
+  if (section === "bio") {
+    if (!userBranch || BIO_ALL_BRANCH[role]) {
+      return withCookie(new Response(upstream.body, {
+        status: 200,
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+      }));
+    }
+    let bioData;
+    try {
+      bioData = await upstream.json();
+    } catch (err) {
+      return json({ error: true, message: "Cached payload unreadable: " + err.message }, 502);
+    }
+    return withCookie(json(filterBioByBranch(bioData, userBranch)));
+  }
+
   // ── 3. Full-access roles: stream straight through (no parse) ──
 //   Anyone WITHOUT a branch on their account gets the whole payload: that is how
 //   the group-wide roles are expressed (management, auditor, admin_manager,
@@ -412,6 +438,52 @@ export async function onRequestGet({ request, env }) {
 //
 // Note the review still renders correctly on a single branch: its comparisons
 // fall back to within-branch ones when there is nothing to compare against.
+/* ── the biometric payload's own branch filter ──────────────────────────────
+   BIO_RAW is not a table of rows with a Branch column, so filterTablesByBranch
+   cannot touch it: it is a staff dictionary plus an array of punch records that
+   point into it by index. Those records carry names and arrival times, so a
+   branch-scoped user must never receive another campus's copy — the tab being
+   hidden in the browser is not a boundary.
+
+   What IS passed through whole is the calendar: how many staff across the group
+   punched on each date, and whether that made it a working day. Those are
+   counts with no names in them, and the working-day verdict is sounder computed
+   over the whole group than over eighteen people at one campus. */
+function filterBioByBranch(data, branch) {
+  const R = data && data.BIO_RAW;
+  if (!R || !Array.isArray(R.staff) || !Array.isArray(R.recs)) return data;
+  const bi = (R.branches || []).indexOf(branch);
+
+  /* A campus with no biometric sheet in the workbook yet gets a well-formed
+     empty payload, so the tab says "no records" instead of failing. */
+  if (bi < 0) {
+    return Object.assign({}, data, { BIO_RAW: Object.assign({}, R, {
+      branches: [], staff: [], recs: [], codes: [], cohorts: [], overrides: []
+    }) });
+  }
+
+  const map = new Map();
+  const staff = [];
+  R.staff.forEach((p, i) => {
+    if (p && p.b === bi) { map.set(i, staff.length); staff.push(Object.assign({}, p, { b: 0 })); }
+  });
+  const recs = [];
+  R.recs.forEach((r) => {
+    if (!Array.isArray(r)) return;
+    const j = map.get(r[0]);
+    if (j === undefined) return;
+    const c = r.slice();
+    c[0] = j;
+    recs.push(c);
+  });
+  const own = (arr) => (Array.isArray(arr) ? arr.filter((x) => x && x.branch === branch) : []);
+
+  return Object.assign({}, data, { BIO_RAW: Object.assign({}, R, {
+    branches: [branch], staff: staff, recs: recs,
+    codes: own(R.codes), cohorts: own(R.cohorts), overrides: own(R.overrides)
+  }) });
+}
+
 function filterTablesByBranch(data, branch, wrapper) {
   const src = data && data[wrapper];
   if (!src) return data;
