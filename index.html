@@ -3546,6 +3546,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     </div>
   </div>
   <div id="exm-flag" style="display:none"></div>
+  <div id="exm-pending" style="display:none"></div>
   <div class="exm-shell">
     <div id="exm-loader" class="exm-loader">
       <div class="exm-spin"></div>
@@ -15036,9 +15037,131 @@ function _pt1Post(){
                                 branchLock: window._BRANCH_LOCK || null }, '*');
   exSyncSwitch();
   exCheckMarks(pay);
+  exRenderPending();
   _pt1HideLoader(true);
 }
 
+/* ── Results not yet received ──────────────────────────────────
+   Built in Code.gs by setting the care-call roster — the only list of who is
+   actually on the roll — against the result sheet for the sitting on screen.
+   Only the children WITHOUT a result come down; the roster stays in the sheet.
+
+   Two reasons are kept apart, because they need different action: a whole
+   grade with no results is a file nobody loaded, while a single child missing
+   from a grade that does have results is a paper to chase. Reporting them as
+   one number would make the second look far larger than it is. */
+function exPendingTable(){
+  if(!_pt1Raw) return null;
+  var t = (_exSitting==='hy') ? _pt1Raw.pending_hy : _pt1Raw.pending;
+  return (t && t.hdr && t.hdr.length) ? t : null;
+}
+function exPendingRows(){
+  var t=exPendingTable(); if(!t) return [];
+  var H={}; t.hdr.forEach(function(h,i){ H[String(h).trim()]=i; });
+  return (t.rows||[]).map(function(r){
+    return { branch:String(r[H['Branch']]||''), grade:String(r[H['Grade']]||''),
+             section:String(r[H['Section']]||''), name:String(r[H['Student Name']]||''),
+             roll:String(r[H['Roll No']]||''), why:String(r[H['Why']]||''),
+             basis:String(r[H['Matched on']]||'') };
+  }).filter(function(x){ return x.name; });
+}
+function exRenderPending(){
+  var el=document.getElementById('exm-pending'); if(!el) return;
+  var rows=exPendingRows();
+  if(!rows.length){ el.style.display='none'; el.innerHTML=''; return; }
+  var gm=rows.filter(function(r){return r.why==='grade';}).length;
+  var brs={}; rows.forEach(function(r){ brs[r.branch]=1; });
+  el.innerHTML='<button onclick="exOpenPending()" style="width:100%;text-align:left;border:1px solid #FCD34D;'+
+    'background:#FFFBEB;border-radius:10px;padding:11px 14px;margin-bottom:12px;cursor:pointer;font:inherit;'+
+    'display:flex;gap:12px;align-items:center">'+
+    '<span style="font-size:20px">\ud83d\udccb</span>'+
+    '<span style="flex:1">'+
+      '<span style="display:block;font-size:13px;font-weight:800;color:#92400E">'+
+        rows.length.toLocaleString('en-IN')+' students on the care-call roster have no result in this sitting.</span>'+
+      '<span style="display:block;font-size:12px;color:#78350F;line-height:1.6;margin-top:3px">'+
+        'Across '+Object.keys(brs).length+' branches'+
+        (gm? ' \u00b7 <b>'+gm.toLocaleString('en-IN')+'</b> of them are in grades where <b>nobody</b> has a result yet':'')+
+        '.</span></span>'+
+    '<span style="font-size:11.5px;font-weight:800;color:#B45309;white-space:nowrap">Click to view \u203a</span>'+
+    '</button>';
+  el.style.display='';
+}
+
+function exOpenPending(){
+  var rows=exPendingRows(); if(!rows.length) return;
+  var S=EX_SITTINGS[_exSitting]||EX_SITTINGS.pt1;
+  var by={};
+  rows.forEach(function(r){
+    var e=by[r.branch]||(by[r.branch]={b:r.branch,n:0,grade:0,student:0,id:0,name:0,rows:[]});
+    e.n++; if(r.why==='grade') e.grade++; else e.student++;
+    if(r.basis==='id') e.id++; else e.name++;
+    e.rows.push(r);
+  });
+  var list=Object.keys(by).map(function(k){return by[k];}).sort(function(a,b){return b.n-a.n;});
+  var max=list.length?list[0].n:1;
+  var tG=rows.filter(function(r){return r.why==='grade';}).length;
+  var tN=rows.filter(function(r){return r.basis==='name';}).length;
+
+  var h='<div style="font-size:12.5px;color:var(--txm);line-height:1.7;margin-bottom:12px">'+
+    'Every child on the care-call roster who has no row in the <b>'+S.label+'</b> result sheet. '+
+    'Matched on the admission number where both sheets carry one, and on the exact name within the same '+
+    'branch otherwise. Tap a branch for the names.</div>';
+
+  if(tG){
+    h+='<div style="background:#FEF2F2;border:1px solid #FCA5A5;border-radius:10px;padding:11px 13px;margin-bottom:12px">'+
+      '<div style="font-size:13px;font-weight:800;color:#991B1B">'+tG.toLocaleString('en-IN')+
+      ' of these are in grades where no child at all has a result.</div>'+
+      '<div style="font-size:12px;color:#7F1D1D;line-height:1.65;margin-top:4px">'+
+      'That is a result file that was never loaded for those grades, not children who missed a paper. '+
+      'It is worth settling before anyone reads the averages above, because those grades are missing '+
+      'from every figure on this page.</div></div>';
+  }
+
+  list.forEach(function(d){
+    var head='<span style="display:inline-flex;align-items:center;gap:7px;min-width:150px">'+
+        '<span class="bd b'+d.b+'"></span><b style="font-size:13px">'+d.b+'</b></span>'+
+      '<span style="display:inline-block;width:40%;max-width:300px;vertical-align:middle;margin:0 12px">'+
+        '<span class="au-bar" style="display:block"><i style="width:'+(100*d.n/max)+'%;background:#D97706"></i></span></span>'+
+      '<b style="font-size:15px;color:#B45309">'+d.n.toLocaleString('en-IN')+'</b>'+
+      '<span style="font-size:11px;color:var(--txm);margin-left:8px">'+
+        (d.grade? d.grade+' whole-grade \u00b7 ':'')+d.student+' individual</span>';
+
+    /* grouped by grade: a whole grade missing reads as one fact, not as fifty */
+    var g={}; d.rows.forEach(function(r){ (g[r.grade||'(not stated)']=g[r.grade||'(not stated)']||[]).push(r); });
+    var keys=Object.keys(g).sort(function(a,b){ return g[b].length-g[a].length; });
+    var body=keys.map(function(k){
+      var set=g[k], whole=set.length&&set[0].why==='grade';
+      return '<div style="margin-bottom:10px">'+
+        '<div style="font-weight:800;font-size:12px;margin-bottom:4px">'+_naEsc(k)+
+          ' <span style="color:var(--txm);font-weight:600">\u2014 '+set.length+'</span>'+
+          (whole? ' <span class="na-pill" style="background:#FEE2E2;color:#991B1B">no result for this grade at all</span>':'')+
+        '</div>'+
+        '<table class="au-tbl"><thead><tr><th>Student</th><th>Section</th><th>Roll / ID</th>'+
+        '<th>Matched on</th></tr></thead><tbody>'+
+        set.map(function(r){
+          return '<tr><td>'+_naEsc(r.name)+'</td>'+
+            '<td style="color:var(--txm)">'+_naEsc(r.section||'\u2013')+'</td>'+
+            '<td style="color:var(--txm)">'+_naEsc(r.roll||'\u2013')+'</td>'+
+            '<td>'+(r.basis==='id'
+              ? '<span class="na-pill" style="background:#ECFDF5;color:#065F46">admission number</span>'
+              : '<span class="na-pill" style="background:#FFFBEB;color:#92400E" title="A spelling difference between the two sheets would also land here">name only</span>')+
+            '</td></tr>';
+        }).join('')+'</tbody></table></div>';
+    }).join('');
+    h+=_naAcc(head, body);
+  });
+
+  if(tN){
+    h+='<div class="au-note" style="margin-top:10px"><b>'+tN.toLocaleString('en-IN')+' of these were matched on name alone</b>, '+
+      'because one of the two sheets has no admission number for them. A name spelled differently in the two '+
+      'sheets looks the same as a missing result, so treat those as a list to check rather than a count to '+
+      'report. The quickest fix is an admission number in the care-call sheet\u2019s Roll No column \u2014 at '+
+      'Pocharam and Gowdavalli that column holds the class roll number (1\u201340), which cannot identify a child '+
+      'across sections.</div>';
+  }
+  if(typeof openHTMLModal==='function')
+    openHTMLModal('Results not yet received', S.label+' \u00b7 '+rows.length.toLocaleString('en-IN')+' students', h);
+}
 /* ── A percentage above 100 is not a result ─────────────────────────
    The review averages whatever it is given. If a subject’s maximum is entered
    lower than the marks awarded against it, those students score over 100% and
