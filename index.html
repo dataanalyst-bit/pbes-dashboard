@@ -3447,6 +3447,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
 
       <div class="au-sec">
+        <h3>🧪 What these numbers will and will not support</h3>
+        <div class="sub">Every figure on this page was checked before it was printed, and two things that
+          were asked for did not survive the check. The tests are run here against the live data rather
+          than quoted from a note, so when a later season makes a forecast sound, this panel will say so
+          on its own.</div>
+        <div id="adm-model"></div>
+      </div>
+
+      <div class="au-sec">
         <h3>📐 How these numbers are made</h3>
         <div class="sub" id="adm-method"></div>
         <div class="sub" style="margin-top:10px">An lead is counted at the branch whose tracker holds it.
@@ -20235,34 +20244,46 @@ function _admSource() {
   });
   h += '</tbody></table>';
 
-  /* The finding this panel exists to surface, said carefully. Digital having
-     returned nothing YET is a fact; digital not working is a conclusion the
-     dates do not yet support, and the two must not be confused in front of a
-     director deciding next month\'s budget. */
-  var DIG = { website: 1, facebook: 1, google_ads: 1, chatbot: 1, qr: 1 };
+  /* The finding this panel exists to surface, and the one objection to it
+     answered with the data rather than with an opinion. "Digital just needs
+     longer" is the obvious reply, and it is testable: if it were true, the
+     OLDER digital leads would convert and only the fresh ones would not. */
   var dN = 0, dW = 0, oN = 0, oW = 0;
   S.rows.forEach(function (r) {
-    if (DIG[r.src]) { dN++; if (_admIsWon(r)) dW++; } else { oN++; if (_admIsWon(r)) oW++; }
+    if (_admIsDigital(r)) { dN++; if (_admIsWon(r)) dW++; }
+    else { oN++; if (_admIsWon(r)) oW++; }
   });
   if (dN && oN) {
     var sev = (dW === 0);
+    var today = _admIso(new Date());
+    var ageOf = function (r) {
+      return r.d ? Math.round((new Date(today) - new Date(r.d)) / 86400000) : 0; };
+    var MATURE = 8;
+    var dOld = S.rows.filter(function (r) { return _admIsDigital(r) && ageOf(r) >= MATURE; });
+    var wOld = S.rows.filter(function (r) { return _admIsWalk(r) && ageOf(r) >= MATURE; });
+    var dOldW = dOld.filter(_admIsWon).length, wOldW = wOld.filter(_admIsWon).length;
     h += '<div style="margin-top:13px;border-radius:12px;padding:13px 15px;font-size:12.5px;' +
       'line-height:1.65;background:' + (sev ? '#FFFBEB' : 'var(--sur)') + ';border:1px solid ' +
       (sev ? '#FDE68A' : 'var(--bor)') + ';color:' + (sev ? '#78350F' : 'inherit') + '">' +
       '<b>Digital has brought ' + _admN(dN) + ' leads and ' +
-        (dW ? _admN(dW) + ' admission' + (dW === 1 ? '' : 's') : 'no admission yet') + '.</b> ' +
-      'Walk-ins, referrals and hand-entered leads brought ' + _admN(oN) + ' and ' + _admN(oW) +
-      ' — ' + (oN ? _admPct1(oW, oN) : '0') + ' per hundred against ' +
-      (dN ? _admPct1(dW, dN) : '0') + '. ' +
-      (sev
-        ? 'That gap is worth reading beside the dates rather than as a verdict on the advertising: a ' +
-          'parent who walks in is already most of the way to a decision, while a digital lead is ' +
-          'answered, followed up and visited over weeks. The question to put to the agencies is not ' +
-          'whether the leads convert but how far along they have got — and ' +
-          _admN(S.rows.filter(function (r) { return DIG[r.src] && _admIsOpen(r); }).length) +
-          ' of them are still open, so that answer exists.'
-        : 'Spend follows conversion, not volume, so this is the column the agency conversation ' +
-          'should start from.') + '</div>';
+        (dW ? _admN(dW) + ' admission' + (dW === 1 ? '' : 's') : 'no admission at all') + '.</b> ' +
+      'Walk-in brought ' + _admN(oN) + ' and ' + _admN(oW) + ' \u2014 ' +
+      (oN ? _admPct1(oW, oN) : '0') + ' per hundred against ' + (dN ? _admPct1(dW, dN) : '0') + '. ' +
+      (sev && dOld.length >= 50
+        ? 'The usual explanation is that digital needs longer, and that can be checked rather than ' +
+          'argued: of the <b>' + _admN(dOld.length) + '</b> digital leads now at least ' + MATURE +
+          ' days old, <b>' + _admN(dOldW) + '</b> have converted, while ' + _admN(wOld.length) +
+          ' walk-ins of the same age produced ' + _admN(wOldW) + '. Age is not what is between them. ' +
+          'What the figures do not say is why \u2014 whether the advertising is reaching the wrong ' +
+          'parents or the follow-up on it is too slow is a question for the branches, and the stage ' +
+          'breakdown above is where to start, with ' +
+          _admN(S.rows.filter(function (r) { return _admIsDigital(r) && _admIsOpen(r); }).length) +
+          ' of these still open.'
+        : sev
+          ? 'Too few digital leads have had time to convert for that gap to mean anything yet; it is ' +
+            'worth re-reading once a few hundred of them are a fortnight old.'
+          : 'Spend follows conversion, not volume, so this is the column the agency conversation ' +
+            'should start from.') + '</div>';
   }
   el.innerHTML = h;
 }
@@ -20580,7 +20601,8 @@ function _admPaint() {
       return t.kind === 'enquiry' && (!S.scope || t.branch === S.scope); }).length === 1) ? '' : 's') + ' read';
   _admNotes(); _admKpis();
   _admCompare(); _admPlanPanel(); _admYoY();
-  _admFunnel(); _admSource(); _admClassPanel(); _admPace(); _admHist(); _admMethod();
+  _admFunnel(); _admSource(); _admClassPanel(); _admPace(); _admHist();
+  _admModel(); _admMethod();
   _admClean();
   var l = document.getElementById('adm-loader'), b = document.getElementById('adm-body');
   if (l) l.style.display = 'none';
@@ -20884,8 +20906,17 @@ function admOpenClean(v) {
    Three: the same point of the season in earlier years, which is the only
    thing that says whether a mid-season number is good.                     */
 
-var ADM_DIGITAL = { website: 1, facebook: 1, google_ads: 1, chatbot: 1, qr: 1 };
-var ADM_WALKIN  = { walk_in: 1 };
+/* Walk-in is the closed set; everything else is digital, so a source nobody
+   has seen yet lands in digital on its own and the two always add to the
+   total. The list comes from Code.gs so there is one definition. */
+function _admWalkinSet() {
+  var L = (_admRaw && _admRaw.walkinSources) || ['walk_in', 'referral', 'manual', 'chatbot', 'qr'];
+  var m = {};
+  L.forEach(function (k) { m[k] = 1; });
+  return m;
+}
+function _admIsWalk(r) { return !!_admWalkinSet()[r.src]; }
+function _admIsDigital(r) { return !_admWalkinSet()[r.src]; }
 
 var ADM_PERIODS = [
   ['season',    'Whole season'],
@@ -20983,22 +21014,25 @@ function _admCompare() {
       _admDate(a) + (a === b ? '' : ' to ' + _admDate(b)) + '</span></div>';
 
   var data = brs.map(function (br) {
-    var rs = S.rows.filter(function (r) { return r.b === br && r.d >= a && r.d <= b; });
-    var dig = rs.filter(function (r) { return ADM_DIGITAL[r.src]; });
-    var wlk = rs.filter(function (r) { return ADM_WALKIN[r.src]; });
-    var won = rs.filter(_admIsWon).length;
-    return { b: br, n: rs.length,
-             dL: dig.length, dA: dig.filter(_admIsWon).length,
-             wL: wlk.length, wA: wlk.filter(_admIsWon).length,
-             won: won, conv: rs.length ? 100 * won / rs.length : 0,
-             tgt: _admTargetFor(br, a, b, 'adms'),
-             tgtL: _admTargetFor(br, a, b, 'leads') };
+    var rs  = S.rows.filter(function (r) { return r.b === br && r.d >= a && r.d <= b; });
+    var dig = rs.filter(_admIsDigital), wlk = rs.filter(_admIsWalk);
+    var dA  = dig.filter(_admIsWon).length, wA = wlk.filter(_admIsWon).length;
+    /* The season figure never moves with the period switch: the year\'s target
+       is a year\'s target, and measuring a Tuesday against it would be noise
+       dressed up as a percentage. */
+    var seasonWon = S.rows.filter(function (r) { return r.b === br && _admIsWon(r); }).length;
+    return { b: br, n: rs.length, won: dA + wA,
+             dL: dig.length, dA: dA, dC: dig.length ? 100 * dA / dig.length : null,
+             wL: wlk.length, wA: wA, wC: wlk.length ? 100 * wA / wlk.length : null,
+             conv: rs.length ? 100 * (dA + wA) / rs.length : 0,
+             seasonWon: seasonWon,
+             tgt: _admTarget(br), tgtL: (_admRaw.leadTargets || {})[br] || 0 };
   }).sort(function (x, y) { return y.n - x.n; });
 
-  var T = { n: 0, dL: 0, dA: 0, wL: 0, wA: 0, won: 0, tgt: 0, tgtL: 0 };
+  var T = { n: 0, dL: 0, dA: 0, wL: 0, wA: 0, won: 0, seasonWon: 0, tgt: 0, tgtL: 0 };
   data.forEach(function (d) {
     T.n += d.n; T.dL += d.dL; T.dA += d.dA; T.wL += d.wL; T.wA += d.wA;
-    T.won += d.won; T.tgt += d.tgt; T.tgtL += d.tgtL;
+    T.won += d.won; T.seasonWon += d.seasonWon; T.tgt += d.tgt; T.tgtL += d.tgtL;
   });
 
   if (!T.n && !T.tgt) {
@@ -21006,57 +21040,70 @@ function _admCompare() {
     return;
   }
 
-  h += '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:860px"><thead><tr>' +
-    '<th>Branch</th><th class="n">Total Leads</th>' +
-    '<th class="n">Digital Leads</th><th class="n">Digital Admissions</th>' +
-    '<th class="n">Walk-in Leads</th><th class="n">Walk-in Admissions</th>' +
-    '<th class="n">Converted %</th><th class="n">Target to date</th><th class="n">Against target</th>' +
-    '</tr></thead><tbody>';
+  h += '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:1120px"><thead><tr>' +
+    '<th>Branch</th><th class="n">Total Leads</th><th class="n">Total Admissions</th>' +
+    '<th class="n">Converted %</th>' +
+    '<th class="n" style="border-left:1px solid var(--bor)">Digital Leads</th>' +
+    '<th class="n">Digital Admissions</th><th class="n">Digital Conv %</th>' +
+    '<th class="n" style="border-left:1px solid var(--bor)">Walk-in Leads</th>' +
+    '<th class="n">Walk-in Admissions</th><th class="n">Walk-in Conv %</th>' +
+    '<th class="n" style="border-left:1px solid var(--bor)">Target (full year)</th>' +
+    '<th class="n">Season vs target</th></tr></thead><tbody>';
+  var pc = function (v) {
+    if (v === null) return '<span style="color:var(--txm)">\u2013</span>';
+    return '<span style="font-weight:800;color:' + (v >= 20 ? '#059669' : v >= 5 ? '#D97706' : '#DC2626') +
+      '">' + v.toFixed(1) + '%</span>';
+  };
   data.forEach(function (d) {
-    /* A branch planning fifteen admissions in October is targeting half of one
-       a day, and rounding that to zero would print "no target" beside a real
-       one. Under one, it keeps a decimal. */
-    var tg = (d.tgt > 0 && d.tgt < 1) ? d.tgt.toFixed(1) : _admN(Math.round(d.tgt));
-    var pct = d.tgt ? 100 * d.won / d.tgt : null;
+    var sp = d.tgt ? 100 * d.seasonWon / d.tgt : null;
     h += '<tr><td><button class="na-secbtn" onclick="admOpenCompare(' +
         JSON.stringify(d.b).replace(/"/g, '&quot;') + ')">' + _admDot(d.b) + ' ' +
-        _admEsc(d.b) + ' ›</button></td>' +
+        _admEsc(d.b) + ' \u203a</button></td>' +
       '<td class="n" style="font-weight:800">' + _admN(d.n) + '</td>' +
-      '<td class="n">' + _admN(d.dL) + '</td>' +
+      '<td class="n" style="font-weight:800;color:' + (d.won ? '#059669' : 'var(--txm)') + '">' +
+        _admN(d.won) + '</td>' +
+      '<td class="n">' + pc(d.n ? d.conv : null) + '</td>' +
+      '<td class="n" style="border-left:1px solid var(--bor)">' + _admN(d.dL) + '</td>' +
       '<td class="n" style="font-weight:700;color:' + (d.dA ? '#059669' : 'var(--txm)') + '">' +
         _admN(d.dA) + '</td>' +
-      '<td class="n">' + _admN(d.wL) + '</td>' +
+      '<td class="n">' + pc(d.dC) + '</td>' +
+      '<td class="n" style="border-left:1px solid var(--bor)">' + _admN(d.wL) + '</td>' +
       '<td class="n" style="font-weight:700;color:' + (d.wA ? '#059669' : 'var(--txm)') + '">' +
         _admN(d.wA) + '</td>' +
-      '<td class="n" style="font-weight:800">' + d.conv.toFixed(1) + '%</td>' +
-      '<td class="n" style="color:var(--txm)">' + (d.tgt ? tg : '–') + '</td>' +
-      '<td class="n" style="font-weight:800;color:' + (pct === null ? 'var(--txm)'
-        : pct >= 100 ? '#059669' : pct >= 60 ? '#D97706' : '#DC2626') + '">' +
-        (pct === null ? '–' : Math.round(pct) + '%') + '</td></tr>';
+      '<td class="n">' + pc(d.wC) + '</td>' +
+      '<td class="n" style="border-left:1px solid var(--bor);color:var(--txm)">' +
+        (d.tgt ? _admN(d.tgt) : '\u2013') + '</td>' +
+      '<td class="n" style="font-weight:800;color:' + (sp === null ? 'var(--txm)'
+        : sp >= 100 ? '#059669' : sp >= 50 ? '#D97706' : '#DC2626') + '">' +
+        (sp === null ? '\u2013' : _admN(d.seasonWon) + ' \u00b7 ' + sp.toFixed(1) + '%') + '</td></tr>';
   });
-  var tgT = Math.round(T.tgt);
+  var spT = T.tgt ? 100 * T.seasonWon / T.tgt : null;
   h += '</tbody>' + (data.length < 2 ? '' :
     '<tfoot><tr style="font-weight:800;border-top:2px solid var(--bor)">' +
     '<td>' + (S.scope ? _admEsc(S.scope) : 'All five branches') + '</td>' +
-    '<td class="n">' + _admN(T.n) + '</td><td class="n">' + _admN(T.dL) + '</td>' +
-    '<td class="n" style="color:#059669">' + _admN(T.dA) + '</td>' +
-    '<td class="n">' + _admN(T.wL) + '</td>' +
-    '<td class="n" style="color:#059669">' + _admN(T.wA) + '</td>' +
+    '<td class="n">' + _admN(T.n) + '</td>' +
+    '<td class="n" style="color:#059669">' + _admN(T.won) + '</td>' +
     '<td class="n">' + (T.n ? (100 * T.won / T.n).toFixed(1) : '0.0') + '%</td>' +
-    '<td class="n">' + (tgT ? _admN(tgT) : '–') + '</td>' +
-    '<td class="n">' + (tgT ? Math.round(100 * T.won / tgT) + '%' : '–') + '</td>' +
-    '</tr></tfoot>') + '</table></div>';
+    '<td class="n" style="border-left:1px solid var(--bor)">' + _admN(T.dL) + '</td>' +
+    '<td class="n" style="color:#059669">' + _admN(T.dA) + '</td>' +
+    '<td class="n">' + (T.dL ? (100 * T.dA / T.dL).toFixed(1) + '%' : '\u2013') + '</td>' +
+    '<td class="n" style="border-left:1px solid var(--bor)">' + _admN(T.wL) + '</td>' +
+    '<td class="n" style="color:#059669">' + _admN(T.wA) + '</td>' +
+    '<td class="n">' + (T.wL ? (100 * T.wA / T.wL).toFixed(1) + '%' : '\u2013') + '</td>' +
+    '<td class="n" style="border-left:1px solid var(--bor)">' + _admN(T.tgt) + '</td>' +
+    '<td class="n">' + (spT === null ? '\u2013' : _admN(T.seasonWon) + ' \u00b7 ' + spT.toFixed(1) + '%') +
+    '</td></tr></tfoot>') + '</table></div>';
 
-  var other = T.n - T.dL - T.wL;
+  var WS = _admWalkinSet();
+  var wn = Object.keys(WS).map(function (k) { return _admSrcLab(k); });
   h += '<div style="font-size:11.5px;color:var(--txm);margin-top:10px;line-height:1.65">' +
-    '<b style="color:var(--tx)">Target</b> is the fixed monthly plan, shared across the days of its ' +
-    'month and added up over the window shown — so a week straddling two months is charged to both, ' +
-    'and the season-to-date figure is what the plan asked for by today rather than by June. ' +
-    'Admissions are counted against the branch\'s own plan, so a branch can be ahead of target and ' +
-    'still behind another branch on volume.' +
-    (other > 0 ? ' <b style="color:var(--tx)">' + _admN(other) + '</b> lead' + (other === 1 ? '' : 's') +
-      ' came by referral or were entered by hand, so they are in Total Leads and in neither of the ' +
-      'two source columns.' : '') +
+    '<b style="color:var(--tx)">Walk-in</b> is ' + wn.join(', ') + '. <b style="color:var(--tx)">' +
+    'Digital</b> is everything else \u2014 the website, Facebook, Instagram, Google Ads and any source ' +
+    'added later \u2014 so the two columns always add up to Total Leads with nothing left over.' +
+    '<br><br><b style="color:var(--tx)">Target</b> is the whole academic year and does not move with ' +
+    'the buttons above; neither does the last column, which is the season\'s admissions so far against ' +
+    'that target. Only the lead and admission counts follow the window, because measuring a Tuesday ' +
+    'against a year\'s target would be noise dressed up as a percentage.' +
     '</div>';
   el.innerHTML = h;
 }
@@ -21221,10 +21268,8 @@ function _admYoY() {
   h += '<div style="font-size:11.5px;color:var(--txm);margin-top:10px;line-height:1.65">' +
     'Every year is cut at <b style="color:var(--tx)">the same day of its own season</b> — day ' + day +
     ', counting from 1 October, which is when the season opens and when the plan starts. Comparing ' +
-    'one calendar month to another would not do: ' + _admMonthLab(today.slice(0, 7)) + ' still has ' +
-    (_admDaysIn(today.slice(0, 7)) - new Date(today).getDate()) + ' day' +
-    ((_admDaysIn(today.slice(0, 7)) - new Date(today).getDate()) === 1 ? '' : 's') +
-    ' to run and the months it would be set against are complete.' +
+    'October to October would not do: this October has ' + (31 - new Date(today).getDate()) +
+    ' days left in it and the Octobers it would be set against are complete.' +
     '<br><br>Against an average of <b style="color:var(--tx)">' + avg.toFixed(0) + '</b> by this day, ' +
     'this season has <b style="color:var(--tx)">' + _admN(now) + '</b>' +
     (avg ? ' — ' + (now >= avg ? 'ahead by ' : 'behind by ') +
@@ -21274,6 +21319,194 @@ function admOpenYoY(ay, day) {
           '<td style="white-space:nowrap">' + _admDot(r.b) + ' ' + _admEsc(r.b) + '</td>' +
           '<td class="n">' + _admDate(r.d) + '</td></tr>'; }).join('') + '</tbody></table>';
   _admModal(ay + ' · first ' + (day + 1) + ' days', _admN(rows.length) + ' admissions', h);
+}
+
+/* ═══════════ WHAT THE DATA WILL AND WILL NOT SUPPORT ═══════════
+ *
+ * This panel exists because the obvious next request is a forecast and a lead
+ * score, and on this data neither survives being tested. Rather than leave
+ * that as an assertion, the test is run here, in the browser, against the live
+ * figures, and its result is printed. If a later season makes a forecast sound
+ * the numbers below will say so on their own.
+ *
+ * The back-test: take each finished year, pretend to stand at the same day of
+ * its season, and project its final intake from the share of the season that
+ * the OTHER years had won by that day. Compare against what that year actually
+ * finished on. The error is the honest accuracy of a forecast made today.
+ */
+
+function _admShareAt(hist, ay, day) {
+  var st = _admSeasonStart(ay), cut = _admAddDays(st, day);
+  var all = 0, upto = 0;
+  hist.forEach(function (r) {
+    if (r.ay !== ay || !r.d) return;
+    all++;
+    if (r.d >= st && r.d <= cut) upto++;
+  });
+  return all ? { share: upto / all, full: all, upto: upto } : null;
+}
+function _admMedian(a) {
+  if (!a.length) return null;
+  var s = a.slice().sort(function (x, y) { return x - y; }), n = s.length;
+  return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2;
+}
+
+/* Leave-one-year-out, at a given day of season. Returns the mean absolute
+   percentage error and the worst single year. */
+function _admBacktest(hist, ays, day) {
+  var out = [];
+  ays.forEach(function (ay) {
+    var me = _admShareAt(hist, ay, day);
+    if (!me) return;
+    var others = [];
+    ays.forEach(function (o) {
+      if (o === ay) return;
+      var s = _admShareAt(hist, o, day);
+      if (s && s.share > 0) others.push(s.share);
+    });
+    var m = _admMedian(others);
+    if (!m) return;
+    var proj = me.upto / m;
+    out.push({ ay: ay, proj: Math.round(proj), act: me.full,
+               err: 100 * Math.abs(proj - me.full) / me.full });
+  });
+  if (!out.length) return null;
+  var mape = out.reduce(function (t, x) { return t + x.err; }, 0) / out.length;
+  var worst = out.reduce(function (a, x) { return x.err > a.err ? x : a; });
+  return { mape: mape, worst: worst, folds: out.length, rows: out };
+}
+
+/* Wilson score interval — the right one for a count of nought out of several
+   hundred, where the textbook formula returns the meaningless 0% to 0%. */
+function _admWilson(k, n) {
+  if (!n) return null;
+  var z = 1.96, p = k / n, d = 1 + z * z / n;
+  var c = (p + z * z / (2 * n)) / d;
+  var hw = z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d;
+  return [Math.max(0, 100 * (c - hw)), Math.min(100, 100 * (c + hw))];
+}
+
+function _admModel() {
+  var el = document.getElementById('adm-model'); if (!el) return;
+  var S = _admSet(), R = _admRaw;
+  var season = R.season || '';
+  var start = _admSeasonStart(season), today = _admIso(new Date());
+  var day = Math.round((new Date(today) - new Date(start)) / 86400000);
+  var ays = (R.histAys || []).filter(function (ay) { return ay < season; });
+
+  var h = '';
+
+  // ── 1. can the season be forecast from here? ────────────────────────────
+  if (ays.length >= 4) {
+    var DAYS = [day, 90, 150, 210, 270];
+    var seen = {}, pts = [];
+    DAYS.forEach(function (d) {
+      if (d < 1 || d > 330 || seen[d]) return;
+      seen[d] = 1;
+      var bt = _admBacktest(S.hist, ays, d);
+      if (bt) pts.push({ d: d, bt: bt });
+    });
+    pts.sort(function (a, b) { return a.d - b.d; });
+    var here = pts.filter(function (p) { return p.d === day; })[0];
+    var ok = pts.filter(function (p) { return p.bt.mape <= 15; })[0];
+
+    h += '<div style="font-weight:800;font-size:13px;margin-bottom:5px">1 · Can the season be ' +
+      'forecast from where we stand?</div>' +
+      '<div style="font-size:12px;color:var(--txm);line-height:1.65;margin-bottom:9px">' +
+      'Each finished year is projected from the share of a season the <b>other</b> years had won by ' +
+      'the same day, then checked against what that year actually finished on. ' + ays.length +
+      ' years, each held out in turn.</div>';
+    h += '<table class="au-tbl"><thead><tr><th class="n">Day of season</th><th>Date it falls on</th>' +
+      '<th class="n">Average error</th><th>Worst year</th><th>Usable?</th></tr></thead><tbody>' +
+      pts.map(function (p) {
+        var good = p.bt.mape <= 15, fair = p.bt.mape <= 30;
+        return '<tr' + (p.d === day ? ' style="background:#6366F10D"' : '') + '>' +
+          '<td class="n" style="font-weight:800">' + p.d + (p.d === day ? ' <span class="na-pill" ' +
+            'style="background:#6366F120;color:#6366F1">today</span>' : '') + '</td>' +
+          '<td style="color:var(--txm)">' + _admDate(_admAddDays(start, p.d)) + '</td>' +
+          '<td class="n" style="font-weight:800;color:' + (good ? '#059669' : fair ? '#D97706' : '#DC2626') +
+            '">±' + p.bt.mape.toFixed(0) + '%</td>' +
+          '<td style="color:var(--txm)">' + _admEsc(p.bt.worst.ay) + ': said ' +
+            _admN(p.bt.worst.proj) + ', actually ' + _admN(p.bt.worst.act) + '</td>' +
+          '<td>' + (good ? '<span class="na-pill" style="background:#05966918;color:#059669">yes</span>'
+            : fair ? '<span class="na-pill" style="background:#D9770618;color:#D97706">roughly</span>'
+            : '<span class="na-pill" style="background:#DC262618;color:#DC2626">no</span>') +
+          '</td></tr>';
+      }).join('') + '</tbody></table>';
+    h += '<div style="font-size:11.5px;color:var(--txm);margin-top:9px;line-height:1.65">' +
+      (here
+        ? 'A season-end number produced today would be wrong by about <b style="color:var(--tx)">' +
+          here.bt.mape.toFixed(0) + '%</b> on average, and in the worst held-out year it said <b ' +
+          'style="color:var(--tx)">' + _admN(here.bt.worst.proj) + '</b> against an actual <b ' +
+          'style="color:var(--tx)">' + _admN(here.bt.worst.act) + '</b>. That is why this page shows ' +
+          'no projected total: at this point in a season, admissions arrive so unevenly from year to ' +
+          'year that any forecast is a guess wearing a decimal point. '
+        : '') +
+      (ok ? 'It becomes worth trusting around <b style="color:var(--tx)">day ' + ok.d + '</b> (' +
+            _admDate(_admAddDays(start, ok.d)) + '), where the same test lands within ±' +
+            ok.bt.mape.toFixed(0) + '%. Ask for the forecast then and it will mean something.'
+          : 'No day tested comes within ±15%, so a forecast is not offered at all this season.') +
+      '</div>';
+  }
+
+  // ── 2. the one comparison that does hold up ─────────────────────────────
+  var dig = S.rows.filter(_admIsDigital), wlk = S.rows.filter(_admIsWalk);
+  var dW = dig.filter(_admIsWon).length, wW = wlk.filter(_admIsWon).length;
+  var di = _admWilson(dW, dig.length), wi = _admWilson(wW, wlk.length);
+  if (di && wi) {
+    var apart = (di[1] < wi[0]) || (wi[1] < di[0]);
+    h += '<div style="font-weight:800;font-size:13px;margin:18px 0 5px">2 · The one comparison ' +
+      'that does hold up</div>' +
+      '<table class="au-tbl"><thead><tr><th>Source</th><th class="n">Leads</th>' +
+      '<th class="n">Admitted</th><th class="n">Rate</th><th>True rate lies between</th>' +
+      '</tr></thead><tbody>' +
+      [['Walk-in', wlk.length, wW, wi], ['Digital', dig.length, dW, di]].map(function (x) {
+        return '<tr><td style="font-weight:700">' + x[0] + '</td>' +
+          '<td class="n">' + _admN(x[1]) + '</td>' +
+          '<td class="n" style="font-weight:800;color:' + (x[2] ? '#059669' : '#DC2626') + '">' +
+            _admN(x[2]) + '</td>' +
+          '<td class="n" style="font-weight:800">' + (x[1] ? (100 * x[2] / x[1]).toFixed(1) : '0.0') + '%</td>' +
+          '<td style="color:var(--txm)">' + x[3][0].toFixed(1) + '% to ' + x[3][1].toFixed(1) +
+          '% <span style="font-size:10.5px">(95% confidence)</span></td></tr>';
+      }).join('') + '</tbody></table>' +
+      '<div style="font-size:11.5px;color:var(--txm);margin-top:9px;line-height:1.65">' +
+      (apart
+        ? 'The two ranges do not overlap, so this gap is not chance. It is the only claim on this page ' +
+          'that survives a significance test, and it is the one to act on.'
+        : 'The two ranges overlap, so the difference between them could still be chance. Wait for more ' +
+          'of the season before acting on it.') +
+      ' A rate of nought out of ' + _admN(dig.length) + ' is not the same as "we do not know": it puts ' +
+      'the true digital rate below <b style="color:var(--tx)">' + di[1].toFixed(1) + '%</b>.</div>';
+  }
+
+  // ── 3. why there is no lead score ───────────────────────────────────────
+  var Q = R.quality || {};
+  var typFilled = S.rows.filter(function (r) { return r.typ; });
+  var typWon = typFilled.filter(_admIsWon).length;
+  h += '<div style="font-weight:800;font-size:13px;margin:18px 0 5px">3 · Why there is no lead ' +
+    'score on this page</div>' +
+    '<div style="font-size:12px;color:var(--txm);line-height:1.7">' +
+    'A model was fitted and cross-validated before this panel was written, and it is not shipped, for ' +
+    'two reasons that are worth knowing rather than hiding.' +
+    '<br><br><b style="color:var(--tx)">It had nothing to learn except the source.</b> With ' +
+    _admN(dig.length) + ' digital leads and ' + _admN(dW) + ' digital admissions, there is no example ' +
+    'of a converting digital lead for a model to learn from. Everything it scored, it scored by asking ' +
+    'whether the lead walked in — which the table above already says, without a model.' +
+    '<br><br><b style="color:var(--tx)">What looked like signal was the counsellor\'s own paperwork.</b> ' +
+    'Adding the other columns raised the apparent accuracy sharply, and the reason is that they are ' +
+    'filled in <i>because</i> a child was admitted, not before. Admission type is written on ' +
+    _admN(typFilled.length) + ' leads and ' + _admN(typWon) + ' of those are admitted; locality is ' +
+    'blank on exactly the walk-ins, because a parent at the gate never fills a web form. A score built ' +
+    'on those would have looked excellent in testing and been worthless on a new lead, because on a ' +
+    'new lead those cells are empty.' +
+    '<br><br><b style="color:var(--tx)">What would change it.</b> Three things, in order of how much ' +
+    'they would help: a <b>dated admission column</b> in the tracker, so time-to-convert can be ' +
+    'measured and an admission counted in the month it was actually won; a <b>full season</b> of ' +
+    'leads, so the model sees February and March rather than one October; and <b>any digital ' +
+    'admissions at all</b>, without which no amount of modelling can describe how a digital lead ' +
+    'converts. The first is a column; the other two are time.</div>';
+
+  el.innerHTML = h;
 }
 </script>
 
