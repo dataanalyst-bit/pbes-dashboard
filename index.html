@@ -3421,21 +3421,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
 
       <div class="au-sec">
-        <h3>👤 The staff to handle as individuals</h3>
-        <div class="sub">Everyone repeatedly well past their shift start — a different working day from the one
-          on their roster, not a few minutes of drift. Grouped by branch so each principal sees their own
-          list. Tap a branch, then a name for every attended day with the punch time beside the start it was
-          judged against.</div>
+        <h3>🚩 Late marks against the monthly allowance</h3>
+        <div class="sub">The school rule, applied: a late mark is an arrival more than <b>15 minutes</b> past
+          the shift start, and <b>three are allowed in a calendar month</b>. The fourth flags the employee.
+          The allowance resets each month, so two clean-ish months do not add up to a flag. Grouped by branch
+          so each principal sees their own list; tap a name for the months that broke the allowance and every
+          late mark behind them.</div>
         <div id="bio-people"></div>
       </div>
 
       <div class="au-sec">
-        <h3>🧭 Rosters that do not match the punches</h3>
-        <div class="sub">The shift timings column is not trusted blindly, because judging somebody against a
-          roster nobody updated manufactures lateness that is not there. Where the punches disagree with the
-          roster consistently, the punch time is used instead — and where they disagree <i>inconsistently</i>,
-          the roster is kept, because scatter is what real lateness looks like. Everything overridden either
-          way is listed here rather than applied quietly.</div>
+        <h3>🧭 Staff carried on the wrong shift</h3>
+        <div class="sub">The school runs a small number of shifts and the sheet says which. Where somebody's
+          typical punch sits far from the shift they are carried on and lands squarely on another, they are
+          moved to it — a roster cell nobody updated otherwise manufactures an hour of lateness every day.
+          Someone merely <i>late</i> is never moved: arriving at 08:32 on an 08:00 shift is closer to 08:15
+          but not convincingly, so the roster stands and the lateness shows. Every change is listed here
+          rather than applied quietly.</div>
         <div id="bio-roster"></div>
       </div>
 
@@ -18799,6 +18801,50 @@ function _bioAvg(rows) {
   var l = _bioLate(rows); if (!l.length) return 0;
   return l.reduce(function (t, r) { return t + r.late; }, 0) / l.length;
 }
+/* ── the attendance rule ──────────────────────────────────────────────────
+   Three late marks a calendar month; a fourth flags the employee. A late mark
+   is an arrival more than policy.lateMin minutes past the shift start, so the
+   quarter hour is a tolerance rather than a budget of forgiven minutes — a run
+   of two-minute slips never flags anybody, four real late arrivals do.
+
+   The count is per CALENDAR MONTH even when the page is showing several, so an
+   employee with three marks in each of two months is not flagged for six: the
+   allowance resets, and a figure that ignored that would be indefensible the
+   first time somebody checked it.
+
+   Measured against the corrected shift, not the roster cell — flagging someone
+   for missing a shift they do not work is the fastest way to lose the room. */
+function _bioPolicy(rows) {
+  var P = (_bioRaw && _bioRaw.policy) || { lateMin: 15, allow: 3 };
+  var by = {}, order = [];
+  rows.forEach(function (r) {
+    var o = by[r.si];
+    if (!o) { o = by[r.si] = { si: r.si, s: r.s, br: r.br, rows: [], marks: [], months: {} }; order.push(r.si); }
+    o.rows.push(r);
+    if (r.late > P.lateMin) {
+      o.marks.push(r);
+      var m = r.d.slice(0, 7);
+      (o.months[m] = o.months[m] || []).push(r);
+    }
+  });
+  return order.map(function (si) {
+    var o = by[si];
+    o.days = o.rows.length;
+    o.markCount = o.marks.length;
+    /* over the allowance in the worst single month, and in total */
+    o.over = 0; o.worstMonth = null; o.worstCount = 0;
+    Object.keys(o.months).forEach(function (m) {
+      var n = o.months[m].length;
+      o.over += Math.max(0, n - P.allow);
+      if (n > o.worstCount) { o.worstCount = n; o.worstMonth = m; }
+    });
+    o.flagged = o.over > 0 ? 1 : 0;
+    o.avg = o.marks.length
+      ? o.marks.reduce(function (t, r) { return t + r.late; }, 0) / o.marks.length : 0;
+    return o;
+  });
+}
+
 /* staff → their days, used wherever a figure has to become a list of people */
 function _bioByStaff(rows) {
   var m = {}, order = [];
@@ -18914,17 +18960,22 @@ var BIO_KPI = {
     },
     pick: function (rows) { return _bioDeep(rows); }
   },
-  repeat: {
-    t: 'Staff repeatedly well past the shift start', u: 'n',
-    sub: function () { return 'Staff past ' + _bioRaw.bands[1] + ' minutes on three days or more — ' +
-      'the list that is genuinely about individuals rather than about the start of the day'; },
+  flagged: {
+    t: 'Staff over the monthly late allowance', u: 'n',
+    sub: function () {
+      var P = _bioRaw.policy || {};
+      return 'More than ' + P.allow + ' late marks in a calendar month, where a late mark is an ' +
+        'arrival more than ' + P.lateMin + ' minutes past the shift start';
+    },
     val: function (rows) {
-      var n = _bioByStaff(rows).filter(function (p) { return p.deepDays >= 3; }).length;
-      return { n: n, txt: _bioN(n), note: _bioByStaff(rows).length + ' staff attended' };
+      var P = _bioRaw.policy || {}, all = _bioPolicy(rows);
+      var n = all.filter(function (p) { return p.flagged; }).length;
+      return { n: n, txt: _bioN(n),
+               note: n + ' of ' + all.length + ' staff past the ' + P.allow + '-a-month allowance' };
     },
     pick: function (rows) {
       var keep = {};
-      _bioByStaff(rows).forEach(function (p) { if (p.deepDays >= 3) keep[p.si] = 1; });
+      _bioPolicy(rows).forEach(function (p) { if (p.flagged) keep[p.si] = 1; });
       return rows.filter(function (r) { return keep[r.si]; });
     }
   },
@@ -18971,13 +19022,13 @@ function _bioKpis() {
   var R = _bioRaw;
   var tiles = Object.keys(BIO_KPI).map(function (k) {
     var K = BIO_KPI[k], v = K.val(rows);
-    var col = K.u === '%' ? _bioLateCol(v.n) : k === 'repeat' ? (v.n ? '#DC2626' : '#059669')
+    var col = K.u === '%' ? _bioLateCol(v.n) : k === 'flagged' ? (v.n ? '#DC2626' : '#059669')
             : k === 'deep' ? '#EA580C' : '#D97706';
-    var ic = k === 'rate' ? '⏰' : k === 'deep' ? '🔺' : k === 'repeat' ? '👤' : '⌛';
-    var bg = k === 'rate' ? '#EFF6FF' : k === 'deep' ? '#FFF7ED' : k === 'repeat' ? '#FEF2F2' : '#FFFBEB';
-    var fg = k === 'rate' ? '#1D4ED8' : k === 'deep' ? '#C2410C' : k === 'repeat' ? '#B91C1C' : '#B45309';
+    var ic = k === 'rate' ? '⏰' : k === 'deep' ? '🔺' : k === 'flagged' ? '🚩' : '⌛';
+    var bg = k === 'rate' ? '#EFF6FF' : k === 'deep' ? '#FFF7ED' : k === 'flagged' ? '#FEF2F2' : '#FFFBEB';
+    var fg = k === 'rate' ? '#1D4ED8' : k === 'deep' ? '#C2410C' : k === 'flagged' ? '#B91C1C' : '#B45309';
     var lab = k === 'rate' ? 'Late arrival rate' : k === 'deep' ? 'Past ' + R.bands[1] + ' minutes'
-            : k === 'repeat' ? 'Repeat offenders' : 'Average when late';
+            : k === 'flagged' ? 'Flagged on the rule' : 'Average when late';
     return '<button class="au-kpi na-kpi-b" onclick="bioOpenKpi(\'' + k + '\')" ' +
       'title="Click for the branch-wise breakdown">' +
       '<div class="na-kh"><span class="na-ico" style="background:' + bg + ';color:' + fg + '">' + ic + '</span>' +
@@ -19365,31 +19416,87 @@ function bioOpenDept(dept) {
 /* ── the individual list ───────────────────────────────────────────────────── */
 function _bioPeople() {
   var el = document.getElementById('bio-people'); if (!el) return;
-  var S = _bioSet(), R = _bioRaw;
-  var people = _bioByStaff(S.rows).filter(function (p) { return p.deepDays >= 3; })
-    .sort(function (a, b) { return (b.deepDays - a.deepDays) || (b.avg - a.avg); });
-  if (!people.length) {
-    el.innerHTML = '<div class="au-empty">Nobody was past ' + R.bands[1] +
-      ' minutes on three days or more in this scope — which is the good outcome for this panel.</div>';
+  var S = _bioSet(), R = _bioRaw, P = R.policy || { lateMin: 15, allow: 3 };
+  var all = _bioPolicy(S.rows);
+  var flagged = all.filter(function (p) { return p.flagged; })
+    .sort(function (a2, b2) { return (b2.over - a2.over) || (b2.avg - a2.avg); });
+
+  if (!all.length) { el.innerHTML = '<div class="au-empty">No attendance in this scope.</div>'; return; }
+  if (!flagged.length) {
+    el.innerHTML = '<div class="au-empty">Nobody exceeded ' + P.allow + ' late marks in a calendar ' +
+      'month in this scope \u2014 which is the good outcome for this panel.</div>';
     return;
   }
-  var brs = {};
-  people.forEach(function (p) { (brs[p.br] || (brs[p.br] = [])).push(p); });
+
+  /* how the whole group sits against the allowance, so the flagged list is
+     read against something rather than in isolation */
+  var buckets = [0, 0, 0, 0];      // 0 marks · 1-allow · just over · well over
+  all.forEach(function (p) {
+    buckets[p.markCount === 0 ? 0 : !p.flagged ? 1 : p.over <= 2 ? 2 : 3]++;
+  });
+  var labs = ['No late marks', 'Within the allowance', 'Just over', 'Well over'];
+  var cols = ['#059669', '#65A30D', '#D97706', '#DC2626'];
+
   var h = '<div style="font-size:12.5px;color:var(--txm);line-height:1.65;margin-bottom:12px">' +
-    '<b style="color:var(--tx)">' + people.length + ' staff</b> were more than ' + R.bands[1] +
-    ' minutes late on at least three working days. An average past about three hours usually means the ' +
-    'shift on file is still wrong rather than the person being absent for a morning — those are worth ' +
-    'checking against the shift list before any conversation. Tap a name for every attended day.</div>';
-  Object.keys(brs).sort(function (a, b) { return brs[b].length - brs[a].length; }).forEach(function (b) {
-    var ps = brs[b];
-    var head = '<span style="display:inline-flex;align-items:center;gap:7px;min-width:165px">' + _bioDot(b) +
-      '<b style="font-size:13px">' + _bioEsc(b) + '</b></span>' +
+    'A <b style="color:var(--tx)">late mark</b> is an arrival more than ' + P.lateMin +
+    ' minutes past the shift start. <b style="color:var(--tx)">' + P.allow + ' are allowed in a ' +
+    'calendar month</b>; the next one flags the employee. The allowance resets each month, so ' +
+    'somebody with three marks in each of two months is not flagged. Marks are counted against the ' +
+    'corrected shift, not the roster cell \u2014 see the panel below for whose shift was corrected.</div>';
+
+  h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">' +
+    buckets.map(function (n, i) {
+      return '<div class="na-card" style="flex:1 1 150px;border-left:3px solid ' + cols[i] + '">' +
+        '<div style="font-size:21px;font-weight:800;color:' + cols[i] + '">' + _bioN(n) + '</div>' +
+        '<div style="font-size:11.5px;color:var(--txm);margin-top:2px">' + labs[i] + '</div></div>';
+    }).join('') + '</div>';
+
+  var brs = {};
+  flagged.forEach(function (p) { (brs[p.br] || (brs[p.br] = [])).push(p); });
+  Object.keys(brs).sort(function (x, y) { return brs[y].length - brs[x].length; }).forEach(function (b2) {
+    var ps = brs[b2];
+    var head = '<span style="display:inline-flex;align-items:center;gap:7px;min-width:165px">' + _bioDot(b2) +
+      '<b style="font-size:13px">' + _bioEsc(b2) + '</b></span>' +
       '<b style="font-size:15px;color:#DC2626">' + ps.length + '</b>' +
-      '<span style="font-size:11px;color:var(--txm);margin-left:8px">staff past ' + R.bands[1] +
-      ' minutes on 3+ days</span>';
-    h += _naAcc(head, ps.map(function (p) { return _bioPersonAcc(p, false); }).join(''));
+      '<span style="font-size:11px;color:var(--txm);margin-left:8px">flagged \u00b7 ' +
+      _bioN(ps.reduce(function (t, p) { return t + p.over; }, 0)) + ' marks over the allowance</span>';
+    h += _naAcc(head, ps.map(function (p) { return _bioPolicyAcc(p); }).join(''));
   });
   el.innerHTML = h;
+}
+
+/* One flagged person: the months that broke the allowance, then every late
+   mark behind them. */
+function _bioPolicyAcc(p) {
+  var P = _bioRaw.policy || { lateMin: 15, allow: 3 };
+  var months = Object.keys(p.months).sort();
+  var head =
+    '<span style="display:inline-block;min-width:200px"><b style="font-size:13px">' + _bioEsc(p.s.n) + '</b>' +
+      '<div style="font-size:10.5px;color:var(--txm)">' + _bioEsc(p.s.g) + '</div></span>' +
+    '<span style="display:inline-block;width:30%;max-width:240px;vertical-align:middle;margin:0 12px">' +
+      '<span class="au-bar" style="display:block"><i style="width:' +
+      Math.min(100, 100 * p.markCount / Math.max(1, p.days)) + '%;background:#DC2626"></i></span></span>' +
+    '<b style="font-size:14px;color:#DC2626">' + p.markCount + '</b>' +
+    '<span style="font-size:11px;color:var(--txm);margin-left:8px">late mark' +
+      (p.markCount === 1 ? '' : 's') + ' in ' + p.days + ' days \u00b7 <b style="color:#DC2626">' +
+      p.over + ' over</b> \u00b7 avg ' + _bioMM(p.avg) + '</span>';
+
+  var body = '<table class="au-tbl" style="margin-bottom:10px"><thead><tr><th>Month</th>' +
+    '<th class="n">Late marks</th><th class="n">Allowed</th><th class="n">Over</th>' +
+    '<th>Verdict</th></tr></thead><tbody>' +
+    months.map(function (m) {
+      var n = p.months[m].length, over = Math.max(0, n - P.allow);
+      return '<tr><td>' + _bioMonthLabel(m) + '</td>' +
+        '<td class="n" style="font-weight:800">' + n + '</td>' +
+        '<td class="n" style="color:var(--txm)">' + P.allow + '</td>' +
+        '<td class="n" style="font-weight:800;color:' + (over ? '#DC2626' : '#059669') + '">' + over + '</td>' +
+        '<td><span class="na-pill" style="background:' + (over ? '#DC26261A;color:#DC2626'
+          : '#0596691A;color:#059669') + '">' + (over ? 'Over the allowance' : 'Within') + '</span></td></tr>';
+    }).join('') + '</tbody></table>' +
+    '<div style="font-size:11.5px;color:var(--txm);margin-bottom:6px">Every late mark, with the punch ' +
+    'time against the shift it was judged on.</div>' +
+    _bioRecTable(p.marks, false);
+  return _naAcc(head, body);
 }
 
 /* ── rosters overridden ────────────────────────────────────────────────────── */
@@ -19404,8 +19511,8 @@ function _bioRoster() {
     return;
   }
   var h = '<table class="au-tbl"><thead><tr><th>Who</th><th>Scope</th><th>Branch</th>' +
-    '<th class="n">Roster start</th><th class="n">Typical punch</th><th class="n">Gap</th>' +
-    '<th class="n">Spread</th><th>Used</th></tr></thead><tbody>';
+    '<th class="n">Carried on</th><th class="n">Typical punch</th><th class="n">Mean punch</th>' +
+    '<th class="n">Gap</th><th class="n">Spread</th><th>Shift used</th></tr></thead><tbody>';
   coh.forEach(function (c) {
     h += '<tr><td><b>' + _bioEsc(c.sc) + '</b><div style="font-size:10.5px;color:var(--txm)">' +
         c.staff + ' staff, ' + _bioN(c.days) + ' attended days</div></td>' +
@@ -19413,9 +19520,11 @@ function _bioRoster() {
       '<td style="white-space:nowrap">' + _bioDot(c.branch) + ' ' + _bioEsc(c.branch) + '</td>' +
       '<td class="n" style="color:var(--txm);font-variant-numeric:tabular-nums">' + _bioHM(c.roster) + '</td>' +
       '<td class="n" style="font-weight:800;font-variant-numeric:tabular-nums">' + _bioHM(c.start) + '</td>' +
+      '<td class="n" style="color:var(--txm)">\u2013</td>' +
       '<td class="n" style="color:#D97706;font-weight:700">+' + (c.start - c.roster) + 'm</td>' +
       '<td class="n" style="color:var(--txm)">' + c.iqr + 'm</td>' +
-      '<td><span class="na-pill" style="background:#0596691A;color:#059669">Punch time</span></td></tr>';
+      '<td><span class="na-pill" style="background:#0596691A;color:#059669">' + _bioHM(c.start) +
+        '</span></td></tr>';
   });
   ind.forEach(function (o) {
     h += '<tr><td><b>' + _bioEsc(o.name) + '</b><div style="font-size:10.5px;color:var(--txm)">' +
@@ -19424,21 +19533,26 @@ function _bioRoster() {
       '<td style="white-space:nowrap">' + _bioDot(o.branch) + ' ' + _bioEsc(o.branch) + '</td>' +
       '<td class="n" style="color:var(--txm);font-variant-numeric:tabular-nums">' + _bioHM(o.roster) + '</td>' +
       '<td class="n" style="font-weight:800;font-variant-numeric:tabular-nums">' + _bioHM(o.actual) + '</td>' +
-      '<td class="n" style="color:#D97706;font-weight:700">+' +
-        (o.roster === null ? '–' : (o.actual - o.roster)) + 'm</td>' +
+      '<td class="n" style="color:var(--txm);font-variant-numeric:tabular-nums">' +
+        (o.mean === undefined ? '\u2013' : _bioHM(o.mean)) + '</td>' +
+      '<td class="n" style="color:#D97706;font-weight:700">' +
+        (o.roster === null ? '\u2013' : ((o.actual - o.roster > 0 ? '+' : '') + (o.actual - o.roster) + 'm')) + '</td>' +
       '<td class="n" style="font-weight:700;color:' + (o.iqr > R.tight ? '#DC2626' : 'var(--txm)') + '">' +
         o.iqr + 'm</td>' +
       '<td><span class="na-pill" style="background:' + (o.applied ? '#0596691A;color:#059669'
-          : '#DC26261A;color:#DC2626') + '">' + (o.applied ? 'Punch time' : 'Roster kept') + '</span></td></tr>';
+          : '#DC26261A;color:#DC2626') + '">' + (o.applied ? _bioHM(o.slot) + ' \u2713'
+          : 'Roster kept') + '</span></td></tr>';
   });
   el.innerHTML = h + '</tbody></table>' +
     '<div style="font-size:11.5px;color:var(--txm);margin-top:10px;line-height:1.65">' +
-    '<b style="color:var(--tx)">Spread is the test.</b> A person who is genuinely late arrives at a ' +
-    'different time every day; a person on a shift nobody wrote down arrives at almost the same time ' +
-    'daily. So a tight spread sitting well after the roster means the roster is wrong and the punch ' +
-    'time is used — and a wide spread means the scatter <i>is</i> the lateness, the roster is kept, and ' +
-    'the person stays in the figures above. Rows marked <b>Roster kept</b> are staff whose punches sit ' +
-    'late but scattered: they were deliberately not excused.</div>';
+    '<b style="color:var(--tx)">The shifts this school runs</b>, taken from the sheet itself: ' +
+    (R.slots || []).map(_bioHM).join(', ') + '. Somebody is moved to a different one only when their ' +
+    'typical punch sits at least <b>' + ((R.policy && R.policy.gap) || 30) + ' minutes</b> from the ' +
+    'shift they are carried on <i>and</i> at least <b>' + ((R.policy && R.policy.ratio) || 2) +
+    '\u00d7 closer</b> to another one. That ratio is what keeps it honest: somebody rostered 08:00 who ' +
+    'arrives at 08:32 is nearer 08:15, but not convincingly, so they stay on 08:00 and read as late \u2014 ' +
+    'moving them would quietly erase it. Rows marked <b>Roster kept</b> are staff whose punches sit late ' +
+    'but scattered; scatter is what lateness looks like, so they were deliberately not excused.</div>';
 }
 
 /* ── month switch and paint ────────────────────────────────────────────────── */
