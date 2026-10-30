@@ -1165,6 +1165,7 @@ var LIVE_SECTIONS = [
   { tab:'naa',       run:function(){ return window.loadNaa && loadNaa(false); } },
   { tab:'dm',        run:function(){ return window.loadDm && loadDm(false); } },
   { tab:'bio',       run:function(){ return window.loadBio && loadBio(false); } },
+  { tab:'adm27',     run:function(){ return window.loadAdm27 && loadAdm27(false); } },
   { tab:'ptm',       run:function(){ return window.loadPTM && loadPTM(false); } },
   { tab:'civil',     run:function(){ return window.loadCivil && loadCivil(false); } },
   { tab:'vigilance', also:['glance','overview'], run:function(){ return window.loadVchk && loadVchk(false); } },
@@ -1801,6 +1802,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     <button class="tb" onclick="showTab('care',this)" title="Care Calls"><span class="ic">📞</span><span class="lb">Care Calls</span></button>
     <button class="tb" onclick="showTab('grievance',this)" title="Grievance"><span class="ic">📣</span><span class="lb">Grievance</span></button>
     <button class="tb" onclick="showTab('admissions',this)" title="Admissions 2026-27"><span class="ic">🎓</span><span class="lb">Admissions 2026-27</span></button>
+    <button class="tb" onclick="showTab('adm27',this)" title="Admissions 2027-28 · enquiry tracker, targets and history"><span class="ic">🗳️</span><span class="lb">Admissions 2027-28</span></button>
     <button class="tb" onclick="showTab('dm',this)" title="Digital Marketing"><span class="ic">📣</span><span class="lb">Digital Marketing</span></button>
     <div class="sn-grp">Operations</div>
     <button class="tb" onclick="showTab('naa',this)" title="Non Academic Audit"><span class="ic">🧯</span><span class="lb">Non Academic Audit</span></button>
@@ -3352,6 +3354,93 @@ document.addEventListener('DOMContentLoaded', async () => {
   </div>
 </div>
 
+<div id="pane-adm27" class="pane">
+  <div class="au-wrap">
+
+    <div class="au-head">
+      <div>
+        <h2 style="margin:0;font-size:20px;font-weight:800">🎓 Admissions <span id="adm-season">2027-28</span></h2>
+        <div style="font-size:12.5px;color:var(--txm);margin-top:3px" id="adm-meta">Loading…</div>
+      </div>
+      <div class="au-ctl">
+        <span class="scope-chip" id="adm-scope"><i></i>All branches</span>
+        <span class="exm-status" id="adm-status"></span>
+      </div>
+    </div>
+
+    <div id="adm-loader" class="exm-loader"><div class="exm-spin"></div>
+      <div>Reading the Overall Admissions file…<br><span>The enquiry tracker, the admission history and the month-by-month trend</span></div></div>
+
+    <div id="adm-body" style="display:none;flex-direction:column;gap:16px">
+
+      <div id="adm-notes"></div>
+
+      <div class="au-kpis" id="adm-kpis"></div>
+
+      <div class="au-sec">
+        <h3>🎯 Against the target</h3>
+        <div class="sub">The director's revised targets of 8 September 2026. The figure that matters is the
+          <b>share of target already admitted</b>, not the enquiry count — a branch can be busy and still
+          be behind. Branch sizes and targets differ, so the count alone is not comparable. Click a branch
+          for its whole pipeline, then a name for that enquiry's record.</div>
+        <div id="adm-target"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>🪜 Where the season stands</h3>
+        <div class="sub">Every enquiry sits at one stage. The two that cost admissions are at the top of
+          the list rather than the bottom: an enquiry nobody has reached, and one that reached the campus
+          and then stopped. Click any stage for the parents inside it, with their number and the last thing
+          the counsellor wrote.</div>
+        <div id="adm-funnel"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>📣 What each source is actually worth</h3>
+        <div class="sub">Volume and conversion are different questions and a source can win one while losing
+          the other. The column to read is <b>admitted per hundred enquiries</b>: a source that sends fewer
+          but better parents deserves more budget than one that fills the sheet. Click a source for its
+          enquiries.</div>
+        <div id="adm-source"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>🪑 Which classes parents are asking for</h3>
+        <div class="sub">Demand along the class ladder, which is what decides how many sections to open and
+          where a waiting list will form. Cells naming a range of grades are counted as enquiries but left
+          out of this chart, because placing them on one grade would invent demand that was never stated.</div>
+        <div id="adm-class"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>📈 Is this pace normal?</h3>
+        <div class="sub">A number taken mid-season means nothing on its own. This is the month-by-month
+          admission pattern of every previous year, so the current season can be read against the shape it
+          normally follows. Click a year for its months.</div>
+        <div id="adm-pace"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>🏫 Admissions actually taken, year by year</h3>
+        <div class="sub">Students who joined, from the group's own record. This is the baseline a target is
+          set against and the only honest comparison for a finished season. Click a year, or a branch inside
+          it, for the students behind the number.</div>
+        <div id="adm-hist"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>📐 How these numbers are made</h3>
+        <div class="sub" id="adm-method"></div>
+        <div class="sub" style="margin-top:10px">An enquiry is counted at the branch whose tracker holds it.
+          A parent who enquires at two campuses is therefore one enquiry at each — right for a branch, and
+          one too many for the group, so that count is reported separately rather than quietly removed. Test
+          rows and repeat numbers are marked, never deleted: the sheet is the only place a correction lasts.</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <div id="pane-bio" class="pane">
   <div class="au-wrap">
 
@@ -3380,9 +3469,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         <h3>🚨 What the system reported, and what the punches show</h3>
         <div class="sub">This comes first because it decides whether any attendance report can be trusted
           for a group of staff. Every arrival past the grace period is counted here, and set beside the
-          number the biometric system <b>itself</b> flagged as late. Where a shift code flagged none, the
-          late-marking rule is simply not switched on for it — so the absence of late-coming complaints
-          about those staff is not evidence that they arrive on time. Click any code for the people behind it.</div>
+          number the biometric system <b>itself</b> flagged as late. It is grouped by <b>designation</b>,
+          because a role is who gets spoken to — with the shift code those staff sit on named underneath,
+          since the late-marking rule is a setting on the code. Where a role flagged none, that rule is
+          simply not switched on for its code — so the absence of late-coming complaints about those
+          staff is not evidence that they arrive on time. Click any designation for the people behind it.</div>
         <div id="bio-codes"></div>
       </div>
 
@@ -12951,7 +13042,10 @@ var _RENDERERS = {
   admp:          ['Admission Process', function(){ renderAdmProcess(); }],
   /* The biometric tab paints from one record set held in the browser, so a
      change of BRANCH is a repaint rather than a reload. */
-  bio:           ['Biometric', function(){ if (window._bioRepaint) window._bioRepaint(); }]
+  bio:           ['Biometric', function(){ if (window._bioRepaint) window._bioRepaint(); }],
+  /* Admissions 2027-28 holds the whole file in the browser, so a change of
+     BRANCH is arithmetic rather than another fetch. */
+  adm27:         ['Admissions 2027-28', function(){ if (window._admRepaint) window._admRepaint(); }]
 };
 var _stale = {};
 function _currentTab(){
@@ -18696,7 +18790,8 @@ async function loadAudit(force){
  * Two things this tab is built around, because they are what the data actually
  * shows and they point at different actions:
  *
- *   1. The biometric system's own late flag is not enabled on every shift code.
+ *   1. The biometric system's own late flag is not enabled on every shift code, so whole
+ *      designations have never had a late arrival reported about them.
  *      On the codes where it is silent, nobody has ever been told about a late
  *      arrival. That is a settings problem, not a staff problem, and it comes
  *      first on the page because it decides whether any other attendance report
@@ -19048,7 +19143,7 @@ function _bioKpis() {
   });
   var missPct = tl ? Math.round(100 * (tl - tf) / tl) : null;
   tiles.push('<button class="au-kpi na-kpi-b" onclick="bioOpenCodes()" ' +
-    'title="Click for every shift code">' +
+    'title="Click for every designation">' +
     '<div class="na-kh"><span class="na-ico" style="background:#FEF2F2;color:#B91C1C">🚨</span>' +
     '<span class="v" style="color:#DC2626">' + (missPct === null ? '–' : missPct + '%') + '</span></div>' +
     '<div class="k">Never flagged by the system</div>' +
@@ -19070,36 +19165,88 @@ function _bioKpis() {
 /* ── what the machine reported ──────────────────────────────────────────────
    The finding that comes first on the page, because it decides whether a
    monthly attendance report can be used for a group of staff at all. */
+function _bioRoles() {
+  var S = _bioSet(), R = _bioRaw;
+  var m = {}, order = [];
+  (R.codes || []).forEach(function (c) {
+    if (S.scope && c.branch !== S.scope) return;
+    /* dg is the designation; falling back to the shift code keeps a payload
+       cached before this panel was re-grouped rendering rather than blank. */
+    var dg = c.dg || c.sc || '(not recorded)';
+    var o = m[dg];
+    if (!o) { o = m[dg] = { dg: dg, staff: 0, late: 0, flagged: 0, brs: [], scs: [] }; order.push(dg); }
+    o.staff += c.staff; o.late += c.late; o.flagged += c.flagged;
+    if (c.branch && o.brs.indexOf(c.branch) < 0) o.brs.push(c.branch);
+    if (c.sc && o.scs.indexOf(c.sc) < 0) o.scs.push(c.sc);
+  });
+  return order.map(function (k) { return m[k]; })
+              .sort(function (a, b) { return b.late - a.late || b.staff - a.staff; });
+}
+/* A role spanning five branches can sit on six shift codes, which is too long
+   to read under a name — two, then a count, with the rest on hover. */
+function _bioRoleSc(o) {
+  if (!o.scs.length) return '';
+  var head = o.scs.slice(0, 2).map(_bioEsc).join(' / ');
+  return '<span title="' + _bioEsc(o.scs.join(' / ')) + '">' + head +
+    (o.scs.length > 2 ? ' +' + (o.scs.length - 2) + ' more' : '') + '</span>';
+}
+function _bioRoleBr(o) {
+  if (o.brs.length === 1) return _bioDot(o.brs[0]) + ' ' + _bioEsc(o.brs[0]);
+  return o.brs.sort().map(function (b) { return _bioDot(b); }).join('') +
+         ' <span style="color:var(--txm)">' + o.brs.length + ' branches</span>';
+}
+
 function _bioCodes() {
   var el = document.getElementById('bio-codes'); if (!el) return;
-  var S = _bioSet(), R = _bioRaw;
-  var codes = (R.codes || []).filter(function (c) { return !S.scope || c.branch === S.scope; });
-  if (!codes.length) { el.innerHTML = '<div class="au-empty">No late arrivals in this scope.</div>'; return; }
-  var max = Math.max.apply(null, codes.map(function (c) { return c.late; })) || 1;
-  var tl = codes.reduce(function (t, c) { return t + c.late; }, 0);
-  var tf = codes.reduce(function (t, c) { return t + c.flagged; }, 0);
-  var silent = codes.filter(function (c) { return !c.flagged; });
+  var S = _bioSet(), R = _bioRaw, roles = _bioRoles();
+  if (!roles.length) { el.innerHTML = '<div class="au-empty">No late arrivals in this scope.</div>'; return; }
+  var max = Math.max.apply(null, roles.map(function (c) { return c.late; })) || 1;
+  var tl = roles.reduce(function (t, c) { return t + c.late; }, 0);
+  var tf = roles.reduce(function (t, c) { return t + c.flagged; }, 0);
+  var silent = roles.filter(function (c) { return !c.flagged; });
 
   var h = '';
   if (silent.length) {
+    /* The rule lives on the shift code, so a code that flagged nothing AT ALL
+       has the rule switched off. A code that flags other staff but never these
+       is a different fault and must not be reported as the same one: the
+       exemption is then on the employee, not on the code. */
+    var scF = {};
+    (R.codes || []).forEach(function (c) {
+      if (S.scope && c.branch !== S.scope) return;
+      var k = c.sc || '(no code)'; scF[k] = (scF[k] || 0) + c.flagged;
+    });
+    var off = [], mixed = [];
+    silent.forEach(function (c) {
+      c.scs.forEach(function (x) {
+        var t = scF[x] ? mixed : off;
+        if (t.indexOf(x) < 0) t.push(x);
+      });
+    });
     h += '<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;padding:13px 15px;' +
       'margin-bottom:14px;font-size:12.5px;line-height:1.65;color:#7F1D1D">' +
-      '<b>' + silent.length + ' shift code' + (silent.length === 1 ? '' : 's') + ' never raised a single late ' +
+      '<b>' + silent.length + ' role' + (silent.length === 1 ? '' : 's') + ' never raised a single late ' +
       'arrival</b> — ' + silent.map(function (c) {
-        return _bioEsc(c.sc) + ' (' + _bioEsc(c.branch) + ', ' + c.staff + ' staff, ' +
-               _bioN(c.late) + ' late arrivals)'; }).join('; ') + '. The late-marking rule is not switched ' +
-      'on for these codes, so nobody has ever been told about lateness on them. That is a setting in the ' +
-      'biometric software, not a new process — and until it is changed, no attendance report from this ' +
-      'system can be used for these staff.</div>';
+        return _bioEsc(c.dg) + ' (' + c.staff + ' staff, ' + _bioN(c.late) + ' late)';
+      }).join(', ') + '. The late-marking rule is a setting on the <b>shift code</b>, not on the person' +
+      (off.length ? ', and on ' + off.map(_bioEsc).join(' / ') + ' it has never fired for anybody — one ' +
+        'setting in the biometric software rather than a new process' : '') +
+      (mixed.length ? '. ' + mixed.map(_bioEsc).join(' / ') + (mixed.length === 1 ? ' does' : ' do') +
+        ' fire for other staff on the same ' +
+        'code, so for the roles above it is the <b>employee record</b> that is carrying the exemption, ' +
+        'not the code — that one is checked person by person' : '') +
+      '. Until it is corrected, no attendance report from this system can be used for these staff.</div>';
   }
-  h += '<table class="au-tbl"><thead><tr><th>Shift code</th><th>Branch</th><th class="n">Staff</th>' +
+  h += '<table class="au-tbl"><thead><tr><th>Designation</th><th>Branch</th><th class="n">Staff</th>' +
     '<th style="min-width:170px">Late arrivals · flagged vs never flagged</th>' +
     '<th class="n">Late</th><th class="n">Flagged</th><th class="n">Share flagged</th></tr></thead><tbody>';
-  codes.forEach(function (c) {
+  roles.forEach(function (c) {
     var w = 100 * c.late / max, fw = c.late ? 100 * c.flagged / c.late : 0;
-    h += '<tr><td><button class="na-secbtn" onclick="bioOpenCode(' + JSON.stringify(c.sc).replace(/"/g, '&quot;') +
-        ',' + JSON.stringify(c.branch).replace(/"/g, '&quot;') + ')">' + _bioEsc(c.sc) + ' ›</button></td>' +
-      '<td style="white-space:nowrap">' + _bioDot(c.branch) + ' ' + _bioEsc(c.branch) + '</td>' +
+    h += '<tr><td><button class="na-secbtn" onclick="bioOpenDesig(' +
+        JSON.stringify(c.dg).replace(/"/g, '&quot;') + ')">' + _bioEsc(c.dg) + ' ›</button>' +
+      '<div style="font-size:10.5px;color:var(--txm);margin-top:2px">on ' +
+        _bioRoleSc(c) + '</div></td>' +
+      '<td style="white-space:nowrap">' + _bioRoleBr(c) + '</td>' +
       '<td class="n" style="color:var(--txm)">' + c.staff + '</td>' +
       '<td><div style="height:11px;width:' + w + '%;min-width:3px;border-radius:99px;overflow:hidden;' +
         'background:#DC2626;display:flex"><i style="width:' + fw + '%;background:#94A3B8;display:block"></i></div></td>' +
@@ -19110,53 +19257,57 @@ function _bioCodes() {
   });
   h += '</tbody></table>' +
     '<div style="font-size:11.5px;color:var(--txm);margin-top:10px;line-height:1.6">' +
-    'Grey is the part the system flagged, red the part it did not. Across every code here the system ' +
+    'Grey is the part the system flagged, red the part it did not. Across every role here the system ' +
     'reported <b style="color:var(--tx)">' + _bioN(tf) + ' of ' + _bioN(tl) + '</b> late arrivals (' +
-    (tl ? Math.round(100 * tf / tl) : 0) + '%). Counted over every date in the file, because this is about ' +
-    'the machine rather than about which day somebody was late.</div>';
+    (tl ? Math.round(100 * tf / tl) : 0) + '%). The small line under each designation is the shift ' +
+    'code its staff are carried on, because that is where the late-marking rule is turned on or off. ' +
+    'Counted over every date in the file, because this is about the machine rather than about which ' +
+    'day somebody was late.</div>';
   el.innerHTML = h;
 }
-function bioOpenCode(sc, branch) {
+function bioOpenDesig(dg) {
   if (!_bioRaw) return;
   var S = _bioSet();
   var rows = S.rows.filter(function (r) {
-    return (r.s.sc || '(no code)') === sc && r.br === branch && r.late > _bioRaw.grace;
+    if (r.late <= _bioRaw.grace) return false;
+    return (r.s.g || '(not recorded)') === dg || (r.s.sc || '(no code)') === dg;
   });
   var people = _bioByStaff(rows).sort(function (a, b) { return b.lateDays - a.lateDays || b.avg - a.avg; });
   /* The table on the page counts every date in the file, because it is about
      whether the machine reports a late arrival at all. This list counts working
      days only, because it is about people. Both counts are shown rather than
      quietly differing by a handful. */
-  var every = (_bioRaw.codes || []).filter(function (c) {
-    return c.sc === sc && c.branch === branch; })[0];
+  var every = _bioRoles().filter(function (c) { return c.dg === dg; })[0];
   var h = '<div style="font-size:12.5px;color:var(--txm);line-height:1.6;margin-bottom:12px">' +
-    'Every late arrival on this shift code on the <b style="color:var(--tx)">working days</b> of ' +
-    (_bioMonth ? _bioMonthLabel(_bioMonth) : 'the file') +
+    'Every late arrival by staff carrying this designation on the <b style="color:var(--tx)">working ' +
+    'days</b> of ' + (_bioMonth ? _bioMonthLabel(_bioMonth) : 'the file') +
     (every && every.late !== rows.length
       ? ' — ' + _bioN(every.late) + ' across every date in the file, ' + _bioN(rows.length) +
         ' once holidays and Sundays are set aside'
       : '') +
+    (every && every.scs.length ? '. Carried on shift code ' + every.scs.map(_bioEsc).join(' / ') : '') +
     '. Tap a name for their day-by-day record.</div>' +
-    (people.length ? people.map(function (p) { return _bioPersonAcc(p, false); }).join('')
+    (people.length ? people.map(function (p) { return _bioPersonAcc(p, true); }).join('')
                    : '<div class="au-empty">No late arrivals on working days.</div>');
   if (typeof openHTMLModal === 'function')
-    openHTMLModal(sc + ' — ' + branch,
+    openHTMLModal(dg + (S.scope ? ' — ' + S.scope : ''),
       _bioN(rows.length) + ' late arrivals on working days · ' + people.length + ' staff', h);
 }
 function bioOpenCodes() {
   if (!_bioRaw) return;
-  var S = _bioSet();
-  var codes = (_bioRaw.codes || []).filter(function (c) { return !S.scope || c.branch === S.scope; });
+  var roles = _bioRoles();
   var h = '<div style="font-size:12.5px;color:var(--txm);line-height:1.6;margin-bottom:12px">' +
-    'Every shift code with at least one late arrival, worst first. A code flagging none means the ' +
-    'late-marking rule is off for it. Tap a code for the staff behind it.</div>' +
-    '<table class="au-tbl"><thead><tr><th>Shift code</th><th>Branch</th><th class="n">Staff</th>' +
-    '<th class="n">Late arrivals</th><th class="n">Flagged</th><th class="n">Never flagged</th></tr></thead><tbody>' +
-    codes.map(function (c) {
-      return '<tr><td><button class="na-secbtn" onclick="bioOpenCode(' +
-          JSON.stringify(c.sc).replace(/"/g, '&quot;') + ',' +
-          JSON.stringify(c.branch).replace(/"/g, '&quot;') + ')">' + _bioEsc(c.sc) + ' ›</button></td>' +
-        '<td style="white-space:nowrap">' + _bioDot(c.branch) + ' ' + _bioEsc(c.branch) + '</td>' +
+    'Every designation with at least one late arrival, worst first. A role flagging none sits on a ' +
+    'shift code whose late-marking rule is off — the code is named beside it. Tap a role for the ' +
+    'staff behind it.</div>' +
+    '<table class="au-tbl"><thead><tr><th>Designation</th><th>Branch</th><th>Shift code</th>' +
+    '<th class="n">Staff</th><th class="n">Late arrivals</th><th class="n">Flagged</th>' +
+    '<th class="n">Never flagged</th></tr></thead><tbody>' +
+    roles.map(function (c) {
+      return '<tr><td><button class="na-secbtn" onclick="bioOpenDesig(' +
+          JSON.stringify(c.dg).replace(/"/g, '&quot;') + ')">' + _bioEsc(c.dg) + ' ›</button></td>' +
+        '<td style="white-space:nowrap">' + _bioRoleBr(c) + '</td>' +
+        '<td style="font-size:11.5px;color:var(--txm)">' + _bioRoleSc(c) + '</td>' +
         '<td class="n" style="color:var(--txm)">' + c.staff + '</td>' +
         '<td class="n" style="font-weight:800">' + _bioN(c.late) + '</td>' +
         '<td class="n" style="color:var(--txm)">' + _bioN(c.flagged) + '</td>' +
@@ -19164,7 +19315,8 @@ function bioOpenCodes() {
           _bioN(c.late - c.flagged) + '</td></tr>';
     }).join('') + '</tbody></table>';
   if (typeof openHTMLModal === 'function')
-    openHTMLModal('What the biometric system reported', codes.length + ' shift codes · every date in the file', h);
+    openHTMLModal('What the biometric system reported',
+      roles.length + ' designations · every date in the file', h)
 }
 
 /* ── branch comparison ─────────────────────────────────────────────────────── */
@@ -19711,11 +19863,811 @@ window._bioRepaint = function () { if (_bioRaw) _bioPaint(); };
 
 (function(){
   var _s=window.showTab, _w=window.switchTab;
-  var open=function(id){ if(id==='audit') loadAudit(false); if(id==='naa') loadNaa(false); if(id==='bio') loadBio(false); if(id==='dm') loadDm(false); };
+  var open=function(id){ if(id==='audit') loadAudit(false); if(id==='naa') loadNaa(false); if(id==='bio') loadBio(false); if(id==='dm') loadDm(false); if(id==='adm27') loadAdm27(false); };
   window.showTab=function(id,btn){ _s(id,btn); open(id); };
   window.switchTab=function(id){ _w(id); open(id); };
 })();
 window.loadNaa=loadNaa;
+
+
+/* ═══════════════════ ADMISSIONS 2027-28 ═══════════════════
+ *
+ * The one tab fed by a second workbook. Everything here is computed in the
+ * browser from one payload, so a change of BRANCH is a repaint rather than a
+ * reload — the same arrangement the Biometric tab uses.
+ *
+ * What the panels are for, in the order a reader meets them:
+ *   1. against target   — the only figure the director asks for
+ *   2. the funnel       — where the season is stuck, which is what to act on
+ *   3. by source        — which channel converts, not which one is loudest
+ *   4. by class         — how many sections to open
+ *   5. pace             — whether a mid-season number is good or bad
+ *   6. history          — the baseline the target was set against
+ */
+var _admRaw = null, _admLoaded = false, _admLoading = false, _admQueued = false;
+
+function _admEsc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function _admN(n) { return (n || 0).toLocaleString('en-IN'); }
+function _admPct(a, b) { return b ? Math.round(100 * a / b) : 0; }
+function _admPct1(a, b) { return b ? (100 * a / b).toFixed(1) : '0.0'; }
+var ADM_DOT = { Keesara: '#059669', Pocharam: '#D97706', Bachupally: '#7C3AED',
+                Boduppal: '#1E4FD8', Gowdavalli: '#0D9488' };
+function _admDot(b) {
+  return '<span class="bd" style="background:' + (ADM_DOT[b] || '#94A3B8') + '"></span>';
+}
+function _admDate(d) {
+  if (!d) return '–';
+  var M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var p = String(d).split('-');
+  if (p.length < 3) return _admEsc(d);
+  return p[2] + ' ' + (M[parseInt(p[1], 10) - 1] || '?') + (p[0] ? ' ' + p[0].slice(2) : '');
+}
+function _admStatus(t, bad) {
+  var e = document.getElementById('adm-status'); if (!e) return;
+  e.textContent = t || ''; e.style.color = bad ? 'var(--r)' : '';
+}
+
+/* The rows in scope: the headline season, minus the rows the sheet itself says
+   are not enquiries. Test rows are excluded from every figure — a row somebody
+   typed to check the form is not a parent, and leaving it in drags a branch\'s
+   conversion rate down by a whole point on forty enquiries. */
+function _admSet() {
+  var R = _admRaw;
+  if (!R || !R.enq) return { rows: [], hist: [], trend: [], scope: '', season: '' };
+  var scope = window._USER_BRANCH ||
+    ((typeof fBranch !== 'undefined' && fBranch !== 'ALL') ? fBranch : '');
+  if (scope && (R.branches || []).indexOf(scope) < 0) scope = '';
+  var season = R.season || '';
+  var rows = R.enq.filter(function (r) {
+    return r.season === season && !r.test && (!scope || r.b === scope);
+  });
+  return {
+    rows: rows, scope: scope, season: season,
+    hist:  (R.hist  || []).filter(function (r) { return !scope || r.b === scope; }),
+    trend: (R.trend || []).filter(function (r) { return !scope || r.b === scope; })
+  };
+}
+function _admBranches(S) {
+  var R = _admRaw;
+  if (S.scope) return [S.scope];
+  return (R.branches || []).slice();
+}
+function _admStageLab(code) {
+  var L = _admRaw && _admRaw.stages || [];
+  for (var i = 0; i < L.length; i++) if (L[i][0] === code) return L[i][1];
+  var C = (_admRaw && _admRaw.closed) || {};
+  if (C[code]) return C[code];
+  return code ? code.replace(/_/g, ' ') : '(no status)';
+}
+function _admStageCol(code) {
+  var L = _admRaw && _admRaw.stages || [];
+  for (var i = 0; i < L.length; i++) if (L[i][0] === code) return L[i][2];
+  return (_admRaw && _admRaw.closed && _admRaw.closed[code]) ? '#DC2626' : '#94A3B8';
+}
+function _admIsWon(r)    { return r.st === 'admitted'; }
+function _admIsClosed(r) { return !!(_admRaw && _admRaw.closed && _admRaw.closed[r.st]); }
+function _admIsOpen(r)   { return !_admIsWon(r) && !_admIsClosed(r); }
+function _admSrcLab(s) {
+  var M = (_admRaw && _admRaw.sources) || {};
+  if (M[s]) return M[s];
+  if (!s) return '(not recorded)';
+  return s.replace(/_/g, ' ').replace(/^./, function (c) { return c.toUpperCase(); });
+}
+function _admTarget(b) { return ((_admRaw && _admRaw.targets) || {})[b] || 0; }
+
+// ── what the file is, and what is wrong with it ────────────────────────────
+function _admNotes() {
+  var el = document.getElementById('adm-notes'); if (!el) return;
+  var R = _admRaw, Q = R.quality || {}, h = '';
+
+  /* The history stopping a year short is the one note that changes how a chart
+     is read rather than how much to trust a count, so it is said plainly: a
+     missing year looks exactly like a collapse. */
+  if (Q.noHistAy) {
+    var p = String(Q.noHistAy).split('|');
+    h += '<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;padding:12px 15px;' +
+      'margin-bottom:10px;font-size:12.5px;line-height:1.65;color:#78350F">' +
+      '<b>The student-by-student history stops at ' + _admEsc(p[0]) + '</b>, but the monthly trend ' +
+      'tab carries figures up to ' + _admEsc(p[1]) + '. So the year-by-year panel at the foot of this ' +
+      'page ends a year earlier than the pace chart above it — that gap is the sheet, not a fall in ' +
+      'admissions. Paste the newer years into "' + _admEsc(ADM_HIST_TAB) + '" and it closes itself.</div>';
+  }
+
+  var issues = [];
+  if (Q.tests)       issues.push(['🧪', Q.tests + ' test row' + (Q.tests === 1 ? '' : 's'),
+    'typed to check the form. Left out of every figure here, but still in the sheet']);
+  if (Q.dups)        issues.push(['👯', Q.dups + ' repeat number at one branch',
+    'the same phone enquiring twice at the same campus — counted once per row, so decide which is real']);
+  if (Q.crossBranch) issues.push(['🔀', Q.crossBranch + ' famil' + (Q.crossBranch === 1 ? 'y' : 'ies') + ' at two campuses',
+    'one family shopping around. Right for a branch, one too many for the group total']);
+  if (Q.blankType)   issues.push(['📋', Q.blankType + ' of ' + (Q.total || 0) + ' with no admission type',
+    'New / Transfer is blank, so that split cannot be reported at all']);
+  if (Q.blankCur)    issues.push(['📚', Q.blankCur + ' with no curriculum',
+    'CBSE or Cambridge not recorded on the enquiry']);
+  if (Q.ranges)      issues.push(['🪜', Q.ranges + ' naming a range of grades',
+    'like "Grade 1 - 3" — counted as enquiries, left out of the class chart']);
+  if (Q.unreadable)  issues.push(['🔡', Q.unreadable + ' with an unreadable curriculum',
+    'the cell came through a bad encoding and no longer says anything']);
+  if (Q.blankClass)  issues.push(['❓', Q.blankClass + ' with no class',
+    'nothing recorded in class_interested']);
+
+  if (issues.length) {
+    h += '<div style="border:1px solid var(--bor);border-radius:12px;padding:12px 15px;font-size:12.5px;' +
+      'line-height:1.6;background:var(--sur)">' +
+      '<div style="font-weight:800;margin-bottom:8px">What to fix in the tracker</div>' +
+      '<div style="display:grid;gap:7px">' + issues.map(function (x) {
+        return '<div style="display:flex;gap:9px;align-items:flex-start">' +
+          '<span style="font-size:13px;line-height:1.3">' + x[0] + '</span>' +
+          '<span><b style="color:var(--tx)">' + _admEsc(x[1]) + '</b> — <span style="color:var(--txm)">' +
+          x[2] + '</span></span></div>';
+      }).join('') + '</div></div>';
+  }
+  el.innerHTML = h;
+}
+var ADM_HIST_TAB = 'All AY Admissions';
+
+// ── the headline tiles ─────────────────────────────────────────────────────
+function _admKpis() {
+  var el = document.getElementById('adm-kpis'); if (!el) return;
+  var S = _admSet(), rows = S.rows;
+  var won  = rows.filter(_admIsWon).length;
+  var open = rows.filter(_admIsOpen).length;
+  var shut = rows.filter(_admIsClosed).length;
+  /* "New" is a queue, not a failure — these arrived days ago and the counsellor
+     has not got to them yet. "Not connected" is the failure: somebody tried and
+     the parent was never reached. Counting the two together would put a fresh
+     week\'s enquiries in the same pile as a month of unanswered phones. */
+  var cold = rows.filter(function (r) { return r.st === 'not_connected'; }).length;
+  var fresh = rows.filter(function (r) { return r.st === 'new'; }).length;
+  var tgt = 0;
+  _admBranches(S).forEach(function (b) { tgt += _admTarget(b); });
+
+  function tile(id, ico, bg, fg, col, val, lab, note) {
+    return '<button class="au-kpi na-kpi-b" onclick="admOpenKpi(\'' + id + '\')" ' +
+      'title="Click for the branch-wise breakdown">' +
+      '<div class="na-kh"><span class="na-ico" style="background:' + bg + ';color:' + fg + '">' + ico + '</span>' +
+      '<span class="v" style="color:' + col + '">' + val + '</span></div>' +
+      '<div class="k">' + lab + '</div><div class="d">' + note + '</div>' +
+      '<div class="na-click">Click to view ›</div></button>';
+  }
+  var h = '';
+  h += tile('enq', '📥', '#EFF6FF', '#1D4ED8', 'var(--tx)', _admN(rows.length), 'Enquiries this season',
+    (S.season || '') + (rows.length ? ' · ' + _admN(open) + ' still open' : ''));
+  h += tile('won', '🎓', '#ECFDF5', '#047857', '#059669', _admN(won), 'Admitted so far',
+    tgt ? _admPct1(won, tgt) + '% of a ' + _admN(tgt) + ' target' : 'no target set');
+  h += tile('conv', '📈', '#F5F3FF', '#6D28D9', '#7C3AED', _admPct1(won, rows.length) + '%', 'Conversion rate',
+    _admN(won) + ' admitted of ' + _admN(rows.length) + ' enquiries');
+  h += tile('cold', '📵', '#FFFBEB', '#B45309', cold ? '#D97706' : '#059669', _admN(cold),
+    'Tried and never reached', _admN(fresh) + ' more are new and not yet called');
+  h += tile('lost', '🚪', '#FEF2F2', '#B91C1C', shut ? '#DC2626' : '#059669', _admN(shut), 'Closed without admission',
+    _admPct(shut, rows.length) + '% of enquiries, lost or not interested');
+  h += tile('gap', '🎯', '#F8FAFC', '#475569', 'var(--tx)', _admN(Math.max(0, tgt - won)), 'Still to find',
+    tgt ? 'to reach ' + _admN(tgt) + ' admissions' : 'set a target to see this');
+  el.innerHTML = h;
+}
+function admOpenKpi(k) {
+  if (!_admRaw) return;
+  var S = _admSet(), f, title, sub;
+  if (k === 'won')       { f = _admIsWon;    title = 'Admitted'; }
+  else if (k === 'cold') { f = function (r) { return r.st === 'not_connected' || r.st === 'new'; };
+                           title = 'Not reached, and not yet called'; }
+  else if (k === 'lost') { f = _admIsClosed; title = 'Closed without admission'; }
+  else if (k === 'conv' || k === 'gap') { return admOpenTargets(); }
+  else                   { f = function () { return true; }; title = 'Every enquiry'; }
+  var rows = S.rows.filter(f);
+  sub = _admN(rows.length) + ' enquiries · ' + (S.season || '');
+  _admModal(title, sub, _admByBranchAcc(rows));
+}
+
+// ── 1. against target ──────────────────────────────────────────────────────
+function _admTargetPanel() {
+  var el = document.getElementById('adm-target'); if (!el) return;
+  var S = _admSet(), brs = _admBranches(S);
+  if (!brs.length) { el.innerHTML = '<div class="au-empty">No enquiries in this scope.</div>'; return; }
+
+  var data = brs.map(function (b) {
+    var rs = S.rows.filter(function (r) { return r.b === b; });
+    var won = rs.filter(_admIsWon).length, t = _admTarget(b);
+    return { b: b, n: rs.length, won: won, open: rs.filter(_admIsOpen).length,
+             shut: rs.filter(_admIsClosed).length, t: t,
+             share: t ? 100 * won / t : 0, conv: rs.length ? 100 * won / rs.length : 0 };
+  }).sort(function (a, b) { return b.share - a.share || b.won - a.won; });
+
+  var tn = 0, tw = 0, tt = 0, to = 0, ts = 0;
+  data.forEach(function (d) { tn += d.n; tw += d.won; tt += d.t; to += d.open; ts += d.shut; });
+  var maxShare = Math.max.apply(null, data.map(function (d) { return d.share; }).concat([1]));
+
+  var h = '<table class="au-tbl"><thead><tr><th>Branch</th><th class="n">Enquiries</th>' +
+    '<th class="n">Admitted</th><th class="n">Conversion</th><th class="n">Target</th>' +
+    '<th style="min-width:150px">Share of target</th><th class="n">% of target</th>' +
+    '<th class="n">Still to find</th></tr></thead><tbody>';
+  data.forEach(function (d) {
+    var w = 100 * d.share / maxShare;
+    h += '<tr><td><button class="na-secbtn" onclick="admOpenBranch(' +
+        JSON.stringify(d.b).replace(/"/g, '&quot;') + ')">' + _admDot(d.b) + ' ' +
+        _admEsc(d.b) + ' ›</button></td>' +
+      '<td class="n" style="font-weight:800">' + _admN(d.n) + '</td>' +
+      '<td class="n" style="font-weight:800;color:#059669">' + _admN(d.won) + '</td>' +
+      '<td class="n" style="color:var(--txm)">' + d.conv.toFixed(1) + '%</td>' +
+      '<td class="n" style="color:var(--txm)">' + _admN(d.t) + '</td>' +
+      '<td><div style="height:11px;width:' + Math.max(2, w) + '%;min-width:3px;border-radius:99px;' +
+        'background:' + (ADM_DOT[d.b] || '#94A3B8') + '"></div></td>' +
+      '<td class="n" style="font-weight:800">' + d.share.toFixed(1) + '%</td>' +
+      '<td class="n" style="color:var(--txm)">' + _admN(Math.max(0, d.t - d.won)) + '</td></tr>';
+  });
+  /* With one branch in scope the total row would simply repeat it. */
+  h += '</tbody>' + (data.length < 2 ? '' :
+    '<tfoot><tr style="font-weight:800;border-top:2px solid var(--bor)">' +
+    '<td>' + (S.scope ? _admEsc(S.scope) : 'All five branches') + '</td>' +
+    '<td class="n">' + _admN(tn) + '</td><td class="n" style="color:#059669">' + _admN(tw) + '</td>' +
+    '<td class="n">' + _admPct1(tw, tn) + '%</td><td class="n">' + _admN(tt) + '</td><td></td>' +
+    '<td class="n">' + _admPct1(tw, tt) + '%</td><td class="n">' + _admN(Math.max(0, tt - tw)) + '</td>' +
+    '</tr></tfoot>') + '</table>' +
+    '<div style="font-size:11.5px;color:var(--txm);margin-top:10px;line-height:1.6">' +
+    _admN(to) + ' enquiries are still open and ' + _admN(ts) + ' have closed without an admission. ' +
+    'The season has ' + _admN(Math.max(0, tt - tw)) + ' admissions left to find, and the enquiries ' +
+    'in hand can supply at most ' + _admN(to) + ' of them — which is the real argument for how much ' +
+    'new enquiry the branches need, rather than how hard to push the ones they have.</div>';
+  el.innerHTML = h;
+}
+function admOpenBranch(b) {
+  if (!_admRaw) return;
+  var S = _admSet();
+  var rows = S.rows.filter(function (r) { return r.b === b; });
+  var won = rows.filter(_admIsWon).length, t = _admTarget(b);
+  var byStage = {};
+  rows.forEach(function (r) { byStage[r.st] = (byStage[r.st] || 0) + 1; });
+  var order = (_admRaw.stages || []).map(function (s) { return s[0]; })
+    .concat(Object.keys(_admRaw.closed || {}))
+    .filter(function (k) { return byStage[k]; });
+
+  var head = '<div style="font-size:12.5px;color:var(--txm);line-height:1.7;margin-bottom:12px">' +
+    '<b style="color:var(--tx)">' + _admN(rows.length) + '</b> enquiries, <b style="color:#059669">' +
+    _admN(won) + '</b> admitted' +
+    (t ? ' against a target of <b style="color:var(--tx)">' + _admN(t) + '</b> — ' +
+         _admPct1(won, t) + '% of the way, with ' + _admN(Math.max(0, t - won)) + ' still to find' : '') +
+    '.<div style="margin-top:9px;display:flex;flex-wrap:wrap;gap:6px">' +
+      order.map(function (k) {
+        return '<span class="na-pill" style="background:' + _admStageCol(k) + '1A;color:' +
+          _admStageCol(k) + '">' + _admEsc(_admStageLab(k)) + ' ' + byStage[k] + '</span>'; }).join('') +
+    '</div></div>';
+  _admModal(b, _admN(rows.length) + ' enquiries · ' + (S.season || ''),
+    head + _admEnqTable(rows, false));
+}
+function admOpenTargets() {
+  var S = _admSet();
+  var h = '<div style="font-size:12.5px;color:var(--txm);line-height:1.6;margin-bottom:12px">' +
+    'Every branch against the director\'s revised AY 2027-28 target. Tap a branch for its pipeline.</div>' +
+    _admByBranchAcc(S.rows);
+  _admModal('Against the target', (S.season || '') + ' · ' + _admN(S.rows.length) + ' enquiries', h);
+}
+
+// ── 2. the funnel ──────────────────────────────────────────────────────────
+function _admFunnel() {
+  var el = document.getElementById('adm-funnel'); if (!el) return;
+  var S = _admSet(), R = _admRaw;
+  if (!S.rows.length) { el.innerHTML = '<div class="au-empty">No enquiries in this scope.</div>'; return; }
+  var cnt = {}; S.rows.forEach(function (r) { cnt[r.st] = (cnt[r.st] || 0) + 1; });
+
+  var order = (R.stages || []).map(function (s) { return s[0]; });
+  Object.keys(R.closed || {}).forEach(function (k) { order.push(k); });
+  Object.keys(cnt).forEach(function (k) { if (order.indexOf(k) < 0) order.push(k); });
+
+  var max = Math.max.apply(null, order.map(function (k) { return cnt[k] || 0; }).concat([1]));
+  var h = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:10px">';
+  order.forEach(function (k) {
+    var n = cnt[k] || 0;
+    if (!n) return;
+    var col = _admStageCol(k), dead = !!(R.closed || {})[k];
+    h += '<button class="na-card" onclick="admOpenStage(' + JSON.stringify(k).replace(/"/g, '&quot;') + ')" ' +
+      'style="border:1px solid var(--bor);border-radius:12px;padding:12px 13px;background:var(--sur);' +
+      'cursor:pointer;font:inherit;color:inherit;text-align:left' + (dead ? ';opacity:.92' : '') + '">' +
+      '<div style="font-size:22px;font-weight:800;color:' + col + ';line-height:1.1">' + _admN(n) + '</div>' +
+      '<div style="font-weight:700;font-size:12.5px;margin-top:2px">' + _admEsc(_admStageLab(k)) + '</div>' +
+      '<div style="height:7px;border-radius:99px;background:var(--bor);margin:8px 0 6px;overflow:hidden">' +
+        '<i style="display:block;height:100%;width:' + (100 * n / max) + '%;background:' + col + '"></i></div>' +
+      '<div style="font-size:11px;color:var(--txm)">' + _admPct(n, S.rows.length) + '% of enquiries' +
+        (dead ? ' · closed' : '') + '</div>' +
+      '<div class="na-click">Click to view ›</div></button>';
+  });
+  h += '</div>';
+
+  var fresh = cnt['new'] || 0, cold = cnt['not_connected'] || 0;
+  var warm = (cnt['visited'] || 0) + (cnt['visit_scheduled'] || 0) + (cnt['admission_form_issued'] || 0);
+  h += '<div style="font-size:11.5px;color:var(--txm);margin-top:12px;line-height:1.6">' +
+    'Three piles are worth a counsellor\'s morning, and they are not the same job. ' +
+    '<b style="color:var(--tx)">' + _admN(fresh) + '</b> are new and have not been called yet — ' +
+    'that is a queue, and it only becomes a problem if it stops moving. ' +
+    '<b style="color:var(--tx)">' + _admN(cold) + '</b> were called and never reached, which needs a ' +
+    'different number, a different hour of the day, or a message rather than a call. And ' +
+    '<b style="color:var(--tx)">' + _admN(warm) + '</b> have come as far as a campus visit or a form ' +
+    'without closing — the hard part is already done on those, so they are the cheapest admissions ' +
+    'left on this page.</div>';
+  el.innerHTML = h;
+}
+function admOpenStage(code) {
+  var S = _admSet();
+  var rows = S.rows.filter(function (r) { return r.st === code; });
+  _admModal(_admStageLab(code), _admN(rows.length) + ' enquiries · ' + (S.season || ''),
+    _admByBranchAcc(rows));
+}
+
+// ── 3. by source ───────────────────────────────────────────────────────────
+function _admSource() {
+  var el = document.getElementById('adm-source'); if (!el) return;
+  var S = _admSet();
+  if (!S.rows.length) { el.innerHTML = '<div class="au-empty">No enquiries in this scope.</div>'; return; }
+  var m = {}, order = [];
+  S.rows.forEach(function (r) {
+    var k = r.src || '';
+    if (!m[k]) { m[k] = { k: k, n: 0, won: 0, open: 0, shut: 0, brs: {} }; order.push(k); }
+    m[k].n++; m[k].brs[r.b] = 1;
+    if (_admIsWon(r)) m[k].won++; else if (_admIsClosed(r)) m[k].shut++; else m[k].open++;
+  });
+  var data = order.map(function (k) { return m[k]; })
+                  .sort(function (a, b) { return b.won - a.won || b.n - a.n; });
+  var maxN = Math.max.apply(null, data.map(function (d) { return d.n; }).concat([1]));
+  var bestRate = Math.max.apply(null, data.filter(function (d) { return d.n >= 20; })
+                   .map(function (d) { return 100 * d.won / d.n; }).concat([0]));
+
+  var h = '<table class="au-tbl"><thead><tr><th>Source</th><th class="n">Enquiries</th>' +
+    '<th style="min-width:150px">Share of all enquiries</th><th class="n">Admitted</th>' +
+    '<th class="n">Admitted per 100</th><th class="n">Still open</th><th class="n">Closed</th>' +
+    '<th>Branches</th></tr></thead><tbody>';
+  data.forEach(function (d) {
+    var rate = d.n ? 100 * d.won / d.n : 0;
+    var star = (d.n >= 20 && rate >= bestRate && bestRate > 0);
+    h += '<tr><td><button class="na-secbtn" onclick="admOpenSource(' +
+        JSON.stringify(d.k).replace(/"/g, '&quot;') + ')">' + _admEsc(_admSrcLab(d.k)) + ' ›</button>' +
+        (star ? ' <span class="na-pill" style="background:#05966920;color:#059669">best rate</span>' : '') + '</td>' +
+      '<td class="n" style="font-weight:800">' + _admN(d.n) + '</td>' +
+      '<td><div style="height:11px;width:' + Math.max(2, 100 * d.n / maxN) + '%;min-width:3px;' +
+        'border-radius:99px;background:#6366F1"></div></td>' +
+      '<td class="n" style="font-weight:800;color:#059669">' + _admN(d.won) + '</td>' +
+      '<td class="n" style="font-weight:800;color:' + (rate >= 10 ? '#059669' : rate >= 5 ? '#D97706' : '#DC2626') +
+        '">' + rate.toFixed(1) + '</td>' +
+      '<td class="n" style="color:var(--txm)">' + _admN(d.open) + '</td>' +
+      '<td class="n" style="color:var(--txm)">' + _admN(d.shut) + '</td>' +
+      '<td style="white-space:nowrap">' + Object.keys(d.brs).sort().map(_admDot).join('') + '</td></tr>';
+  });
+  h += '</tbody></table>';
+
+  /* The finding this panel exists to surface, said carefully. Digital having
+     returned nothing YET is a fact; digital not working is a conclusion the
+     dates do not yet support, and the two must not be confused in front of a
+     director deciding next month\'s budget. */
+  var DIG = { website: 1, facebook: 1, google_ads: 1, chatbot: 1, qr: 1 };
+  var dN = 0, dW = 0, oN = 0, oW = 0;
+  S.rows.forEach(function (r) {
+    if (DIG[r.src]) { dN++; if (_admIsWon(r)) dW++; } else { oN++; if (_admIsWon(r)) oW++; }
+  });
+  if (dN && oN) {
+    var sev = (dW === 0);
+    h += '<div style="margin-top:13px;border-radius:12px;padding:13px 15px;font-size:12.5px;' +
+      'line-height:1.65;background:' + (sev ? '#FFFBEB' : 'var(--sur)') + ';border:1px solid ' +
+      (sev ? '#FDE68A' : 'var(--bor)') + ';color:' + (sev ? '#78350F' : 'inherit') + '">' +
+      '<b>Digital has brought ' + _admN(dN) + ' enquiries and ' +
+        (dW ? _admN(dW) + ' admission' + (dW === 1 ? '' : 's') : 'no admission yet') + '.</b> ' +
+      'Walk-ins, referrals and hand-entered enquiries brought ' + _admN(oN) + ' and ' + _admN(oW) +
+      ' — ' + (oN ? _admPct1(oW, oN) : '0') + ' per hundred against ' +
+      (dN ? _admPct1(dW, dN) : '0') + '. ' +
+      (sev
+        ? 'That gap is worth reading beside the dates rather than as a verdict on the advertising: a ' +
+          'parent who walks in is already most of the way to a decision, while a digital enquiry is ' +
+          'answered, followed up and visited over weeks. The question to put to the agencies is not ' +
+          'whether the leads convert but how far along they have got — and ' +
+          _admN(S.rows.filter(function (r) { return DIG[r.src] && _admIsOpen(r); }).length) +
+          ' of them are still open, so that answer exists.'
+        : 'Spend follows conversion, not volume, so this is the column the agency conversation ' +
+          'should start from.') + '</div>';
+  }
+  el.innerHTML = h;
+}
+function admOpenSource(k) {
+  var S = _admSet();
+  var rows = S.rows.filter(function (r) { return (r.src || '') === k; });
+  _admModal(_admSrcLab(k), _admN(rows.length) + ' enquiries · ' +
+    _admN(rows.filter(_admIsWon).length) + ' admitted', _admByBranchAcc(rows));
+}
+
+// ── 4. by class ────────────────────────────────────────────────────────────
+function _admClassPanel() {
+  var el = document.getElementById('adm-class'); if (!el) return;
+  var S = _admSet();
+  var placed = S.rows.filter(function (r) { return r.lvl !== '' && r.lvl !== null && r.lvl !== undefined; });
+  if (!placed.length) { el.innerHTML = '<div class="au-empty">No enquiry names a single class.</div>'; return; }
+  var m = {};
+  placed.forEach(function (r) {
+    var k = r.cls;
+    if (!m[k]) m[k] = { k: k, lvl: Number(r.lvl), n: 0, won: 0, cur: {} };
+    m[k].n++; if (_admIsWon(r)) m[k].won++;
+    m[k].cur[r.cur || '(not recorded)'] = (m[k].cur[r.cur || '(not recorded)'] || 0) + 1;
+  });
+  var data = Object.keys(m).map(function (k) { return m[k]; })
+                   .sort(function (a, b) { return a.lvl - b.lvl; });
+  var max = Math.max.apply(null, data.map(function (d) { return d.n; }).concat([1]));
+
+  var h = '<div style="display:flex;align-items:flex-end;gap:5px;height:170px;padding:4px 0 0">';
+  data.forEach(function (d) {
+    var hgt = Math.max(3, 100 * d.n / max);
+    h += '<button onclick="admOpenClass(' + JSON.stringify(d.k).replace(/"/g, '&quot;') + ')" ' +
+      'title="' + _admEsc(d.k) + ' — ' + d.n + ' enquiries, ' + d.won + ' admitted" ' +
+      'style="flex:1;min-width:0;border:0;background:transparent;cursor:pointer;font:inherit;color:inherit;' +
+      'display:flex;flex-direction:column;justify-content:flex-end;height:100%;padding:0">' +
+      '<div style="font-size:11px;font-weight:800;margin-bottom:3px">' + d.n + '</div>' +
+      '<div style="height:' + hgt + '%;border-radius:5px 5px 0 0;background:#6366F1;position:relative">' +
+        (d.won ? '<i style="position:absolute;left:0;right:0;bottom:0;height:' +
+          Math.min(100, 100 * d.won / d.n) + '%;background:#059669;border-radius:' +
+          (d.won === d.n ? '5px 5px 0 0' : '0') + '"></i>' : '') + '</div>' +
+      '<div style="font-size:9.5px;color:var(--txm);margin-top:4px;white-space:nowrap;overflow:hidden;' +
+        'text-overflow:ellipsis">' + _admEsc(d.k.replace('Grade ', 'G')) + '</div></button>';
+  });
+  h += '</div>';
+
+  var top = data.slice().sort(function (a, b) { return b.n - a.n; })[0];
+  var ey = data.filter(function (d) { return d.lvl < 1; }).reduce(function (t, d) { return t + d.n; }, 0);
+  h += '<div style="font-size:11.5px;color:var(--txm);margin-top:12px;line-height:1.6">' +
+    'Green is the part already admitted. Heaviest demand is <b style="color:var(--tx)">' +
+    _admEsc(top.k) + '</b> with ' + _admN(top.n) + ' enquiries; early years (Nursery to UKG) account ' +
+    'for <b style="color:var(--tx)">' + _admN(ey) + '</b> between them, which is the intake that sets ' +
+    'how many sections open next April. Click a bar for the parents asking about it.' +
+    (S.rows.length - placed.length
+      ? ' ' + _admN(S.rows.length - placed.length) + ' enquiries are not on this chart because they ' +
+        'name a range of grades or no class at all.' : '') + '</div>';
+  el.innerHTML = h;
+}
+function admOpenClass(k) {
+  var S = _admSet();
+  var rows = S.rows.filter(function (r) { return r.cls === k; });
+  var cur = {};
+  rows.forEach(function (r) { var c = r.cur || '(not recorded)'; cur[c] = (cur[c] || 0) + 1; });
+  var head = '<div style="font-size:12.5px;color:var(--txm);line-height:1.6;margin-bottom:12px">' +
+    'Curriculum asked for: ' + Object.keys(cur).sort(function (a, b) { return cur[b] - cur[a]; })
+      .map(function (c) { return '<b style="color:var(--tx)">' + _admEsc(c) + '</b> ' + cur[c]; })
+      .join(' · ') + '.</div>';
+  _admModal(k, _admN(rows.length) + ' enquiries · ' +
+    _admN(rows.filter(_admIsWon).length) + ' admitted', head + _admByBranchAcc(rows));
+}
+
+// ── 5. pace against previous seasons ───────────────────────────────────────
+function _admPace() {
+  var el = document.getElementById('adm-pace'); if (!el) return;
+  var S = _admSet(), R = _admRaw;
+  var MON = R.months || ['APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC','JAN','FEB','MAR'];
+  var adm = S.trend.filter(function (r) { return r.t === 'Admission'; });
+  if (!adm.length) { el.innerHTML = '<div class="au-empty">The monthly trend tab has no admissions in this scope.</div>'; return; }
+
+  var ays = {}, cell = {}, tot = {};
+  adm.forEach(function (r) {
+    ays[r.ay] = 1;
+    cell[r.ay + '|' + r.m] = (cell[r.ay + '|' + r.m] || 0) + r.n;
+    tot[r.ay] = (tot[r.ay] || 0) + r.n;
+  });
+  var years = Object.keys(ays).sort();
+  var max = 0;
+  Object.keys(cell).forEach(function (k) { if (cell[k] > max) max = cell[k]; });
+  max = max || 1;
+
+  var h = '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:680px"><thead><tr>' +
+    '<th>Academic year</th>' + MON.map(function (m) {
+      return '<th class="n" style="font-size:10.5px">' + m + '</th>'; }).join('') +
+    '<th class="n">Total</th></tr></thead><tbody>';
+  years.forEach(function (ay) {
+    var cur = (ay === S.season);
+    h += '<tr' + (cur ? ' style="background:#6366F10D"' : '') + '>' +
+      '<td><button class="na-secbtn" onclick="admOpenPace(' + JSON.stringify(ay).replace(/"/g, '&quot;') +
+        ')">' + _admEsc(ay) + ' ›</button>' +
+        (cur ? ' <span class="na-pill" style="background:#6366F120;color:#6366F1">this season</span>' : '') + '</td>';
+    MON.forEach(function (m) {
+      var v = cell[ay + '|' + m] || 0;
+      var sh = v / max;
+      h += '<td class="n" style="font-size:11px;' +
+        (v ? 'background:rgba(99,102,241,' + (0.08 + 0.55 * sh).toFixed(2) + ');font-weight:' +
+             (sh > 0.45 ? '800' : '600') : 'color:var(--txm)') + '">' + (v || '·') + '</td>';
+    });
+    h += '<td class="n" style="font-weight:800">' + _admN(tot[ay] || 0) + '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+
+  /* The sentence the whole panel exists for: this month, against the same
+     month in the years that finished. */
+  var thisAy = S.season, prev = years.filter(function (y) { return y < thisAy; });
+  var liveMons = MON.filter(function (m) { return cell[thisAy + '|' + m]; });
+  if (liveMons.length && prev.length) {
+    var m0 = liveMons[liveMons.length - 1];
+    var now = cell[thisAy + '|' + m0] || 0;
+    var past = prev.map(function (y) { return cell[y + '|' + m0] || 0; });
+    var avg = past.reduce(function (a, b) { return a + b; }, 0) / past.length;
+    h += '<div style="font-size:11.5px;color:var(--txm);margin-top:12px;line-height:1.6">' +
+      'In ' + m0 + ' this season the branches in view took <b style="color:var(--tx)">' + _admN(now) +
+      '</b> admissions. The average ' + m0 + ' across ' + prev.length + ' earlier year' +
+      (prev.length === 1 ? '' : 's') + ' was <b style="color:var(--tx)">' + avg.toFixed(0) + '</b>' +
+      (avg ? ' — ' + (now >= avg ? 'ahead of' : 'behind') + ' the usual pace by ' +
+             Math.abs(Math.round(100 * (now - avg) / avg)) + '%' : '') +
+      '. Admissions cluster in February and March, so an October figure is a start rather than a verdict.</div>';
+  } else {
+    h += '<div style="font-size:11.5px;color:var(--txm);margin-top:12px;line-height:1.6">' +
+      'Darker is busier. Admissions cluster in the months before a year begins, so a figure taken ' +
+      'mid-season is read against the same month of earlier years rather than against their totals.</div>';
+  }
+
+  var tc = S.trend.filter(function (r) { return r.t === 'TC'; });
+  if (tc.length) {
+    var tcAy = {};
+    tc.forEach(function (r) { tcAy[r.ay] = (tcAy[r.ay] || 0) + r.n; });
+    h += '<div style="font-size:11.5px;color:var(--txm);margin-top:8px;line-height:1.6">' +
+      '<b style="color:var(--tx)">Children who left (TC):</b> ' +
+      Object.keys(tcAy).sort().map(function (y) {
+        return _admEsc(y) + ' ' + _admN(tcAy[y]) +
+          (tot[y] ? ' (' + _admPct(tcAy[y], tot[y]) + '% of that year\'s intake)' : ''); }).join(' · ') +
+      '. A target is a net figure in practice, so the leavers belong beside the joiners.</div>';
+  }
+  el.innerHTML = h;
+}
+function admOpenPace(ay) {
+  var S = _admSet(), R = _admRaw;
+  var MON = R.months || [];
+  var rows = S.trend.filter(function (r) { return r.ay === ay; });
+  var brs = {}; rows.forEach(function (r) { brs[r.b] = 1; });
+  var h = '<table class="au-tbl"><thead><tr><th>Branch</th><th>Type</th>' +
+    MON.map(function (m) { return '<th class="n" style="font-size:10.5px">' + m + '</th>'; }).join('') +
+    '<th class="n">Total</th></tr></thead><tbody>';
+  Object.keys(brs).sort().forEach(function (b) {
+    ['Admission', 'TC'].forEach(function (t) {
+      var rs = rows.filter(function (r) { return r.b === b && r.t === t; });
+      if (!rs.length) return;
+      var byM = {}, tot = 0;
+      rs.forEach(function (r) { byM[r.m] = (byM[r.m] || 0) + r.n; tot += r.n; });
+      h += '<tr><td style="white-space:nowrap">' + _admDot(b) + ' ' + _admEsc(b) + '</td>' +
+        '<td><span class="na-pill" style="background:' + (t === 'TC' ? '#DC262618;color:#DC2626' :
+          '#05966918;color:#059669') + '">' + t + '</span></td>' +
+        MON.map(function (m) { return '<td class="n" style="font-size:11px' +
+          (byM[m] ? ';font-weight:700' : ';color:var(--txm)') + '">' + (byM[m] || '·') + '</td>'; }).join('') +
+        '<td class="n" style="font-weight:800">' + _admN(tot) + '</td></tr>';
+    });
+  });
+  h += '</tbody></table>';
+  _admModal('Admissions and leavers · ' + ay, rows.length + ' monthly figures', h);
+}
+
+// ── 6. the history ─────────────────────────────────────────────────────────
+function _admHist() {
+  var el = document.getElementById('adm-hist'); if (!el) return;
+  var S = _admSet(), R = _admRaw;
+  if (!S.hist.length) {
+    el.innerHTML = '<div class="au-empty">' + (S.scope
+      ? _admEsc(S.scope) + ' has no student-level admission history in this file — the newest branch ' +
+        'has no prior year to carry.'
+      : 'The history tab holds no rows.') + '</div>';
+    return;
+  }
+  var ays = {}, brs = {}, grid = {};
+  S.hist.forEach(function (r) {
+    ays[r.ay] = 1; brs[r.b] = 1;
+    grid[r.ay + '|' + r.b] = (grid[r.ay + '|' + r.b] || 0) + 1;
+  });
+  var years = Object.keys(ays).sort(), bl = Object.keys(brs).sort();
+  var tot = {}; years.forEach(function (y) {
+    tot[y] = bl.reduce(function (t, b) { return t + (grid[y + '|' + b] || 0); }, 0); });
+  var max = Math.max.apply(null, years.map(function (y) { return tot[y]; }).concat([1]));
+
+  var h = '<table class="au-tbl"><thead><tr><th>Academic year</th>' +
+    bl.map(function (b) { return '<th class="n">' + _admDot(b) + ' ' + _admEsc(b) + '</th>'; }).join('') +
+    '<th style="min-width:130px">Total</th><th class="n">Admissions</th>' +
+    '<th class="n">Year on year</th></tr></thead><tbody>';
+  years.forEach(function (y, i) {
+    var prev = i ? tot[years[i - 1]] : 0;
+    var chg = prev ? Math.round(100 * (tot[y] - prev) / prev) : null;
+    h += '<tr><td><button class="na-secbtn" onclick="admOpenHist(' +
+        JSON.stringify(y).replace(/"/g, '&quot;') + ',\'\')">' + _admEsc(y) + ' ›</button></td>' +
+      bl.map(function (b) {
+        var v = grid[y + '|' + b] || 0;
+        return '<td class="n">' + (v
+          ? '<button class="na-secbtn" style="font-weight:700" onclick="admOpenHist(' +
+            JSON.stringify(y).replace(/"/g, '&quot;') + ',' +
+            JSON.stringify(b).replace(/"/g, '&quot;') + ')">' + _admN(v) + '</button>'
+          : '<span style="color:var(--txm)">·</span>') + '</td>';
+      }).join('') +
+      '<td><div style="height:11px;width:' + Math.max(2, 100 * tot[y] / max) + '%;min-width:3px;' +
+        'border-radius:99px;background:#0D9488"></div></td>' +
+      '<td class="n" style="font-weight:800">' + _admN(tot[y]) + '</td>' +
+      '<td class="n" style="font-weight:700;color:' + (chg === null ? 'var(--txm)' :
+        chg >= 0 ? '#059669' : '#DC2626') + '">' +
+        (chg === null ? '–' : (chg >= 0 ? '+' : '') + chg + '%') + '</td></tr>';
+  });
+  h += '</tbody></table>' +
+    '<div style="font-size:11.5px;color:var(--txm);margin-top:10px;line-height:1.6">' +
+    'A blank cell is a branch that had not opened yet, not a year with no admissions — Gowdavalli\'s ' +
+    'first intake was 2026-27, and Pocharam\'s 2024-25. Click a year, or any number inside it, for the ' +
+    'students behind it.</div>';
+  el.innerHTML = h;
+}
+function admOpenHist(ay, branch) {
+  var S = _admSet();
+  var rows = S.hist.filter(function (r) {
+    return r.ay === ay && (!branch || r.b === branch); });
+  var byCls = {};
+  rows.forEach(function (r) { byCls[r.cls] = (byCls[r.cls] || 0) + 1; });
+  var head = '<div style="font-size:12.5px;color:var(--txm);line-height:1.6;margin-bottom:12px">' +
+    _admN(rows.length) + ' students joined' + (branch ? ' at ' + _admEsc(branch) : '') + ' in ' +
+    _admEsc(ay) + '. By class: ' + Object.keys(byCls)
+      .sort(function (a, b) { return byCls[b] - byCls[a]; }).slice(0, 8)
+      .map(function (c) { return '<b style="color:var(--tx)">' + _admEsc(c) + '</b> ' + byCls[c]; })
+      .join(' · ') + '.</div>';
+  /* Nine thousand rows will not open as one table, so the list is capped and
+     says so rather than freezing the browser without explanation. */
+  var CAP = 400, shown = rows.slice(0, CAP);
+  var h = head + '<table class="au-tbl"><thead><tr><th>Student</th><th>Class</th><th>Section</th>' +
+    (branch ? '' : '<th>Branch</th>') + '<th class="n">Admission no.</th><th class="n">Joined</th>' +
+    '</tr></thead><tbody>' +
+    shown.map(function (r) {
+      return '<tr><td>' + _admEsc(r.n) + '</td><td>' + _admEsc(r.cls) + '</td>' +
+        '<td style="color:var(--txm)">' + (_admEsc(r.sec) || '–') + '</td>' +
+        (branch ? '' : '<td style="white-space:nowrap">' + _admDot(r.b) + ' ' + _admEsc(r.b) + '</td>') +
+        '<td class="n" style="color:var(--txm)">' + (_admEsc(r.adn) || '–') + '</td>' +
+        '<td class="n">' + _admDate(r.d) + '</td></tr>';
+    }).join('') + '</tbody></table>' +
+    (rows.length > CAP ? '<div style="font-size:11.5px;color:var(--txm);margin-top:9px">Showing the ' +
+      'first ' + CAP + ' of ' + _admN(rows.length) + ' — open a single branch for a shorter list.</div>' : '');
+  _admModal(_admEsc(ay) + (branch ? ' · ' + branch : ''),
+    _admN(rows.length) + ' students joined', h);
+}
+
+// ── the drill-down shared by every panel ───────────────────────────────────
+function _admEnqTable(rows, showBranch) {
+  if (!rows.length) return '<div class="au-empty">Nothing here.</div>';
+  var h = '<table class="au-tbl"><thead><tr><th>Child</th><th>Parent</th><th class="n">Phone</th>' +
+    (showBranch ? '<th>Branch</th>' : '') + '<th>Class</th><th>Curriculum</th><th>Source</th>' +
+    '<th>Stage</th><th>Last note</th><th class="n">Enquired</th></tr></thead><tbody>';
+  rows.slice().sort(function (a, b) { return (b.d || '').localeCompare(a.d || ''); })
+    .forEach(function (r) {
+      h += '<tr><td style="font-weight:600">' + (_admEsc(r.name) || '–') +
+          (r.dup ? ' <span class="na-pill" style="background:#D9770618;color:#D97706">repeat</span>' : '') +
+          (r.xbr ? ' <span class="na-pill" style="background:#7C3AED18;color:#7C3AED">also elsewhere</span>' : '') +
+          '</td>' +
+        '<td style="color:var(--txm)">' + (_admEsc(r.parent) || '–') + '</td>' +
+        '<td class="n" style="white-space:nowrap">' + (_admEsc(r.ph) || '–') + '</td>' +
+        (showBranch ? '<td style="white-space:nowrap">' + _admDot(r.b) + ' ' + _admEsc(r.b) + '</td>' : '') +
+        '<td>' + _admEsc(r.cls) + '</td>' +
+        '<td style="color:var(--txm)">' + (_admEsc(r.cur) || '–') + '</td>' +
+        '<td style="color:var(--txm)">' + _admEsc(_admSrcLab(r.src)) + '</td>' +
+        '<td><span class="na-pill" style="background:' + _admStageCol(r.st) + '1A;color:' +
+          _admStageCol(r.st) + '">' + _admEsc(_admStageLab(r.st)) + '</span></td>' +
+        '<td style="max-width:36ch;color:var(--txm)">' + (_admEsc(r.sub) || '–') + '</td>' +
+        '<td class="n" style="white-space:nowrap">' + _admDate(r.d) + '</td></tr>';
+    });
+  return h + '</tbody></table>';
+}
+function _admByBranchAcc(rows) {
+  var S = _admSet();
+  if (!rows.length) return '<div class="au-empty">Nothing here.</div>';
+  if (S.scope) return _admEnqTable(rows, false);
+  var m = {}, order = [];
+  rows.forEach(function (r) { if (!m[r.b]) { m[r.b] = []; order.push(r.b); } m[r.b].push(r); });
+  order.sort(function (a, b) { return m[b].length - m[a].length; });
+  return order.map(function (b) {
+    var rs = m[b], won = rs.filter(_admIsWon).length;
+    var head = '<span style="display:flex;align-items:center;gap:9px;width:100%">' +
+      _admDot(b) + '<b style="flex:1">' + _admEsc(b) + '</b>' +
+      '<span style="font-weight:800">' + _admN(rs.length) + '</span>' +
+      '<span style="color:var(--txm);font-size:11.5px">enquiries · ' + won + ' admitted</span></span>';
+    return (typeof _naAcc === 'function') ? _naAcc(head, _admEnqTable(rs, false))
+      : '<div><div style="font-weight:700;margin:10px 0 6px">' + _admEsc(b) + '</div>' +
+        _admEnqTable(rs, false) + '</div>';
+  }).join('');
+}
+function _admModal(title, sub, html) {
+  if (typeof openHTMLModal === 'function') openHTMLModal(title, sub, html);
+}
+
+// ── paint ──────────────────────────────────────────────────────────────────
+function _admMethod() {
+  var el = document.getElementById('adm-method'); if (!el) return;
+  var R = _admRaw;
+  var tabs = (R.tabs || []).map(function (t) {
+    return '<b style="color:var(--tx)">' + _admEsc(t.name) + '</b> (' + _admN(t.rows) + ')'; }).join(', ');
+  el.innerHTML = _admEsc(R.method || '') +
+    '<br><br>Read from <b style="color:var(--tx)">' + _admEsc((R.source || {}).name || 'the second workbook') +
+    '</b>, which the dashboard opens where it stands — no data is copied into "PBES-All Reports 2026-27". ' +
+    'Tabs read: ' + tabs + '.' +
+    ((R.notes || []).length ? ' Skipped: ' + _admEsc(R.notes.join('; ')) + '.' : '');
+}
+function _admPaint() {
+  if (!_admRaw) return;
+  var R = _admRaw, S = _admSet();
+  var se = document.getElementById('adm-season'); if (se) se.textContent = R.season || '';
+  var sc = document.getElementById('adm-scope');
+  if (sc) sc.innerHTML = '<i></i>' + _admEsc(S.scope || 'All branches');
+  var mt = document.getElementById('adm-meta');
+  if (mt) mt.textContent = _admN(S.rows.length) + ' enquiries · ' +
+    _admN(S.hist.length) + ' past admissions · ' +
+    ((R.tabs || []).filter(function (t) {
+      return t.kind === 'enquiry' && (!S.scope || t.branch === S.scope); }).length) +
+    ' branch tracker' + (((R.tabs || []).filter(function (t) {
+      return t.kind === 'enquiry' && (!S.scope || t.branch === S.scope); }).length === 1) ? '' : 's') + ' read';
+  _admNotes(); _admKpis(); _admTargetPanel(); _admFunnel(); _admSource();
+  _admClassPanel(); _admPace(); _admHist(); _admMethod();
+  var l = document.getElementById('adm-loader'), b = document.getElementById('adm-body');
+  if (l) l.style.display = 'none';
+  if (b) b.style.display = 'flex';
+}
+window._admRepaint = function () { if (_admLoaded) _admPaint(); };
+
+async function loadAdm27(force) {
+  if (_admLoading) { _admQueued = true; return; }
+  if (!force && _admLoaded) { if (!_liveDue('adm27')) return; }
+  _admLoading = true; if (!_admLoaded) _admStatus('Loading…');
+  try {
+    if (!force && !_admLoaded) {
+      try {
+        var c = await idbGet('pbes_adm27');
+        if (c && c.data && c.data.enq && (Date.now() - c.t) < 24 * 3600 * 1000) {
+          _admRaw = c.data; _admLoaded = true; _admPaint();
+          _admStatus('Cached · refreshing in background');
+        }
+      } catch (e) {}
+    }
+    var session = null;
+    try { var sx = await sb.auth.getSession(); session = sx && sx.data && sx.data.session; } catch (e) {}
+    if (!session) { window.location.href = 'login.html'; return; }
+
+    var res = await _lazyFetch('adm27', force, session, 55000);
+    if (res.status === 401) { await sb.auth.signOut(); window.location.href = 'login.html'; return; }
+    if (!res.ok) {
+      var why = '';
+      try { var ej = await res.json(); why = (ej && ej.message) || ''; } catch (e) {}
+      if (why) throw new Error(why);
+      throw new Error('HTTP ' + res.status + ' from /api/data. A 404 means the Apps Script deployment ' +
+        'URL is stale — in Apps Script use Deploy → Manage deployments → edit the EXISTING ' +
+        'deployment → New version, so the /exec URL stays the same.');
+    }
+    var d = await res.json();
+    if (d && d.error) throw new Error(d.message || 'Upstream error');
+    var raw = (d && d.ADM27_RAW) ? d.ADM27_RAW : null;
+
+    /* A section neither hop knows is not an error anywhere along the way: the
+       Pages Function maps an unknown name to "" and doGet falls through, so
+       both return the MAIN payload with a 200. Tell that apart from a real
+       failure by what came back, and name which half is behind. */
+    if (!raw && d && (d.SECTIONS || d.CARE_DATA || d.generatedAt)) {
+      var known = d.SECTIONS || null;
+      if (known && known.indexOf('adm27') >= 0) {
+        throw new Error('Apps Script has this section, but /api/data returned the main dashboard ' +
+          'payload instead. The Cloudflare Pages Function is the old version: update ' +
+          'functions/api/data.js so "adm27" appears in ALLOWED_SECTIONS, then redeploy Pages.');
+      }
+      throw new Error('The Apps Script deployment that answered has no "adm27" section' +
+        (known ? ' — it knows only: ' + known.join(', ') : '') + '. Paste the new Code.gs, then ' +
+        'Deploy → Manage deployments → edit the EXISTING deployment → New version.');
+    }
+    if (!raw) throw new Error('The section loaded but carried no admissions payload. Run ' +
+      'testAdm27Raw() in the Apps Script editor — it prints which file and tabs it found.');
+    if (raw.problem) throw new Error(raw.problem);
+
+    var changed = _liveMark('adm27', raw.generatedAt,
+      function () { loadAdm27(true); }, function () { return _admLoading; }) || !_admLoaded;
+    _admRaw = raw; _admLoaded = true;
+    try { idbSet('pbes_adm27', { t: Date.now(), data: raw }); } catch (e) {}
+    if (changed || !document.getElementById('adm-body').style.display) _admPaint();
+    else _admPaint();
+    _admStatus(_liveLabel(raw.generatedAt));
+  } catch (err) {
+    var msg = String(err && err.message || err);
+    _admStatus(msg, true);
+    if (!_admLoaded) {
+      var l = document.getElementById('adm-loader');
+      if (l) l.innerHTML = '<div style="color:var(--r);font-weight:700">Could not load Admissions 2027-28</div>' +
+        '<div style="font-size:11px;color:var(--txm);max-width:520px;line-height:1.6">' +
+        msg.replace(/</g, '&lt;') + '</div>';
+    }
+  } finally {
+    _admLoading = false;
+    if (_admQueued) { _admQueued = false; setTimeout(function () { loadAdm27(true); }, 50); }
+  }
+}
+window.loadAdm27 = loadAdm27;
 </script>
 
 
