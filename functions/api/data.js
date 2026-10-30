@@ -557,7 +557,9 @@ function filterAdm27ByBranch(data, branch) {
     branches: [branch],
     histBranches: Object.keys(ays).length ? [branch] : [],
     histAys: Object.keys(ays).sort(),
-    targets: { [branch]: (R.targets || {})[branch] },
+    targets:     { [branch]: (R.targets || {})[branch] },
+    leadTargets: { [branch]: (R.leadTargets || {})[branch] },
+    plan:        { [branch]: (R.plan || {})[branch] },
     enq, hist, trend, tabs,
     histGrid: grid, histClass: clsN, histMonth: monN,
     quality: Object.assign({}, R.quality || {}, {
