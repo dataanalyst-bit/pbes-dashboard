@@ -3378,6 +3378,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div class="au-kpis" id="adm-kpis"></div>
 
       <div class="au-sec">
+        <h3>🧹 Leads to clean out</h3>
+        <div class="sub">Every row the tracker holds that is not a parent waiting to be rung, with the tab
+          and the line number to go to. The three piles are kept apart because they are different
+          decisions: one is safe to delete, one needs a choice between two records, and one must
+          <b>not</b> be deleted at all — a Facebook lead form never asks for the child's name, so a blank
+          name is an incomplete enquiry rather than a junk one, and some of those already have a campus
+          visit booked. Tap a branch to expand its rows.</div>
+        <div id="adm-clean"></div>
+      </div>
+
+      <div class="au-sec">
         <h3>🎯 Against the target</h3>
         <div class="sub">The director's revised targets of 8 September 2026. The figure that matters is the
           <b>share of target already admitted</b>, not the enquiry count — a branch can be busy and still
@@ -19976,10 +19987,6 @@ function _admNotes() {
   }
 
   var issues = [];
-  if (Q.tests)       issues.push(['🧪', Q.tests + ' test row' + (Q.tests === 1 ? '' : 's'),
-    'typed to check the form. Left out of every figure here, but still in the sheet']);
-  if (Q.dups)        issues.push(['👯', Q.dups + ' repeat number at one branch',
-    'the same phone enquiring twice at the same campus — counted once per row, so decide which is real']);
   if (Q.crossBranch) issues.push(['🔀', Q.crossBranch + ' famil' + (Q.crossBranch === 1 ? 'y' : 'ies') + ' at two campuses',
     'one family shopping around. Right for a branch, one too many for the group total']);
   if (Q.blankType)   issues.push(['📋', Q.blankType + ' of ' + (Q.total || 0) + ' with no admission type',
@@ -19990,13 +19997,14 @@ function _admNotes() {
     'like "Grade 1 - 3" — counted as enquiries, left out of the class chart']);
   if (Q.unreadable)  issues.push(['🔡', Q.unreadable + ' with an unreadable curriculum',
     'the cell came through a bad encoding and no longer says anything']);
-  if (Q.blankClass)  issues.push(['❓', Q.blankClass + ' with no class',
-    'nothing recorded in class_interested']);
 
   if (issues.length) {
     h += '<div style="border:1px solid var(--bor);border-radius:12px;padding:12px 15px;font-size:12.5px;' +
       'line-height:1.6;background:var(--sur)">' +
-      '<div style="font-weight:800;margin-bottom:8px">What to fix in the tracker</div>' +
+      '<div style="font-weight:800;margin-bottom:8px">Columns left blank across the tracker</div>' +
+      '<div style="color:var(--txm);margin-bottom:9px">These are whole columns nobody is filling in, ' +
+      'so the breakdowns that use them cannot be reported. Individual bad rows are in the cleanup ' +
+      'panel above instead.</div>' +
       '<div style="display:grid;gap:7px">' + issues.map(function (x) {
         return '<div style="display:flex;gap:9px;align-items:flex-start">' +
           '<span style="font-size:13px;line-height:1.3">' + x[0] + '</span>' +
@@ -20587,7 +20595,7 @@ function _admPaint() {
       return t.kind === 'enquiry' && (!S.scope || t.branch === S.scope); }).length) +
     ' branch tracker' + (((R.tabs || []).filter(function (t) {
       return t.kind === 'enquiry' && (!S.scope || t.branch === S.scope); }).length === 1) ? '' : 's') + ' read';
-  _admNotes(); _admKpis(); _admTargetPanel(); _admFunnel(); _admSource();
+  _admNotes(); _admKpis(); _admClean(); _admTargetPanel(); _admFunnel(); _admSource();
   _admClassPanel(); _admPace(); _admHist(); _admMethod();
   var l = document.getElementById('adm-loader'), b = document.getElementById('adm-body');
   if (l) l.style.display = 'none';
@@ -20668,6 +20676,222 @@ async function loadAdm27(force) {
   }
 }
 window.loadAdm27 = loadAdm27;
+
+/* ── the cleanup worklist ───────────────────────────────────────────────────
+   Built to be worked through with the sheet open beside it, so every row names
+   the tab and the line to go to. Three verdicts, and the split matters more
+   than the counts:
+
+     drop   not a parent. Delete the row.
+     decide the same child twice. One of them goes; which one is a judgement
+            about which record is further along, so the page will not guess.
+     fix    a real enquiry with a cell to repair. Never a deletion — 83 of
+            these are Facebook lead forms with no child name, eight of them
+            with a campus visit already booked.
+
+   Rows are listed BOTTOM-UP within a branch. Deleting a row in a Google Sheet
+   shifts every row below it, so a list worked downwards is wrong after the
+   first deletion; worked upwards it stays correct to the last row. */
+var ADM_VERDICT = {
+  drop:   ['🗑️', 'Delete these',   '#DC2626', '#FEF2F2', '#FECACA',
+           'Not a parent at all — a test row, one the counsellor has already written off, ' +
+           'or a number nobody can ring.'],
+  decide: ['⚖️',       'Decide which to keep', '#D97706', '#FFFBEB', '#FDE68A',
+           'The same child entered twice on one number. Keep the record that is further along ' +
+           'and delete the other.'],
+  fix:    ['🔧',       'Fix the cell, keep the lead', '#0D9488', '#F0FDFA', '#99F6E4',
+           'A real enquiry with something missing or mistyped. None of these should be deleted.']
+};
+var ADM_FLAG_LAB = {
+  test:    'Test row', junk: 'Written off by the counsellor', phone: 'Unusable number',
+  dup:     'Same child, twice', sib: 'Sibling, not a duplicate',
+  unknown: 'Shared number, child not named', noname: 'No child name',
+  class:   'Class not recognised', inname: 'Phone in the name column',
+  garbled: 'Name came through garbled'
+};
+/* Said ONCE under a group rather than on every row. Repeating the same two
+   lines down forty rows buries the one thing that differs between them. */
+var ADM_FLAG_WHY = {
+  test:    '"test" appears in the child name, the parent name or the counsellor\'s note.',
+  junk:    'The counsellor has already written these off in sub_status. Their judgement beats any rule here.',
+  phone:   'An Indian mobile is ten digits beginning 6-9. These cannot be rung as they stand.',
+  dup:     'The same child already appears on this number. Keep whichever record is further along.',
+  sib:     'A different child on the same number. Brothers and sisters share a parent\'s phone, ' +
+           'so this is not a duplicate and both rows stay.',
+  unknown: 'The number is shared with an enquiry that has no child name, so which is which cannot be told yet. Fill the names in first.',
+  noname:  'A Facebook lead form asks for the parent and not the child, so the child name arrives ' +
+           'blank. These are real enquiries and some already have a campus visit booked. Fill the ' +
+           'name in; do not delete them.',
+  class:   'The class written here is not one this group runs, so the enquiry cannot be counted against an intake.',
+  inname:  'A phone number has been typed into the child name column.',
+  garbled: 'The name came through a broken encoding, so nobody can read who to greet. Retype it from the original enquiry.'
+};
+
+function _admCleanRows() {
+  var S = _admSet(), R = _admRaw;
+  /* Test rows are filtered out of _admSet because they are not parents; here
+     they are exactly what we are looking for, so the season list is rebuilt. */
+  var scope = S.scope, season = S.season;
+  return (R.enq || []).filter(function (r) {
+    return r.season === season && r.verdict && (!scope || r.b === scope);
+  });
+}
+function _admCleanCount(rows, v) {
+  return rows.filter(function (r) { return r.verdict === v; }).length;
+}
+
+function _admClean() {
+  var el = document.getElementById('adm-clean'); if (!el) return;
+  var S = _admSet(), rows = _admCleanRows();
+  if (!rows.length) {
+    el.innerHTML = '<div class="au-empty">Nothing to clean — every enquiry in this scope has a ' +
+      'name, a usable number and no repeat.</div>';
+    return;
+  }
+  var h = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:10px">';
+  ['drop', 'decide', 'fix'].forEach(function (v) {
+    var V = ADM_VERDICT[v], n = _admCleanCount(rows, v);
+    h += '<button onclick="admOpenClean(\'' + v + '\')" ' +
+      'style="border:1px solid ' + V[4] + ';border-radius:12px;padding:13px 14px;background:' + V[3] +
+      ';cursor:pointer;font:inherit;text-align:left;color:#1f2937">' +
+      '<div style="display:flex;align-items:center;gap:9px">' +
+        '<span style="font-size:15px">' + V[0] + '</span>' +
+        '<span style="font-size:23px;font-weight:800;color:' + V[2] + ';line-height:1">' + _admN(n) + '</span></div>' +
+      '<div style="font-weight:800;font-size:12.5px;margin-top:5px;color:' + V[2] + '">' + V[1] + '</div>' +
+      '<div style="font-size:11px;line-height:1.55;margin-top:4px;color:#4b5563">' + V[5] + '</div>' +
+      '<div style="font-size:11px;font-weight:700;margin-top:7px;color:' + V[2] + '">Click to view ›</div>' +
+      '</button>';
+  });
+  h += '</div>';
+
+  /* what each finding is, and how many — the reasons behind the three cards */
+  var fc = {};
+  rows.forEach(function (r) { (r.fl || []).forEach(function (f) { fc[f[0]] = (fc[f[0]] || 0) + 1; }); });
+  var keys = Object.keys(fc).sort(function (a, b) { return fc[b] - fc[a]; });
+  if (keys.length) {
+    h += '<div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:7px">' +
+      keys.map(function (k) {
+        return '<span class="na-pill" style="background:var(--sur);border:1px solid var(--bor);' +
+          'color:var(--txm)"><b style="color:var(--tx)">' + fc[k] + '</b> ' +
+          _admEsc(ADM_FLAG_LAB[k] || k) + '</span>'; }).join('') + '</div>';
+  }
+
+  h += '<div style="margin-top:16px;font-size:12.5px;font-weight:800">By branch — tap to expand</div>' +
+    '<div style="font-size:11.5px;color:var(--txm);margin:4px 0 10px;line-height:1.6">' +
+    'Each branch lists its own rows with the tab and line number to go to. They are listed ' +
+    '<b style="color:var(--tx)">highest row first on purpose</b>: deleting a row in Google Sheets ' +
+    'moves every row below it up by one, so a list worked from the top is wrong after the first ' +
+    'deletion. Worked from the top of this list downwards, every number stays correct to the end.</div>';
+
+  var brs = {};
+  rows.forEach(function (r) { (brs[r.b] || (brs[r.b] = [])).push(r); });
+  h += Object.keys(brs).sort(function (a, b) { return brs[b].length - brs[a].length; })
+    .map(function (b) {
+      var rs = brs[b], d = _admCleanCount(rs, 'drop'), dc = _admCleanCount(rs, 'decide'),
+          fx = _admCleanCount(rs, 'fix');
+      var head = '<span style="display:flex;align-items:center;gap:9px;width:100%;flex-wrap:wrap">' +
+        _admDot(b) + '<b style="flex:1;min-width:110px">' + _admEsc(b) + '</b>' +
+        (d  ? '<span class="na-pill" style="background:#DC262618;color:#DC2626">' + d + ' to delete</span>' : '') +
+        (dc ? '<span class="na-pill" style="background:#D9770618;color:#D97706">' + dc + ' to decide</span>' : '') +
+        (fx ? '<span class="na-pill" style="background:#0D948818;color:#0D9488">' + fx + ' to fix</span>' : '') +
+        '</span>';
+      return (typeof _naAcc === 'function') ? _naAcc(head, _admCleanBody(rs))
+        : '<div><div style="font-weight:700;margin:10px 0 6px">' + _admEsc(b) + '</div>' +
+          _admCleanBody(rs) + '</div>';
+    }).join('');
+  el.innerHTML = h;
+}
+
+/* One branch, grouped by verdict, hardest first. */
+function _admCleanBody(rs) {
+  var h = '';
+  ['drop', 'decide', 'fix'].forEach(function (v) {
+    var sub = rs.filter(function (r) { return r.verdict === v; });
+    if (!sub.length) return;
+    var V = ADM_VERDICT[v];
+    var tab = (sub[0] && sub[0].tab) || '';
+    var nums = sub.map(function (r) { return r.row; })
+                  .sort(function (a, b) { return b - a; }).join(', ');
+    /* every reason present in this group, explained once */
+    var why = [];
+    sub.forEach(function (r) {
+      (r.fl || []).forEach(function (f) { if (why.indexOf(f[0]) < 0) why.push(f[0]); });
+    });
+    h += '<div style="margin-top:14px">' +
+      '<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:6px">' +
+        '<b style="color:' + V[2] + ';font-size:12.5px">' + V[0] + ' ' + V[1] + ' · ' + sub.length + '</b>' +
+        (tab ? '<span style="font-size:11px;color:var(--txm)">tab "' + _admEsc(tab) + '"</span>' : '') +
+        '<button onclick="admCopyRows(this,' + JSON.stringify(nums).replace(/"/g, '&quot;') + ')" ' +
+          'style="border:1px solid var(--bor);background:var(--sur);border-radius:7px;padding:3px 9px;' +
+          'font:inherit;font-size:11px;cursor:pointer;color:inherit">Copy row numbers</button>' +
+      '</div>' +
+      (why.length ? '<div style="font-size:11px;color:var(--txm);line-height:1.6;margin-bottom:7px">' +
+        why.map(function (k) {
+          return '<b style="color:var(--tx)">' + _admEsc(ADM_FLAG_LAB[k] || k) + ':</b> ' +
+                 _admEsc(ADM_FLAG_WHY[k] || ''); }).join('<br>') + '</div>' : '') +
+      _admCleanTable(sub) + '</div>';
+  });
+  return h || '<div class="au-empty">Nothing here.</div>';
+}
+
+function _admCleanTable(rows) {
+  var h = '<table class="au-tbl"><thead><tr><th class="n">Sheet row</th><th>Enquiry ID</th>' +
+    '<th>Child</th><th>Parent</th><th class="n">Phone</th><th>Class</th><th>Source</th>' +
+    '<th>Stage</th><th>What is wrong</th><th class="n">Added</th></tr></thead><tbody>';
+  rows.slice().sort(function (a, b) { return b.row - a.row; }).forEach(function (r) {
+    h += '<tr><td class="n" style="font-weight:800;font-variant-numeric:tabular-nums">' + r.row + '</td>' +
+      '<td style="color:var(--txm);white-space:nowrap">' + (_admEsc(r.id) || '–') + '</td>' +
+      '<td style="font-weight:600">' + (_admEsc(r.name) ||
+        '<span style="color:var(--txm);font-weight:400">(blank)</span>') + '</td>' +
+      '<td style="color:var(--txm)">' + (_admEsc(r.parent) || '–') + '</td>' +
+      '<td class="n" style="white-space:nowrap">' + (_admEsc(r.ph) || '–') + '</td>' +
+      '<td style="color:var(--txm)">' + _admEsc(r.cls) + '</td>' +
+      '<td style="color:var(--txm)">' + _admEsc(_admSrcLab(r.src)) + '</td>' +
+      '<td><span class="na-pill" style="background:' + _admStageCol(r.st) + '1A;color:' +
+        _admStageCol(r.st) + '">' + _admEsc(_admStageLab(r.st)) + '</span></td>' +
+      '<td style="max-width:40ch;line-height:1.5">' + (r.fl || []).map(function (f) {
+        return '<div><b style="color:var(--tx)">' + _admEsc(ADM_FLAG_LAB[f[0]] || f[0]) + '</b>' +
+          (f[1] ? ' <span style="color:var(--txm)">' + _admEsc(f[1]) + '</span>' : '') + '</div>'; }).join('') + '</td>' +
+      '<td class="n" style="white-space:nowrap">' + _admDate(r.d) + '</td></tr>';
+  });
+  return h + '</tbody></table>';
+}
+
+function admCopyRows(btn, nums) {
+  var done = function () {
+    var t = btn.textContent; btn.textContent = 'Copied';
+    setTimeout(function () { btn.textContent = t; }, 1400);
+  };
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(nums).then(done, function () { window.prompt('Row numbers:', nums); });
+      return;
+    }
+  } catch (e) {}
+  window.prompt('Row numbers:', nums);
+}
+
+function admOpenClean(v) {
+  if (!_admRaw) return;
+  var S = _admSet();
+  var rows = _admCleanRows().filter(function (r) { return r.verdict === v; });
+  var V = ADM_VERDICT[v];
+  var brs = {};
+  rows.forEach(function (r) { (brs[r.b] || (brs[r.b] = [])).push(r); });
+  var h = '<div style="font-size:12.5px;color:var(--txm);line-height:1.65;margin-bottom:12px">' +
+    V[5] + ' Rows are listed highest first, because deleting one in Google Sheets moves every row ' +
+    'below it up by one.</div>' +
+    Object.keys(brs).sort(function (a, b) { return brs[b].length - brs[a].length; })
+      .map(function (b) {
+        var head = '<span style="display:flex;align-items:center;gap:9px;width:100%">' +
+          _admDot(b) + '<b style="flex:1">' + _admEsc(b) + '</b>' +
+          '<span style="font-weight:800">' + brs[b].length + '</span>' +
+          '<span style="color:var(--txm);font-size:11.5px">rows</span></span>';
+        return (typeof _naAcc === 'function') ? _naAcc(head, _admCleanTable(brs[b]))
+          : _admCleanTable(brs[b]);
+      }).join('');
+  _admModal(V[1], _admN(rows.length) + ' rows · ' + (S.season || ''), h);
+}
 </script>
 
 
