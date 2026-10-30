@@ -49,7 +49,7 @@ const CACHE_TTL_SECONDS = 300; // edge freshness window (Apps Script keep-warm k
 // still one entry here — plus one line in step 4 if it carries personal data.
 const ALLOWED_SECTIONS = {
   pt1: 1, audit: 1, ptm: 1, civil: 1, syl: 1, vchk: 1, kptm: 1, sylc: 1,
-  term1: 1, meet: 1, dm: 1, naa: 1, bio: 1
+  term1: 1, meet: 1, dm: 1, naa: 1, bio: 1, adm27: 1
 };
 
 // Heavier than the main payload and most sections change only when marks are
@@ -64,7 +64,9 @@ const SECTION_TTL_SECONDS = 1800;
    fetch, hence the same 5 minutes the audit uses. */
 /* dm is a 1.3 MB payload rebuilt from six tabs that are replaced once a month,
    so a two-minute edge copy was costing a full rebuild for no freshness. */
-const SECTION_TTL_OVERRIDE = { syl: 120, sylc: 120, meet: 30, dm: 900, naa: 300, bio: 300 };
+/* The 2027-28 enquiry tracker is worked all day by counsellors, so a long
+   edge copy would show a principal this morning's pipeline at four o'clock. */
+const SECTION_TTL_OVERRIDE = { syl: 120, sylc: 120, meet: 30, dm: 900, naa: 300, bio: 300, adm27: 120 };
 
 // Column headers that carry the campus name, in the order they are looked for.
 // The three PT-1 tabs all use "Branch", but this keeps a rename from silently
@@ -412,6 +414,12 @@ export async function onRequestGet({ request, env }) {
   // The meeting transcript is one group-wide document with no branch column;
   // filtering it by branch would blank it for every principal.
   if (section === "meet")  return withCookie(json(data));
+  /* Admissions 2027-28 carries every enquiring parent's name and phone
+     number, plus nine thousand historic students. A principal gets their own
+     campus and nothing else, and the year grids are recomputed from what is
+     left rather than sent whole — a grid built over all five branches would
+     hand back the totals the row filter just removed. */
+  if (section === "adm27") return withCookie(json(filterAdm27ByBranch(data, userBranch)));
   // Digital marketing: a record belongs to the campus its ads were run FOR,
   // which is not always the account that paid — a Boduppal account runs
   // Bachupally hiring ads. servedList is what the builder resolved, so filter on
@@ -517,6 +525,53 @@ function filterBioByBranch(data, branch) {
   return Object.assign({}, data, { BIO_RAW: Object.assign({}, R, {
     branches: [branch], staff: staff, recs: recs,
     codes: own(R.codes), cohorts: own(R.cohorts), overrides: own(R.overrides)
+  }) });
+}
+
+function filterAdm27ByBranch(data, branch) {
+  const R = data && data.ADM27_RAW;
+  if (!R) return data;
+  const own = (arr) => (Array.isArray(arr) ? arr.filter((x) => x && x.b === branch) : []);
+  const enq = own(R.enq), hist = own(R.hist), trend = own(R.trend);
+
+  /* The grids are aggregates over every branch, so they are rebuilt here from
+     the rows this user may see. Shipping the originals would leak the group
+     totals through a chart even with the detail rows stripped. */
+  const MONTHS = Array.isArray(R.months) ? R.months
+    : ["APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC","JAN","FEB","MAR"];
+  const grid = {}, clsN = {}, monN = {}, ays = {};
+  hist.forEach((r) => {
+    ays[r.ay] = 1;
+    const g = r.ay + "\u0000" + r.b;       grid[g] = (grid[g] || 0) + 1;
+    const c = r.ay + "\u0000" + r.cls;     clsN[c] = (clsN[c] || 0) + 1;
+    if (r.d) {
+      const mo = MONTHS[(parseInt(r.d.slice(5, 7), 10) + 8) % 12];
+      const k = r.ay + "\u0000" + mo;      monN[k] = (monN[k] || 0) + 1;
+    }
+  });
+
+  const tabs = Array.isArray(R.tabs)
+    ? R.tabs.filter((t) => !t || !t.branch || t.branch === branch) : [];
+
+  return Object.assign({}, data, { ADM27_RAW: Object.assign({}, R, {
+    branches: [branch],
+    histBranches: Object.keys(ays).length ? [branch] : [],
+    histAys: Object.keys(ays).sort(),
+    targets: { [branch]: (R.targets || {})[branch] },
+    enq, hist, trend, tabs,
+    histGrid: grid, histClass: clsN, histMonth: monN,
+    quality: Object.assign({}, R.quality || {}, {
+      total: enq.length,
+      tests:       enq.filter((r) => r.test).length,
+      dups:        enq.filter((r) => r.dup).length,
+      crossBranch: enq.filter((r) => r.xbr).length,
+      ranges:      enq.filter((r) => r.rng).length,
+      unreadable:  enq.filter((r) => r.cur === "(unreadable)").length,
+      blankType:   enq.filter((r) => !r.typ).length,
+      blankCur:    enq.filter((r) => !r.cur).length,
+      blankClass:  enq.filter((r) => r.cls === "(not recorded)").length,
+      blankDate:   enq.filter((r) => !r.d).length,
+    }),
   }) });
 }
 
