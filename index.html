@@ -14790,6 +14790,65 @@ function renderRankings(){
     contrib.push(valMap);
   }
 
+  /* ── Non-Academic Audit ──
+     The operational half of the audit — safety, statutory, housekeeping,
+     transport and everything else checked outside the classroom. It sits in
+     its own lazily loaded section, so the row asks for it and redraws when it
+     lands, the same way the academic audit row above does.
+
+     It is scored on that tab's own rule, the mean of the scored checks, so
+     the number here and the number there can never disagree. */
+  {
+    var nStats={}, nMonth=null, nFell=false, nPrevM=null, nHave=false;
+    var _NR=(typeof _naRows==='function' && typeof _naRaw!=='undefined' && _naRaw) ? _naRows() : null;
+    if(_NR && _NR.length){
+      nHave=true;
+      var _seen={}; _NR.forEach(function(r){ if(r.month) _seen[r.month]=1; });
+      var _ms=Object.keys(_seen).sort(function(a,b){ return _naMonthKey(a)-_naMonthKey(b); });
+      var _want=getReportMonthInfo().label, _prev=getPriorMonthInfo().label;
+      if(_seen[_want]){ nMonth=_want; nPrevM=_seen[_prev]?_prev:null; }
+      else {
+        /* nothing checked in the reporting month yet — show the newest month
+           that does carry findings and say which, rather than five dashes */
+        nMonth=_ms[_ms.length-1]||null; nFell=!!nMonth;
+        nPrevM=_ms.length>1?_ms[_ms.length-2]:null;
+      }
+      ALLB.forEach(function(b){
+        var v=naBranchScore(b,nMonth);
+        var w=nPrevM?naBranchScore(b,nPrevM):null;
+        nStats[b]= v==null ? null : {pct:Math.round(v*10)/10, prev:(w==null?null:Math.round(w*10)/10)};
+      });
+    } else if(typeof loadNaa==='function' && !window.__scNaaAsked){
+      window.__scNaaAsked=1; try{ loadNaa(); }catch(e){}
+    }
+    var nValMap={}; ALLB.forEach(function(b){ nValMap[b]=nStats[b]?nStats[b].pct:null; });
+    var nWin=winners(nValMap);
+    html+='<tr><td style="padding:10px 14px;font-size:12.5px;font-weight:600;border-bottom:1px solid #E0E8FF;color:#0F172A;">'+
+      '\ud83e\uddef Non-Academic Audit<small style="display:block;font-weight:400;font-size:10px;color:#94A3B8">'+
+      (nMonth?String(nMonth):'operational checks')+(nFell?' \u00b7 newest checked':'')+'</small></td>';
+    ALLB.forEach(function(b){
+      var d=nStats[b];
+      if(!d){
+        html+=cell('<span style="color:#94A3B8;">\u2014</span><br><small style="color:#94A3B8;font-size:10px;">'+
+          (nHave?('not checked in '+String(nMonth||'').split(/\s+/)[0]):'audit not loaded yet')+'</small>',false);
+        return;
+      }
+      var ncol=(typeof _naColor==='function')?_naColor(d.pct)
+             :(d.pct>=85?'#059669':d.pct>=70?'#D97706':'#DC2626');
+      var nmv='';
+      if(d.prev!=null){
+        var nd=d.pct-d.prev;
+        nmv = Math.abs(nd)<0.5 ? 'level on '+String(nPrevM||'').split(/\s+/)[0].slice(0,3)
+            : (nd>0?'\u25b2 ':'\u25bc ')+Math.abs(nd).toFixed(1)+' on '+String(nPrevM||'').split(/\s+/)[0].slice(0,3);
+      }
+      html+=cell('<span style="font-weight:800;color:'+ncol+';font-size:15px;">'+d.pct+'%</span>'+
+        '<br><small style="color:#94A3B8;font-size:10px;">'+(nmv||String(nMonth||'').split(/\s+/)[0].slice(0,3))+'</small>',
+        nWin.includes(b));
+    });
+    html+='<td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;">'+winnerBadge(nWin)+'</td></tr>';
+    contrib.push(nValMap);
+  }
+
   // HR
   {
     const r=scoreRow('🧑‍💼','HR Hiring Score',hrStats,d=>{
@@ -17928,6 +17987,10 @@ async function loadNaa(force) {
     _naRaw = raw; _naLoaded = true; _naNetAt = Date.now();
     try { idbSet('pbes_naa', { t: Date.now(), data: raw }); } catch (e) {}
     if (changed) _naPaint();
+    /* The head-to-head scorecard carries a Non-Academic Audit row and may have
+       drawn before this section arrived, so it is redrawn here rather than
+       left showing "not loaded yet" until the next repaint. */
+    try { if (typeof renderRankings === 'function') renderRankings(); } catch (e) {}
     _naStatus(_liveLabel(raw.generatedAt));
   } catch (err) {
     if (!_naLoaded) {
@@ -17976,6 +18039,24 @@ function _naPct(rows) {
   var sc = rows.filter(function (r) { return r.scored; });
   if (!sc.length) return null;
   return 100 * sc.reduce(function (t, r) { return t + r.pts; }, 0) / sc.length;
+}
+/* "October 2026" → 202610, so the audit months sort and compare like numbers
+   rather than like text, where "October" sorts before "September". */
+function _naMonthKey(label) {
+  var p = String(label || '').trim().split(/\s+/);
+  if (p.length < 2) return 0;
+  var i = _CAL_MONTHS.indexOf(p[0]);
+  if (i < 0) i = _CAL_MONTHS.map(function (m) { return m.slice(0, 3); }).indexOf(p[0].slice(0, 3));
+  var y = parseInt(p[1], 10);
+  return (i < 0 || isNaN(y)) ? 0 : y * 100 + i + 1;
+}
+/* The non-academic score for one branch in one month, on the tab's own rule:
+   the mean of the scored checks. Returns null when nothing was scored. */
+function naBranchScore(branch, month) {
+  if (typeof _naRows !== 'function') return null;
+  var rs = _naRows().filter(function (r) {
+    return r.branch === branch && (!month || r.month === month); });
+  return _naPct(rs);
 }
 function _naColor(p) {
   if (p === null) return 'var(--bor)';
