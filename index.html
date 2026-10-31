@@ -4084,10 +4084,51 @@ const _CAL_MONTHS_FULL=['January','February','March','April','May','June','July'
 // Previous CALENDAR month (July → June). Falls back to the latest month with data
 // BEFORE the current calendar month if the exact previous month has no data yet.
 const _CAL_MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
-function getPrevCalendarMonth(){ return _CAL_MONTHS[(new Date().getMonth()+11)%12]; }
+
+/* ── the month the Executive Overview reports on ───────────────────────
+   A month still running understates every branch — half the calls are not made
+   yet, half the audit is not done — so the default is the last month that is
+   actually over. The one exception is the FINAL DAY of a month, whichever date
+   that falls on: the 28th, 29th, 30th or 31st. By then the month's work is
+   done, so it becomes the reporting month that same day instead of waiting
+   until the 1st.
+
+   The effect is that the number never jumps backwards. October appears on 31
+   October and stays there through the whole of November; November appears on
+   30 November and stays through December. Nothing on these panels ever shows
+   a part-finished month.
+
+   The date comes from getDateWindows(), which is the server's IST date when
+   it is available, so a laptop set to another timezone cannot roll the month
+   a day early or late for one person and not for everybody else. */
+function getReportMonthInfo(){
+  var W=(typeof getDateWindows==='function')?getDateWindows():null;
+  var iso=(W&&W.today)?String(W.today):'';
+  var y,m,d;
+  if(/^\d{4}-\d{2}-\d{2}$/.test(iso)){ y=+iso.slice(0,4); m=+iso.slice(5,7)-1; d=+iso.slice(8,10); }
+  else { var n=new Date(); y=n.getFullYear(); m=n.getMonth(); d=n.getDate(); }
+  var lastDay=new Date(y,m+1,0).getDate();
+  var onLast=(d>=lastDay);                      // >= not ===, so a bad clock cannot skip the day
+  var ry=onLast?y:(m===0?y-1:y), rm=onLast?m:(m+11)%12;
+  return { year:ry, month:rm, name:_CAL_MONTHS[rm], key:ry*100+rm+1,
+           label:_CAL_MONTHS[rm]+' '+ry, isCurrentMonth:onLast, day:d, lastDay:lastDay };
+}
+/* the month before the reporting one — what the "▲ on Sep" deltas compare with */
+function getPriorMonthInfo(){
+  var R=getReportMonthInfo();
+  var y=(R.month===0)?R.year-1:R.year, m=(R.month+11)%12;
+  return { year:y, month:m, name:_CAL_MONTHS[m], key:y*100+m+1, label:_CAL_MONTHS[m]+' '+y };
+}
+/* How a caption should describe it, so "October" on 31 October is never read
+   as a panel that has gone stale. */
+function reportMonthNote(){
+  var R=getReportMonthInfo();
+  return R.isCurrentMonth ? 'this month, complete today' : 'last completed month';
+}
+function getReportMonthName(){ return getReportMonthInfo().name; }
 function getPrevMonth(branch){
   const has=m=>TRACKER.some(d=>d.branch===branch&&d.month===m&&d.calls>0);
-  const prev=getPrevCalendarMonth();
+  const prev=getReportMonthName();
   if(has(prev)) return prev;
   const curName=_CAL_MONTHS[new Date().getMonth()];
   let curIdx=MONTHS.indexOf(curName); if(curIdx<0) curIdx=MONTHS.length;
@@ -4484,13 +4525,12 @@ function renderOvAudit(){
      newest month and showed October under a "previous month" caption. The
      months are parsed with the audit module's own monthKey instead, so the
      format of the label cannot break the match. */
-  var _n=new Date();
-  var _pm=new Date(_n.getFullYear(), _n.getMonth()-1, 1);
-  var _b4=new Date(_n.getFullYear(), _n.getMonth()-2, 1);
-  var wantK=_pm.getFullYear()*100+(_pm.getMonth()+1);
-  var wantK0=_b4.getFullYear()*100+(_b4.getMonth()+1);
-  var _MLONG=['January','February','March','April','May','June','July','August','September','October','November','December'];
-  var want=_MLONG[_pm.getMonth()]+' '+_pm.getFullYear();
+  /* The reporting month, on the same rule as every other panel here: the last
+     month that is over, except on the final day of a month, when that month
+     counts as complete and is shown from that day. */
+  var _R=getReportMonthInfo(), _P=getPriorMonthInfo();
+  var wantK=_R.key, wantK0=_P.key;
+  var want=_R.label;
   var m=null, mPrev=null;
   mths.forEach(function(x){
     var k=A.monthKey(x);
@@ -4528,7 +4568,7 @@ function renderOvAudit(){
   });
   box.innerHTML=out||'<div class="no-data">No audit data</div>';
   if(fn) fn.textContent=String(m)+' \u00b7 marked Yes \u00f7 parameters scored'+
-    (fellBack?' \u00b7 '+want+' not audited yet, showing the newest month':' \u00b7 previous month')+
+    (fellBack?' \u00b7 '+want+' not audited yet, showing the newest month':' \u00b7 '+reportMonthNote())+
     (mPrev?' \u00b7 against '+String(mPrev).split(/\s+/)[0]:'');
 }
 window.__renderOvAudit=function(){
@@ -4738,7 +4778,7 @@ function renderOverview(){
        there was nothing on screen to say why. A branch with no calls logged for
        the month is now named as such instead of being replaced by an older
        one. */
-    const lm=getPrevCalendarMonth();
+    const lm=getReportMonthName();
     const rec=TRACKER.find(r=>r.branch===b&&r.month===lm&&r.calls>0);
     if(!rec){
       html+=`<div class="bcb"><div class="bcb-name"><span class="bd b${b}"></span>${b}</div>
@@ -4757,7 +4797,8 @@ function renderOverview(){
   });
   document.getElementById('ov-branch-bars').innerHTML=html||'<div class="no-data">No data</div>';
   { const _f=document.getElementById('ov-bcb-fn');
-    if(_f) _f.textContent=getPrevCalendarMonth()+' \u00b7 calls made \u00f7 total students'; }
+    if(_f) _f.textContent=getReportMonthName()+' \u00b7 '+reportMonthNote()+
+      ' \u00b7 calls made \u00f7 total students'; }
 
   try{ renderOvAudit(); }catch(e){ console.error('ov audit:', e && e.message); }
   try{ renderOvDept(); }catch(e){ console.error('ov dept:', e && e.message); }
@@ -8555,7 +8596,7 @@ function renderRankings(){
      back to the previous month. */
   const prevMonth={};
   ALLB.forEach(b=>{
-    prevMonth[b]=(typeof fMonth!=='undefined'&&fMonth!=='ALL')?fMonth:getPrevCalendarMonth();
+    prevMonth[b]=(typeof fMonth!=='undefined'&&fMonth!=='ALL')?fMonth:getReportMonthName();
   });
 
   // ── Row 1: Care Call Rate (PREVIOUS month per branch) ──
@@ -8569,7 +8610,7 @@ function renderRankings(){
   // Falls back to the latest observed month BEFORE the current calendar month.
   function prevObsMonthKey(branchObs){
     const presentMonths=new Set(branchObs.map(r=>r.Month));
-    const prevKey=MO_MAP[getPrevCalendarMonth()];
+    const prevKey=MO_MAP[getReportMonthName()];
     if(prevKey&&presentMonths.has(prevKey)) return prevKey;
     let curIdx=MONTHS.indexOf(_CAL_MONTHS[new Date().getMonth()]); if(curIdx<0)curIdx=MONTHS.length;
     for(let i=curIdx-1;i>=0;i--){ if(presentMonths.has(MO_MAP[MONTHS[i]])) return MO_MAP[MONTHS[i]]; }
@@ -8599,7 +8640,7 @@ function renderRankings(){
     if(branchObs.length===0||!cfg){obsCompletionStats[b]=null;return;}
     // previous calendar month first; else latest earlier month with BOTH working days and observations
     let useMonth=null;
-    const _pk=MO_MAP[getPrevCalendarMonth()];
+    const _pk=MO_MAP[getReportMonthName()];
     const _ok=mk=>mcMaxWD(cfg,mk)>0&&branchObs.some(r=>r.Month===mk);
     if(_pk&&_ok(_pk)) useMonth=_pk;
     else{
@@ -14538,7 +14579,7 @@ function renderRankings(){
      wearing this month's label. A month picked in the filter still wins. */
   const prevMonth={};
   ALLB.forEach(b=>{
-    prevMonth[b]=(typeof fMonth!=='undefined'&&fMonth!=='ALL')?fMonth:getPrevCalendarMonth();
+    prevMonth[b]=(typeof fMonth!=='undefined'&&fMonth!=='ALL')?fMonth:getReportMonthName();
   });
   const careStats={};
   ALLB.forEach(b=>{
@@ -14554,7 +14595,7 @@ function renderRankings(){
     const branchObs=(typeof OBS_DATA!=='undefined'?OBS_DATA:[]).filter(r=>r.Branch===b);
     if(branchObs.length===0||!cfg){obsCompletionStats[b]=null;return;}
     let useMonth=null;
-    const _pk=MO_MAP[getPrevCalendarMonth()];
+    const _pk=MO_MAP[getReportMonthName()];
     const _ok=mk=>mcMaxWD(cfg,mk)>0&&branchObs.some(r=>r.Month===mk);
     if(_pk&&_ok(_pk)) useMonth=_pk;
     else{
@@ -14666,8 +14707,8 @@ function renderRankings(){
   {
     const valMap={}; ALLB.forEach(b=>{valMap[b]=careStats[b]?careStats[b].pct:null;});
     const win=winners(valMap);
-    const _cm=(typeof fMonth!=='undefined'&&fMonth!=='ALL')?fMonth:getPrevCalendarMonth();
-    html+=`<tr><td style="padding:10px 14px;font-size:12.5px;font-weight:600;border-bottom:1px solid #E0E8FF;color:#0F172A;">📞 Care Call Rate<small style="display:block;font-weight:400;font-size:10px;color:#94A3B8">${_cm} 2026</small></td>`;
+    const _cm=(typeof fMonth!=='undefined'&&fMonth!=='ALL')?fMonth:getReportMonthName();
+    html+=`<tr><td style="padding:10px 14px;font-size:12.5px;font-weight:600;border-bottom:1px solid #E0E8FF;color:#0F172A;">📞 Care Call Rate<small style="display:block;font-weight:400;font-size:10px;color:#94A3B8">${(typeof fMonth!=='undefined'&&fMonth!=='ALL')?_cm:getReportMonthInfo().label}</small></td>`;
     ALLB.forEach(b=>{
       const d=careStats[b];
       /* names the month, so a dash can never be read as a broken feed */
@@ -14707,10 +14748,8 @@ function renderRankings(){
   {
     var _AD=window.__AUDIT_D, _AU=window.AUDIT, aStats={}, aMonth=null, aFell=false, aPrevM=null;
     if(_AD && _AU && (_AD.months||[]).length){
-      var _nn=new Date();
-      var _p1=new Date(_nn.getFullYear(), _nn.getMonth()-1, 1);
-      var _p2=new Date(_nn.getFullYear(), _nn.getMonth()-2, 1);
-      var k1=_p1.getFullYear()*100+(_p1.getMonth()+1), k2=_p2.getFullYear()*100+(_p2.getMonth()+1);
+      /* the same reporting month the Executive Overview charts use */
+      var k1=getReportMonthInfo().key, k2=getPriorMonthInfo().key;
       (_AD.months||[]).forEach(function(x){
         var k=_AU.monthKey(x); if(k===k1) aMonth=x; if(k===k2) aPrevM=x; });
       if(!aMonth){ aMonth=_AD.months[_AD.months.length-1]; aFell=true;
