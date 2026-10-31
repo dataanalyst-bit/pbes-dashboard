@@ -635,7 +635,10 @@ function filterByBranch(data, branch) {
   // branch can be compared without any campus seeing another's detail.
   const KEEP_FULL = { TRACKER: 1, OBS_DATA: 1, HR_RECORDS: 1, SCORE_SLIM: 1 };
   const arrayKeys = [
-    "CARE_DATA", "GO_DATA", "GRIEVANCE_DATA", "ADM_TRENDS", "ALL_TEACHER",
+    // CARE_CLASS used to be counts only and streamed whole. It now carries the
+    // NAMES of the students still to be called, so it is filtered like every
+    // other student-level feed.
+    "CARE_DATA", "CARE_CLASS", "GO_DATA", "GRIEVANCE_DATA", "ADM_TRENDS", "ALL_TEACHER",
     "ADMIN_DATA", "PUR_DATA", "VIG_DATA", "OWNER_STATS",
     "COMBINED_ADM", "ADM1_DATA", "ADM2_DATA", "LEAD_DATES", "AVIS_DATA",
     "ADMP_DATA",
