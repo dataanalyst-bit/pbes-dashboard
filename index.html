@@ -1889,8 +1889,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 <!-- ═══ CARE CALLS ═══ -->
 <div id="pane-care" class="pane">
   <div class="sh"><div class="sh-l"><h2>Care Calls Tracker</h2><span class="tag" id="care-tag">All Branches · All Months</span></div></div>
-  <div class="krow k4">
+  <div class="krow k5">
     <div class="kc blue" onclick="viewCareRecords('ALL')" style="cursor:pointer;" title="Click to view all calls"><div class="kc-ico">📞</div><div class="kc-lbl">Calls Made</div><div class="kc-val" id="cc-calls">–</div><div class="kc-sub" id="cc-calls-s">–</div></div>
+    <div class="kc red" onclick="viewCareNotCalled()" style="cursor:pointer;" title="Click for the children still to be rung, by class and section"><div class="kc-ico">📵</div><div class="kc-lbl">Not Called Yet</div><div class="kc-val" id="cc-nc">–</div><div class="kc-sub" id="cc-nc-s">–</div></div>
     <div class="kc green" onclick="viewCareRecords('Resolved')" style="cursor:pointer;" title="Click to view Resolved records"><div class="kc-ico">✅</div><div class="kc-lbl">Resolved</div><div class="kc-val" id="cc-res">–</div><div class="kc-sub" id="cc-res-s">–</div></div>
     <div class="kc amber" onclick="viewCareRecords('Pending')" style="cursor:pointer;" title="Click to view Pending records"><div class="kc-ico">⏳</div><div class="kc-lbl">Pending</div><div class="kc-val" id="cc-pend">–</div><div class="kc-sub" id="cc-pend-s">–</div></div>
     <div class="kc purple" onclick="viewCareRecords('In Progress')" style="cursor:pointer;" title="Click to view In Progress records"><div class="kc-ico">🔄</div><div class="kc-lbl">In Progress</div><div class="kc-val" id="cc-ip">–</div><div class="kc-sub" id="cc-ip-s">–</div></div>
@@ -10166,6 +10167,98 @@ function _careClassOrder(c){
   if(m){ var v=R[m[1]]!=null?R[m[1]]:parseInt(m[1],10); if(!isNaN(v)) return 10+v; }
   return 999;
 }
+/* Who is on the class register this month with no call logged against them.
+   Scoped by the dashboard's own Branch and Month filters, so the tile and the
+   drill-down always agree with the rest of the tab. */
+function _careNotCalled(){
+  var CC=Array.isArray(window._CARE_CLASS)?window._CARE_CLASS:[];
+  var br=(typeof fBranch!=='undefined'&&fBranch!=='ALL')?fBranch:null;
+  var mo=(typeof fMonth!=='undefined'&&fMonth!=='ALL')?fMonth:null;
+  var rows=CC.filter(function(r){
+    return (!br||r.Branch===br) && (!mo||r.Month===mo) && (r.Students||0)>0; });
+  var roster=0, called=0, pending=0, list=[];
+  rows.forEach(function(r){
+    roster+=r.Students||0; called+=r.Called||0;
+    var p=Array.isArray(r.Pending)?r.Pending:[];
+    pending+=p.length?p.length:Math.max((r.Students||0)-(r.Called||0),0);
+    if(p.length) list.push(r);
+  });
+  return { roster:roster, called:called, pending:pending, rows:list, hasNames:list.length>0,
+           branch:br, month:mo };
+}
+function viewCareNotCalled(){
+  var esc=function(v){ return String(v==null?'':v).replace(/[&<>"']/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
+  var NC=_careNotCalled();
+  if(!NC.roster){
+    if(typeof openHTMLModal==='function')
+      openHTMLModal('Not called yet','',
+        '<div class="no-data">The class registers have not loaded yet. Reload the dashboard with ?flush=1 '+
+        'if this does not clear.</div>');
+    return;
+  }
+  if(!NC.pending){
+    if(typeof openHTMLModal==='function')
+      openHTMLModal('Not called yet', NC.roster.toLocaleString('en-IN')+' children on the register',
+        '<div class="no-data">Every child on the register has a call logged for this scope.</div>');
+    return;
+  }
+  /* branch → class-section → the children themselves */
+  var byBranch={}, order=[];
+  NC.rows.forEach(function(r){ if(!byBranch[r.Branch]){ byBranch[r.Branch]=[]; order.push(r.Branch); }
+    byBranch[r.Branch].push(r); });
+  order.sort(function(a,b){ return byBranch[b].reduce(function(t,r){return t+r.Pending.length;},0)
+                                 - byBranch[a].reduce(function(t,r){return t+r.Pending.length;},0); });
+
+  var h='<div style="font-size:12.5px;color:var(--txm);line-height:1.65;margin-bottom:12px">'+
+    '<b style="color:var(--tx)">'+NC.pending.toLocaleString('en-IN')+'</b> of '+
+    NC.roster.toLocaleString('en-IN')+' children on the class registers have no call logged against them'+
+    (NC.month?' for '+esc(NC.month):'')+(NC.branch?' at '+esc(NC.branch):'')+
+    ' — '+(100*NC.pending/NC.roster).toFixed(1)+'%. Tap a branch, then a class-section, for the names '+
+    'and roll numbers. A child called twice counts once, so this is children not reached rather than '+
+    'calls not made.</div>';
+
+  h+=order.map(function(b){
+    var rs=byBranch[b].slice().sort(function(x,y){
+      return (_careClassOrder(_careClassSplit(x.Class).cls)-_careClassOrder(_careClassSplit(y.Class).cls))
+             || String(x.Class).localeCompare(String(y.Class)); });
+    var n=rs.reduce(function(t,r){ return t+r.Pending.length; },0);
+    var st=rs.reduce(function(t,r){ return t+(r.Students||0); },0);
+    var head='<span style="display:flex;align-items:center;gap:9px;width:100%;flex-wrap:wrap">'+
+      '<span class="bd b'+esc(b)+'"></span><b style="flex:1;min-width:110px">'+esc(b)+'</b>'+
+      '<span style="font-weight:800;color:#DC2626">'+n+'</span>'+
+      '<span style="color:var(--txm);font-size:11.5px">not called · '+rs.length+
+      ' class-section'+(rs.length===1?'':'s')+' · '+st+' on the register</span></span>';
+
+    var body=rs.map(function(r){
+      var sp=_careClassSplit(r.Class);
+      var ch='<table class="au-tbl"><thead><tr><th class="n">Roll no.</th><th>Student</th>'+
+        '<th>Class</th><th>Section</th><th>Month</th></tr></thead><tbody>'+
+        r.Pending.map(function(p){
+          return '<tr><td class="n" style="font-variant-numeric:tabular-nums">'+esc(p.Roll||'–')+'</td>'+
+            '<td style="font-weight:600">'+esc(p.Student||'–')+'</td>'+
+            '<td>'+esc(sp.cls)+'</td><td>'+esc(sp.sec)+'</td>'+
+            '<td style="color:var(--txm)">'+esc(r.Month)+'</td></tr>'; }).join('')+
+        '</tbody></table>';
+      var ih='<span style="display:flex;align-items:center;gap:9px;width:100%;flex-wrap:wrap">'+
+        '<b style="flex:1;min-width:120px">'+esc(r.Class)+'</b>'+
+        '<span style="font-weight:800;color:#DC2626">'+r.Pending.length+'</span>'+
+        '<span style="color:var(--txm);font-size:11.5px">of '+(r.Students||0)+' · '+
+        (r.Students?Math.round(100*r.Called/r.Students):0)+'% called</span></span>';
+      return (typeof _naAcc==='function') ? _naAcc(ih, ch)
+        : '<div style="margin:8px 0"><b>'+esc(r.Class)+'</b>'+ch+'</div>';
+    }).join('');
+
+    return (typeof _naAcc==='function') ? _naAcc(head, body)
+      : '<div><h4>'+esc(b)+'</h4>'+body+'</div>';
+  }).join('');
+
+  if(typeof openHTMLModal==='function')
+    openHTMLModal('📵 Not called yet',
+      NC.pending.toLocaleString('en-IN')+' children · '+
+      (NC.month||'all months')+' · '+(NC.branch||'all branches'), h);
+}
+
 function viewCareClassWise(b, month){
   var escHtml=function(v){ return String(v==null?'':v).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); };
   var CC=Array.isArray(window._CARE_CLASS)?window._CARE_CLASS:[];
@@ -10383,6 +10476,22 @@ function renderCare(){
   document.getElementById('cc-pend-s').textContent=s.calls>0?fp(s.pending/s.calls*100)+' of calls':'–';
   document.getElementById('cc-ip').textContent=fi(s.ip);
   document.getElementById('cc-ip-s').textContent=s.calls>0?fp(s.ip/s.calls*100)+' of calls':'–';
+
+  /* Not called yet — the other side of the completion figure. It comes from the
+     roster roll-up rather than from the calls, because a call that was never
+     made leaves no row to count: the only way to see it is to compare the class
+     register against the calls logged. 99% done is only worth anything if the
+     missing one per cent has names against it. */
+  { var NC=_careNotCalled();
+    var _v=document.getElementById('cc-nc'), _sv=document.getElementById('cc-nc-s');
+    if(_v){
+      _v.textContent = NC.roster ? fi(NC.pending) : '–';
+      _sv.textContent = NC.roster
+        ? (NC.pending
+            ? fp(100*NC.pending/NC.roster)+' of '+fi(NC.roster)+' on the register'
+            : 'every child on the register was rung')
+        : 'roster not loaded';
+    } }
 
   // Branch bars — ALWAYS the current calendar month by default (never silently substitutes
   // an older month just because it has data); a Month selection in the dropdown overrides it.
@@ -30234,8 +30343,33 @@ window.VCHK = (function () {
     });
     return order.map(function(k){
       var g = groups[k].slice().sort(function(a,b){ return dayOf(b.raised) - dayOf(a.raised); });   // newest first
-      var worst = Math.min.apply(null, g.map(stateOf));
+
+      /* Two rows for the same checkpoint on the SAME DAY are one inspection
+         entered twice, not the problem coming back. PGS-00174 and PGS-00175
+         were both raised on 17 October, two minutes apart; the work was done
+         and signed off against one of them and the duplicate was left sitting
+         at Assigned. Counting the day by its WORST row then showed a
+         checkpoint as Open on a line that also read "Verified · Pass", which
+         is the sheet contradicting itself on screen.
+
+         So within one day the BEST state stands — if any copy of that day's
+         entry was closed, that day's inspection is closed. Across DIFFERENT
+         days nothing changes: a checkpoint that failed again a week later is
+         open until that later visit is closed too, which is the whole point of
+         tracking repeats. Both IDs stay in "Every visit" either way, so the
+         duplicate is still visible rather than swallowed. */
+      var dayKey = function(v){
+        var t = Date.parse(String(v.raised || ''));
+        return isNaN(t) ? ('#' + (v.id || '')) : new Date(t).toISOString().slice(0, 10);
+      };
+      var perDay = {};
+      g.forEach(function(v){
+        var d = dayKey(v), st = stateOf(v);
+        if (perDay[d] === undefined || st > perDay[d]) perDay[d] = st;    // best that day
+      });
+      var worst = Math.min.apply(null, Object.keys(perDay).map(function(d){ return perDay[d]; }));
       var live = g.filter(function(v){ return stateOf(v) === worst; });
+      if (!live.length) live = g.slice();            // never leave the rollup without a row
       var latest = live[0], first = g[g.length - 1], newest = g[0];
       var rep = Object.assign({}, latest);
 
