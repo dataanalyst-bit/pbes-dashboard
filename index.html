@@ -20187,11 +20187,25 @@ function _admSet() {
     ((typeof fBranch !== 'undefined' && fBranch !== 'ALL') ? fBranch : '');
   if (scope && (R.branches || []).indexOf(scope) < 0) scope = '';
   var season = R.season || '';
-  var rows = R.enq.filter(function (r) {
-    return r.season === season && !r.test && (!scope || r.b === scope);
+  /* Two sets, deliberately.
+
+     "all" is the register: every enquiry_id in the tracker for this season and
+     scope, test rows included. It is what the headline Total Leads counts, so
+     the figure on the page reconciles with a count of enquiry_id in the sheet.
+     Pocharam read 114 against 116 in the sheet for months because the two test
+     rows were dropped here without anything on the page saying so.
+
+     "rows" is the real-parent set, test rows removed. Every RATE uses it, and
+     must: a test row can never be admitted, so counting it in a denominator
+     understates conversion. The counts reconcile, the rates stay clean, and
+     the tile says which is which. */
+  var all = R.enq.filter(function (r) {
+    return r.season === season && (!scope || r.b === scope);
   });
+  var rows = all.filter(function (r) { return !r.test; });
   return {
-    rows: rows, scope: scope, season: season,
+    rows: rows, all: all, tests: all.length - rows.length,
+    scope: scope, season: season,
     hist:  (R.hist  || []).filter(function (r) { return !scope || r.b === scope; }),
     trend: (R.trend || []).filter(function (r) { return !scope || r.b === scope; })
   };
@@ -20272,12 +20286,14 @@ function _admKpis() {
       '<div class="na-click">Click to view ›</div></button>';
   }
   var h = '';
-  h += tile('enq', '📥', '#EFF6FF', '#1D4ED8', 'var(--tx)', _admN(rows.length), 'Total Leads',
-    (S.season || '') + (rows.length ? ' · ' + _admN(open) + ' still open' : ''));
+  h += tile('enq', '📥', '#EFF6FF', '#1D4ED8', 'var(--tx)', _admN(S.all.length), 'Total Leads',
+    (S.season || '') + (S.all.length ? ' · ' + _admN(open) + ' still open' : '') +
+    (S.tests ? ' · incl. ' + _admN(S.tests) + ' test row' + (S.tests === 1 ? '' : 's') : ''));
   h += tile('won', '🎓', '#ECFDF5', '#047857', '#059669', _admN(won), 'Admitted so far',
     tgt ? _admPct1(won, tgt) + '% of a ' + _admN(tgt) + ' target' : 'no target set');
   h += tile('conv', '📈', '#F5F3FF', '#6D28D9', '#7C3AED', _admPct1(won, rows.length) + '%', 'Conversion rate',
-    _admN(won) + ' admitted of ' + _admN(rows.length) + ' leads');
+    _admN(won) + ' admitted of ' + _admN(rows.length) +
+    (S.tests ? ' real enquiries (test rows left out)' : ' leads'));
   h += tile('cold', '📵', '#FFFBEB', '#B45309', cold ? '#D97706' : '#059669', _admN(cold),
     'Tried and never reached', _admN(fresh) + ' more are new and not yet called');
   h += tile('lost', '🚪', '#FEF2F2', '#B91C1C', shut ? '#DC2626' : '#059669', _admN(shut), 'Closed without admission',
@@ -20295,7 +20311,10 @@ function admOpenKpi(k) {
   else if (k === 'lost') { f = _admIsClosed; title = 'Closed without admission'; }
   else if (k === 'conv' || k === 'gap') { return admOpenTargets(); }
   else                   { f = function () { return true; }; title = 'Total Leads'; }
-  var rows = S.rows.filter(f);
+  /* Total Leads opens the whole register so every enquiry_id is reachable and a
+     test row can be found and deleted; every other tile is a rate or a stage
+     count and stays on the real-parent set. */
+  var rows = (k === 'enq' ? S.all : S.rows).filter(f);
   sub = _admN(rows.length) + ' leads · ' + (S.season || '');
   _admModal(title, sub, _admByBranchAcc(rows));
 }
