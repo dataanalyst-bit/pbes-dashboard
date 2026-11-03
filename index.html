@@ -3176,6 +3176,13 @@ document.addEventListener('DOMContentLoaded', async () => {
           against that band&rsquo;s audit score. Each ring is the spread of overall-satisfaction ratings given by
           that band&rsquo;s parents — an average of 3.9 built from 5s and 1s is a different year group from one
           built from 4s. A band with no responses is left out rather than drawn empty.</div>
+        <div class="sub" style="margin-top:7px"><b>Reading the NPS.</b> It is not a score out of 100 and not an
+          average — it is the share of parents who would recommend the school (they answered 9 or 10) minus the
+          share who would not (0 to 6). Parents answering 7 or 8 count for nothing either way. So it runs from
+          −100 to +100, and <b>a minus simply means that band has more parents who would not recommend us than
+          parents who would</b>. A band can average a respectable 3.5 out of 5 and still be negative here,
+          because the stars ask how satisfied a parent is while this asks whether they would put their name to
+          us — the three figures under each ring are the parents behind it.</div>
         <div id="t1-stages"></div>
       </div>
 
@@ -33448,10 +33455,10 @@ window.T1 = (function () {
         rated.forEach(function (o) { cnt[Math.max(1, Math.min(5, Math.round(o.overall)))]++; });
         var avg = n ? window.T1.mean(rated.map(function (o) { return o.overall; })) : null;
         var npsR = rows.filter(function (o) { return o.nps != null; });
-        var nps = npsR.length
-          ? Math.round(100 * (npsR.filter(function (o) { return o.nps >= 9; }).length -
-                              npsR.filter(function (o) { return o.nps <= 6; }).length) / npsR.length)
-          : null;
+        var pro = npsR.filter(function (o) { return o.nps >= 9; }).length;
+        var det = npsR.filter(function (o) { return o.nps <= 6; }).length;
+        var pas = npsR.length - pro - det;
+        var nps = npsR.length ? Math.round(100 * (pro - det) / npsR.length) : null;
         var sl = [5, 4, 3, 2, 1].filter(function (k) { return cnt[k]; }).map(function (k) {
           return { v: cnt[k], c: SC[k], label: k + '\u2605 \u2014 ' + cnt[k] + ' (' + (100 * cnt[k] / n).toFixed(1) + '%)' }; });
         return '<div class="pt-card">' +
@@ -33464,7 +33471,11 @@ window.T1 = (function () {
                   avg.toFixed(2) + '</text>' +
                 '<text x="100" y="92" text-anchor="middle" font-size="9.5" fill="#64748B">out of 5</text>' +
                 (nps == null ? '' : '<text x="100" y="108" text-anchor="middle" font-size="10" font-weight="700" fill="' +
-                  (nps >= 30 ? '#059669' : nps >= 0 ? '#D97706' : '#DC2626') + '">NPS ' + (nps > 0 ? '+' : '') + nps + '</text>') +
+                  (nps >= 30 ? '#059669' : nps >= 0 ? '#D97706' : '#DC2626') + '">NPS ' + (nps > 0 ? '+' : '') + nps +
+                  '<title>' + pro + ' would recommend the school (9\u201310), ' + det +
+                  ' would not (0\u20136), ' + pas + ' are in between (7\u20138). ' +
+                  'NPS = ' + Math.round(100 * pro / npsR.length) + '% minus ' +
+                  Math.round(100 * det / npsR.length) + '% = ' + (nps > 0 ? '+' : '') + nps + '.</title></text>') +
               '</svg>' +
               '<table class="pt-mini"><thead><tr><th>Rating</th><th class="n">Count</th><th class="n">Share</th></tr></thead><tbody>' +
               [5, 4, 3, 2, 1].map(function (k) {
@@ -33474,6 +33485,13 @@ window.T1 = (function () {
               '<div class="pt-final">' + esc(g.label) + ' &nbsp;<b>' + avg.toFixed(2) + ' / 5</b> (' +
                 (100 * avg / 5).toFixed(1) + '%)<br><span class="st">' + starsOf(avg) + '</span></div>'
             : '<div class="pt-none">No overall rating given by this band.</div>') +
+          (npsR.length
+            ? '<div class="pt-card-f" style="border-top:1px dashed var(--bor)">' +
+                '<span style="color:#059669">Would recommend <b>' + pro + '</b></span>' +
+                '<span style="color:#94A3B8">In between <b>' + pas + '</b></span>' +
+                '<span style="color:#DC2626">Would not <b>' + det + '</b></span>' +
+              '</div>'
+            : '') +
           '<div class="pt-card-f">' +
             '<span>' + K(rows, g.label + ' \u2014 every response', g.note, rows.length) + '</span>' +
             '<span>Wrote something <b>' + (rows.length ? (100 * rows.filter(function (o) { return o.sub; }).length / rows.length).toFixed(0) : 0) + '%</b></span>' +
