@@ -32823,7 +32823,18 @@ window.T1 = (function () {
       /* Three states, not two: closed (somebody rang, or decided not to),
          still waiting, or nothing written against it at all. */
       o.callDone = /called|resolved|not\s*required|no\s*response|closed|done/i.test(o.contacted);
-      o.callOpen = o.wants && !o.callDone;
+      /* At risk: the mean of the seven ratings has fallen to 2.5 or below, or
+         they would not recommend the school at all (under 5 out of 10). The
+         mean is used rather than the single overall question because that
+         question is a whole number, so "2.5 or below" there is just "2 or
+         below" and misses a parent who scored 3,1,1,2,3,2,1. */
+      o.atRisk = (o.avg != null && o.avg <= 2.5) || (o.nps != null && o.nps < 5);
+      /* The queue is a parent who asked, is still open, AND is actually in
+         trouble. A content parent who ticked the box is a request, not a
+         rescue, and is counted separately rather than dropped. */
+      o.callOpen = o.wants && !o.callDone && o.atRisk;
+      o.callAsk  = o.wants && !o.callDone && !o.atRisk;
+      o.callSilent = !o.wants && o.atRisk;
       o.seg = o.nps == null ? 'unrated' : o.nps >= 9 ? 'promoter' : o.nps >= 7 ? 'passive' : 'detractor';
       o.sub = substantive(o.text);
       if (o.sub) {
@@ -33212,7 +33223,10 @@ window.T1 = (function () {
     var wants = asked.filter(function (o) { return o.callOpen; });
     var closed = asked.filter(function (o) { return o.callDone; });
     var noPhone = wants.filter(function (o) { return !o.phoneOk; });
-    var happyCall = wants.filter(function (o) { return o.overall != null && o.overall >= 4; });
+    /* Asked, still open, but not in trouble — a suggestion or a request. */
+    var askOnly = R.filter(function (o) { return o.callAsk; });
+    /* In trouble and never asked. Nobody is coming to these on their own. */
+    var silent = R.filter(function (o) { return o.callSilent; });
     var detr = R.filter(function (o) { return o.seg === 'detractor'; });
     var strScoped = BR === 'ALL'
       ? branches.reduce(function (a, b) { return a + (strengthOf(b) || 0); }, 0)
@@ -33240,16 +33254,21 @@ window.T1 = (function () {
              not an error in the data and must not be filtered out — they asked.
              But it is a different job from ringing an unhappy parent, so the
              two are counted apart rather than piled into one queue. */
-          (happyCall.length
-            ? ' \u00b7 ' + K(happyCall, 'Satisfied parents who asked for a call',
-                'rated 4 or 5 — usually a request or a suggestion, not a complaint',
-                happyCall.length + ' rated 4–5')
+          (askOnly.length
+            ? ' \u00b7 ' + K(askOnly, 'Asked for a call but not at risk',
+                'content parents with a request or a suggestion — still owed a reply',
+                askOnly.length + ' asked, not at risk')
             : '') +
           (noPhone.length
             ? ' \u00b7 ' + K(noPhone, 'Still to call, with no usable number', 'these cannot be rung',
                 '<b style="color:' + COL.neg + '">' + noPhone.length + ' unreachable</b>')
             : ''),
           wants.length ? COL.warn : COL.pos, wants, 'Callback requests still open') +
+      kpi(silent.length, 'At risk, never asked',
+          K(silent, 'At risk and did not ask for a call',
+            'mean rating 2.5 or below, or would not recommend — nobody is coming to these',
+            'not on anybody\u2019s list'),
+          silent.length ? COL.neg : COL.pos, silent, 'At risk, no callback requested') +
       kpi(strScoped ? pc(R.length / strScoped * 100) : '–', 'Response rate',
           strScoped ? R.length + ' of ' + strScoped.toLocaleString('en-IN') + ' families' : 'roll not available',
           strScoped && (R.length / strScoped * 100) < 10 ? COL.neg : COL.warn);
