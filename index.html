@@ -3718,6 +3718,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 onclick="exSetSitting('pt1')">PT-1 / IA-1</button>
         <button class="ex-sw" id="exsw-hy" role="tab" aria-selected="false"
                 onclick="exSetSitting('hy')">Half Yearly / Mid Term</button>
+        <button class="ex-sw" id="exsw-cmp" role="tab" aria-selected="false"
+                onclick="exSetSitting('cmp')">PT-1 &rarr; Half Yearly</button>
       </div>
       <span id="exm-status" class="exm-status"></span>
     </div>
@@ -3731,6 +3733,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     </div>
     <iframe id="exm-frame" title="PT-1 Academic Review" referrerpolicy="no-referrer"></iframe>
   </div>
+  <div id="exm-compare" style="display:none;padding:18px 20px 26px"></div>
 </div>
 
 </div><!-- /content -->
@@ -15366,10 +15369,23 @@ function exHasSitting(which){
 
 /* Grey out a sitting the workbook has no rows for, rather than letting it be
    chosen and show an empty review. */
+/* Swap the review frame for the comparison panel, or back. */
+function _exShowCompare(on){
+  var sh=document.querySelector('#pane-pt1 .exm-shell');
+  var cm=document.getElementById('exm-compare');
+  var fl=document.getElementById('exm-flag'), pd=document.getElementById('exm-pending');
+  if(sh) sh.style.display = on ? 'none' : '';
+  if(fl) fl.style.display = on ? 'none' : fl.style.display;
+  if(pd) pd.style.display = on ? 'none' : pd.style.display;
+  if(cm){ cm.style.display = on ? '' : 'none'; if(on) _exRenderCompare(); }
+  var st=document.getElementById('exm-status');
+  if(st && on) st.textContent='';
+}
 function exSyncSwitch(){
-  [['pt1','exsw-pt1'],['hy','exsw-hy']].forEach(function(pair){
+  [['pt1','exsw-pt1'],['hy','exsw-hy'],['cmp','exsw-cmp']].forEach(function(pair){
     var b=document.getElementById(pair[1]); if(!b) return;
-    var on=_exSitting===pair[0], ok=exHasSitting(pair[0]);
+    var on=_exSitting===pair[0];
+    var ok=pair[0]==='cmp' ? (exHasSitting('pt1')&&exHasSitting('hy')) : exHasSitting(pair[0]);
     b.classList.toggle('on', on);
     b.setAttribute('aria-selected', on?'true':'false');
     b.disabled = !ok && !on;
@@ -15398,12 +15414,302 @@ function _exResolveDefault(){
   if(exHasSitting(other)) _exSitting = other;
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   PT-1 → HALF YEARLY · what actually moved
+
+   Three corrections stand between the two mark sheets and an honest answer.
+   Each was measured on this workbook before it was written in.
+
+   1. MATCH THE CHILD, NOT THE ROW. 6,944 PT-1 rows and 6,844 Half-Yearly rows
+      are not the same 6,900 children: 726 sat only the first, 234 only the
+      second. Comparing the two averages compares two different cohorts. Rows
+      are joined on the student ID, and where the ID is blank — every Pocharam
+      and Gowdavalli half-yearly row is — on branch + grade + name, but only
+      where that name is unique on both sides. That recovers 222 children,
+      140 of them Pocharam, with no ambiguous pairs at all.
+
+   2. COMPARE THE SAME SUBJECTS. Half the matched children (2,948 of 5,908)
+      sat a different set of papers in the two sittings, usually through
+      absence. The printed Overall % is an average over whatever they sat, so
+      a child who missed their weakest paper in September and sat it in
+      December appears to collapse. Each child's two averages are recomputed
+      over the subjects they sat BOTH times. On this data that moves 331
+      children across the zero line and 66 by more than ten points.
+
+   3. SUBTRACT THE PAPER. Every subject but one rose between the sittings —
+      English +7.3, Computing +8.2, Science +5.1 — with 5,887 children moving
+      almost in step. Six thousand children do not improve in unison; the
+      second paper was easier or marked more kindly. So beside the raw change
+      sits the change against what that grade and subject did as a whole.
+      A section that rose five points when everyone rose five has not moved.
+      That one correction changes the ranking: Bachupally's +10.8 is +0.2
+      against its cohort, and Boduppal, up only 4.1, is the branch actually
+      ahead. ══════════════════════════════════════════════════════════════ */
+var _exCmp = null;
+
+function _exBuildCompare() {
+  if (!_pt1Raw || !_pt1Raw.students || !_pt1Raw.students_hy) return null;
+  var tA = _pt1Raw.students, tB = _pt1Raw.students_hy;
+  if (!tA.rows || !tA.rows.length || !tB.rows || !tB.rows.length) return null;
+
+  var obj = function (t) {
+    return (t.rows || []).map(function (r) {
+      var o = {}; t.hdr.forEach(function (h, i) { o[h] = r[i]; }); return o; });
+  };
+  var A = obj(tA), B = obj(tB);
+  var SUBJ = tA.hdr.filter(function (h) {
+    return / %$/.test(h) && h !== 'Overall %' && h !== 'Target %';
+  }).map(function (h) { return h.replace(/ %$/, ''); });
+
+  var S = function (v) { return String(v == null ? '' : v).trim(); };
+  var nameKey = function (o) {
+    return S(o['Branch']) + '|' + S(o['Grade']) + '|' +
+           S(o['Student Name']).toLowerCase().replace(/[^a-z]/g, '');
+  };
+  /* ── the join ── */
+  var byId = {}, nmA = {}, nmB = {};
+  A.forEach(function (o) { var k = S(o['ID']); if (k) byId[k] = o; });
+  A.forEach(function (o) { var k = nameKey(o); if (k.split('|')[2]) nmA[k] = (nmA[k] || 0) + 1; });
+  B.forEach(function (o) { var k = nameKey(o); if (k.split('|')[2]) nmB[k] = (nmB[k] || 0) + 1; });
+  var aByName = {};
+  A.forEach(function (o) { var k = nameKey(o); if (nmA[k] === 1) aByName[k] = o; });
+
+  var pairs = [], viaId = 0, viaName = 0;
+  B.forEach(function (b) {
+    var id = S(b['ID']), a = null;
+    if (id && byId[id]) { a = byId[id]; viaId++; }
+    else {
+      var k = nameKey(b);
+      if (k.split('|')[2] && nmA[k] === 1 && nmB[k] === 1 && aByName[k]) { a = aByName[k]; viaName++; }
+    }
+    if (a) pairs.push({ a: a, b: b });
+  });
+
+  /* ── the paper effect, per grade and subject ── */
+  var bag = {}, gbag = {};
+  pairs.forEach(function (p) {
+    SUBJ.forEach(function (sj) {
+      var x = p.a[sj + ' %'], y = p.b[sj + ' %'];
+      if (x == null || y == null) return;
+      var d = (+y) - (+x);
+      (bag[S(p.a['Grade']) + '|' + sj] = bag[S(p.a['Grade']) + '|' + sj] || []).push(d);
+      (gbag[sj] = gbag[sj] || []).push(d);
+    });
+  });
+  var mean = function (a) { return a && a.length ? a.reduce(function (x, y) { return x + y; }, 0) / a.length : null; };
+  var shift = {}, gshift = {};
+  Object.keys(bag).forEach(function (k) { if (bag[k].length >= 20) shift[k] = mean(bag[k]); });
+  Object.keys(gbag).forEach(function (k) { gshift[k] = mean(gbag[k]); });
+
+  /* ── one row per child ── */
+  var P = [];
+  pairs.forEach(function (p) {
+    var com = SUBJ.filter(function (sj) {
+      return p.a[sj + ' %'] != null && p.b[sj + ' %'] != null; });
+    if (!com.length) return;
+    var raw = mean(com.map(function (sj) { return (+p.b[sj + ' %']) - (+p.a[sj + ' %']); }));
+    var exp = mean(com.map(function (sj) {
+      var k = S(p.a['Grade']) + '|' + sj;
+      return shift[k] != null ? shift[k] : (gshift[sj] || 0); }));
+    var per = {};
+    com.forEach(function (sj) {
+      var k = S(p.a['Grade']) + '|' + sj;
+      var e = shift[k] != null ? shift[k] : (gshift[sj] || 0);
+      per[sj] = { pt0: +p.a[sj + ' %'], hy0: +p.b[sj + ' %'],
+                  raw: (+p.b[sj + ' %']) - (+p.a[sj + ' %']),
+                  adj: ((+p.b[sj + ' %']) - (+p.a[sj + ' %'])) - e };
+    });
+    P.push({ br: S(p.a['Branch']), gr: S(p.a['Grade']), sec: S(p.a['Section']),
+             cur: S(p.a['Curriculum']), nm: S(p.a['Student Name']), id: S(p.a['ID']),
+             tch: S(p.b['Class Teacher']) || S(p.a['Class Teacher']),
+             pt: mean(com.map(function (sj) { return +p.a[sj + ' %']; })),
+             hy: mean(com.map(function (sj) { return +p.b[sj + ' %']; })),
+             raw: raw, adj: raw - exp, k: com.length, per: per });
+  });
+
+  /* ── who could not be compared, and why ── */
+  var inPair = {};
+  pairs.forEach(function (p) { inPair[S(p.a['ID']) || nameKey(p.a)] = 1; });
+  var missA = {}, missB = {};
+  A.forEach(function (o) { if (!inPair[S(o['ID']) || nameKey(o)]) missA[S(o['Branch'])] = (missA[S(o['Branch'])] || 0) + 1; });
+  var pairedB = {}; pairs.forEach(function (p) { pairedB[S(p.b['ID']) || nameKey(p.b)] = 1; });
+  B.forEach(function (o) { if (!pairedB[S(o['ID']) || nameKey(o)]) missB[S(o['Branch'])] = (missB[S(o['Branch'])] || 0) + 1; });
+
+  return { rows: P, subjects: SUBJ, gshift: gshift, mean: mean,
+           viaId: viaId, viaName: viaName,
+           nA: A.length, nB: B.length, missA: missA, missB: missB };
+}
+
+/* The comparison, drawn. Every table carries the raw change and the change
+   against the cohort side by side: management asked where we gained and
+   where we lost, and those two columns disagree often enough that printing
+   only one of them would answer the question wrongly. */
+function _exRenderCompare() {
+  var el = document.getElementById('exm-compare'); if (!el) return;
+  if (!_exCmp) _exCmp = _exBuildCompare();
+  var C = _exCmp;
+  if (!C || !C.rows.length) {
+    el.innerHTML = '<div class="au-empty">Both sittings need marks before they can be compared. ' +
+      'The workbook currently has ' + (C ? C.nA : 0) + ' PT-1 rows and ' + (C ? C.nB : 0) +
+      ' half-yearly rows with no student in common.</div>';
+    return;
+  }
+  var scope = (window._BRANCH_LOCK) || (typeof fBranch !== 'undefined' && fBranch !== 'ALL' ? fBranch : '');
+  var R = scope ? C.rows.filter(function (r) { return r.br === scope; }) : C.rows;
+  if (!R.length) { el.innerHTML = '<div class="au-empty">No child at this branch sat both papers.</div>'; return; }
+
+  var mean = C.mean;
+  var e = function (v) { return String(v == null ? '' : v).replace(/[&<>"]/g, function (m) {
+    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]; }); };
+  var sg = function (v, d) { return (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v).toFixed(d == null ? 1 : d); };
+  var col = function (v) { return v >= 2 ? '#047857' : v >= 0.5 ? '#059669' : v > -0.5 ? '#64748B' : v > -2 ? '#D97706' : '#DC2626'; };
+
+  /* a bar that grows either side of a centre line, because the number is signed */
+  var MAXB = 8;
+  var dbar = function (v) {
+    var w = Math.min(Math.abs(v) / MAXB, 1) * 50;
+    return '<div style="position:relative;height:16px;background:var(--pl);border-radius:4px">' +
+      '<div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--bor)"></div>' +
+      '<div style="position:absolute;top:2px;bottom:2px;border-radius:3px;background:' + col(v) + ';' +
+        (v >= 0 ? 'left:50%;width:' + w + '%' : 'right:50%;width:' + w + '%') + '"></div></div>';
+  };
+
+  var agg = function (keyf) {
+    var m = {};
+    R.forEach(function (r) { var k = keyf(r); if (!k) return; (m[k] = m[k] || []).push(r); });
+    return Object.keys(m).map(function (k) {
+      var g = m[k];
+      return { k: k, n: g.length, rows: g,
+        pt: mean(g.map(function (r) { return r.pt; })),
+        hy: mean(g.map(function (r) { return r.hy; })),
+        raw: mean(g.map(function (r) { return r.raw; })),
+        up: 100 * g.filter(function (r) { return r.raw > 0; }).length / g.length,
+        adj: mean(g.map(function (r) { return r.adj; })) };
+    });
+  };
+
+  var allRaw = mean(R.map(function (r) { return r.raw; }));
+  var ahead = R.filter(function (r) { return r.adj >= 2; }).length;
+  var behind = R.filter(function (r) { return r.adj <= -2; }).length;
+
+  var tile = function (v, lab, sub, c) {
+    return '<div class="au-kpi" style="cursor:default">' +
+      '<div class="na-kh"><span class="v" style="color:' + (c || 'var(--tx)') + '">' + v + '</span></div>' +
+      '<div class="k">' + lab + '</div><div class="d">' + sub + '</div></div>';
+  };
+
+  /* mode 'adj' scores a group against its cohort; mode 'raw' is for the two
+     tables where that is meaningless. The adjustment is computed per grade and
+     subject, so a grade or a subject cannot beat itself — those columns came
+     out as a row of zeros, which reads as a broken table rather than as a
+     property of the method. They get the raw move and the share of children
+     who improved instead, which is what those two questions actually are. */
+  var tbl = function (title, data, note, nameCol, mode) {
+    var rawMode = mode === 'raw';
+    data = data.slice().sort(function (x, y) { return rawMode ? (y.raw - x.raw) : (y.adj - x.adj); });
+    return '<div class="au-sec"><h3>' + e(title) + '</h3>' +
+      (note ? '<div class="sub">' + note + '</div>' : '') +
+      '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:720px"><thead><tr>' +
+      '<th>' + e(nameCol) + '</th><th class="n">Pupils</th><th class="n">PT-1</th><th class="n">Half yearly</th>' +
+      (rawMode
+        ? '<th style="min-width:150px">Raw change</th><th class="n">&nbsp;</th><th class="n">Improved</th>'
+        : '<th class="n">Raw change</th><th style="min-width:150px">Against its cohort</th><th class="n">&nbsp;</th>') +
+      '</tr></thead><tbody>' +
+      data.map(function (x) {
+        return '<tr><td style="font-weight:700">' + e(x.k) + '</td>' +
+          '<td class="n" style="color:var(--txm)">' + x.n + '</td>' +
+          '<td class="n">' + x.pt.toFixed(1) + '</td>' +
+          '<td class="n">' + x.hy.toFixed(1) + '</td>' +
+          (rawMode
+            ? '<td>' + dbar(x.raw) + '</td>' +
+              '<td class="n" style="font-weight:800;color:' + (x.raw >= 0 ? '#059669' : '#DC2626') + '">' + sg(x.raw) + '</td>' +
+              '<td class="n" style="font-weight:700;color:' + (x.up >= 60 ? '#059669' : x.up >= 45 ? '#D97706' : '#DC2626') + '">' +
+                (x.up == null ? '\u2013' : x.up.toFixed(0) + '%') + '</td>'
+            : '<td class="n" style="font-weight:700;color:' + (x.raw >= 0 ? '#059669' : '#DC2626') + '">' + sg(x.raw) + '</td>' +
+              '<td>' + dbar(x.adj) + '</td>' +
+              '<td class="n" style="font-weight:800;color:' + col(x.adj) + '">' + sg(x.adj) + '</td>') + '</tr>';
+      }).join('') + '</tbody></table></div></div>';
+  };
+
+  var h = '';
+  h += '<div class="au-kpis">' +
+    tile(R.length.toLocaleString('en-IN'), 'Children in the comparison',
+      'sat both papers &middot; ' + C.viaId.toLocaleString('en-IN') + ' matched on ID, ' + C.viaName + ' on name') +
+    tile(sg(allRaw), 'Raw change', 'average, same subjects both sittings', allRaw >= 0 ? '#059669' : '#DC2626') +
+    tile(ahead.toLocaleString('en-IN'), 'Genuinely ahead', 'gained 2+ points on their cohort', '#047857') +
+    tile(behind.toLocaleString('en-IN'), 'Genuinely behind', 'lost 2+ points against their cohort', '#DC2626') +
+    '</div>';
+
+  /* the finding that governs how every other number is read */
+  var up = C.subjects.filter(function (s) { return C.gshift[s] != null && C.gshift[s] > 0; }).length;
+  var tot = C.subjects.filter(function (s) { return C.gshift[s] != null; }).length;
+  h += '<div style="margin:14px 0;border-radius:12px;padding:14px 18px;background:#FFFBEB;border:1px solid #FDE68A;' +
+    'font-size:13px;line-height:1.6;color:#78350F">' +
+    '<b>The half-yearly paper was the easier of the two, so read the right-hand column, not the raw change.</b> ' +
+    up + ' of ' + tot + ' subjects rose across every branch at once, by ' + sg(mean(C.subjects.map(function (s) {
+      return C.gshift[s] || 0; }))) + ' points on average. Six thousand children do not improve in step. ' +
+    '<b>Against its cohort</b> is each group’s change minus what its own grade and subject did overall — ' +
+    'zero means it moved exactly with everyone else, not that nothing happened.</div>';
+
+  h += tbl('Branch', agg(function (r) { return r.br; }),
+    'Sorted by movement against the cohort, which is not the same order as the raw change.', 'Branch');
+  h += tbl('Subject', (function () {
+      return C.subjects.map(function (sj) {
+        var g = R.filter(function (r) { return r.per[sj]; });
+        if (g.length < 20) return null;
+        return { k: sj, n: g.length,
+          pt: mean(g.map(function (r) { return +r.per[sj].pt0; })),
+          hy: mean(g.map(function (r) { return +r.per[sj].hy0; })),
+          raw: mean(g.map(function (r) { return r.per[sj].raw; })),
+          up: 100 * g.filter(function (r) { return r.per[sj].raw > 0; }).length / g.length,
+          adj: 0 };
+      }).filter(Boolean);
+    })(),
+    'This is where the paper effect is visible. Every subject but one rose for everybody, so these are not ' +
+    'teaching gains — they are the size of the shift each paper carried, and the figure the branch and ' +
+    'section tables are measured against.', 'Subject', 'raw');
+  h += tbl('Grade', agg(function (r) { return r.gr; }),
+    'Raw movement by grade, with the share of children who actually went up. A grade is part of how the ' +
+    'cohort figure is worked out, so it cannot be scored against itself — use the branch and section ' +
+    'tables for that.', 'Grade', 'raw');
+
+  var secs = agg(function (r) { return r.br + ' · ' + r.gr + ' · ' + r.sec; })
+    .filter(function (x) { return x.n >= 12; });
+  var best = secs.slice().sort(function (a, b) { return b.adj - a.adj; }).slice(0, 8);
+  var worst = secs.slice().sort(function (a, b) { return a.adj - b.adj; }).slice(0, 8);
+  h += tbl('The eight rooms that gained the most', best,
+    'Twelve pupils or more. These teachers did something their colleagues did not.', 'Section');
+  h += tbl('The eight rooms that lost the most', worst,
+    'Twelve pupils or more. A negative figure here means the room fell behind a cohort that was rising.', 'Section');
+
+  /* who is not on this page */
+  var mk = function (o) { return Object.keys(o).sort(function (a, b) { return o[b] - o[a]; })
+    .map(function (k) { return e(k || '(no branch)') + ' ' + o[k]; }).join(' &middot; '); };
+  h += '<div class="au-sec"><h3>Who is not in this comparison</h3>' +
+    '<div class="sub">A child appears above only if both sittings can be tied to them. ' +
+    'Everyone else is named here rather than quietly dropped.</div>' +
+    '<div style="font-size:13px;line-height:1.7">' +
+    '<b>Sat PT-1, no half yearly found:</b> ' + mk(C.missA) + '<br>' +
+    '<b>Sat the half yearly, no PT-1 found:</b> ' + mk(C.missB) + '</div>' +
+    '<div class="au-note">Where the ID column is blank the join falls back to branch, grade and name, and only ' +
+    'where that name is unique in both sittings. Filling the ID column on every mark sheet is what would close ' +
+    'the remaining gap.</div></div>';
+
+  el.innerHTML = h;
+}
+
 function exSetSitting(which){
-  if(!EX_SITTINGS[which] || which===_exSitting) return;
-  if(!exHasSitting(which)) return;
+  if(which===_exSitting) return;
+  if(which!=='cmp' && !EX_SITTINGS[which]) return;
+  if(which!=='cmp' && !exHasSitting(which)) return;
+  if(which==='cmp' && !exHasSitting('pt1')) return;
   _exSitting=which;
   _exUserPicked=true;
   exSyncSwitch();
+  /* Compare is drawn here rather than inside the review frame: it needs both
+     sittings at once, and the frame is handed one at a time by design. */
+  if(which==='cmp'){ _exShowCompare(true); return; }
+  _exShowCompare(false);
   _pt1HideLoader(false);
   /* replace the frame so the review boots fresh against a new document */
   var old=_pt1Frame();
