@@ -609,6 +609,11 @@ button.au-cell.t1k{border:none}
 .pt-scope{font-size:12.5px;padding:11px 14px;border-radius:10px;background:#FFFBEB;border:1px solid #FCD34D;
   color:#3F2E10;margin-bottom:14px;line-height:1.6}
 .pt-scope.ok{background:#ECFDF5;border-color:#A7F3D0;color:#065F46}
+.t1sw{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.t1sw button{font:inherit;font-size:12px;font-weight:700;padding:6px 13px;border-radius:99px;cursor:pointer;
+  border:1px solid var(--bor);background:var(--sur);color:var(--txm);transition:background .12s,color .12s}
+.t1sw button:hover{border-color:#94A3B8;color:var(--tx)}
+.t1sw button[aria-pressed="true"]{background:#1E4FD8;border-color:#1E4FD8;color:#fff}
 .pt-jump{font:inherit;font-size:11.5px;font-weight:700;padding:4px 10px;margin:0 4px 0 0;border-radius:99px;
   border:1px solid #D97706;background:#fff;color:#B45309;cursor:pointer}
 .pt-jump:hover{background:#D97706;color:#fff}
@@ -33471,14 +33476,24 @@ window.T1 = (function () {
         for (var i = 1; i <= 5; i++) o += '<span style="color:' + (i <= full ? '#F59E0B' : '#E2E8F0') + '">\u2605</span>';
         return o;
       };
-      var cards = SEG.map(function (g) {
+      /* Which of the seven questions the rings are drawn from. Kept on window
+         so the choice survives a rebuild when a filter above changes. */
+      if (!window.__t1StageDim) window.__t1StageDim = 'overall';
+      var DIMLIST = window.T1.DIMS;
+      var dimOf = function (k) {
+        for (var i = 0; i < DIMLIST.length; i++) if (DIMLIST[i].k === k) return DIMLIST[i];
+        return DIMLIST[0];
+      };
+      var buildCards = function (dk) {
+      var DL = dimOf(dk).label;
+      return SEG.map(function (g) {
         var rows = R.filter(function (o) { return inSeg(o, g); });
         if (!rows.length) return '';
-        var rated = rows.filter(function (o) { return o.overall != null; });
+        var rated = rows.filter(function (o) { return o[dk] != null; });
         var n = rated.length;
         var cnt = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-        rated.forEach(function (o) { cnt[Math.max(1, Math.min(5, Math.round(o.overall)))]++; });
-        var avg = n ? window.T1.mean(rated.map(function (o) { return o.overall; })) : null;
+        rated.forEach(function (o) { cnt[Math.max(1, Math.min(5, Math.round(o[dk])))]++; });
+        var avg = n ? window.T1.mean(rated.map(function (o) { return o[dk]; })) : null;
         var npsR = rows.filter(function (o) { return o.nps != null; });
         var pro = npsR.filter(function (o) { return o.nps >= 9; }).length;
         var det = npsR.filter(function (o) { return o.nps <= 6; }).length;
@@ -33514,7 +33529,8 @@ window.T1 = (function () {
         return '<div class="pt-card">' +
           '<div class="pt-card-h">' + esc(g.label) + '</div>' +
           '<div class="pt-card-n">' + esc(g.note) + ' \u00b7 ' + rows.length + ' response' +
-            (rows.length === 1 ? '' : 's') + '</div>' +
+            (rows.length === 1 ? '' : 's') +
+            (n && n < rows.length ? ' \u00b7 ' + n + ' answered this' : '') + '</div>' +
           (n
             ? '<svg viewBox="0 0 200 168" class="pt-svg">' + ring(sl, 100, 80, 72, 40) +
                 '<text x="100" y="76" text-anchor="middle" font-size="21" font-weight="800" fill="#0F172A">' +
@@ -33532,9 +33548,9 @@ window.T1 = (function () {
                 return '<tr><td><span style="color:' + SC[k] + '">\u2605</span> ' + k + '</td><td class="n">' +
                   cnt[k] + '</td><td class="n">' + (100 * cnt[k] / n).toFixed(1) + '%</td></tr>'; }).join('') +
               '<tr class="tot"><td>Total</td><td class="n">' + n + '</td><td class="n">100%</td></tr></tbody></table>' +
-              '<div class="pt-final">' + esc(g.label) + ' &nbsp;<b>' + avg.toFixed(2) + ' / 5</b> (' +
+              '<div class="pt-final">' + esc(DL) + ' &nbsp;<b>' + avg.toFixed(2) + ' / 5</b> (' +
                 (100 * avg / 5).toFixed(1) + '%)<br><span class="st">' + starsOf(avg) + '</span></div>'
-            : '<div class="pt-none">No overall rating given by this band.</div>') +
+            : '<div class="pt-none">Nobody in this band rated ' + esc(DL.toLowerCase()) + '.</div>') +
           (split
             ? '<div style="font-size:10.5px;color:var(--txm);padding:6px 10px 0;line-height:1.5">' +
                 '<div style="font-weight:700;letter-spacing:.04em;text-transform:uppercase;font-size:9px;color:var(--txl)">NPS by questionnaire</div>' +
@@ -33553,6 +33569,7 @@ window.T1 = (function () {
             '<span>Wrote something <b>' + (rows.length ? (100 * rows.filter(function (o) { return o.sub; }).length / rows.length).toFixed(0) : 0) + '%</b></span>' +
           '</div></div>';
       }).filter(Boolean).join('');
+      };
       var placed = R.filter(function (o) { return SEG.some(function (g) { return inSeg(o, g); }); }).length;
       /* One warning for the whole section, with the gap measured rather than
          asserted — a reader comparing two bands needs to know how much of the
@@ -33580,11 +33597,27 @@ window.T1 = (function () {
             'than what they think. Each ring shows its own split.</div>';
         }
       }
-      el.innerHTML = warn + '<div class="pt-cards">' + cards + '</div>' +
+      var swHTML = '<div class="t1sw" id="t1-stage-sw">' + DIMLIST.map(function (d) {
+        return '<button type="button" data-k="' + esc(d.k) + '" aria-pressed="' +
+          (d.k === window.__t1StageDim ? 'true' : 'false') + '">' + esc(d.label) + '</button>'; }).join('') + '</div>';
+      el.innerHTML = swHTML + warn + '<div class="pt-cards" id="t1-stage-cards">' +
+          buildCards(window.__t1StageDim) + '</div>' +
         (placed < R.length
           ? '<div class="au-note">' + (R.length - placed) + ' response' + ((R.length - placed) === 1 ? '' : 's') +
             ' carry a grade this school does not use and are not on any ring above.</div>'
           : '');
+      /* One listener on the row rather than one per button, so redrawing the
+         cards cannot leave a handler behind. */
+      var sw = $('t1-stage-sw');
+      if (sw) sw.addEventListener('click', function (ev) {
+        var b = ev.target.closest ? ev.target.closest('button[data-k]') : null;
+        if (!b) return;
+        window.__t1StageDim = b.getAttribute('data-k');
+        Array.prototype.forEach.call(sw.querySelectorAll('button[data-k]'), function (x) {
+          x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+        var host = $('t1-stage-cards');
+        if (host) host.innerHTML = buildCards(window.__t1StageDim);
+      });
     })();
 
     /* ── 3 · drivers ── */
