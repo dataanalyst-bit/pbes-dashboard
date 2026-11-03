@@ -3191,63 +3191,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div id="t1-stages"></div>
       </div>
 
-      <div class="au-sec">
-        <h3>What actually moves a parent’s opinion</h3>
-        <div class="sub">Each part of the school experience set against the parent’s own overall rating. A high score
-          on something nobody weighs heavily is worth less than a middling score on the thing their whole judgement
-          rests on — this is the table that says where to spend the term.</div>
-        <div id="t1-drivers"></div>
-      </div>
 
-      <div class="au-sec">
-        <h3>Where goodwill falls away as children move up</h3>
-        <div class="sub">The same families, grade by grade. Grades with fewer than eight responses are left out
-          rather than shown as a number one family could swing.</div>
-        <div id="t1-grades"></div>
-      </div>
 
-      <div class="au-sec">
-        <h3>Hot spots — branch and grade together</h3>
-        <div class="sub">Small enough to act on as a meeting with one grade team, which a branch average is not.</div>
-        <div id="t1-hot"></div>
-      </div>
 
-      <div class="au-sec">
-        <h3>What parents wrote about</h3>
-        <div class="sub">Every written comment read against the wording these parents actually use. Shares are of
-          comments, not of responses, so they are comparable between branches of different sizes.</div>
-        <div id="t1-themes"></div>
-        <div style="height:18px"></div>
-        <div class="au-h4">Which subject clusters where</div>
-        <div id="t1-lift"></div>
-      </div>
 
-      <div class="au-sec">
-        <h3>The words only they are using</h3>
-        <div class="sub">Not the most common words — the words each branch uses disproportionately against the
-          others, and the phrases parents reached for most often. This is the layer that says something a manager
-          has not already heard.</div>
-        <div id="t1-words"></div>
-      </div>
 
-      <div class="au-sec">
-        <h3>The same point, made separately by several parents</h3>
-        <div class="sub">Comments grouped by how much language they share. A theme count tells you how many parents
-          mentioned academics; this tells you which particular complaint a dozen of them wrote independently — the
-          one worth answering in a circular rather than one call at a time.</div>
-        <div id="t1-repeat"></div>
-      </div>
 
-      <div class="au-sec">
-        <h3>The callback queue — <span id="t1-queue-n">0</span> parents</h3>
-        <div class="sub">Every parent who asked to be contacted, and every parent who would not recommend the school
-          whether they asked or not. Most urgent first: unhappy and waiting for a call, then unhappy and silent.</div>
-        <div class="au-ctl" style="margin-bottom:12px">
-          <div class="f"><label for="t1-q">Search comments, subjects, branches and names</label>
-            <input id="t1-q" type="search" placeholder="e.g. transport, homework, academics"></div>
-        </div>
-        <div style="max-height:620px;overflow:auto"><div id="t1-queue"></div></div>
-      </div>
 
       <div class="au-sec">
         <h3>Where the work would land</h3>
@@ -32843,7 +32792,12 @@ window.T1 = (function () {
          "Source Form" matters because the responses now pool a Term-I form
          with three branch PTM forms, and those instruments do not score
          alike. Both optional - an older sheet without them still works. */
-      level: ix('Level'), form: ix('Source Form'), wave: ix('Wave')
+      level: ix('Level'), form: ix('Source Form'), wave: ix('Wave'),
+      /* The branch records what it did about a callback request here. Without
+         reading it, "asked for a call" never falls as the school works the
+         list, so a parent rung and resolved in week one still counts as
+         outstanding in week six. */
+      done: ix('Grievance Contacted')
     };
     if (c.branch < 0) throw new Error('The feedback sheet needs a Branch column.');
     var dimIx = DIMS.map(function (d) { return ix(d.q); });
@@ -32855,6 +32809,7 @@ window.T1 = (function () {
         ts: str(r[c.ts]), nps: num(r[c.nps]), text: str(r[c.text]),
         wants: /^y/i.test(str(r[c.wants])), wantsBlank: str(r[c.wants]) === '',
         phone: str(r[c.phone]),
+        contacted: c.done >= 0 ? str(r[c.done]) : '',
         level: c.level >= 0 ? str(r[c.level]) : '',
         form:  c.form  >= 0 ? str(r[c.form])  : '',
         wave:  c.wave  >= 0 ? str(r[c.wave])  : '' };
@@ -32865,6 +32820,10 @@ window.T1 = (function () {
       o.avg = mean(o.rated);
       o.flat = o.rated.length >= 5 && Math.min.apply(null, o.rated) === Math.max.apply(null, o.rated);
       o.phoneOk = o.phone.replace(/\D/g, '').length >= 10;
+      /* Three states, not two: closed (somebody rang, or decided not to),
+         still waiting, or nothing written against it at all. */
+      o.callDone = /called|resolved|not\s*required|no\s*response|closed|done/i.test(o.contacted);
+      o.callOpen = o.wants && !o.callDone;
       o.seg = o.nps == null ? 'unrated' : o.nps >= 9 ? 'promoter' : o.nps >= 7 ? 'passive' : 'detractor';
       o.sub = substantive(o.text);
       if (o.sub) {
@@ -33244,8 +33203,16 @@ window.T1 = (function () {
 
     var nps = window.T1.npsOf(R.map(function (o) { return o.nps; }).filter(function (v) { return v != null; }));
     var ov = window.T1.dimStats(R, 'overall');
-    var wants = R.filter(function (o) { return o.wants; });
+    var asked = R.filter(function (o) { return o.wants; });
+    /* Outstanding, not "ever asked". The branch writes its outcome in the
+       Grievance Contacted column, and a request the branch has already closed
+       is not a job on anybody's list. Printing the raw ask count is what put
+       parents who rate the school 5/5, were rung the same week and marked
+       resolved, back in front of the principal every morning. */
+    var wants = asked.filter(function (o) { return o.callOpen; });
+    var closed = asked.filter(function (o) { return o.callDone; });
     var noPhone = wants.filter(function (o) { return !o.phoneOk; });
+    var happyCall = wants.filter(function (o) { return o.overall != null && o.overall >= 4; });
     var detr = R.filter(function (o) { return o.seg === 'detractor'; });
     var strScoped = BR === 'ALL'
       ? branches.reduce(function (a, b) { return a + (strengthOf(b) || 0); }, 0)
@@ -33264,10 +33231,25 @@ window.T1 = (function () {
       kpi(nps ? pc(nps.detrPct) : '–', 'Parents at risk',
           nps ? nps.detr + ' scored 6 or below' : '–', nps && nps.detrPct > 20 ? COL.neg : COL.warn,
           detr, 'Detractors — scored 6 or below') +
-      kpi(wants.length, 'Asked for a call',
-          noPhone.length ? K(noPhone, 'Asked for a call with no usable number', 'these cannot be rung',
-            '<b style="color:' + COL.neg + '">' + noPhone.length + ' left no usable number</b>') : 'all reachable',
-          wants.length ? COL.warn : COL.mid, wants, 'Parents who asked to be contacted') +
+      kpi(wants.length, 'Calls still to make',
+          (closed.length
+            ? K(closed, 'Callback requests already closed', 'rung, resolved or not required',
+                closed.length + ' of ' + asked.length + ' already closed')
+            : asked.length + ' asked, none closed yet') +
+          /* A parent who rated the school 4 or 5 and still asked to be rung is
+             not an error in the data and must not be filtered out — they asked.
+             But it is a different job from ringing an unhappy parent, so the
+             two are counted apart rather than piled into one queue. */
+          (happyCall.length
+            ? ' \u00b7 ' + K(happyCall, 'Satisfied parents who asked for a call',
+                'rated 4 or 5 — usually a request or a suggestion, not a complaint',
+                happyCall.length + ' rated 4–5')
+            : '') +
+          (noPhone.length
+            ? ' \u00b7 ' + K(noPhone, 'Still to call, with no usable number', 'these cannot be rung',
+                '<b style="color:' + COL.neg + '">' + noPhone.length + ' unreachable</b>')
+            : ''),
+          wants.length ? COL.warn : COL.pos, wants, 'Callback requests still open') +
       kpi(strScoped ? pc(R.length / strScoped * 100) : '–', 'Response rate',
           strScoped ? R.length + ' of ' + strScoped.toLocaleString('en-IN') + ' families' : 'roll not available',
           strScoped && (R.length / strScoped * 100) < 10 ? COL.neg : COL.warn);
@@ -33316,9 +33298,9 @@ window.T1 = (function () {
       $('t1-nps').innerHTML =
         '<table class="au-tbl"><thead><tr><th>Branch</th><th class="n">Responses</th><th class="n">Reply rate</th>' +
         '<th style="min-width:170px">Promoters · passives · detractors</th><th class="n">NPS</th>' +
-        '<th class="n">Overall /5</th><th class="n">Detractors</th><th class="n">Want a call</th></tr></thead><tbody>' +
+        '<th class="n">Overall /5</th><th class="n">Detractors</th><th class="n">Calls to make</th></tr></thead><tbody>' +
         rowsH.map(function (x) {
-          var w = x.g.filter(function (o) { return o.wants; });
+          var w = x.g.filter(function (o) { return o.callOpen; });
           var d = x.g.filter(function (o) { return o.seg === 'detractor'; });
           return '<tr><td><b>' + esc(x.b) + '</b>' +
               (x.g.length < 30 ? ' <span style="font-size:10px;color:' + COL.warn + ';font-weight:700">too few to rank</span>' : '') + '</td>' +
@@ -33622,6 +33604,7 @@ window.T1 = (function () {
 
     /* ── 3 · drivers ── */
     (function () {
+      if (!$('t1-drivers')) return;
       var dr = window.T1.DIMS.slice(1).map(function (d) {
         var pair = R.filter(function (o) { return o[d.k] != null && o.overall != null; });
         var lowR = pair.filter(function (o) { return o[d.k] <= 3; });
@@ -33667,6 +33650,7 @@ window.T1 = (function () {
 
     /* ── 4 · where satisfaction falls away ── */
     (function () {
+      if (!$('t1-grades')) return;
       var grades = {};
       R.forEach(function (o) { if (o.grade) (grades[o.grade] = grades[o.grade] || []).push(o); });
       var gl = Object.keys(grades).map(function (g) {
@@ -33714,6 +33698,7 @@ window.T1 = (function () {
 
     /* ── 5 · hot spots ── */
     (function () {
+      if (!$('t1-hot')) return;
       var cells = [];
       branches.forEach(function (b) {
         var gs = {};
@@ -33760,6 +33745,7 @@ window.T1 = (function () {
 
   /* ── 6 · what parents wrote ─────────────────────────────────────────── */
   function paintText(R, ALL, branches, inBranch) {
+    if (!$('t1-themes')) return;
     var T = window.T1.themeCounts(R);
     var sub = R.filter(function (o) { return o.sub; });
     if (!T.list.length) {
@@ -33920,6 +33906,7 @@ window.T1 = (function () {
 
   /* ── 7 · the callback queue ──────────────────────────────────────────── */
   function paintQueue(R) {
+    if (!$('t1-queue')) return;
     var q = R.filter(function (o) { return o.wants || o.seg === 'detractor'; })
       .map(function (o) {
         var p = (o.wants ? 60 : 0) + (o.seg === 'detractor' ? 40 : o.seg === 'passive' ? 10 : 0) +
