@@ -32831,7 +32831,14 @@ window.T1 = (function () {
       grade: ix('Grade'), section: ix('Section'), curr: ix('Curriculum'), branch: ix('Branch'),
       nps: ix('8. Net Promoter Score (NPS)'), text: ix('9. Your Feedback'),
       wants: ix('Would you like a member of the school management team to contact you regarding your feedback?'),
-      phone: ix('Contact Number')
+      phone: ix('Contact Number'),
+      /* Added to the sheet after this tab was first built. "Level" is the
+         school's own five-band grouping, better than deriving one from the
+         grade string because it already knows PP 1 and PP 2 are Prep.
+         "Source Form" matters because the responses now pool a Term-I form
+         with three branch PTM forms, and those instruments do not score
+         alike. Both optional - an older sheet without them still works. */
+      level: ix('Level'), form: ix('Source Form'), wave: ix('Wave')
     };
     if (c.branch < 0) throw new Error('The feedback sheet needs a Branch column.');
     var dimIx = DIMS.map(function (d) { return ix(d.q); });
@@ -32842,7 +32849,10 @@ window.T1 = (function () {
         student: str(r[c.student]), parent: str(r[c.parent]),
         ts: str(r[c.ts]), nps: num(r[c.nps]), text: str(r[c.text]),
         wants: /^y/i.test(str(r[c.wants])), wantsBlank: str(r[c.wants]) === '',
-        phone: str(r[c.phone]) };
+        phone: str(r[c.phone]),
+        level: c.level >= 0 ? str(r[c.level]) : '',
+        form:  c.form  >= 0 ? str(r[c.form])  : '',
+        wave:  c.wave  >= 0 ? str(r[c.wave])  : '' };
       DIMS.forEach(function (d, k) { o[d.k] = dimIx[k] >= 0 ? num(r[dimIx[k]]) : null; });
       o.day = o.ts.slice(0, 10);
       o.band = band(o.grade);
@@ -33401,13 +33411,28 @@ window.T1 = (function () {
       var el = $('t1-stages'); if (!el) return;
       var rank = window.T1.gradeRank;
       var SEG = [
-        { label: 'Prep', note: 'EY, Pre-Primary, Nursery, LKG, UKG', lo: 0,  hi: 6  },
-        { label: 'Grades 1 & 2',  note: 'I–II',    lo: 7,  hi: 8  },
-        { label: 'Grades 3 to 5', note: 'III–V',   lo: 9,  hi: 11 },
-        { label: 'Grades 6 to 8', note: 'VI–VIII', lo: 12, hi: 14 },
-        { label: 'Grades 9 & 10', note: 'IX–X',    lo: 15, hi: 16 },
-        { label: 'Grades 11 & 12', note: 'XI–XII', lo: 17, hi: 18 }
+        { label: 'Prep', note: 'EY, PP, Nursery, Pre-Primary', lv: 'Prep',      lo: 0,  hi: 6  },
+        { label: 'Grades 1 & 2',  note: 'I–II',    lv: 'Grade 1-2',   lo: 7,  hi: 8  },
+        { label: 'Grades 3 to 5', note: 'III–V',   lv: 'Grade 3-5',   lo: 9,  hi: 11 },
+        { label: 'Grades 6 to 8', note: 'VI–VIII', lv: 'Grade 6-8',   lo: 12, hi: 14 },
+        { label: 'Grades 9 & 10', note: 'IX–X',    lv: 'Grade 9-10',  lo: 15, hi: 16 },
+        { label: 'Grades 11 & 12', note: 'XI–XII', lv: 'Grade 11-12', lo: 17, hi: 18 }
       ];
+      /* The sheet now carries its own Level column. Use it wherever it is
+         filled: it already places "PP 1" and "PP 2", which the grade ladder
+         does not, and those two alone were 129 responses falling off every
+         ring. The ladder stays as the fallback for an older sheet. */
+      var useLevel = R.some(function (o) { return o.level; });
+      var key = function (v) { return String(v || '').toLowerCase().replace(/[^a-z0-9]/g, ''); };
+      var inSeg = function (o, g) {
+        if (useLevel && o.level) return key(o.level) === key(g.lv);
+        var r = rank(o.grade);
+        if (r === 99) {
+          var t = String(o.grade || '').toUpperCase().replace(/\s+/g, '');
+          if (/^PP[12]$/.test(t) || /^EY/.test(t)) return g.lo === 0;
+        }
+        return r >= g.lo && r <= g.hi;
+      };
       var SC = { 1: '#DC2626', 2: '#EA580C', 3: '#F59E0B', 4: '#1E4FD8', 5: '#059669' };
       /* an SVG ring; slices is [{v,c,label}] */
       var ring = function (sl, cx, cy, rO, rI) {
@@ -33447,7 +33472,7 @@ window.T1 = (function () {
         return o;
       };
       var cards = SEG.map(function (g) {
-        var rows = R.filter(function (o) { var r = rank(o.grade); return r >= g.lo && r <= g.hi; });
+        var rows = R.filter(function (o) { return inSeg(o, g); });
         if (!rows.length) return '';
         var rated = rows.filter(function (o) { return o.overall != null; });
         var n = rated.length;
@@ -33459,6 +33484,31 @@ window.T1 = (function () {
         var det = npsR.filter(function (o) { return o.nps <= 6; }).length;
         var pas = npsR.length - pro - det;
         var nps = npsR.length ? Math.round(100 * (pro - det) / npsR.length) : null;
+        /* The responses now pool a Term-I form with three branch PTM forms, and
+           the instruments do not score alike: across the whole sheet the PTM
+           forms run well below the original. Where a band mixes them, the net
+           figure is partly a comparison of questionnaires, so the split is
+           printed rather than left for somebody to discover. */
+        var npsBy = function (list) {
+          var v = list.filter(function (o) { return o.nps != null; });
+          if (!v.length) return null;
+          var p2 = v.filter(function (o) { return o.nps >= 9; }).length;
+          var d2 = v.filter(function (o) { return o.nps <= 6; }).length;
+          return { n: v.length, v: Math.round(100 * (p2 - d2) / v.length) };
+        };
+        var forms = {};
+        npsR.forEach(function (o) { if (o.form) forms[o.form] = 1; });
+        var fKeys = Object.keys(forms).sort();
+        var split = fKeys.length > 1
+          ? fKeys.map(function (f) {
+              var x = npsBy(npsR.filter(function (o) { return o.form === f; }));
+              return x && x.n >= 20
+                ? '<div><span>' + esc(f.replace(/\s*Form$/i, '')) + '</span><b style="color:' +
+                  (x.v >= 0 ? '#059669' : '#DC2626') + '">' + (x.v > 0 ? '+' : '') + x.v + '</b>' +
+                  '<span style="color:var(--txl)">n=' + x.n + '</span></div>'
+                : '';
+            }).filter(Boolean).join('')
+          : '';
         var sl = [5, 4, 3, 2, 1].filter(function (k) { return cnt[k]; }).map(function (k) {
           return { v: cnt[k], c: SC[k], label: k + '\u2605 \u2014 ' + cnt[k] + ' (' + (100 * cnt[k] / n).toFixed(1) + '%)' }; });
         return '<div class="pt-card">' +
@@ -33485,6 +33535,12 @@ window.T1 = (function () {
               '<div class="pt-final">' + esc(g.label) + ' &nbsp;<b>' + avg.toFixed(2) + ' / 5</b> (' +
                 (100 * avg / 5).toFixed(1) + '%)<br><span class="st">' + starsOf(avg) + '</span></div>'
             : '<div class="pt-none">No overall rating given by this band.</div>') +
+          (split
+            ? '<div style="font-size:10.5px;color:var(--txm);padding:6px 10px 0;line-height:1.5">' +
+                '<div style="font-weight:700;letter-spacing:.04em;text-transform:uppercase;font-size:9px;color:var(--txl)">NPS by questionnaire</div>' +
+                split.replace(/<div>/g, '<div style="display:flex;justify-content:space-between;gap:6px">') +
+              '</div>'
+            : '') +
           (npsR.length
             ? '<div class="pt-card-f" style="border-top:1px dashed var(--bor)">' +
                 '<span style="color:#059669">Would recommend <b>' + pro + '</b></span>' +
@@ -33497,8 +33553,34 @@ window.T1 = (function () {
             '<span>Wrote something <b>' + (rows.length ? (100 * rows.filter(function (o) { return o.sub; }).length / rows.length).toFixed(0) : 0) + '%</b></span>' +
           '</div></div>';
       }).filter(Boolean).join('');
-      var placed = R.filter(function (o) { return rank(o.grade) <= 18; }).length;
-      el.innerHTML = '<div class="pt-cards">' + cards + '</div>' +
+      var placed = R.filter(function (o) { return SEG.some(function (g) { return inSeg(o, g); }); }).length;
+      /* One warning for the whole section, with the gap measured rather than
+         asserted — a reader comparing two bands needs to know how much of the
+         difference could be the form the parent was handed. */
+      var allForms = {};
+      R.forEach(function (o) { if (o.form && o.nps != null) (allForms[o.form] = allForms[o.form] || []).push(o); });
+      var fn = Object.keys(allForms);
+      var warn = '';
+      if (fn.length > 1) {
+        var fv = fn.map(function (f) {
+          var v = allForms[f];
+          var p2 = v.filter(function (o) { return o.nps >= 9; }).length;
+          var d2 = v.filter(function (o) { return o.nps <= 6; }).length;
+          return { f: f, n: v.length, v: Math.round(100 * (p2 - d2) / v.length) };
+        }).filter(function (x) { return x.n >= 20; }).sort(function (a, b) { return b.v - a.v; });
+        if (fv.length > 1) {
+          var gap = fv[0].v - fv[fv.length - 1].v;
+          warn = '<div class="au-note" style="background:#FFFBEB;border:1px solid #FDE68A;color:#78350F;' +
+            'padding:10px 13px;border-radius:10px;margin-bottom:12px;line-height:1.55">' +
+            '<b>These responses come from ' + fn.length + ' different questionnaires, and they do not score alike.</b> ' +
+            fv.map(function (x) { return esc(x.f.replace(/\s*Form$/i, '')) + ' <b>' +
+              (x.v > 0 ? '+' : '') + x.v + '</b> (n=' + x.n + ')'; }).join(' &middot; ') +
+            ' — a spread of <b>' + gap + ' points</b> between the highest and lowest. Branches did not all use ' +
+            'the same form, so part of any gap between the rings below is the form the parent was handed rather ' +
+            'than what they think. Each ring shows its own split.</div>';
+        }
+      }
+      el.innerHTML = warn + '<div class="pt-cards">' + cards + '</div>' +
         (placed < R.length
           ? '<div class="au-note">' + (R.length - placed) + ' response' + ((R.length - placed) === 1 ? '' : 's') +
             ' carry a grade this school does not use and are not on any ring above.</div>'
