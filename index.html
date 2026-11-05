@@ -15813,6 +15813,36 @@ function _exBand(grade) {
    CLICK TO VIEW opens the children themselves, named, with both their marks.
    It is on every row and every headline tile, because the question a reader
    asks of a number on this page is almost always "which children?". */
+/* ── WHICH LANGUAGE A LANGUAGE SLOT IS ──
+   "III Language" is a column on the mark sheet, not a subject. Different
+   rooms fill it with different languages and the mark sheet never says which,
+   so one row of the subject table can hold Hindi, Telugu and French at once
+   and comparing it across branches is not comparing like with like.
+
+   The syllabus ledger does name the languages a grade teaches, and that is
+   what is shown: not what a child sat, which the workbook cannot say, but
+   what the slot can contain where that child sits. Where a grade teaches one
+   language the slot is unambiguous; where it teaches two, the row is mixed
+   and the page says so rather than letting it pass as a subject. */
+function _exLangs(rows, slot) {
+  var M = (_pt1Raw && _pt1Raw.langs) || {}, seen = {};
+  rows.forEach(function (r) {
+    var k = String(r.br || '') + '|' + String(r.gr || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    (M[k] || []).forEach(function (n) {
+      var m = n.match(/^(.*?)\s*\((II|III)\)$/);
+      if (m) { if (!slot || m[2] === slot) seen[m[1]] = 1; }
+      else seen[n] = 1;                       // the ledger did not state a slot
+    });
+  });
+  return Object.keys(seen).sort();
+}
+function _exLangNote(rows, slot) {
+  var L = _exLangs(rows, slot);
+  if (!L.length) return '';
+  return L.length === 1
+    ? '<span style="color:#047857;font-weight:700">' + L[0] + '</span>'
+    : '<span style="color:#B45309;font-weight:700">' + L.join(' or ') + '</span>';
+}
 var _exOpen = {};
 function exToggle(key) { _exOpen[key] = !_exOpen[key]; _exRenderCompare(); }
 function exToggleBand(br) { exToggle('branch|' + br); }          /* kept: older markup calls it */
@@ -15983,11 +16013,25 @@ function _exRenderCompare() {
         return stats(b.lab, m[b.k], x.key + '|' + b.k, roomsOf);
       });
   };
+  /* a language slot → the grades inside a branch, each naming the language
+     it is actually filled with; one grade usually settles it outright */
+  var gradesOf = function (x) {
+    var G = groupBy(x.rows, function (r) { return r.gr; });
+    return G.keys.map(function (k) {
+      var o = stats(k, G.m[k], '');
+      var L = _exLangNote(G.m[k], x.slot);
+      if (L) { o.k = e(k) + '  —  ' + L; o.html = 1; }
+      return o;
+    }).sort(function (a, b) { return b.adj - a.adj; });
+  };
   /* a subject or a grade → the branches that carry it */
   var branchesOf = function (x) {
     var G = groupBy(x.rows, function (r) { return r.br; });
-    return G.keys.map(function (k) { return stats(k, G.m[k], x.key + '|' + k, roomsOf); })
-      .sort(function (a, b) { return b.adj - a.adj; });
+    return G.keys.map(function (k) {
+      var o = stats(k, G.m[k], x.key + '|' + k, x.slot ? gradesOf : roomsOf);
+      if (x.slot) o.slot = x.slot;
+      return o;
+    }).sort(function (a, b) { return b.adj - a.adj; });
   };
 
   /* mode 'adj' scores a group after the paper effect is removed; mode 'raw'
@@ -16008,8 +16052,8 @@ function _exRenderCompare() {
       var head = (kids && kids.length && x.key)
         ? '<button class="na-secbtn" onclick="exToggle(' +
             JSON.stringify(x.key).replace(/"/g, '&quot;') + ')" style="font-weight:' +
-            (depth ? '600' : '700') + '">' + (open ? '▾ ' : '▸ ') + e(x.k) + '</button>'
-        : '<span style="font-weight:' + (depth ? '500' : '700') + '">' + e(x.k) + '</span>';
+            (depth ? '600' : '700') + '">' + (open ? '▾ ' : '▸ ') + (x.html ? x.k : e(x.k)) + '</button>'
+        : '<span style="font-weight:' + (depth ? '500' : '700') + '">' + (x.html ? x.k : e(x.k)) + '</span>';
       var vid = pick((opt.what || nameCol) + ' · ' + x.k, x.rows, title);
       body += '<tr' + (depth ? ' style="background:var(--pl)"' : '') + '>' +
         '<td style="padding-left:' + (9 + pad) + 'px' + (depth ? ';color:var(--txm)' : '') + '">' + head + '</td>' +
@@ -16082,7 +16126,18 @@ function _exRenderCompare() {
       return C.subjects.map(function (sj) {
         var g = R.filter(function (r) { return r.per[sj]; });
         if (g.length < 20) return null;
-        var o = stats(sj, g, 'subject|' + sj, branchesOf);
+        /* "II Language" and "III Language" are slots on the mark sheet, not
+           subjects, so the row is labelled as one and carries which languages
+           fill it. Everything else is a subject and reads as before. */
+        var slot = /^III Language$/i.test(sj) ? 'III' : /^II Language$/i.test(sj) ? 'II' : '';
+        var lab = sj;
+        if (slot) {
+          var LL = _exLangs(g, slot);
+          lab = sj + ' — ' + (LL.length ? LL.join(' or ') : 'language not recorded') +
+                (LL.length > 1 ? ', mixed' : '');
+        }
+        var o = stats(lab, g, 'subject|' + sj, branchesOf);
+        o.slot = slot;
         /* a subject row shows that subject's own marks, not the child's average */
         o.pt = mean(g.map(function (r) { return +r.per[sj].pt0; }));
         o.hy = mean(g.map(function (r) { return +r.per[sj].hy0; }));
@@ -16094,7 +16149,15 @@ function _exRenderCompare() {
     })(),
     'This is where the paper effect is visible. Every subject but one rose for everybody, so these are not ' +
     'teaching gains — they are the size of the shift each paper carried, and the figure the branch and ' +
-    'section tables are measured against. Tap a subject for the branches that carry it.', 'Subject', 'raw',
+    'section tables are measured against. Tap a subject for the branches that carry it.' +
+    '<br><br><b style="color:var(--tx)">II Language and III Language are columns on the mark sheet, not ' +
+    'subjects.</b> Nothing in the workbook records which language a child actually sat — not the ' +
+    'result sheets, not the teacher roster — so one row can hold Hindi, Telugu and French at once. ' +
+    'What IS known is which languages each grade teaches, and that is what the row names: ' +
+    '<span style="color:#047857;font-weight:700">one language</span> means the slot is unambiguous there, ' +
+    '<span style="color:#B45309;font-weight:700">two or more</span> means the row is mixed and cannot be ' +
+    'read across branches as one subject. Tap it to see which language each branch fills it with. ' +
+    'A third-language column on the mark sheet is what would settle it per child.', 'Subject', 'raw',
     { what: 'Subject' });
 
   var grG = groupBy(R, function (r) { return r.gr; });
