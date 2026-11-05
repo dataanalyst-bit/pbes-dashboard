@@ -22229,68 +22229,108 @@ function _admYoY() {
   el.innerHTML = h;
 }
 
-/* ── EVERY YEAR, EVERY BRANCH ──
-   Asked for on 5 November 2026: the complete branch-by-branch comparison of
-   earlier academic years, not just the group line. Full-year intake, so the
-   finished seasons are whole; the season in progress is marked as such.
-   A branch shows a dash, not a zero, for a year before it opened — Gowdavalli
-   took its first admissions in 2026-27 and printing 0 against 2018-19 would
-   read as a branch that failed rather than a branch that did not exist. */
+/* ── EVERY BRANCH, THE LAST FOUR YEARS ──
+   Asked for on 5 November 2026 and then set out again: branches down the
+   side, four academic years across the top, newest first, and nothing in it
+   but the admissions and the move between years. The register each column is
+   read from was taken out at management's request — it is stated once under
+   the table instead of in a column of its own.
+
+   The percentage is the YEAR ON YEAR CHANGE, not admissions over leads. The
+   two older columns come from "All AY Admissions", which holds the children
+   who joined and carries no lead count at all, so a conversion rate cannot be
+   worked out for them and would sit empty in half the table. 2024-25 is the
+   baseline and has no change figure beside it; the season in progress has
+   none either, because 74 against a finished 1,648 is not a fall of 96%, it
+   is five weeks against a year.
+
+   A branch shows a dash, not a zero, for a year before it opened. Gowdavalli
+   took its first admissions in 2026-27, and a 0 against 2024-25 would read as
+   a branch that failed rather than one that did not exist. */
 function _admYoYBranches(S, R, season, lastAy, scope) {
   var LD = (typeof LEAD_DATES !== 'undefined' && LEAD_DATES) ? LEAD_DATES : [];
-  var brs = (R.branches || []).slice();
-  if (scope) brs = [scope];
+  var brs = scope ? [scope] : (R.branches || []).slice();
   if (!brs.length) return '';
-  var ays = (R.histAys || []).filter(function (a) { return a < season && a !== lastAy; }).slice();
-  var rows = [];
-  ays.forEach(function (ay) {
-    rows.push({ ay: ay, src: ADM_HIST_TAB, by: function (b) {
+
+  /* newest first, exactly as the columns read */
+  var hist = (R.histAys || []).filter(function (a) { return a < season && a !== lastAy; });
+  var cols = [{ ay: season, now: 1, by: function (b) {
+                  return S.rows.filter(function (r) { return r.b === b && _admIsWon(r); }).length; } }];
+  if (lastAy) cols.push({ ay: lastAy, by: function (b) {
+    return LD.filter(function (r) { return r.Branch === b && r.Stage === '08-Admission Completed'; }).length; } });
+  hist.slice(-3).reverse().forEach(function (ay) {
+    cols.push({ ay: ay, by: function (b) {
       return S.hist.filter(function (r) { return r.ay === ay && r.b === b; }).length; } });
   });
-  if (lastAy && LD.length) {
-    rows.push({ ay: lastAy, src: 'Touched Leads', by: function (b) {
-      return LD.filter(function (r) { return r.Branch === b && r.Stage === '08-Admission Completed'; }).length; } });
-  }
-  rows.push({ ay: season, src: '27-28 tabs', now: 1, by: function (b) {
-    return S.rows.filter(function (r) { return r.b === b && _admIsWon(r); }).length; } });
-  rows.reverse();
-  /* a branch that never appears anywhere is not a column */
+  cols = cols.slice(0, 4);
+  if (cols.length < 2) return '';
+  /* the year before the oldest column, used only to decide whether a branch
+     existed then — never printed */
+  var older = hist.slice(-4)[0];
+
   var live = brs.filter(function (b) {
-    return rows.some(function (r) { return r.by(b) > 0; }); });
+    return cols.some(function (c) { return c.by(b) > 0; }); });
   if (!live.length) return '';
 
-  var h = '<div class="h4" style="margin:22px 0 10px;font-size:17px;font-weight:800;color:var(--tx)">' +
-    'Every year, branch by branch · full intake</div>' +
+  var chgCell = function (now, was) {
+    if (was == null) return '<td class="n" style="color:var(--txl)">–</td>';
+    if (!was) return '<td class="n" style="color:var(--ok);font-weight:700">new</td>';
+    var v = Math.round(100 * (now - was) / was);
+    return '<td class="n" style="font-weight:800;color:' +
+      (v === 0 ? 'var(--txm)' : v > 0 ? 'var(--ok)' : 'var(--bad)') + '">' +
+      (v > 0 ? '+' : '') + v + '%</td>';
+  };
+  var numCell = function (v, bold) {
+    return '<td class="n"' + (v ? (bold ? ' style="font-weight:800"' : '')
+                                : ' style="color:var(--txl)"') + '>' +
+      (v ? _admN(v) : '–') + '</td>';
+  };
+
+  var h = '<div style="margin:22px 0 10px;font-size:17px;font-weight:800;color:var(--tx)">' +
+      'Every branch, the last four years · admissions taken</div>' +
     '<div style="overflow-x:auto"><table class="au-tbl au-yoy" style="min-width:' +
-      (320 + live.length * 120) + 'px"><thead><tr><th>Academic year</th><th>Read from</th>' +
-    live.map(function (b) { return '<th class="n">' + _admDot(b) + ' ' + _admEsc(b) + '</th>'; }).join('') +
-    '<th class="n">Total</th><th class="n">Year on year</th></tr></thead><tbody>';
-  var prev = null;
-  /* oldest first for the year-on-year arithmetic, printed newest first */
-  var ordered = rows.slice().reverse(), totals = {};
-  ordered.forEach(function (r) {
-    totals[r.ay] = live.reduce(function (t, b) { return t + r.by(b); }, 0);
+      (200 + cols.length * 170) + 'px"><thead><tr><th rowspan="2" style="vertical-align:bottom">Branch</th>' +
+    cols.map(function (c, k) {
+      return '<th colspan="' + (k === cols.length - 1 ? 1 : 2) + '" class="n" style="text-align:center' +
+        (k ? ';border-left:2px solid var(--bor)' : '') + '">' + _admEsc(c.ay) +
+        (c.now ? ' <span class="na-pill" style="background:var(--sur);color:var(--p)">so far</span>' : '') +
+        '</th>';
+    }).join('') + '</tr><tr>' +
+    cols.map(function (c, k) {
+      var bl = k ? 'border-left:2px solid var(--bor)' : '';
+      return '<th class="n" style="' + bl + '">Admissions</th>' +
+             (k === cols.length - 1 ? '' : '<th class="n">Change</th>');
+    }).join('') + '</tr></thead><tbody>';
+
+  var row = function (label, by, bold) {
+    var out = '<tr' + (bold ? ' style="font-weight:800;border-top:2px solid var(--bor)"' : '') +
+      '><td>' + label + '</td>';
+    cols.forEach(function (c, k) {
+      var v = by(c);
+      out += numCell(v, 1);
+      if (k === cols.length - 1) return;
+      /* the season in progress is not compared with a finished year */
+      if (c.now) { out += '<td class="n" style="color:var(--txl)">–</td>'; return; }
+      var prev = by(cols[k + 1]);
+      out += chgCell(v, (!prev && !v) ? null : prev);
+    });
+    return out + '</tr>';
+  };
+
+  live.forEach(function (b) {
+    h += row(_admDot(b) + ' ' + _admEsc(b), function (c) { return c.by(b); });
   });
-  rows.forEach(function (r, k) {
-    var tot = totals[r.ay];
-    var idx = ordered.map(function (x) { return x.ay; }).indexOf(r.ay);
-    var before = idx > 0 ? totals[ordered[idx - 1].ay] : null;
-    var chg = (r.now || !before) ? null : Math.round(100 * (tot - before) / before);
-    h += '<tr' + (r.now ? ' style="background:var(--pl)"' : '') + '>' +
-      '<td><b>' + _admEsc(r.ay) + '</b>' +
-        (r.now ? ' <span class="na-pill" style="background:var(--sur);color:var(--p)">in progress</span>' : '') + '</td>' +
-      '<td style="color:var(--txm)">' + _admEsc(r.src) + '</td>' +
-      live.map(function (b) {
-        var v = r.by(b);
-        return '<td class="n"' + (v ? '' : ' style="color:var(--txl)"') + '>' +
-          (v ? _admN(v) : '–') + '</td>';
-      }).join('') +
-      '<td class="n" style="font-weight:800">' + _admN(tot) + '</td>' +
-      '<td class="n" style="font-weight:800;color:' + (chg === null ? 'var(--txm)'
-        : chg >= 0 ? 'var(--ok)' : 'var(--bad)') + '">' +
-        (chg === null ? '–' : (chg >= 0 ? '+' : '') + chg + '%') + '</td></tr>';
-  });
-  return h + '</tbody></table></div>';
+  h += '</tbody>' + (live.length < 2 ? '' : '<tfoot>' +
+    row(scope ? _admEsc(scope) : 'All branches', function (c) {
+      return live.reduce(function (t, b) { return t + c.by(b); }, 0); }, 1) + '</tfoot>') +
+    '</table></div>' +
+    '<div class="au-note">Per cent is the change on the year before. ' +
+    _admEsc(cols[cols.length - 1].ay) + ' is the baseline, and ' + _admEsc(season) +
+    ' is ' + (Math.round((new Date(_admIso(new Date())) - new Date(_admYoyStart(season))) / 86400000)) +
+    ' days old, so neither carries one. ' +
+    _admEsc(season) + ' is read from the 27-28 branch tabs, ' + _admEsc(lastAy || '') +
+    ' from the CRM export, the rest from "' + _admEsc(ADM_HIST_TAB) + '".</div>';
+  return h;
 }
 
 function admOpenYoY(ay, day) {
