@@ -21539,10 +21539,15 @@ function _admIsDigital(r) { return !_admWalkinSet()[r.src]; }
 var ADM_PERIODS = [
   ['season',    'Whole season'],
   ['today',     'Today'],
+  ['yesterday', 'Yesterday'],
   ['week',      'This week'],
   ['lastweek',  'Last week'],
   ['month',     'This month'],
-  ['lastmonth', 'Last month']
+  ['lastmonth', 'Last month'],
+  /* Not a window on this season at all — it swaps the whole table for last
+     season beside this one. Kept in the same row because it is the same
+     question ("how are we doing?") asked over a longer arm. */
+  ['lastyear',  'Last year (2026-27)']
 ];
 var _admPeriod = 'season';
 var _admPlanMetric = 'adms';
@@ -21574,6 +21579,10 @@ function _admRange(p) {
   var now = new Date();
   var t = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   if (p === 'today') return [_admIso(t), _admIso(t)];
+  if (p === 'yesterday') {
+    var y = new Date(t); y.setDate(t.getDate() - 1);
+    return [_admIso(y), _admIso(y)];
+  }
   if (p === 'week' || p === 'lastweek') {
     var dow = (t.getDay() + 6) % 7;                 // Monday is 0
     var mon = new Date(t); mon.setDate(t.getDate() - dow);
@@ -21614,6 +21623,149 @@ function _admTargetFor(branch, a, b, metric) {
 // ── 1. branch comparison ───────────────────────────────────────────────────
 function admSetPeriod(p) { _admPeriod = p; _admCompare(); }
 
+/* ═════ LAST YEAR, SIDE BY SIDE ═════
+   Asked for on 5 November 2026: a button that sets this season against
+   2026-27 branch by branch.
+
+   WHICH REGISTER. The 27-28 tracker tabs this tab is built on only exist for
+   this season — there is no "Bachupally 26-27" tab to read. The one place
+   that holds both seasons on one rule is the CRM export in "Touched Leads",
+   which the dashboard already loads as LEAD_DATES. So THIS VIEW READS BOTH
+   SIDES FROM THE CRM, not from the tracker. That is why its 2027-28 lead
+   count does not match the 634 on the tile above: the tile counts the
+   counsellors' own tracker, this counts the CRM, and the two registers are
+   not the same list. Setting one against the other would be the very mistake
+   this view exists to avoid — one source, one rule, both years.
+
+   WHICH WINDOW. Both seasons are cut at the same day of their own season,
+   counting from 1 October, so a five-week-old campaign is never set against a
+   finished year.
+
+   WHAT THE ADMISSION COLUMN DOES NOT SAY. A lead's stage is read as it stands
+   today. Last season's leads have had a year to convert; this season's have
+   had weeks. The lead columns are the clean comparison; the admission columns
+   flatter last year and the note under the table says so. */
+function _admLastSeason(season) {
+  var y = parseInt(String(season).slice(0, 4), 10);
+  if (!y) return '';
+  return (y - 1) + '-' + String(y % 100);
+}
+/* LEAD_DATES rows inside a window, already carrying Channel and Stage. */
+function _admLeadWin(a, b, scope) {
+  var L = (typeof LEAD_DATES !== 'undefined' && LEAD_DATES) ? LEAD_DATES : [];
+  return L.filter(function (r) {
+    return r && r.Date && r.Date >= a && r.Date <= b && r.Branch &&
+           (!scope || r.Branch === scope);
+  });
+}
+function _admLeadAgg(rows) {
+  var W = 'Walk-In', A = '08-Admission Completed';
+  var dig = rows.filter(function (r) { return r.Channel !== W; });
+  var wlk = rows.filter(function (r) { return r.Channel === W; });
+  var dA = dig.filter(function (r) { return r.Stage === A; }).length;
+  var wA = wlk.filter(function (r) { return r.Stage === A; }).length;
+  return { n: rows.length, dL: dig.length, wL: wlk.length, dA: dA, wA: wA, won: dA + wA };
+}
+function _admCompareYear(el, hdr) {
+  var S = _admSet(), R = _admRaw;
+  var season = (R && R.season) || '', last = _admLastSeason(season);
+  var L = (typeof LEAD_DATES !== 'undefined' && LEAD_DATES) ? LEAD_DATES : [];
+  if (!L.length) {
+    el.innerHTML = hdr + '<div class="au-empty">The CRM lead export has not loaded, so last ' +
+      'season cannot be drawn. It arrives with the main dashboard data \u2014 reloading the page ' +
+      'usually brings it.</div>';
+    return;
+  }
+  var thisStart = _admSeasonStart(season), lastStart = _admSeasonStart(last);
+  var today = _admIso(new Date());
+  var day = Math.round((new Date(today) - new Date(thisStart)) / 86400000);
+  if (day < 0) { el.innerHTML = hdr + '<div class="au-empty">The season has not opened yet.</div>'; return; }
+  var lastEnd = _admAddDays(lastStart, day);
+  var scope = S.scope;
+
+  var cur = _admLeadWin(thisStart, today, scope), prv = _admLeadWin(lastStart, lastEnd, scope);
+  /* the whole of last season, for the line under the table */
+  var prvFull = _admLeadWin(lastStart, _admAddDays(lastStart, 364), scope);
+
+  var brs = {};
+  cur.concat(prv).forEach(function (r) { brs[r.Branch] = 1; });
+  var list = Object.keys(brs).sort();
+  if (!list.length) {
+    el.innerHTML = hdr + '<div class="au-empty">No CRM leads in either window.</div>';
+    return;
+  }
+
+  var chg = function (now, was) {
+    if (!was) return '<span style="color:var(--txm)">\u2013</span>';
+    var v = Math.round(100 * (now - was) / was);
+    return '<span style="font-weight:800;color:' + (v >= 0 ? '#059669' : '#DC2626') + '">' +
+      (v >= 0 ? '+' : '') + v + '%</span>';
+  };
+  var pair = function (was, now, bold) {
+    var st = bold ? 'font-weight:800' : '';
+    return '<td class="n" style="color:var(--txm)">' + _admN(was) + '</td>' +
+           '<td class="n" style="' + st + '">' + _admN(now) + '</td>' +
+           '<td class="n">' + chg(now, was) + '</td>';
+  };
+
+  var rows = list.map(function (br) {
+    return { b: br,
+      was: _admLeadAgg(prv.filter(function (r) { return r.Branch === br; })),
+      now: _admLeadAgg(cur.filter(function (r) { return r.Branch === br; })) };
+  }).sort(function (x, y) { return y.now.n - x.now.n; });
+
+  var h = hdr +
+    '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:1040px"><thead>' +
+    '<tr><th rowspan="2" style="vertical-align:bottom">Branch</th>' +
+    '<th colspan="3" class="n" style="text-align:center">Total leads</th>' +
+    '<th colspan="3" class="n" style="text-align:center;border-left:1px solid var(--bor)">Digital leads</th>' +
+    '<th colspan="3" class="n" style="text-align:center;border-left:1px solid var(--bor)">Walk-in leads</th>' +
+    '<th colspan="3" class="n" style="text-align:center;border-left:1px solid var(--bor)">Admissions</th></tr>' +
+    '<tr>' +
+    ['', 'border-left:1px solid var(--bor)', 'border-left:1px solid var(--bor)',
+     'border-left:1px solid var(--bor)'].map(function (bl) {
+      return '<th class="n" style="font-weight:500;color:var(--txm);' + bl + '">' +
+               _admEsc(String(last).slice(2)) + '</th>' +
+             '<th class="n">' + _admEsc(String(season).slice(2)) + '</th><th class="n">Chg</th>';
+    }).join('') + '</tr></thead><tbody>';
+
+  rows.forEach(function (r) {
+    h += '<tr><td>' + _admDot(r.b) + ' ' + _admEsc(r.b) + '</td>' +
+      pair(r.was.n, r.now.n, true) + pair(r.was.dL, r.now.dL) +
+      pair(r.was.wL, r.now.wL) + pair(r.was.won, r.now.won, true) + '</tr>';
+  });
+  var sum = function (k, side) {
+    return rows.reduce(function (t, r) { return t + r[side][k]; }, 0); };
+  h += '</tbody>' + (rows.length < 2 ? '' :
+    '<tfoot><tr style="font-weight:800;border-top:2px solid var(--bor)">' +
+    '<td>' + (scope ? _admEsc(scope) : 'All five branches') + '</td>' +
+    pair(sum('n', 'was'), sum('n', 'now'), true) +
+    pair(sum('dL', 'was'), sum('dL', 'now')) +
+    pair(sum('wL', 'was'), sum('wL', 'now')) +
+    pair(sum('won', 'was'), sum('won', 'now'), true) +
+    '</tr></tfoot>') + '</table></div>';
+
+  var pf = _admLeadAgg(prvFull);
+  h += '<div style="font-size:11.5px;color:var(--txm);margin-top:10px;line-height:1.65">' +
+    'Both seasons are cut at <b style="color:var(--tx)">day ' + day + '</b> of their own season, ' +
+    'counting from 1 October \u2014 ' + _admDate(lastStart) + ' to ' + _admDate(lastEnd) + ' against ' +
+    _admDate(thisStart) + ' to ' + _admDate(today) + '. For the whole of ' + _admEsc(last) + ' the CRM ' +
+    'carried <b style="color:var(--tx)">' + _admN(pf.n) + '</b> leads and <b style="color:var(--tx)">' +
+    _admN(pf.won) + '</b> admissions.' +
+    '<br><br><b style="color:var(--tx)">This view reads the CRM export, not the 27-28 tracker.</b> ' +
+    'There is no 26-27 tracker tab to read, and the CRM is the one register holding both seasons on ' +
+    'one rule. Its ' + _admEsc(season) + ' lead count will therefore not match the tile above, which ' +
+    'counts the counsellors\' tracker \u2014 two registers, not two answers.' +
+    '<br><br><b style="color:var(--tx)">The admission columns flatter last year.</b> A lead\'s stage ' +
+    'is read as it stands today, so ' + _admEsc(last) + ' has had a full year to convert and ' +
+    _admEsc(season) + ' has had ' + day + ' days. The lead columns are the clean comparison; read the ' +
+    'admission change as a floor, not a verdict.' +
+    '<br><br><b style="color:var(--tx)">Digital and walk-in</b> here follow the CRM\'s own Channel ' +
+    'column, which is not the same split as the source field the other buttons use.' +
+    '</div>';
+  el.innerHTML = h;
+}
+
 function _admCompare() {
   var el = document.getElementById('adm-compare'); if (!el) return;
   var S = _admSet(), R = _admRaw;
@@ -21629,7 +21781,12 @@ function _admCompare() {
         'font-size:12px;font-weight:' + (on ? '700' : '500') + ';cursor:pointer">' + p[1] + '</button>';
     }).join('') +
     '<span style="font-size:11.5px;color:var(--txm);align-self:center;margin-left:4px">' +
-      _admDate(a) + (a === b ? '' : ' to ' + _admDate(b)) + '</span></div>';
+      (_admPeriod === 'lastyear'
+        ? 'from the CRM export \u00b7 both seasons to the same day'
+        : _admDate(a) + (a === b ? '' : ' to ' + _admDate(b))) + '</span></div>';
+
+  /* Last year is not a window on this season, so it draws its own table. */
+  if (_admPeriod === 'lastyear') { _admCompareYear(el, h); return; }
 
   var data = brs.map(function (br) {
     var rs  = S.rows.filter(function (r) { return r.b === br && r.d >= a && r.d <= b; });
@@ -21837,46 +21994,84 @@ function _admYoY() {
   var day = Math.round((new Date(today) - new Date(start)) / 86400000);
   if (day < 0) { el.innerHTML = '<div class="au-empty">The season has not opened yet.</div>'; return; }
 
+  /* ═════ ONE SHEET, ONE RULE ═════
+     Rebuilt 5 November 2026. Every number in this table now comes from
+     "All AY Admissions" and is dated by its DATE OF ADMISSION column —
+     nothing else feeds it.
+
+     WHAT IT USED TO DO, AND WHY THAT WAS WRONG. The earlier-year rows came
+     from that sheet, but the "this season" row came from the 27-28 tracker,
+     counting leads the counsellors have marked admitted. Those are two
+     different events. A tracker row turns admitted the day a counsellor
+     closes it; a row appears in All AY Admissions carrying the date the
+     child's admission was taken. On 5 November the tracker said 60 and the
+     same day of the three earlier seasons held 11, 28 and 10 — so the page
+     reported this season "ahead by 275%", which was a measurement artefact,
+     not a result. A number that flatters by a factor of four is worse than
+     no number.
+
+     SO THE CRM FIGURE IS OUT OF THE COMPARISON. It is still printed, below,
+     labelled as what it is, and it takes no part in the arithmetic.
+
+     THIS SEASON APPEARS HERE the moment its students are in the sheet, with
+     no code change — the row is drawn from histAys like every other year. */
   var past = (R.histAys || []).filter(function (ay) { return ay < season; }).slice(-3);
-  var now = S.rows.filter(_admIsWon).length;
-  var nowL = S.rows.length;
+  var haveNow = (R.histAys || []).indexOf(season) >= 0;
+  var crmWon = S.rows.filter(_admIsWon).length;
+  var crmLeads = S.rows.length;
 
   if (!past.length) {
     el.innerHTML = '<div class="au-empty">No earlier year carries dated student records to compare with.</div>';
     return;
   }
 
-  var rows = past.map(function (ay) {
+  var cut = function (ay) {
     var a = _admSeasonStart(ay), b = _admAddDays(a, day);
     var upto = S.hist.filter(function (r) { return r.ay === ay && r.d && r.d >= a && r.d <= b; });
-    var full = S.hist.filter(function (r) { return r.ay === ay; }).length;
     var byB = {};
     upto.forEach(function (r) { byB[r.b] = (byB[r.b] || 0) + 1; });
-    return { ay: ay, a: a, b: b, n: upto.length, full: full, byB: byB };
-  }).reverse();
+    return { ay: ay, a: a, b: b, n: upto.length,
+             full: S.hist.filter(function (r) { return r.ay === ay; }).length, byB: byB };
+  };
+  var rows = past.map(cut).reverse();
+  var nowRow = haveNow ? cut(season) : null;
 
+  /* With no row for this season there is nothing to compare against, so the
+     comparison column is left out rather than printed as a column of dashes. */
   var h = '<table class="au-tbl"><thead><tr><th>Academic year</th><th>Same window</th>' +
-    '<th class="n">Admissions by this day</th><th class="n">This season vs it</th>' +
+    '<th class="n">Admissions by this day</th>' +
+    (nowRow ? '<th class="n">This season vs it</th>' : '') +
     '<th class="n">That year\'s full intake</th><th class="n">Share won by this day</th>' +
     '</tr></thead><tbody>';
-  h += '<tr style="background:#6366F10D"><td><b>' + _admEsc(season) + '</b> ' +
-      '<span class="na-pill" style="background:#6366F120;color:#6366F1">this season</span></td>' +
-    '<td style="color:var(--txm)">' + _admDate(start) + ' to ' + _admDate(today) + '</td>' +
-    '<td class="n" style="font-weight:800;font-size:15px;color:#059669">' + _admN(now) + '</td>' +
-    '<td class="n" style="color:var(--txm)">–</td>' +
-    '<td class="n" style="color:var(--txm)">–</td>' +
-    '<td class="n" style="color:var(--txm)">–</td></tr>';
+  if (nowRow) {
+    h += '<tr style="background:#6366F10D"><td><button class="na-secbtn" onclick="admOpenYoY(' +
+        JSON.stringify(season).replace(/"/g, '&quot;') + ',' + day + ')"><b>' + _admEsc(season) +
+        '</b> \u203a</button> <span class="na-pill" style="background:#6366F120;color:#6366F1">this season</span></td>' +
+      '<td style="color:var(--txm)">' + _admDate(nowRow.a) + ' to ' + _admDate(nowRow.b) + '</td>' +
+      '<td class="n" style="font-weight:800;font-size:15px;color:#059669">' + _admN(nowRow.n) + '</td>' +
+      '<td class="n" style="color:var(--txm)">\u2013</td>' +
+      '<td class="n" style="color:var(--txm)">in progress</td>' +
+      '<td class="n" style="color:var(--txm)">\u2013</td></tr>';
+  } else {
+    h += '<tr style="background:#FFFBEB"><td><b>' + _admEsc(season) + '</b> ' +
+        '<span class="na-pill" style="background:#FDE68A;color:#78350F">this season</span></td>' +
+      '<td style="color:var(--txm)">' + _admDate(start) + ' to ' + _admDate(today) + '</td>' +
+      '<td class="n" colspan="3" style="color:#78350F;text-align:left;font-size:12px">' +
+        'Not in "' + _admEsc(ADM_HIST_TAB) + '" yet, so it cannot be counted on the same rule as the ' +
+        'years below. It joins this table on the next refresh after its students are pasted in.</td></tr>';
+  }
   rows.forEach(function (r) {
-    var chg = r.n ? Math.round(100 * (now - r.n) / r.n) : null;
+    var base = nowRow ? nowRow.n : null;
+    var chg = (base === null || !r.n) ? null : Math.round(100 * (base - r.n) / r.n);
     h += '<tr><td><button class="na-secbtn" onclick="admOpenYoY(' +
-        JSON.stringify(r.ay).replace(/"/g, '&quot;') + ',' + day + ')">' + _admEsc(r.ay) + ' ›</button></td>' +
+        JSON.stringify(r.ay).replace(/"/g, '&quot;') + ',' + day + ')">' + _admEsc(r.ay) + ' \u203a</button></td>' +
       '<td style="color:var(--txm)">' + _admDate(r.a) + ' to ' + _admDate(r.b) + '</td>' +
       '<td class="n" style="font-weight:800">' + _admN(r.n) + '</td>' +
-      '<td class="n" style="font-weight:800;color:' + (chg === null ? 'var(--txm)'
+      (nowRow ? '<td class="n" style="font-weight:800;color:' + (chg === null ? 'var(--txm)'
         : chg >= 0 ? '#059669' : '#DC2626') + '">' +
-        (chg === null ? '–' : (chg >= 0 ? '+' : '') + _admN(chg) + '%') + '</td>' +
+        (chg === null ? '\u2013' : (chg >= 0 ? '+' : '') + _admN(chg) + '%') + '</td>' : '') +
       '<td class="n" style="color:var(--txm)">' + _admN(r.full) + '</td>' +
-      '<td class="n" style="color:var(--txm)">' + (r.full ? (100 * r.n / r.full).toFixed(1) + '%' : '–') +
+      '<td class="n" style="color:var(--txm)">' + (r.full ? (100 * r.n / r.full).toFixed(1) + '%' : '\u2013') +
       '</td></tr>';
   });
   h += '</tbody></table>';
@@ -21884,19 +22079,41 @@ function _admYoY() {
   var avg = rows.reduce(function (t, r) { return t + r.n; }, 0) / rows.length;
   var share = rows.reduce(function (t, r) { return t + (r.full ? r.n / r.full : 0); }, 0) / rows.length;
   h += '<div style="font-size:11.5px;color:var(--txm);margin-top:10px;line-height:1.65">' +
-    'Every year is cut at <b style="color:var(--tx)">the same day of its own season</b> — day ' + day +
-    ', counting from 1 October, which is when the season opens and when the plan starts. Comparing ' +
-    'October to October would not do: this October has ' + (31 - new Date(today).getDate()) +
+    '<b style="color:var(--tx)">Every figure in this table is a row of "' + _admEsc(ADM_HIST_TAB) +
+    '", dated by its DATE OF ADMISSION.</b> Nothing else feeds it, so the years are counted the same ' +
+    'way and the comparison means something.' +
+    '<br><br>Each year is cut at <b style="color:var(--tx)">the same day of its own season</b> \u2014 day ' +
+    day + ', counting from 1 October, which is when the season opens and when the plan starts. ' +
+    'Comparing October to October would not do: this October has ' + (31 - new Date(today).getDate()) +
     ' days left in it and the Octobers it would be set against are complete.' +
-    '<br><br>Against an average of <b style="color:var(--tx)">' + avg.toFixed(0) + '</b> by this day, ' +
-    'this season has <b style="color:var(--tx)">' + _admN(now) + '</b>' +
-    (avg ? ' — ' + (now >= avg ? 'ahead by ' : 'behind by ') +
-           Math.abs(Math.round(100 * (now - avg) / avg)) + '%' : '') + '. ' +
-    'It is still a small share of a season: those years had won only ' + (100 * share).toFixed(1) +
+    '<br><br>Those years averaged <b style="color:var(--tx)">' + avg.toFixed(0) + '</b> admissions by ' +
+    'this day' +
+    (nowRow ? ', against <b style="color:var(--tx)">' + _admN(nowRow.n) + '</b> this season' +
+      (avg ? ' \u2014 ' + (nowRow.n >= avg ? 'ahead by ' : 'behind by ') +
+             Math.abs(Math.round(100 * (nowRow.n - avg) / avg)) + '%' : '') : '') +
+    '. It is still a small share of a season: they had taken only ' + (100 * share).toFixed(1) +
     '% of their eventual intake by this point, and the heavy months are February and March.' +
-    (nowL ? ' The ' + _admN(nowL) + ' leads behind this season\'s ' + _admN(now) + ' admissions have ' +
-      'no equivalent in the earlier years, which were counted from joined students alone.' : '') +
+    (crmLeads ? '<br><br><b style="color:var(--tx)">Separately, the 27-28 tracker holds ' +
+      _admN(crmLeads) + ' leads with ' + _admN(crmWon) + ' marked admitted.</b> That is a different ' +
+      'count of a different thing \u2014 a counsellor closing a tracker row, not a dated admission in ' +
+      'the sheet above \u2014 so it is deliberately kept out of the table. The two only line up once ' +
+      'this season\'s children are written into "' + _admEsc(ADM_HIST_TAB) + '".' : '') +
     '</div>';
+
+  /* The history sheet does not carry every branch, and a reader comparing
+     "all branches" against it should be told which ones are missing rather
+     than left to wonder why the numbers look small. */
+  var histBr = {}, gap = [];
+  S.hist.forEach(function (r) { histBr[r.b] = 1; });
+  (R.branches || []).forEach(function (b) { if (!histBr[b]) gap.push(b); });
+  if (gap.length && !S.scope) {
+    h += '<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;padding:12px 15px;' +
+      'margin-top:12px;font-size:12.5px;line-height:1.65;color:#78350F">' +
+      '<b>' + gap.sort().join(', ') + ' ' + (gap.length === 1 ? 'has' : 'have') + ' no history in "' +
+      _admEsc(ADM_HIST_TAB) + '".</b> The earlier-year figures above are therefore for the other ' +
+      'branches only. Adding ' + (gap.length === 1 ? 'that branch\'s' : 'those branches\'') +
+      ' past students to that sheet is all it takes.</div>';
+  }
 
   /* The gap that keeps the most recent year out of this table. */
   var missing = [];
