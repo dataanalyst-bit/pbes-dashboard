@@ -1181,6 +1181,7 @@ table.vckt tr.vck-c td.nm{font-weight:600;color:var(--tx)}
   background:linear-gradient(180deg,var(--pl),rgba(30,79,216,.04))}
 
 /* ── bars and meters, thicker so they register ── */
+#pane-adm27 .au-yoy td,#pane-adm27 .au-yoy th{white-space:nowrap}
 #pane-adm27 .au-bar{height:12px}
 </style>
 <script>
@@ -3438,9 +3439,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       <div class="au-sec">
         <h3>📅 The same point of the season, in earlier years</h3>
-        <div class="sub">The only honest way to read a mid-season number. Every year is cut at the same day of
-          its own season, counting from 1 October, so a part-finished October is never set against a complete
-          one. Click a year for the children who had joined by then.</div>
+        <div class="sub">Every year cut at the same day of its own season, counting from 1 October.</div>
         <div id="adm-yoy"></div>
       </div>
 
@@ -21775,46 +21774,76 @@ function _admCompareYear(el, hdr) {
     return;
   }
 
-  /* One cell carries the whole story for one measure: last season, this
-     season, and the move between them. Nine measures in nine columns would
-     be a wall of numbers with no way to tell which pair belongs together. */
-  var cell = function (was, now, opt) {
-    opt = opt || {};
-    var fmt = opt.pct ? function (v) { return v == null ? '–' : v.toFixed(1) + '%'; }
-                      : function (v) { return _admN(v); };
-    var d = '';
-    if (opt.pct) {
-      /* A conversion rate moves in PERCENTAGE POINTS. Printing 36.7% to 18.1%
-         as "-51%" would be arithmetically true and read as nonsense. */
-      if (was != null && now != null) {
-        var p = now - was;
-        d = (p >= 0 ? '+' : '') + p.toFixed(1) + ' pts';
-        d = '<span style="color:' + (Math.abs(p) < 0.05 ? 'var(--txm)' : p > 0 ? 'var(--ok)' : 'var(--bad)') + '">' + d + '</span>';
-      }
-    } else if (was) {
-      var v = Math.round(100 * (now - was) / was);
-      d = '<span style="color:' + (v === 0 ? 'var(--txm)' : v > 0 ? 'var(--ok)' : 'var(--bad)') + '">' +
-          (v > 0 ? '+' : '') + v + '%</span>';
-    } else if (now) {
-      d = '<span style="color:var(--ok)">new</span>';
-    }
-    return '<td class="n"><span style="color:var(--txm)">' + fmt(was) + '</span>' +
-      '<span style="color:var(--txl);margin:0 5px">→</span>' +
-      '<b' + (opt.lead ? ' style="font-size:1.08em"' : '') + '>' + fmt(now) + '</b>' +
-      (d ? '<div style="font-size:.84em;font-weight:700;margin-top:2px">' + d + '</div>' : '') + '</td>';
+  /* ── THE TWO SIDES COME FROM THE TWO REGISTERS THAT HOLD THEM ──
+     Settled with management on 5 November 2026, and it is the only honest
+     arrangement available:
+
+       2026-27  the CRM export ("Touched Leads"), read EXACTLY as the
+                Admissions 2026-27 tab reads it — Channel says Digital or
+                Walk-In, anything else is Other, and an admission is a lead
+                standing at stage 08. Same rule, same numbers, so the two tabs
+                can never disagree.
+
+       2027-28  the counsellors' own 27-28 branch tabs, read exactly as every
+                other button on this page reads them — the source field against
+                the walk-in list, an admission is a row at "admitted". That is
+                what the tile at the top of this tab counts, so this column and
+                that tile always agree.
+
+     There is no 26-27 tracker tab and no 27-28 CRM worth reading, so one
+     source for both is not on offer. Each column therefore carries the
+     register its season actually lives in, and the table says which. */
+  var crmAgg = function (rows) {
+    var dL = rows.filter(function (r) { return r.Channel === 'Digital'; });
+    var wL = rows.filter(function (r) { return r.Channel === 'Walk-In'; });
+    var ad = rows.filter(function (r) { return r.Stage === '08-Admission Completed'; });
+    return { n: rows.length, won: ad.length, dL: dL.length, wL: wL.length,
+             oL: rows.length - dL.length - wL.length,
+             dA: ad.filter(function (r) { return r.Channel === 'Digital'; }).length,
+             wA: ad.filter(function (r) { return r.Channel === 'Walk-In'; }).length };
   };
-  var cv = function (a, b) { return b ? 100 * a / b : null; };
+  var trkAgg = function (rows) {
+    var dL = rows.filter(_admIsDigital), wL = rows.filter(_admIsWalk), ad = rows.filter(_admIsWon);
+    return { n: rows.length, won: ad.length, dL: dL.length, wL: wL.length, oL: 0,
+             dA: ad.filter(_admIsDigital).length, wA: ad.filter(_admIsWalk).length };
+  };
+  var trkRows = S.rows;
 
   var rows = list.map(function (br) {
     return { b: br,
-      was: _admLeadAgg(prv.filter(function (r) { return r.Branch === br; })),
-      now: _admLeadAgg(cur.filter(function (r) { return r.Branch === br; })) };
+      was: crmAgg(prv.filter(function (r) { return r.Branch === br; })),
+      now: trkAgg(trkRows.filter(function (r) { return r.b === br; })) };
   }).sort(function (x, y) { return y.now.n - x.now.n; });
+
+  var pcCell = function (a, b, good, warn) {
+    if (!b) return '<td class="n" style="color:var(--txm)">–</td>';
+    var v = 100 * a / b;
+    return '<td class="n" style="font-weight:800;color:' +
+      (v >= good ? 'var(--ok)' : v >= warn ? 'var(--warn)' : 'var(--bad)') + '">' + v.toFixed(1) + '%</td>';
+  };
+  var numCell = function (v, strong) {
+    return '<td class="n"' + (strong ? ' style="font-weight:800"' : '') + '>' + _admN(v) + '</td>';
+  };
+  /* one season of one branch — the same nine figures the Admissions 2026-27
+     tab prints, in the same order, so a reader moving between the two tabs is
+     reading the same table twice */
+  var seasonRow = function (label, tag, o, opt) {
+    opt = opt || {};
+    return '<tr style="' + (opt.foot ? 'font-weight:800;' : '') +
+      (opt.top ? 'border-top:2px solid var(--bor);' : '') + '">' +
+      '<td>' + label + '</td>' +
+      '<td><span class="na-pill" style="background:' + (opt.now ? 'var(--pl)' : 'transparent') +
+        ';color:' + (opt.now ? 'var(--p)' : 'var(--txm)') + '">' + tag + '</span></td>' +
+      numCell(o.n, 1) + numCell(o.won, 1) + pcCell(o.won, o.n, 25, 15) +
+      numCell(o.dL) + numCell(o.dA) + pcCell(o.dA, o.dL, 10, 5) +
+      numCell(o.wL) + numCell(o.wA) + pcCell(o.wA, o.wL, 40, 25) + '</tr>';
+  };
 
   var BL = 'border-left:2px solid var(--bor)';
   var h = hdr +
-    '<div style="overflow-x:auto"><table class="au-tbl au-yr" style="min-width:1340px"><thead>' +
+    '<div style="overflow-x:auto"><table class="au-tbl au-yr" style="min-width:1320px"><thead>' +
     '<tr><th rowspan="2" style="vertical-align:bottom">Branch</th>' +
+    '<th rowspan="2" style="vertical-align:bottom">Season</th>' +
     '<th colspan="3" class="n" style="text-align:center">Everything</th>' +
     '<th colspan="3" class="n" style="text-align:center;' + BL + '">Digital</th>' +
     '<th colspan="3" class="n" style="text-align:center;' + BL + '">Walk-in</th></tr>' +
@@ -21823,43 +21852,34 @@ function _admCompareYear(el, hdr) {
              '<th class="n">Conv %</th>';
     }).join('') + '</tr></thead><tbody>';
 
-  var line = function (label, w, n, foot) {
-    return '<tr' + (foot ? ' style="font-weight:800;border-top:2px solid var(--bor)"' : '') + '><td>' + label + '</td>' +
-      cell(w.n, n.n, { lead: 1 }) + cell(w.won, n.won, { lead: 1 }) + cell(cv(w.won, w.n), cv(n.won, n.n), { pct: 1 }) +
-      cell(w.dL, n.dL) + cell(w.dA, n.dA) + cell(cv(w.dA, w.dL), cv(n.dA, n.dL), { pct: 1 }) +
-      cell(w.wL, n.wL) + cell(w.wA, n.wA) + cell(cv(w.wA, w.wL), cv(n.wA, n.wL), { pct: 1 }) + '</tr>';
-  };
-  rows.forEach(function (r) { h += line(_admDot(r.b) + ' ' + _admEsc(r.b), r.was, r.now); });
+  rows.forEach(function (r, k) {
+    var nm = _admDot(r.b) + ' ' + _admEsc(r.b);
+    h += seasonRow(nm, _admEsc(last), r.was, { top: k > 0 });
+    h += seasonRow('', _admEsc(season), r.now, { now: 1 });
+  });
   var tot = function (side) {
-    var o = { n: 0, dL: 0, wL: 0, dA: 0, wA: 0, won: 0 };
+    var o = { n: 0, won: 0, dL: 0, wL: 0, oL: 0, dA: 0, wA: 0 };
     rows.forEach(function (r) { for (var k in o) o[k] += r[side][k]; });
     return o;
   };
-  h += '</tbody>' + (rows.length < 2 ? '' :
-    '<tfoot>' + line(scope ? _admEsc(scope) : 'All five branches', tot('was'), tot('now'), 1) + '</tfoot>') +
-    '</table></div>' +
-    '<div class="au-note" style="margin-top:8px"><b>Each cell reads ' + _admEsc(last) +
-    ' → ' + _admEsc(season) + '</b>, with the move underneath. Counts move in per cent; a ' +
-    'conversion rate moves in <b>percentage points</b>, because 36.7% to 18.1% is a fall of 18.6 ' +
-    'points, not of 51 per cent.</div>';
+  var label = scope ? _admEsc(scope) : 'All five branches';
+  h += '</tbody>' + (rows.length < 2 ? '' : '<tfoot>' +
+    seasonRow(label, _admEsc(last), tot('was'), { foot: 1, top: 1 }) +
+    seasonRow('', _admEsc(season), tot('now'), { foot: 1, now: 1 }) + '</tfoot>') +
+    '</table></div>';
 
-  var pf = _admLeadAgg(prvFull);
-  h += '<div style="font-size:14px;color:var(--txm);margin-top:10px;line-height:1.65">' +
-    'Both seasons are cut at <b style="color:var(--tx)">day ' + day + '</b> of their own season, ' +
-    'counting from 1 October \u2014 ' + _admDate(lastStart) + ' to ' + _admDate(lastEnd) + ' against ' +
-    _admDate(thisStart) + ' to ' + _admDate(today) + '. For the whole of ' + _admEsc(last) + ' the CRM ' +
-    'carried <b style="color:var(--tx)">' + _admN(pf.n) + '</b> leads and <b style="color:var(--tx)">' +
-    _admN(pf.won) + '</b> admissions.' +
-    '<br><br><b style="color:var(--tx)">This view reads the CRM export, not the 27-28 tracker.</b> ' +
-    'There is no 26-27 tracker tab to read, and the CRM is the one register holding both seasons on ' +
-    'one rule. Its ' + _admEsc(season) + ' lead count will therefore not match the tile above, which ' +
-    'counts the counsellors\' tracker \u2014 two registers, not two answers.' +
-    '<br><br><b style="color:var(--tx)">The admission columns flatter last year.</b> A lead\'s stage ' +
-    'is read as it stands today, so ' + _admEsc(last) + ' has had a full year to convert and ' +
-    _admEsc(season) + ' has had ' + day + ' days. The lead columns are the clean comparison; read the ' +
-    'admission change as a floor, not a verdict.' +
-    '<br><br><b style="color:var(--tx)">Digital and walk-in</b> here follow the CRM\'s own Channel ' +
-    'column, which is not the same split as the source field the other buttons use.' +
+  var pf = crmAgg(prvFull);
+  h += '<div class="au-note">' +
+    '<b>' + _admEsc(last) + '</b> is the CRM export, read exactly as the Admissions ' + _admEsc(last) +
+    ' tab reads it, cut at day ' + day + ' of its season (' + _admDate(lastStart) + ' to ' +
+    _admDate(lastEnd) + ') so it meets this season at the same point. That whole season carried <b>' +
+    _admN(pf.n) + '</b> leads and <b>' + _admN(pf.won) + '</b> admissions.' +
+    '<br><b>' + _admEsc(season) + '</b> is the 27-28 branch tabs, the same register every other ' +
+    'button on this page counts — so these figures match the tiles above exactly.' +
+    '<br>A lead\'s stage is read as it stands today, so ' + _admEsc(last) + ' has had a year to ' +
+    'convert and ' + _admEsc(season) + ' has had ' + day + ' days.' +
+    (pf.oL || tot('was').oL ? '<br>Leads whose channel is neither Digital nor Walk-In sit in neither ' +
+      'column, which is why the two can add to less than the total.' : '') +
     '</div>';
   el.innerHTML = h;
 }
@@ -21880,7 +21900,7 @@ function _admCompare() {
     }).join('') +
     '<span style="font-size:14px;color:var(--txm);align-self:center;margin-left:4px">' +
       (_admPeriod === 'lastyear'
-        ? 'from the CRM export \u00b7 both seasons to the same day'
+        ? 'both seasons cut at the same day of their own season'
         : _admDate(a) + (a === b ? '' : ' to ' + _admDate(b))) + '</span></div>';
 
   /* Last year is not a window on this season, so it draws its own table. */
@@ -22092,146 +22112,92 @@ function _admYoY() {
   var day = Math.round((new Date(today) - new Date(start)) / 86400000);
   if (day < 0) { el.innerHTML = '<div class="au-empty">The season has not opened yet.</div>'; return; }
 
-  /* ═════ ONE SHEET, ONE RULE ═════
-     Rebuilt 5 November 2026. Every number in this table now comes from
-     "All AY Admissions" and is dated by its DATE OF ADMISSION column —
-     nothing else feeds it.
+  /* ═════ THREE REGISTERS, ONE TABLE ═════
+     Set on 5 November 2026. No single sheet carries every season, so each
+     year is read from the register that actually holds it, and the table
+     names that register in its own column rather than in a paragraph:
 
-     WHAT IT USED TO DO, AND WHY THAT WAS WRONG. The earlier-year rows came
-     from that sheet, but the "this season" row came from the 27-28 tracker,
-     counting leads the counsellors have marked admitted. Those are two
-     different events. A tracker row turns admitted the day a counsellor
-     closes it; a row appears in All AY Admissions carrying the date the
-     child's admission was taken. On 5 November the tracker said 60 and the
-     same day of the three earlier seasons held 11, 28 and 10 — so the page
-     reported this season "ahead by 275%", which was a measurement artefact,
-     not a result. A number that flatters by a factor of four is worse than
-     no number.
+       2027-28 and later  the counsellors' 27-28 branch tabs
+       2026-27            the CRM export, "Touched Leads"
+       2025-26 and before "All AY Admissions", dated by DATE OF ADMISSION
 
-     SO THE CRM FIGURE IS OUT OF THE COMPARISON. It is still printed, below,
-     labelled as what it is, and it takes no part in the arithmetic.
+     Every row is cut at the same day of its own season, counting from
+     1 October, so a part-finished season is never set against a complete one.
 
-     THIS SEASON APPEARS HERE the moment its students are in the sheet, with
-     no code change — the row is drawn from histAys like every other year. */
-  var past = (R.histAys || []).filter(function (ay) { return ay < season; }).slice(-3);
-  var haveNow = (R.histAys || []).indexOf(season) >= 0;
-  var crmWon = S.rows.filter(_admIsWon).length;
-  var crmLeads = S.rows.length;
+     The prose that used to sit under this table was removed at management's
+     request: this panel is figures only. What cannot be shown as a figure —
+     which register a row came from — is a column, not a sentence. */
+  var LD = (typeof LEAD_DATES !== 'undefined' && LEAD_DATES) ? LEAD_DATES : [];
+  var scope = S.scope;
+  var crmIn = function (a, b, wonOnly) {
+    return LD.filter(function (r) {
+      return r && r.Date && r.Date >= a && r.Date <= b && r.Branch && (!scope || r.Branch === scope) &&
+             (!wonOnly || r.Stage === '08-Admission Completed');
+    }).length;
+  };
 
-  if (!past.length) {
-    el.innerHTML = '<div class="au-empty">No earlier year carries dated student records to compare with.</div>';
+  var rows = [];
+  /* this season, from the tracker this whole tab is built on */
+  rows.push({ ay: season, src: '27-28 tabs', a: start, b: today,
+              n: S.rows.filter(_admIsWon).length, full: null, now: 1 });
+  /* last season, from the CRM — "All AY Admissions" has no row for it */
+  var lastAy = _admLastSeason(season);
+  if (lastAy && LD.length) {
+    var la = _admSeasonStart(lastAy);
+    rows.push({ ay: lastAy, src: 'Touched Leads', a: la, b: _admAddDays(la, day),
+                n: crmIn(la, _admAddDays(la, day), 1),
+                full: crmIn(la, _admAddDays(la, 364), 1) });
+  }
+  /* everything earlier, from the history sheet */
+  (R.histAys || []).filter(function (ay) { return ay < season && ay !== lastAy; }).slice(-3).reverse()
+    .forEach(function (ay) {
+      var a = _admSeasonStart(ay), b = _admAddDays(a, day);
+      rows.push({ ay: ay, src: ADM_HIST_TAB, a: a, b: b,
+        n: S.hist.filter(function (r) { return r.ay === ay && r.d && r.d >= a && r.d <= b; }).length,
+        full: S.hist.filter(function (r) { return r.ay === ay; }).length,
+        hist: 1 });
+    });
+  if (rows.length < 2) {
+    el.innerHTML = '<div class="au-empty">No earlier season carries dated records to compare with.</div>';
     return;
   }
 
-  var cut = function (ay) {
-    var a = _admSeasonStart(ay), b = _admAddDays(a, day);
-    var upto = S.hist.filter(function (r) { return r.ay === ay && r.d && r.d >= a && r.d <= b; });
-    var byB = {};
-    upto.forEach(function (r) { byB[r.b] = (byB[r.b] || 0) + 1; });
-    return { ay: ay, a: a, b: b, n: upto.length,
-             full: S.hist.filter(function (r) { return r.ay === ay; }).length, byB: byB };
-  };
-  var rows = past.map(cut).reverse();
-  var nowRow = haveNow ? cut(season) : null;
-
-  /* With no row for this season there is nothing to compare against, so the
-     comparison column is left out rather than printed as a column of dashes. */
-  var h = '<table class="au-tbl"><thead><tr><th>Academic year</th><th>Same window</th>' +
-    '<th class="n">Admissions by this day</th>' +
-    (nowRow ? '<th class="n">This season vs it</th>' : '') +
+  var now = rows[0].n;
+  var h = '<div style="overflow-x:auto"><table class="au-tbl au-yoy" style="min-width:1010px"><thead><tr>' +
+    '<th>Academic year</th><th>Read from</th><th>Same window</th>' +
+    '<th class="n">Admissions by this day</th><th class="n">This season vs it</th>' +
     '<th class="n">That year\'s full intake</th><th class="n">Share won by this day</th>' +
     '</tr></thead><tbody>';
-  if (nowRow) {
-    h += '<tr style="background:#6366F10D"><td><button class="na-secbtn" onclick="admOpenYoY(' +
-        JSON.stringify(season).replace(/"/g, '&quot;') + ',' + day + ')"><b>' + _admEsc(season) +
-        '</b> \u203a</button> <span class="na-pill" style="background:#6366F120;color:#6366F1">this season</span></td>' +
-      '<td style="color:var(--txm)">' + _admDate(nowRow.a) + ' to ' + _admDate(nowRow.b) + '</td>' +
-      '<td class="n" style="font-weight:800;font-size:17px;color:#059669">' + _admN(nowRow.n) + '</td>' +
-      '<td class="n" style="color:var(--txm)">\u2013</td>' +
-      '<td class="n" style="color:var(--txm)">in progress</td>' +
-      '<td class="n" style="color:var(--txm)">\u2013</td></tr>';
-  } else {
-    h += '<tr style="background:#FFFBEB"><td><b>' + _admEsc(season) + '</b> ' +
-        '<span class="na-pill" style="background:#FDE68A;color:#78350F">this season</span></td>' +
-      '<td style="color:var(--txm)">' + _admDate(start) + ' to ' + _admDate(today) + '</td>' +
-      '<td class="n" colspan="3" style="color:#78350F;text-align:left;font-size:14.5px">' +
-        'Not in "' + _admEsc(ADM_HIST_TAB) + '" yet, so it cannot be counted on the same rule as the ' +
-        'years below. It joins this table on the next refresh after its students are pasted in.</td></tr>';
-  }
   rows.forEach(function (r) {
-    var base = nowRow ? nowRow.n : null;
-    var chg = (base === null || !r.n) ? null : Math.round(100 * (base - r.n) / r.n);
-    h += '<tr><td><button class="na-secbtn" onclick="admOpenYoY(' +
-        JSON.stringify(r.ay).replace(/"/g, '&quot;') + ',' + day + ')">' + _admEsc(r.ay) + ' \u203a</button></td>' +
+    var chg = (r.now || !r.n) ? null : Math.round(100 * (now - r.n) / r.n);
+    var name = r.hist
+      ? '<button class="na-secbtn" onclick="admOpenYoY(' + JSON.stringify(r.ay).replace(/"/g, '&quot;') +
+        ',' + day + ')">' + _admEsc(r.ay) + ' ›</button>'
+      : '<b>' + _admEsc(r.ay) + '</b>';
+    h += '<tr' + (r.now ? ' style="background:var(--pl)"' : '') + '><td>' + name +
+        (r.now ? ' <span class="na-pill" style="background:var(--sur);color:var(--p)">this season</span>' : '') + '</td>' +
+      '<td style="color:var(--txm)">' + _admEsc(r.src) + '</td>' +
       '<td style="color:var(--txm)">' + _admDate(r.a) + ' to ' + _admDate(r.b) + '</td>' +
-      '<td class="n" style="font-weight:800">' + _admN(r.n) + '</td>' +
-      (nowRow ? '<td class="n" style="font-weight:800;color:' + (chg === null ? 'var(--txm)'
-        : chg >= 0 ? '#059669' : '#DC2626') + '">' +
-        (chg === null ? '\u2013' : (chg >= 0 ? '+' : '') + _admN(chg) + '%') + '</td>' : '') +
-      '<td class="n" style="color:var(--txm)">' + _admN(r.full) + '</td>' +
-      '<td class="n" style="color:var(--txm)">' + (r.full ? (100 * r.n / r.full).toFixed(1) + '%' : '\u2013') +
-      '</td></tr>';
+      '<td class="n" style="font-weight:800' + (r.now ? ';font-size:1.1em;color:var(--ok)' : '') + '">' + _admN(r.n) + '</td>' +
+      '<td class="n" style="font-weight:800;color:' + (chg === null ? 'var(--txm)'
+        : chg >= 0 ? 'var(--ok)' : 'var(--bad)') + '">' +
+        (chg === null ? '–' : (chg >= 0 ? '+' : '') + _admN(chg) + '%') + '</td>' +
+      '<td class="n" style="color:var(--txm)">' + (r.full == null ? 'in progress' : _admN(r.full)) + '</td>' +
+      '<td class="n" style="color:var(--txm)">' +
+        (r.full ? (100 * r.n / r.full).toFixed(1) + '%' : '–') + '</td></tr>';
   });
-  h += '</tbody></table>';
-
-  var avg = rows.reduce(function (t, r) { return t + r.n; }, 0) / rows.length;
-  var share = rows.reduce(function (t, r) { return t + (r.full ? r.n / r.full : 0); }, 0) / rows.length;
-  h += '<div style="font-size:14px;color:var(--txm);margin-top:10px;line-height:1.65">' +
-    '<b style="color:var(--tx)">Every figure in this table is a row of "' + _admEsc(ADM_HIST_TAB) +
-    '", dated by its DATE OF ADMISSION.</b> Nothing else feeds it, so the years are counted the same ' +
-    'way and the comparison means something.' +
-    '<br><br>Each year is cut at <b style="color:var(--tx)">the same day of its own season</b> \u2014 day ' +
-    day + ', counting from 1 October, which is when the season opens and when the plan starts. ' +
-    'Comparing October to October would not do: this October has ' + (31 - new Date(today).getDate()) +
-    ' days left in it and the Octobers it would be set against are complete.' +
-    '<br><br>Those years averaged <b style="color:var(--tx)">' + avg.toFixed(0) + '</b> admissions by ' +
-    'this day' +
-    (nowRow ? ', against <b style="color:var(--tx)">' + _admN(nowRow.n) + '</b> this season' +
-      (avg ? ' \u2014 ' + (nowRow.n >= avg ? 'ahead by ' : 'behind by ') +
-             Math.abs(Math.round(100 * (nowRow.n - avg) / avg)) + '%' : '') : '') +
-    '. It is still a small share of a season: they had taken only ' + (100 * share).toFixed(1) +
-    '% of their eventual intake by this point, and the heavy months are February and March.' +
-    (crmLeads ? '<br><br><b style="color:var(--tx)">Separately, the 27-28 tracker holds ' +
-      _admN(crmLeads) + ' leads with ' + _admN(crmWon) + ' marked admitted.</b> That is a different ' +
-      'count of a different thing \u2014 a counsellor closing a tracker row, not a dated admission in ' +
-      'the sheet above \u2014 so it is deliberately kept out of the table. The two only line up once ' +
-      'this season\'s children are written into "' + _admEsc(ADM_HIST_TAB) + '".' : '') +
-    '</div>';
-
-  /* The history sheet does not carry every branch, and a reader comparing
-     "all branches" against it should be told which ones are missing rather
-     than left to wonder why the numbers look small. */
-  var histBr = {}, gap = [];
-  S.hist.forEach(function (r) { histBr[r.b] = 1; });
-  (R.branches || []).forEach(function (b) { if (!histBr[b]) gap.push(b); });
-  if (gap.length && !S.scope) {
-    h += '<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;padding:12px 15px;' +
-      'margin-top:12px;font-size:15px;line-height:1.65;color:#78350F">' +
-      '<b>' + gap.sort().join(', ') + ' ' + (gap.length === 1 ? 'has' : 'have') + ' no history in "' +
-      _admEsc(ADM_HIST_TAB) + '".</b> The earlier-year figures above are therefore for the other ' +
-      'branches only. Adding ' + (gap.length === 1 ? 'that branch\'s' : 'those branches\'') +
-      ' past students to that sheet is all it takes.</div>';
-  }
-
-  /* The gap that keeps the most recent year out of this table. */
-  var missing = [];
-  var trendAys = {};
-  (S.trend || []).forEach(function (r) { if (r.ay && r.ay < season) trendAys[r.ay] = 1; });
-  Object.keys(trendAys).forEach(function (ay) {
-    if ((R.histAys || []).indexOf(ay) < 0) missing.push(ay);
-  });
-  if (missing.length) {
-    h += '<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;padding:12px 15px;' +
-      'margin-top:12px;font-size:15px;line-height:1.65;color:#78350F">' +
-      '<b>' + missing.sort().join(', ') + ' cannot be compared yet.</b> The monthly trend tab has ' +
-      'totals for ' + (missing.length === 1 ? 'that year' : 'those years') + ', but comparing a day of ' +
-      'one season to a day of another needs the admission <b>dates</b>, and those live in "' +
-      _admEsc(ADM_HIST_TAB) + '", which stops at ' + _admEsc((R.histAys || []).slice(-1)[0] || '?') +
-      '. Paste the missing students in and ' + (missing.length === 1 ? 'that year joins' : 'those years join') +
-      ' this table on the next refresh — no code change.</div>';
-  }
+  var past = rows.slice(1);
+  var avg = past.length ? past.reduce(function (t, r) { return t + r.n; }, 0) / past.length : null;
+  h += '</tbody>' + (past.length < 2 ? '' :
+    '<tfoot><tr style="font-weight:800;border-top:2px solid var(--bor)">' +
+    '<td>Average of the earlier years</td><td></td><td style="color:var(--txm)">day ' + day + '</td>' +
+    '<td class="n">' + avg.toFixed(0) + '</td>' +
+    '<td class="n" style="color:' + (now >= avg ? 'var(--ok)' : 'var(--bad)') + '">' +
+      (avg ? (now >= avg ? '+' : '') + Math.round(100 * (now - avg) / avg) + '%' : '–') + '</td>' +
+    '<td class="n"></td><td class="n"></td></tr></tfoot>') + '</table></div>';
   el.innerHTML = h;
 }
+
 function admOpenYoY(ay, day) {
   var S = _admSet();
   var a = _admSeasonStart(ay), b = _admAddDays(a, day);
