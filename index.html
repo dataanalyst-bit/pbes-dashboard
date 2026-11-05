@@ -21409,6 +21409,7 @@ var ADM_VERDICT = {
 var ADM_FLAG_LAB = {
   test:    'Test row', junk: 'Written off by the counsellor', phone: 'Unusable number',
   dup:     'Same child, twice', sib: 'Sibling, not a duplicate',
+  dupid:   'Same enquiry_id, twice',
   unknown: 'Shared number, child not named', noname: 'No child name',
   class:   'Class not recognised', inname: 'Phone in the name column',
   garbled: 'Name came through garbled'
@@ -21420,6 +21421,8 @@ var ADM_FLAG_WHY = {
   junk:    'The counsellor has already written these off in sub_status. Their judgement beats any rule here.',
   phone:   'An Indian mobile is ten digits beginning 6-9. These cannot be rung as they stand.',
   dup:     'The same child already appears on this number. Keep whichever record is further along.',
+  dupid:   'enquiry_id is the key for a lead, so one id on two rows is one enquiry entered twice. ' +
+           'Delete the later row; no judgement about which child this is required.',
   sib:     'A different child on the same number. Brothers and sisters share a parent\'s phone, ' +
            'so this is not a duplicate and both rows stay.',
   unknown: 'The number is shared with an enquiry that has no child name, so which is which cannot be told yet. Fill the names in first.',
@@ -21607,7 +21610,13 @@ function admOpenClean(v) {
    has seen yet lands in digital on its own and the two always add to the
    total. The list comes from Code.gs so there is one definition. */
 function _admWalkinSet() {
-  var L = (_admRaw && _admRaw.walkinSources) || ['walk_in', 'referral', 'manual', 'chatbot', 'qr'];
+  /* The live list comes from Code.gs so there is one definition. This
+     fallback matters only before the payload lands, and it must say the same
+     thing: walk-in is walk_in, referral and manual. Chatbot and QR were taken
+     out on 5 November 2026 — both are digital arrivals, and counting them as
+     walk-ins put 26 chatbot leads into Bachupally's walk-in column (116
+     instead of 90) and 3 into Keesara's (17 instead of 14). */
+  var L = (_admRaw && _admRaw.walkinSources) || ['walk_in', 'referral', 'manual'];
   var m = {};
   L.forEach(function (k) { m[k] = 1; });
   return m;
