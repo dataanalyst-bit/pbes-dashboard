@@ -1112,6 +1112,76 @@ table.vckt tr.vck-c td.nm{font-weight:600;color:var(--tx)}
   font-size:11px;border-radius:8px;padding:5px 12px;cursor:pointer;font-family:'Inter',sans-serif}
 .exm-refresh:hover{background:#E2EAFF}
 .sh-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+/* ══════════ ADMISSIONS 2027-28 — bigger type, stronger colour ══════════
+   Asked for on 5 November 2026: the figures on this tab were too small to
+   read across a room and the colour too flat to carry meaning. Every rule
+   below is scoped to #pane-adm27, so no other tab moves. The id beats the
+   plain .au-* rules and the [data-theme] overrides on specificity, which is
+   why nothing here needs !important.
+
+   THE BRANCH COLOURS CHANGED, AND NOT FOR TASTE. The five dots were Keesara
+   #059669 against Gowdavalli #0D9488 — two greens the palette validator
+   measures 4.9 apart for NORMAL vision, well under the 15 floor, so no
+   reader could separate them — and Bachupally #7C3AED against Boduppal
+   #1E4FD8, 3.4 apart under protanopia. Both pairs failed outright. The
+   replacements are the first five slots of a validated categorical order and
+   pass every gate in light and dark alike (worst adjacent pair: CVD 9.1,
+   normal vision 19.6). Three of them sit under 3:1 against white, so the dot
+   never carries meaning on its own — the branch name is always printed
+   beside it, which is the relief that check requires. */
+#pane-adm27{
+  --ok:#047857; --bad:#B91C1C; --warn:#B45309;
+  --b1:#2A78D6; --b2:#EB6834; --b3:#1BAF7A; --b4:#EDA100; --b5:#E87BA4;
+}
+:root[data-theme="dark"] #pane-adm27{
+  --ok:#34D399; --bad:#F87171; --warn:#FBBF24;
+  --b1:#3987E5; --b2:#D95926; --b3:#199E70; --b4:#C98500; --b5:#D55181;
+}
+
+/* ── type: one step up across the tab ── */
+#pane-adm27 .au-sec{padding:22px 24px}
+#pane-adm27 .au-sec>h3{font-size:21px;letter-spacing:-.015em;display:flex;align-items:center;gap:10px}
+#pane-adm27 .au-sec>h3:after{content:'';flex:1;height:3px;border-radius:99px;
+  background:linear-gradient(90deg,var(--b1),transparent)}
+#pane-adm27 .au-sec>.sub{font-size:14px;line-height:1.6;margin-bottom:18px;max-width:100ch}
+#pane-adm27 .au-tbl{font-size:15px}
+#pane-adm27 .au-tbl th{font-size:11.5px;letter-spacing:.07em;color:var(--tx);font-weight:800;
+  padding:11px 11px;background:var(--pl);border-bottom:2px solid var(--bor)}
+#pane-adm27 .au-tbl td{padding:11px 11px;border-bottom:1px solid var(--bor)}
+#pane-adm27 .au-tbl tbody tr:nth-child(even) td{background:rgba(30,79,216,.028)}
+#pane-adm27 .au-tbl tbody tr:hover td{background:var(--pl)}
+#pane-adm27 .au-tbl tfoot td{background:var(--pl);font-size:15.5px}
+#pane-adm27 .au-note{font-size:13.5px;line-height:1.65}
+#pane-adm27 .au-empty{font-size:15px}
+#pane-adm27 .na-secbtn{font-size:inherit;font-weight:700}
+#pane-adm27 .na-pill{font-size:12px;padding:3px 10px}
+#pane-adm27 .bd{width:12px;height:12px}
+
+/* ── the headline tiles carry their own colour ── */
+#pane-adm27 .au-kpis{gap:14px}
+#pane-adm27 .au-kpi{padding:18px 18px 16px;border-radius:16px;position:relative;overflow:hidden}
+#pane-adm27 .au-kpi:before{content:'';position:absolute;left:0;right:0;top:0;height:4px;
+  background:linear-gradient(90deg,var(--b1),var(--b3))}
+#pane-adm27 .au-kpi .v{font-size:38px;letter-spacing:-.03em}
+#pane-adm27 .au-kpi .k{font-size:12px;letter-spacing:.08em;color:var(--tx);margin-top:8px}
+#pane-adm27 .au-kpi .d{font-size:13px;margin-top:7px;line-height:1.5}
+
+/* ── the period buttons read as a control, not as text ── */
+#pane-adm27 #adm-compare>div:first-child button{font-size:13.5px !important;padding:8px 16px !important;
+  border-radius:99px !important;font-weight:700 !important}
+#pane-adm27 #adm-compare>div:first-child span{font-size:13px !important}
+
+/* ── the year-on-year table: the arrow pair needs room to breathe ── */
+#pane-adm27 .au-yr td{padding:12px 11px;line-height:1.3}
+#pane-adm27 .au-tbl td:first-child{white-space:nowrap}
+#pane-adm27 .au-yr td:first-child,#pane-adm27 .au-yr th:first-child{min-width:150px}
+#pane-adm27 .au-tbl tfoot td:first-child{white-space:normal}
+#pane-adm27 .au-yr thead tr:first-child th{font-size:12.5px;letter-spacing:.06em;
+  background:linear-gradient(180deg,var(--pl),rgba(30,79,216,.04))}
+
+/* ── bars and meters, thicker so they register ── */
+#pane-adm27 .au-bar{height:12px}
 </style>
 <script>
 /*****************************************************************
@@ -20445,10 +20515,20 @@ function _admEsc(s) {
 function _admN(n) { return (n || 0).toLocaleString('en-IN'); }
 function _admPct(a, b) { return b ? Math.round(100 * a / b) : 0; }
 function _admPct1(a, b) { return b ? (100 * a / b).toFixed(1) : '0.0'; }
-var ADM_DOT = { Keesara: '#059669', Pocharam: '#D97706', Bachupally: '#7C3AED',
-                Boduppal: '#1E4FD8', Gowdavalli: '#0D9488' };
+/* The five branch hues. These are the first five slots of a validated
+   categorical order; the pair they replaced could not be told apart by a
+   reader with ordinary colour vision. The hexes stay here for anything that
+   needs a literal colour, but the dot itself paints from the CSS variable so
+   dark mode gets its own stepping of the same five hues. See the
+   "ADMISSIONS 2027-28" block in the stylesheet for the measurements. */
+var ADM_DOT = { Boduppal: '#2A78D6', Pocharam: '#EB6834', Gowdavalli: '#1BAF7A',
+                Keesara: '#EDA100', Bachupally: '#E87BA4' };
+var ADM_DOT_VAR = { Boduppal: '--b1', Pocharam: '--b2', Gowdavalli: '--b3',
+                    Keesara: '--b4', Bachupally: '--b5' };
 function _admDot(b) {
-  return '<span class="bd" style="background:' + (ADM_DOT[b] || '#94A3B8') + '"></span>';
+  var v = ADM_DOT_VAR[b];
+  return '<span class="bd" style="background:' +
+    (v ? 'var(' + v + ',' + ADM_DOT[b] + ')' : (ADM_DOT[b] || '#94A3B8')) + '"></span>';
 }
 function _admDate(d) {
   if (!d) return '–';
@@ -20537,7 +20617,7 @@ function _admNotes() {
   if (Q.noHistAy) {
     var p = String(Q.noHistAy).split('|');
     h += '<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;padding:12px 15px;' +
-      'margin-bottom:10px;font-size:12.5px;line-height:1.65;color:#78350F">' +
+      'margin-bottom:10px;font-size:15px;line-height:1.65;color:#78350F">' +
       '<b>The student-by-student history stops at ' + _admEsc(p[0]) + '</b>, but the monthly trend ' +
       'tab carries totals up to ' + _admEsc(p[1]) + '. Comparing one season to another needs the ' +
       'admission <b>dates</b>, so ' + _admEsc(p[1]) + ' cannot yet appear in the day-for-day panel, and ' +
@@ -20647,7 +20727,7 @@ function _admTargetPanel() {
     '<td class="n">' + _admPct1(tw, tn) + '%</td><td class="n">' + _admN(tt) + '</td><td></td>' +
     '<td class="n">' + _admPct1(tw, tt) + '%</td><td class="n">' + _admN(Math.max(0, tt - tw)) + '</td>' +
     '</tr></tfoot>') + '</table>' +
-    '<div style="font-size:11.5px;color:var(--txm);margin-top:10px;line-height:1.6">' +
+    '<div style="font-size:14px;color:var(--txm);margin-top:10px;line-height:1.6">' +
     _admN(to) + ' leads are still open and ' + _admN(ts) + ' have closed without an admission. ' +
     'The season has ' + _admN(Math.max(0, tt - tw)) + ' admissions left to find, and the leads ' +
     'in hand can supply at most ' + _admN(to) + ' of them — which is the real argument for how much ' +
@@ -20665,7 +20745,7 @@ function admOpenBranch(b) {
     .concat(Object.keys(_admRaw.closed || {}))
     .filter(function (k) { return byStage[k]; });
 
-  var head = '<div style="font-size:12.5px;color:var(--txm);line-height:1.7;margin-bottom:12px">' +
+  var head = '<div style="font-size:15px;color:var(--txm);line-height:1.7;margin-bottom:12px">' +
     '<b style="color:var(--tx)">' + _admN(rows.length) + '</b> leads, <b style="color:#059669">' +
     _admN(won) + '</b> admitted' +
     (t ? ' against a target of <b style="color:var(--tx)">' + _admN(t) + '</b> — ' +
@@ -20680,7 +20760,7 @@ function admOpenBranch(b) {
 }
 function admOpenTargets() {
   var S = _admSet();
-  var h = '<div style="font-size:12.5px;color:var(--txm);line-height:1.6;margin-bottom:12px">' +
+  var h = '<div style="font-size:15px;color:var(--txm);line-height:1.6;margin-bottom:12px">' +
     'Every branch against the fixed monthly plan for AY 2027-28, added up to today. Tap a branch for its pipeline.</div>' +
     _admByBranchAcc(S.rows);
   _admModal('Against the target', (S.season || '') + ' · ' + _admN(S.rows.length) + ' leads', h);
@@ -20706,11 +20786,11 @@ function _admFunnel() {
     h += '<button class="na-card" onclick="admOpenStage(' + JSON.stringify(k).replace(/"/g, '&quot;') + ')" ' +
       'style="border:1px solid var(--bor);border-radius:12px;padding:12px 13px;background:var(--sur);' +
       'cursor:pointer;font:inherit;color:inherit;text-align:left' + (dead ? ';opacity:.92' : '') + '">' +
-      '<div style="font-size:22px;font-weight:800;color:' + col + ';line-height:1.1">' + _admN(n) + '</div>' +
-      '<div style="font-weight:700;font-size:12.5px;margin-top:2px">' + _admEsc(_admStageLab(k)) + '</div>' +
+      '<div style="font-size:27px;font-weight:800;color:' + col + ';line-height:1.1">' + _admN(n) + '</div>' +
+      '<div style="font-weight:700;font-size:15px;margin-top:2px">' + _admEsc(_admStageLab(k)) + '</div>' +
       '<div style="height:7px;border-radius:99px;background:var(--bor);margin:8px 0 6px;overflow:hidden">' +
         '<i style="display:block;height:100%;width:' + (100 * n / max) + '%;background:' + col + '"></i></div>' +
-      '<div style="font-size:11px;color:var(--txm)">' + _admPct(n, S.rows.length) + '% of leads' +
+      '<div style="font-size:13.5px;color:var(--txm)">' + _admPct(n, S.rows.length) + '% of leads' +
         (dead ? ' · closed' : '') + '</div>' +
       '<div class="na-click">Click to view ›</div></button>';
   });
@@ -20718,7 +20798,7 @@ function _admFunnel() {
 
   var fresh = cnt['new'] || 0, cold = cnt['not_connected'] || 0;
   var warm = (cnt['visited'] || 0) + (cnt['visit_scheduled'] || 0) + (cnt['admission_form_issued'] || 0);
-  h += '<div style="font-size:11.5px;color:var(--txm);margin-top:12px;line-height:1.6">' +
+  h += '<div style="font-size:14px;color:var(--txm);margin-top:12px;line-height:1.6">' +
     'Three piles are worth a counsellor\'s morning, and they are not the same job. ' +
     '<b style="color:var(--tx)">' + _admN(fresh) + '</b> are new and have not been called yet — ' +
     'that is a queue, and it only becomes a problem if it stops moving. ' +
@@ -20801,7 +20881,7 @@ function _admWork() {
   var digUn = dig.filter(function (r) { return r.st === 'new' || r.st === 'not_connected'; }).length;
   var walkUn = walk.filter(function (r) { return r.st === 'new' || r.st === 'not_connected'; }).length;
   var sev = W.old.length > 0;
-  h += '<div style="margin-top:13px;border-radius:12px;padding:13px 15px;font-size:12.5px;line-height:1.65;' +
+  h += '<div style="margin-top:13px;border-radius:12px;padding:13px 15px;font-size:15px;line-height:1.65;' +
     'background:' + (sev ? '#FFFBEB' : 'var(--sur)') + ';border:1px solid ' + (sev ? '#FDE68A' : 'var(--bor)') + '">' +
     (W.old.length
       ? '<b>' + _admN(W.old.length) + ' lead' + (W.old.length === 1 ? '' : 's') + ' ' +
@@ -20880,7 +20960,7 @@ function _admSource() {
     var dOld = S.rows.filter(function (r) { return _admIsDigital(r) && ageOf(r) >= MATURE; });
     var wOld = S.rows.filter(function (r) { return _admIsWalk(r) && ageOf(r) >= MATURE; });
     var dOldW = dOld.filter(_admIsWon).length, wOldW = wOld.filter(_admIsWon).length;
-    h += '<div style="margin-top:13px;border-radius:12px;padding:13px 15px;font-size:12.5px;' +
+    h += '<div style="margin-top:13px;border-radius:12px;padding:13px 15px;font-size:15px;' +
       'line-height:1.65;background:' + (sev ? '#FFFBEB' : 'var(--sur)') + ';border:1px solid ' +
       (sev ? '#FDE68A' : 'var(--bor)') + ';color:' + (sev ? '#78350F' : 'inherit') + '">' +
       '<b>Digital has brought ' + _admN(dN) + ' leads and ' +
@@ -20936,19 +21016,19 @@ function _admClassPanel() {
       'title="' + _admEsc(d.k) + ' — ' + d.n + ' leads, ' + d.won + ' admitted" ' +
       'style="flex:1;min-width:0;border:0;background:transparent;cursor:pointer;font:inherit;color:inherit;' +
       'display:flex;flex-direction:column;justify-content:flex-end;height:100%;padding:0">' +
-      '<div style="font-size:11px;font-weight:800;margin-bottom:3px">' + d.n + '</div>' +
+      '<div style="font-size:13.5px;font-weight:800;margin-bottom:3px">' + d.n + '</div>' +
       '<div style="height:' + hgt + '%;border-radius:5px 5px 0 0;background:#6366F1;position:relative">' +
         (d.won ? '<i style="position:absolute;left:0;right:0;bottom:0;height:' +
           Math.min(100, 100 * d.won / d.n) + '%;background:#059669;border-radius:' +
           (d.won === d.n ? '5px 5px 0 0' : '0') + '"></i>' : '') + '</div>' +
-      '<div style="font-size:9.5px;color:var(--txm);margin-top:4px;white-space:nowrap;overflow:hidden;' +
+      '<div style="font-size:12px;color:var(--txm);margin-top:4px;white-space:nowrap;overflow:hidden;' +
         'text-overflow:ellipsis">' + _admEsc(d.k.replace('Grade ', 'G')) + '</div></button>';
   });
   h += '</div>';
 
   var top = data.slice().sort(function (a, b) { return b.n - a.n; })[0];
   var ey = data.filter(function (d) { return d.lvl < 1; }).reduce(function (t, d) { return t + d.n; }, 0);
-  h += '<div style="font-size:11.5px;color:var(--txm);margin-top:12px;line-height:1.6">' +
+  h += '<div style="font-size:14px;color:var(--txm);margin-top:12px;line-height:1.6">' +
     'Green is the part already admitted. Heaviest demand is <b style="color:var(--tx)">' +
     _admEsc(top.k) + '</b> with ' + _admN(top.n) + ' leads; early years (Nursery to UKG) account ' +
     'for <b style="color:var(--tx)">' + _admN(ey) + '</b> between them, which is the intake that sets ' +
@@ -20963,7 +21043,7 @@ function admOpenClass(k) {
   var rows = S.rows.filter(function (r) { return r.cls === k; });
   var cur = {};
   rows.forEach(function (r) { var c = r.cur || '(not recorded)'; cur[c] = (cur[c] || 0) + 1; });
-  var head = '<div style="font-size:12.5px;color:var(--txm);line-height:1.6;margin-bottom:12px">' +
+  var head = '<div style="font-size:15px;color:var(--txm);line-height:1.6;margin-bottom:12px">' +
     'Curriculum asked for: ' + Object.keys(cur).sort(function (a, b) { return cur[b] - cur[a]; })
       .map(function (c) { return '<b style="color:var(--tx)">' + _admEsc(c) + '</b> ' + cur[c]; })
       .join(' · ') + '.</div>';
@@ -20992,7 +21072,7 @@ function _admPace() {
 
   var h = '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:680px"><thead><tr>' +
     '<th>Academic year</th>' + MON.map(function (m) {
-      return '<th class="n" style="font-size:10.5px">' + m + '</th>'; }).join('') +
+      return '<th class="n" style="font-size:13px">' + m + '</th>'; }).join('') +
     '<th class="n">Total</th></tr></thead><tbody>';
   years.forEach(function (ay) {
     var cur = (ay === S.season);
@@ -21003,7 +21083,7 @@ function _admPace() {
     MON.forEach(function (m) {
       var v = cell[ay + '|' + m] || 0;
       var sh = v / max;
-      h += '<td class="n" style="font-size:11px;' +
+      h += '<td class="n" style="font-size:13.5px;' +
         (v ? 'background:rgba(99,102,241,' + (0.08 + 0.55 * sh).toFixed(2) + ');font-weight:' +
              (sh > 0.45 ? '800' : '600') : 'color:var(--txm)') + '">' + (v || '·') + '</td>';
     });
@@ -21017,7 +21097,7 @@ function _admPace() {
      branches were being measured by one, and a month label here does not pin
      down a calendar month well enough to set a part-month against complete
      ones. The day-for-day panel above answers it properly. */
-  h += '<div style="font-size:11.5px;color:var(--txm);margin-top:12px;line-height:1.6">' +
+  h += '<div style="font-size:14px;color:var(--txm);margin-top:12px;line-height:1.6">' +
     'Darker is busier. Read this for <b style="color:var(--tx)">when</b> a season is won rather than ' +
     'for how this one is doing: the intake lands in February and March, and the months before that ' +
     'are when the people and the money have to be in place. Whether this season is ahead or behind ' +
@@ -21027,7 +21107,7 @@ function _admPace() {
   if (tc.length) {
     var tcAy = {};
     tc.forEach(function (r) { tcAy[r.ay] = (tcAy[r.ay] || 0) + r.n; });
-    h += '<div style="font-size:11.5px;color:var(--txm);margin-top:8px;line-height:1.6">' +
+    h += '<div style="font-size:14px;color:var(--txm);margin-top:8px;line-height:1.6">' +
       '<b style="color:var(--tx)">Children who left (TC):</b> ' +
       Object.keys(tcAy).sort().map(function (y) {
         return _admEsc(y) + ' ' + _admN(tcAy[y]) +
@@ -21042,7 +21122,7 @@ function admOpenPace(ay) {
   var rows = S.trend.filter(function (r) { return r.ay === ay; });
   var brs = {}; rows.forEach(function (r) { brs[r.b] = 1; });
   var h = '<table class="au-tbl"><thead><tr><th>Branch</th><th>Type</th>' +
-    MON.map(function (m) { return '<th class="n" style="font-size:10.5px">' + m + '</th>'; }).join('') +
+    MON.map(function (m) { return '<th class="n" style="font-size:13px">' + m + '</th>'; }).join('') +
     '<th class="n">Total</th></tr></thead><tbody>';
   Object.keys(brs).sort().forEach(function (b) {
     ['Admission', 'TC'].forEach(function (t) {
@@ -21053,7 +21133,7 @@ function admOpenPace(ay) {
       h += '<tr><td style="white-space:nowrap">' + _admDot(b) + ' ' + _admEsc(b) + '</td>' +
         '<td><span class="na-pill" style="background:' + (t === 'TC' ? '#DC262618;color:#DC2626' :
           '#05966918;color:#059669') + '">' + t + '</span></td>' +
-        MON.map(function (m) { return '<td class="n" style="font-size:11px' +
+        MON.map(function (m) { return '<td class="n" style="font-size:13.5px' +
           (byM[m] ? ';font-weight:700' : ';color:var(--txm)') + '">' + (byM[m] || '·') + '</td>'; }).join('') +
         '<td class="n" style="font-weight:800">' + _admN(tot) + '</td></tr>';
     });
@@ -21108,7 +21188,7 @@ function _admHist() {
         (chg === null ? '–' : (chg >= 0 ? '+' : '') + chg + '%') + '</td></tr>';
   });
   h += '</tbody></table>' +
-    '<div style="font-size:11.5px;color:var(--txm);margin-top:10px;line-height:1.6">' +
+    '<div style="font-size:14px;color:var(--txm);margin-top:10px;line-height:1.6">' +
     'A blank cell is a branch that had not opened yet, not a year with no admissions — Gowdavalli\'s ' +
     'first intake was 2026-27, and Pocharam\'s 2024-25. Click a year, or any number inside it, for the ' +
     'students behind it.</div>';
@@ -21120,7 +21200,7 @@ function admOpenHist(ay, branch) {
     return r.ay === ay && (!branch || r.b === branch); });
   var byCls = {};
   rows.forEach(function (r) { byCls[r.cls] = (byCls[r.cls] || 0) + 1; });
-  var head = '<div style="font-size:12.5px;color:var(--txm);line-height:1.6;margin-bottom:12px">' +
+  var head = '<div style="font-size:15px;color:var(--txm);line-height:1.6;margin-bottom:12px">' +
     _admN(rows.length) + ' students joined' + (branch ? ' at ' + _admEsc(branch) : '') + ' in ' +
     _admEsc(ay) + '. By class: ' + Object.keys(byCls)
       .sort(function (a, b) { return byCls[b] - byCls[a]; }).slice(0, 8)
@@ -21139,7 +21219,7 @@ function admOpenHist(ay, branch) {
         '<td class="n" style="color:var(--txm)">' + (_admEsc(r.adn) || '–') + '</td>' +
         '<td class="n">' + _admDate(r.d) + '</td></tr>';
     }).join('') + '</tbody></table>' +
-    (rows.length > CAP ? '<div style="font-size:11.5px;color:var(--txm);margin-top:9px">Showing the ' +
+    (rows.length > CAP ? '<div style="font-size:14px;color:var(--txm);margin-top:9px">Showing the ' +
       'first ' + CAP + ' of ' + _admN(rows.length) + ' — open a single branch for a shorter list.</div>' : '');
   _admModal(_admEsc(ay) + (branch ? ' · ' + branch : ''),
     _admN(rows.length) + ' students joined', h);
@@ -21182,7 +21262,7 @@ function _admByBranchAcc(rows) {
     var head = '<span style="display:flex;align-items:center;gap:9px;width:100%">' +
       _admDot(b) + '<b style="flex:1">' + _admEsc(b) + '</b>' +
       '<span style="font-weight:800">' + _admN(rs.length) + '</span>' +
-      '<span style="color:var(--txm);font-size:11.5px">leads · ' + won + ' admitted</span></span>';
+      '<span style="color:var(--txm);font-size:14px">leads · ' + won + ' admitted</span></span>';
     return (typeof _naAcc === 'function') ? _naAcc(head, _admEnqTable(rs, false))
       : '<div><div style="font-weight:700;margin:10px 0 6px">' + _admEsc(b) + '</div>' +
         _admEnqTable(rs, false) + '</div>';
@@ -21292,7 +21372,7 @@ async function loadAdm27(force) {
     if (!_admLoaded) {
       var l = document.getElementById('adm-loader');
       if (l) l.innerHTML = '<div style="color:var(--r);font-weight:700">Could not load Admissions 2027-28</div>' +
-        '<div style="font-size:11px;color:var(--txm);max-width:520px;line-height:1.6">' +
+        '<div style="font-size:13.5px;color:var(--txm);max-width:520px;line-height:1.6">' +
         msg.replace(/</g, '&lt;') + '</div>';
     }
   } finally {
@@ -21380,11 +21460,11 @@ function _admClean() {
       'style="border:1px solid ' + V[4] + ';border-radius:12px;padding:13px 14px;background:' + V[3] +
       ';cursor:pointer;font:inherit;text-align:left;color:#1f2937">' +
       '<div style="display:flex;align-items:center;gap:9px">' +
-        '<span style="font-size:15px">' + V[0] + '</span>' +
-        '<span style="font-size:23px;font-weight:800;color:' + V[2] + ';line-height:1">' + _admN(n) + '</span></div>' +
-      '<div style="font-weight:800;font-size:12.5px;margin-top:5px;color:' + V[2] + '">' + V[1] + '</div>' +
-      '<div style="font-size:11px;line-height:1.55;margin-top:4px;color:#4b5563">' + V[5] + '</div>' +
-      '<div style="font-size:11px;font-weight:700;margin-top:7px;color:' + V[2] + '">Click to view ›</div>' +
+        '<span style="font-size:17px">' + V[0] + '</span>' +
+        '<span style="font-size:28px;font-weight:800;color:' + V[2] + ';line-height:1">' + _admN(n) + '</span></div>' +
+      '<div style="font-weight:800;font-size:15px;margin-top:5px;color:' + V[2] + '">' + V[1] + '</div>' +
+      '<div style="font-size:13.5px;line-height:1.55;margin-top:4px;color:#4b5563">' + V[5] + '</div>' +
+      '<div style="font-size:13.5px;font-weight:700;margin-top:7px;color:' + V[2] + '">Click to view ›</div>' +
       '</button>';
   });
   h += '</div>';
@@ -21401,8 +21481,8 @@ function _admClean() {
           _admEsc(ADM_FLAG_LAB[k] || k) + '</span>'; }).join('') + '</div>';
   }
 
-  h += '<div style="margin-top:16px;font-size:12.5px;font-weight:800">By branch — tap to expand</div>' +
-    '<div style="font-size:11.5px;color:var(--txm);margin:4px 0 10px;line-height:1.6">' +
+  h += '<div style="margin-top:16px;font-size:15px;font-weight:800">By branch — tap to expand</div>' +
+    '<div style="font-size:14px;color:var(--txm);margin:4px 0 10px;line-height:1.6">' +
     'Each branch lists its own rows with the tab and line number to go to. They are listed ' +
     '<b style="color:var(--tx)">highest row first on purpose</b>: deleting a row in Google Sheets ' +
     'moves every row below it up by one, so a list worked from the top is wrong after the first ' +
@@ -21444,13 +21524,13 @@ function _admCleanBody(rs) {
     });
     h += '<div style="margin-top:14px">' +
       '<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:6px">' +
-        '<b style="color:' + V[2] + ';font-size:12.5px">' + V[0] + ' ' + V[1] + ' · ' + sub.length + '</b>' +
-        (tab ? '<span style="font-size:11px;color:var(--txm)">tab "' + _admEsc(tab) + '"</span>' : '') +
+        '<b style="color:' + V[2] + ';font-size:15px">' + V[0] + ' ' + V[1] + ' · ' + sub.length + '</b>' +
+        (tab ? '<span style="font-size:13.5px;color:var(--txm)">tab "' + _admEsc(tab) + '"</span>' : '') +
         '<button onclick="admCopyRows(this,' + JSON.stringify(nums).replace(/"/g, '&quot;') + ')" ' +
           'style="border:1px solid var(--bor);background:var(--sur);border-radius:7px;padding:3px 9px;' +
-          'font:inherit;font-size:11px;cursor:pointer;color:inherit">Copy row numbers</button>' +
+          'font:inherit;font-size:13.5px;cursor:pointer;color:inherit">Copy row numbers</button>' +
       '</div>' +
-      (why.length ? '<div style="font-size:11px;color:var(--txm);line-height:1.6;margin-bottom:7px">' +
+      (why.length ? '<div style="font-size:13.5px;color:var(--txm);line-height:1.6;margin-bottom:7px">' +
         why.map(function (k) {
           return '<b style="color:var(--tx)">' + _admEsc(ADM_FLAG_LAB[k] || k) + ':</b> ' +
                  _admEsc(ADM_FLAG_WHY[k] || ''); }).join('<br>') + '</div>' : '') +
@@ -21503,7 +21583,7 @@ function admOpenClean(v) {
   var V = ADM_VERDICT[v];
   var brs = {};
   rows.forEach(function (r) { (brs[r.b] || (brs[r.b] = [])).push(r); });
-  var h = '<div style="font-size:12.5px;color:var(--txm);line-height:1.65;margin-bottom:12px">' +
+  var h = '<div style="font-size:15px;color:var(--txm);line-height:1.65;margin-bottom:12px">' +
     V[5] + ' Rows are listed highest first, because deleting one in Google Sheets moves every row ' +
     'below it up by one.</div>' +
     Object.keys(brs).sort(function (a, b) { return brs[b].length - brs[a].length; })
@@ -21511,7 +21591,7 @@ function admOpenClean(v) {
         var head = '<span style="display:flex;align-items:center;gap:9px;width:100%">' +
           _admDot(b) + '<b style="flex:1">' + _admEsc(b) + '</b>' +
           '<span style="font-weight:800">' + brs[b].length + '</span>' +
-          '<span style="color:var(--txm);font-size:11.5px">rows</span></span>';
+          '<span style="color:var(--txm);font-size:14px">rows</span></span>';
         return (typeof _naAcc === 'function') ? _naAcc(head, _admCleanTable(brs[b]))
           : _admCleanTable(brs[b]);
       }).join('');
@@ -21695,18 +21775,35 @@ function _admCompareYear(el, hdr) {
     return;
   }
 
-  var chg = function (now, was) {
-    if (!was) return '<span style="color:var(--txm)">\u2013</span>';
-    var v = Math.round(100 * (now - was) / was);
-    return '<span style="font-weight:800;color:' + (v >= 0 ? '#059669' : '#DC2626') + '">' +
-      (v >= 0 ? '+' : '') + v + '%</span>';
+  /* One cell carries the whole story for one measure: last season, this
+     season, and the move between them. Nine measures in nine columns would
+     be a wall of numbers with no way to tell which pair belongs together. */
+  var cell = function (was, now, opt) {
+    opt = opt || {};
+    var fmt = opt.pct ? function (v) { return v == null ? '–' : v.toFixed(1) + '%'; }
+                      : function (v) { return _admN(v); };
+    var d = '';
+    if (opt.pct) {
+      /* A conversion rate moves in PERCENTAGE POINTS. Printing 36.7% to 18.1%
+         as "-51%" would be arithmetically true and read as nonsense. */
+      if (was != null && now != null) {
+        var p = now - was;
+        d = (p >= 0 ? '+' : '') + p.toFixed(1) + ' pts';
+        d = '<span style="color:' + (Math.abs(p) < 0.05 ? 'var(--txm)' : p > 0 ? 'var(--ok)' : 'var(--bad)') + '">' + d + '</span>';
+      }
+    } else if (was) {
+      var v = Math.round(100 * (now - was) / was);
+      d = '<span style="color:' + (v === 0 ? 'var(--txm)' : v > 0 ? 'var(--ok)' : 'var(--bad)') + '">' +
+          (v > 0 ? '+' : '') + v + '%</span>';
+    } else if (now) {
+      d = '<span style="color:var(--ok)">new</span>';
+    }
+    return '<td class="n"><span style="color:var(--txm)">' + fmt(was) + '</span>' +
+      '<span style="color:var(--txl);margin:0 5px">→</span>' +
+      '<b' + (opt.lead ? ' style="font-size:1.08em"' : '') + '>' + fmt(now) + '</b>' +
+      (d ? '<div style="font-size:.84em;font-weight:700;margin-top:2px">' + d + '</div>' : '') + '</td>';
   };
-  var pair = function (was, now, bold) {
-    var st = bold ? 'font-weight:800' : '';
-    return '<td class="n" style="color:var(--txm)">' + _admN(was) + '</td>' +
-           '<td class="n" style="' + st + '">' + _admN(now) + '</td>' +
-           '<td class="n">' + chg(now, was) + '</td>';
-  };
+  var cv = function (a, b) { return b ? 100 * a / b : null; };
 
   var rows = list.map(function (br) {
     return { b: br,
@@ -21714,39 +21811,40 @@ function _admCompareYear(el, hdr) {
       now: _admLeadAgg(cur.filter(function (r) { return r.Branch === br; })) };
   }).sort(function (x, y) { return y.now.n - x.now.n; });
 
+  var BL = 'border-left:2px solid var(--bor)';
   var h = hdr +
-    '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:1040px"><thead>' +
+    '<div style="overflow-x:auto"><table class="au-tbl au-yr" style="min-width:1340px"><thead>' +
     '<tr><th rowspan="2" style="vertical-align:bottom">Branch</th>' +
-    '<th colspan="3" class="n" style="text-align:center">Total leads</th>' +
-    '<th colspan="3" class="n" style="text-align:center;border-left:1px solid var(--bor)">Digital leads</th>' +
-    '<th colspan="3" class="n" style="text-align:center;border-left:1px solid var(--bor)">Walk-in leads</th>' +
-    '<th colspan="3" class="n" style="text-align:center;border-left:1px solid var(--bor)">Admissions</th></tr>' +
-    '<tr>' +
-    ['', 'border-left:1px solid var(--bor)', 'border-left:1px solid var(--bor)',
-     'border-left:1px solid var(--bor)'].map(function (bl) {
-      return '<th class="n" style="font-weight:500;color:var(--txm);' + bl + '">' +
-               _admEsc(String(last).slice(2)) + '</th>' +
-             '<th class="n">' + _admEsc(String(season).slice(2)) + '</th><th class="n">Chg</th>';
+    '<th colspan="3" class="n" style="text-align:center">Everything</th>' +
+    '<th colspan="3" class="n" style="text-align:center;' + BL + '">Digital</th>' +
+    '<th colspan="3" class="n" style="text-align:center;' + BL + '">Walk-in</th></tr>' +
+    '<tr>' + ['', BL, BL].map(function (bl) {
+      return '<th class="n" style="' + bl + '">Leads</th><th class="n">Admissions</th>' +
+             '<th class="n">Conv %</th>';
     }).join('') + '</tr></thead><tbody>';
 
-  rows.forEach(function (r) {
-    h += '<tr><td>' + _admDot(r.b) + ' ' + _admEsc(r.b) + '</td>' +
-      pair(r.was.n, r.now.n, true) + pair(r.was.dL, r.now.dL) +
-      pair(r.was.wL, r.now.wL) + pair(r.was.won, r.now.won, true) + '</tr>';
-  });
-  var sum = function (k, side) {
-    return rows.reduce(function (t, r) { return t + r[side][k]; }, 0); };
+  var line = function (label, w, n, foot) {
+    return '<tr' + (foot ? ' style="font-weight:800;border-top:2px solid var(--bor)"' : '') + '><td>' + label + '</td>' +
+      cell(w.n, n.n, { lead: 1 }) + cell(w.won, n.won, { lead: 1 }) + cell(cv(w.won, w.n), cv(n.won, n.n), { pct: 1 }) +
+      cell(w.dL, n.dL) + cell(w.dA, n.dA) + cell(cv(w.dA, w.dL), cv(n.dA, n.dL), { pct: 1 }) +
+      cell(w.wL, n.wL) + cell(w.wA, n.wA) + cell(cv(w.wA, w.wL), cv(n.wA, n.wL), { pct: 1 }) + '</tr>';
+  };
+  rows.forEach(function (r) { h += line(_admDot(r.b) + ' ' + _admEsc(r.b), r.was, r.now); });
+  var tot = function (side) {
+    var o = { n: 0, dL: 0, wL: 0, dA: 0, wA: 0, won: 0 };
+    rows.forEach(function (r) { for (var k in o) o[k] += r[side][k]; });
+    return o;
+  };
   h += '</tbody>' + (rows.length < 2 ? '' :
-    '<tfoot><tr style="font-weight:800;border-top:2px solid var(--bor)">' +
-    '<td>' + (scope ? _admEsc(scope) : 'All five branches') + '</td>' +
-    pair(sum('n', 'was'), sum('n', 'now'), true) +
-    pair(sum('dL', 'was'), sum('dL', 'now')) +
-    pair(sum('wL', 'was'), sum('wL', 'now')) +
-    pair(sum('won', 'was'), sum('won', 'now'), true) +
-    '</tr></tfoot>') + '</table></div>';
+    '<tfoot>' + line(scope ? _admEsc(scope) : 'All five branches', tot('was'), tot('now'), 1) + '</tfoot>') +
+    '</table></div>' +
+    '<div class="au-note" style="margin-top:8px"><b>Each cell reads ' + _admEsc(last) +
+    ' → ' + _admEsc(season) + '</b>, with the move underneath. Counts move in per cent; a ' +
+    'conversion rate moves in <b>percentage points</b>, because 36.7% to 18.1% is a fall of 18.6 ' +
+    'points, not of 51 per cent.</div>';
 
   var pf = _admLeadAgg(prvFull);
-  h += '<div style="font-size:11.5px;color:var(--txm);margin-top:10px;line-height:1.65">' +
+  h += '<div style="font-size:14px;color:var(--txm);margin-top:10px;line-height:1.65">' +
     'Both seasons are cut at <b style="color:var(--tx)">day ' + day + '</b> of their own season, ' +
     'counting from 1 October \u2014 ' + _admDate(lastStart) + ' to ' + _admDate(lastEnd) + ' against ' +
     _admDate(thisStart) + ' to ' + _admDate(today) + '. For the whole of ' + _admEsc(last) + ' the CRM ' +
@@ -21778,9 +21876,9 @@ function _admCompare() {
       return '<button onclick="admSetPeriod(\'' + p[0] + '\')" style="border:1px solid ' +
         (on ? '#6366F1' : 'var(--bor)') + ';background:' + (on ? '#6366F1' : 'var(--sur)') +
         ';color:' + (on ? '#fff' : 'inherit') + ';border-radius:99px;padding:5px 13px;font:inherit;' +
-        'font-size:12px;font-weight:' + (on ? '700' : '500') + ';cursor:pointer">' + p[1] + '</button>';
+        'font-size:14.5px;font-weight:' + (on ? '700' : '500') + ';cursor:pointer">' + p[1] + '</button>';
     }).join('') +
-    '<span style="font-size:11.5px;color:var(--txm);align-self:center;margin-left:4px">' +
+    '<span style="font-size:14px;color:var(--txm);align-self:center;margin-left:4px">' +
       (_admPeriod === 'lastyear'
         ? 'from the CRM export \u00b7 both seasons to the same day'
         : _admDate(a) + (a === b ? '' : ' to ' + _admDate(b))) + '</span></div>';
@@ -21871,7 +21969,7 @@ function _admCompare() {
 
   var WS = _admWalkinSet();
   var wn = Object.keys(WS).map(function (k) { return _admSrcLab(k); });
-  h += '<div style="font-size:11.5px;color:var(--txm);margin-top:10px;line-height:1.65">' +
+  h += '<div style="font-size:14px;color:var(--txm);margin-top:10px;line-height:1.65">' +
     '<b style="color:var(--tx)">Walk-in</b> is ' + wn.join(', ') + '. <b style="color:var(--tx)">' +
     'Digital</b> is everything else \u2014 the website, Facebook, Instagram, Google Ads and any source ' +
     'added later \u2014 so the two columns always add up to Total Leads with nothing left over.' +
@@ -21919,12 +22017,12 @@ function _admPlanPanel() {
       return '<button onclick="admSetPlanMetric(\'' + m[0] + '\')" style="border:1px solid ' +
         (on ? '#0D9488' : 'var(--bor)') + ';background:' + (on ? '#0D9488' : 'var(--sur)') +
         ';color:' + (on ? '#fff' : 'inherit') + ';border-radius:99px;padding:5px 15px;font:inherit;' +
-        'font-size:12px;font-weight:' + (on ? '700' : '500') + ';cursor:pointer">' + m[1] + '</button>';
+        'font-size:14.5px;font-weight:' + (on ? '700' : '500') + ';cursor:pointer">' + m[1] + '</button>';
     }).join('') + '</div>';
 
   h += '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:900px"><thead><tr>' +
     '<th>Branch</th>' + MM.map(function (m) {
-      return '<th class="n" style="font-size:10.5px' + (m === thisYm ? ';color:#6366F1' : '') + '">' +
+      return '<th class="n" style="font-size:13px' + (m === thisYm ? ';color:#6366F1' : '') + '">' +
         _admMonthLab(m) + (m === thisYm ? ' ●' : '') + '</th>'; }).join('') +
     '<th class="n">Plan total</th><th class="n">So far</th></tr></thead><tbody>';
 
@@ -21945,7 +22043,7 @@ function _admPlanPanel() {
         bg = pct >= 100 ? 'background:#05966922' : pct >= 50 ? 'background:#D9770622'
            : ach ? 'background:#DC262618' : 'background:#DC262610';
       }
-      h += '<td class="n" style="font-size:11px;line-height:1.35;' + bg + '">' +
+      h += '<td class="n" style="font-size:13.5px;line-height:1.35;' + bg + '">' +
         ((past || now)
           ? '<b style="color:' + (pct === null ? 'var(--tx)' : pct >= 100 ? '#059669'
               : pct >= 50 ? '#D97706' : '#DC2626') + '">' + ach + '</b>' +
@@ -21960,7 +22058,7 @@ function _admPlanPanel() {
   h += '</tbody>' + (brs.length < 2 ? '' : '<tfoot><tr style="font-weight:800;border-top:2px solid var(--bor)">' +
     '<td>All branches</td>' + MM.map(function (m) {
       var past = m <= thisYm;
-      return '<td class="n" style="font-size:11px">' +
+      return '<td class="n" style="font-size:13.5px">' +
         (past ? colG[m] + '<span style="color:var(--txm)">/' + colT[m] + '</span>'
               : '<span style="color:var(--txm)">' + colT[m] + '</span>') + '</td>'; }).join('') +
     '<td class="n">' + _admN(grandT) + '</td><td class="n">' + _admN(grandG) + '</td>' +
@@ -21969,7 +22067,7 @@ function _admPlanPanel() {
   /* where the plan stands against the months that have actually happened */
   var dueT = 0, dueG = 0;
   MM.forEach(function (m) { if (m <= thisYm) { dueT += colT[m] || 0; dueG += colG[m] || 0; } });
-  h += '<div style="font-size:11.5px;color:var(--txm);margin-top:10px;line-height:1.65">' +
+  h += '<div style="font-size:14px;color:var(--txm);margin-top:10px;line-height:1.65">' +
     'A cell shows <b style="color:var(--tx)">what came in</b> over the plan for months that have ' +
     'started, and the plan alone for months still ahead. Through ' + _admMonthLab(thisYm) +
     ' the plan asked for <b style="color:var(--tx)">' + _admN(dueT) + '</b> ' +
@@ -22048,7 +22146,7 @@ function _admYoY() {
         JSON.stringify(season).replace(/"/g, '&quot;') + ',' + day + ')"><b>' + _admEsc(season) +
         '</b> \u203a</button> <span class="na-pill" style="background:#6366F120;color:#6366F1">this season</span></td>' +
       '<td style="color:var(--txm)">' + _admDate(nowRow.a) + ' to ' + _admDate(nowRow.b) + '</td>' +
-      '<td class="n" style="font-weight:800;font-size:15px;color:#059669">' + _admN(nowRow.n) + '</td>' +
+      '<td class="n" style="font-weight:800;font-size:17px;color:#059669">' + _admN(nowRow.n) + '</td>' +
       '<td class="n" style="color:var(--txm)">\u2013</td>' +
       '<td class="n" style="color:var(--txm)">in progress</td>' +
       '<td class="n" style="color:var(--txm)">\u2013</td></tr>';
@@ -22056,7 +22154,7 @@ function _admYoY() {
     h += '<tr style="background:#FFFBEB"><td><b>' + _admEsc(season) + '</b> ' +
         '<span class="na-pill" style="background:#FDE68A;color:#78350F">this season</span></td>' +
       '<td style="color:var(--txm)">' + _admDate(start) + ' to ' + _admDate(today) + '</td>' +
-      '<td class="n" colspan="3" style="color:#78350F;text-align:left;font-size:12px">' +
+      '<td class="n" colspan="3" style="color:#78350F;text-align:left;font-size:14.5px">' +
         'Not in "' + _admEsc(ADM_HIST_TAB) + '" yet, so it cannot be counted on the same rule as the ' +
         'years below. It joins this table on the next refresh after its students are pasted in.</td></tr>';
   }
@@ -22078,7 +22176,7 @@ function _admYoY() {
 
   var avg = rows.reduce(function (t, r) { return t + r.n; }, 0) / rows.length;
   var share = rows.reduce(function (t, r) { return t + (r.full ? r.n / r.full : 0); }, 0) / rows.length;
-  h += '<div style="font-size:11.5px;color:var(--txm);margin-top:10px;line-height:1.65">' +
+  h += '<div style="font-size:14px;color:var(--txm);margin-top:10px;line-height:1.65">' +
     '<b style="color:var(--tx)">Every figure in this table is a row of "' + _admEsc(ADM_HIST_TAB) +
     '", dated by its DATE OF ADMISSION.</b> Nothing else feeds it, so the years are counted the same ' +
     'way and the comparison means something.' +
@@ -22108,7 +22206,7 @@ function _admYoY() {
   (R.branches || []).forEach(function (b) { if (!histBr[b]) gap.push(b); });
   if (gap.length && !S.scope) {
     h += '<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;padding:12px 15px;' +
-      'margin-top:12px;font-size:12.5px;line-height:1.65;color:#78350F">' +
+      'margin-top:12px;font-size:15px;line-height:1.65;color:#78350F">' +
       '<b>' + gap.sort().join(', ') + ' ' + (gap.length === 1 ? 'has' : 'have') + ' no history in "' +
       _admEsc(ADM_HIST_TAB) + '".</b> The earlier-year figures above are therefore for the other ' +
       'branches only. Adding ' + (gap.length === 1 ? 'that branch\'s' : 'those branches\'') +
@@ -22124,7 +22222,7 @@ function _admYoY() {
   });
   if (missing.length) {
     h += '<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;padding:12px 15px;' +
-      'margin-top:12px;font-size:12.5px;line-height:1.65;color:#78350F">' +
+      'margin-top:12px;font-size:15px;line-height:1.65;color:#78350F">' +
       '<b>' + missing.sort().join(', ') + ' cannot be compared yet.</b> The monthly trend tab has ' +
       'totals for ' + (missing.length === 1 ? 'that year' : 'those years') + ', but comparing a day of ' +
       'one season to a day of another needs the admission <b>dates</b>, and those live in "' +
@@ -22140,7 +22238,7 @@ function admOpenYoY(ay, day) {
   var rows = S.hist.filter(function (r) { return r.ay === ay && r.d && r.d >= a && r.d <= b; });
   var byB = {}, byC = {};
   rows.forEach(function (r) { byB[r.b] = (byB[r.b] || 0) + 1; byC[r.cls] = (byC[r.cls] || 0) + 1; });
-  var head = '<div style="font-size:12.5px;color:var(--txm);line-height:1.65;margin-bottom:12px">' +
+  var head = '<div style="font-size:15px;color:var(--txm);line-height:1.65;margin-bottom:12px">' +
     _admN(rows.length) + ' children joined between ' + _admDate(a) + ' and ' + _admDate(b) +
     ' — the first ' + (day + 1) + ' days of the ' + _admEsc(ay) + ' season. By branch: ' +
     Object.keys(byB).sort(function (x, y) { return byB[y] - byB[x]; })
@@ -22245,9 +22343,9 @@ function _admModel() {
     var here = pts.filter(function (p) { return p.d === day; })[0];
     var ok = pts.filter(function (p) { return p.bt.mape <= 15; })[0];
 
-    h += '<div style="font-weight:800;font-size:13px;margin-bottom:5px">1 · Can the season be ' +
+    h += '<div style="font-weight:800;font-size:15.5px;margin-bottom:5px">1 · Can the season be ' +
       'forecast from where we stand?</div>' +
-      '<div style="font-size:12px;color:var(--txm);line-height:1.65;margin-bottom:9px">' +
+      '<div style="font-size:14.5px;color:var(--txm);line-height:1.65;margin-bottom:9px">' +
       'Each finished year is projected from the share of a season the <b>other</b> years had won by ' +
       'the same day, then checked against what that year actually finished on. ' + ays.length +
       ' years, each held out in turn.</div>';
@@ -22268,7 +22366,7 @@ function _admModel() {
             : '<span class="na-pill" style="background:#DC262618;color:#DC2626">no</span>') +
           '</td></tr>';
       }).join('') + '</tbody></table>';
-    h += '<div style="font-size:11.5px;color:var(--txm);margin-top:9px;line-height:1.65">' +
+    h += '<div style="font-size:14px;color:var(--txm);margin-top:9px;line-height:1.65">' +
       (here
         ? 'A season-end number produced today would be wrong by about <b style="color:var(--tx)">' +
           here.bt.mape.toFixed(0) + '%</b> on average, and in the worst held-out year it said <b ' +
@@ -22290,7 +22388,7 @@ function _admModel() {
   var di = _admWilson(dW, dig.length), wi = _admWilson(wW, wlk.length);
   if (di && wi) {
     var apart = (di[1] < wi[0]) || (wi[1] < di[0]);
-    h += '<div style="font-weight:800;font-size:13px;margin:18px 0 5px">2 · The one comparison ' +
+    h += '<div style="font-weight:800;font-size:15.5px;margin:18px 0 5px">2 · The one comparison ' +
       'that does hold up</div>' +
       '<table class="au-tbl"><thead><tr><th>Source</th><th class="n">Leads</th>' +
       '<th class="n">Admitted</th><th class="n">Rate</th><th>True rate lies between</th>' +
@@ -22302,9 +22400,9 @@ function _admModel() {
             _admN(x[2]) + '</td>' +
           '<td class="n" style="font-weight:800">' + (x[1] ? (100 * x[2] / x[1]).toFixed(1) : '0.0') + '%</td>' +
           '<td style="color:var(--txm)">' + x[3][0].toFixed(1) + '% to ' + x[3][1].toFixed(1) +
-          '% <span style="font-size:10.5px">(95% confidence)</span></td></tr>';
+          '% <span style="font-size:13px">(95% confidence)</span></td></tr>';
       }).join('') + '</tbody></table>' +
-      '<div style="font-size:11.5px;color:var(--txm);margin-top:9px;line-height:1.65">' +
+      '<div style="font-size:14px;color:var(--txm);margin-top:9px;line-height:1.65">' +
       (apart
         ? 'The two ranges do not overlap, so this gap is not chance. It is the only claim on this page ' +
           'that survives a significance test, and it is the one to act on.'
@@ -22318,9 +22416,9 @@ function _admModel() {
   var Q = R.quality || {};
   var typFilled = S.rows.filter(function (r) { return r.typ; });
   var typWon = typFilled.filter(_admIsWon).length;
-  h += '<div style="font-weight:800;font-size:13px;margin:18px 0 5px">3 · Why there is no lead ' +
+  h += '<div style="font-weight:800;font-size:15.5px;margin:18px 0 5px">3 · Why there is no lead ' +
     'score on this page</div>' +
-    '<div style="font-size:12px;color:var(--txm);line-height:1.7">' +
+    '<div style="font-size:14.5px;color:var(--txm);line-height:1.7">' +
     'A model was fitted and cross-validated before this panel was written, and it is not shipped, for ' +
     'two reasons that are worth knowing rather than hiding.' +
     '<br><br><b style="color:var(--tx)">It had nothing to learn except the source.</b> With ' +
@@ -23210,7 +23308,7 @@ window.PTM = (function () {
       '<th class="n">Asked for a change</th><th class="n">Escalated (P1/P2)</th><th class="n">Mean sentiment</th></tr></thead><tbody>' +
       rows.map(function (r) {
         return '<tr class="clk" data-b="' + esc(r.b) + '"><td><b>' + esc(r.b) + '</b>' +
-          '<br><span style="font-size:10.5px;color:#94A3B8">' + r.sub + ' of ' + r.n + ' responses</span></td>' +
+          '<br><span style="font-size:13px;color:#94A3B8">' + r.sub + ' of ' + r.n + ' responses</span></td>' +
           '<td class="n" style="color:' + (r.substRate < 60 ? '#D97706' : '#64748B') + '">' + pc(r.substRate, 0) + '</td>' +
           '<td class="n" style="font-weight:700;color:' + heatBad(r.concern, 40, 80) + '">' + pc(r.concern, 0) + '</td>' +
           '<td style="width:120px">' + bar(r.concern, 40, 80) + '</td>' +
@@ -23265,12 +23363,12 @@ window.PTM = (function () {
     $('pt-drivers').innerHTML = D.drivers.map(function (g) {
       var mx = Math.max.apply(null, g.dims.map(function (d) { return Math.abs(d.r || 0); }).concat([0.1]));
       return '<div class="pt-grp"><div class="pt-grp-h">' + esc(g.scale) +
-        ' <span style="font-weight:400;color:#94A3B8;font-size:11.5px">' + esc(g.branches.join(', ')) +
+        ' <span style="font-weight:400;color:#94A3B8;font-size:14px">' + esc(g.branches.join(', ')) +
         ' · ' + g.n + ' rated responses</span></div>' +
         '<div class="au-sbars">' + g.dims.map(function (d) {
           var w = Math.abs(d.r || 0) / mx * 100;
           return '<div class="au-sbar" style="grid-template-columns:150px 1fr 74px"><div>' + esc(d.dim) +
-            '<br><span style="font-size:10px;color:#94A3B8">n=' + d.n + '</span></div>' +
+            '<br><span style="font-size:12.5px;color:#94A3B8">n=' + d.n + '</span></div>' +
             '<div class="au-bar"><i style="width:' + w + '%;background:' +
             (d.r >= 0.7 ? '#1E4FD8' : d.r >= 0.5 ? '#60A5FA' : '#CBD5E1') + '"></i></div>' +
             '<div class="n" style="font-weight:600">' + (d.r === null ? '—' : d.r.toFixed(2)) + '</div></div>';
@@ -23304,13 +23402,13 @@ window.PTM = (function () {
           var p1 = /^P1/.test(r.prioL);
           return '<tr><td class="n"><span class="pill" style="' +
             (p1 ? 'background:#FEF2F2;color:#DC2626' : 'background:#FFFBEB;color:#D97706') + '">' +
-            esc(r.prioL.split(' - ')[0]) + '</span><br><span style="font-size:10px;color:#94A3B8">' +
+            esc(r.prioL.split(' - ')[0]) + '</span><br><span style="font-size:12.5px;color:#94A3B8">' +
             nn(r.prio, 0) + '</span></td>' +
             '<td>' + esc(r.branch) + '</td>' +
-            '<td style="font-size:11.5px;color:#64748B">' + esc(r.grade || '—') + '</td>' +
+            '<td style="font-size:14px;color:#64748B">' + esc(r.grade || '—') + '</td>' +
             '<td>' + esc(r.theme) + '</td>' +
-            '<td style="max-width:430px;font-size:12px">' + esc(r.text || '—') + '</td>' +
-            '<td style="font-size:11.5px;color:#64748B">' + esc(r.owner === '-' ? '—' : r.owner) + '</td></tr>';
+            '<td style="max-width:430px;font-size:14.5px">' + esc(r.text || '—') + '</td>' +
+            '<td style="font-size:14px;color:#64748B">' + esc(r.owner === '-' ? '—' : r.owner) + '</td></tr>';
         }).join('') + '</tbody></table>' +
         (q.length > 250 ? '<p class="au-note">Showing the 250 highest-priority of ' + q.length + '. Narrow with the filters above.</p>' : '')
       : '<p class="au-empty">Nothing at P1 or P2 under the current filters.</p>';
@@ -23331,8 +23429,8 @@ window.PTM = (function () {
             '<td class="n" style="font-weight:700;color:' + (r.csat >= 85 ? '#059669' : '#DC2626') + '">' + nn(r.csat, 0) + '</td>' +
             '<td><span class="pill" style="' + (r.negative ? 'background:#FEF2F2;color:#DC2626' : 'background:#ECFDF5;color:#059669') + '">' +
             esc(r.sentL) + '</span></td>' +
-            '<td style="font-size:11.5px">' + esc(r.theme) + '</td>' +
-            '<td style="max-width:430px;font-size:12px">' + esc(r.text) + '</td></tr>';
+            '<td style="font-size:14px">' + esc(r.theme) + '</td>' +
+            '<td style="max-width:430px;font-size:14.5px">' + esc(r.text) + '</td></tr>';
         }).join('') + '</tbody></table>' +
         '<p class="au-note"><b>' + high.length + ' of these ' + list.length + '</b> gave the school high marks and then ' +
         'wrote a complaint. They are the most under-counted group in the whole file: nothing in the satisfaction ' +
@@ -23391,7 +23489,7 @@ window.PTM = (function () {
           return '<td class="n" style="font-weight:600;color:' + (Math.abs(v) < 2 ? '#94A3B8' : better ? '#059669' : '#DC2626') + '">' +
             (v > 0 ? '+' : '') + v.toFixed(1) + '</td>';
         }
-        return '<tr><td><b>' + esc(r.branch) + '</b><br><span style="font-size:10.5px;color:#94A3B8">' +
+        return '<tr><td><b>' + esc(r.branch) + '</b><br><span style="font-size:13px;color:#94A3B8">' +
           esc(r.a.month) + ' \u2192 ' + esc(r.b.month) + '</span></td>' +
           '<td class="n">' + r.a.n + ' \u2192 ' + r.b.n + '</td>' +
           '<td class="n">' + pc(r.b.concern, 0) + '</td>' + d(r.dConc, 'down') +
@@ -23415,7 +23513,7 @@ window.PTM = (function () {
             '<td class="n" style="color:' + (o.p1 ? '#DC2626' : '#94A3B8') + '">' + o.p1 + '</td>' +
             '<td style="width:120px"><div class="au-bar"><i style="width:' + (o.n / mx * 100) +
             '%;background:#1E4FD8"></i></div></td>' +
-            '<td style="font-size:11.5px;color:#64748B">' + Object.keys(o.branches).sort(function (a, b) {
+            '<td style="font-size:14px;color:#64748B">' + Object.keys(o.branches).sort(function (a, b) {
               return o.branches[b] - o.branches[a];
             }).map(function (b) { return esc(b) + ' ' + o.branches[b]; }).join(' · ') + '</td></tr>';
         }).join('') + '</tbody></table>' +
@@ -23464,10 +23562,10 @@ window.PTM = (function () {
             : r.sentL === 'Mixed' ? 'background:#FFFBEB;color:#D97706'
             : r.sentL === 'Positive' ? 'background:#ECFDF5;color:#059669' : 'background:#F1F5F9;color:#64748B';
           return '<tr><td>' + esc(r.branch) + '</td>' +
-            '<td style="font-size:11.5px;color:#64748B">' + esc(r.grade || '—') + '</td>' +
+            '<td style="font-size:14px;color:#64748B">' + esc(r.grade || '—') + '</td>' +
             '<td><span class="pill" style="' + col + '">' + esc(r.sentL) + '</span></td>' +
-            '<td style="font-size:11.5px">' + esc(r.theme) + '</td>' +
-            '<td style="max-width:520px;font-size:12px">' + esc(r.text) + '</td></tr>';
+            '<td style="font-size:14px">' + esc(r.theme) + '</td>' +
+            '<td style="max-width:520px;font-size:14.5px">' + esc(r.text) + '</td></tr>';
         }).join('') + '</tbody></table>' +
         (rs.length > 300 ? '<p class="au-note">Showing 300 of ' + rs.length + ', most negative first.</p>' : '')
       : '<p class="au-empty">No comments match the current filters.</p>';
@@ -23528,8 +23626,8 @@ window.PTM = (function () {
         top.map(function (r) {
           return '<tr><td style="width:44px"><span class="pill" style="' +
             (/^P1/.test(r.prioL) ? 'background:#FEF2F2;color:#DC2626' : 'background:#FFFBEB;color:#D97706') + '">' +
-            esc(r.prioL.split(' - ')[0]) + '</span></td><td style="font-size:11.5px;color:#64748B">' + esc(r.theme) + '</td>' +
-            '<td style="font-size:12px">' + esc(r.text) + '</td></tr>';
+            esc(r.prioL.split(' - ')[0]) + '</span></td><td style="font-size:14px;color:#64748B">' + esc(r.theme) + '</td>' +
+            '<td style="font-size:14.5px">' + esc(r.text) + '</td></tr>';
         }).join('') + '</tbody></table>' : ''));
   }
 
@@ -23540,10 +23638,10 @@ window.PTM = (function () {
       '<table class="au-tbl"><thead><tr><th>Grade</th><th>Tone</th><th class="n">Priority</th>' +
       '<th>What they wrote</th></tr></thead><tbody>' +
       rs.map(function (r) {
-        return '<tr><td style="font-size:11.5px;color:#64748B">' + esc(r.grade || '—') + '</td>' +
-          '<td style="font-size:11.5px">' + esc(r.sentL) + '</td>' +
+        return '<tr><td style="font-size:14px;color:#64748B">' + esc(r.grade || '—') + '</td>' +
+          '<td style="font-size:14px">' + esc(r.sentL) + '</td>' +
           '<td class="n">' + nn(r.prio, 0) + '</td>' +
-          '<td style="font-size:12px">' + esc(r.text) + '</td></tr>';
+          '<td style="font-size:14.5px">' + esc(r.text) + '</td></tr>';
       }).join('') + '</tbody></table>');
   }
 
