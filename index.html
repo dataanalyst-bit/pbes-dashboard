@@ -3954,7 +3954,25 @@ function applyFilters(){
   document.getElementById('fbadge-txt').textContent='Showing: '+bl+' · '+ml+' (excl. Overview)';
   try{ window._holdChip && window._holdChip(); }catch(e){}
   renderAll();
+  /* ── THE EXAMINATION TAB FOLLOWS THE DROPDOWN (5 Nov 2026) ──
+     renderAll() does not reach this tab: the review is an iframe fed by
+     postMessage and the comparison is drawn on demand, so both sat on
+     whatever branch was chosen when the tab was opened and ignored the
+     dropdown afterwards. Each is nudged here instead. */
 }
+
+/* Called by the tab registry when this panel is the one on screen and the
+   filters have moved under it. The join is rebuilt rather than filtered,
+   because the paper-effect adjustment is measured on the children in scope:
+   keeping the group's adjustment while showing one branch would score that
+   branch against a cohort it is not in. */
+function _exOnFilter(){
+  _exCmp = null;
+  var cm = document.getElementById('exm-compare');
+  if (cm && cm.style.display !== 'none') { _exRenderCompare(); return; }
+  if (typeof _pt1Post === 'function') _pt1Post();
+}
+window._exOnFilter = _exOnFilter;
 
 // ── HELPERS ──
 function fi(n){return Math.round(n).toLocaleString('en-IN')}
@@ -13285,7 +13303,13 @@ var _RENDERERS = {
   bio:           ['Biometric', function(){ if (window._bioRepaint) window._bioRepaint(); }],
   /* Admissions 2027-28 holds the whole file in the browser, so a change of
      BRANCH is arithmetic rather than another fetch. */
-  adm27:         ['Admissions 2027-28', function(){ if (window._admRepaint) window._admRepaint(); }]
+  adm27:         ['Admissions 2027-28', function(){ if (window._admRepaint) window._admRepaint(); }],
+  /* The examination tab is an iframe plus a panel drawn on demand, so it was
+     the one tab renderAll() could not reach and it ignored the branch
+     dropdown entirely. Registering it here puts it on the same footing as
+     every other tab: marked stale by a filter change, redrawn when it is the
+     panel on screen or the next time it is opened. */
+  pt1:           ['Examination Result', function(){ if (window._exOnFilter) window._exOnFilter(); }]
 };
 var _stale = {};
 function _currentTab(){
@@ -15416,6 +15440,12 @@ var _exUserPicked = false;
 
 /* The rows for the sitting on screen, presented to the frame under the name it
    already reads (`students`), so nothing inside the review changes. */
+/* The branch the page is showing: a role lock first, then the global
+   dropdown. Every part of this tab reads it here so they cannot disagree. */
+function _exBranch(){
+  if (window._BRANCH_LOCK) return window._BRANCH_LOCK;
+  return (typeof fBranch !== 'undefined' && fBranch && fBranch !== 'ALL') ? fBranch : '';
+}
 function _exPayload(){
   if(!_pt1Raw) return null;
   var S=EX_SITTINGS[_exSitting]||EX_SITTINGS.pt1;
@@ -15526,32 +15556,108 @@ function _exBuildCompare() {
       var o = {}; t.hdr.forEach(function (h, i) { o[h] = r[i]; }); return o; });
   };
   var A = obj(tA), B = obj(tB);
+  /* Each row gets its own handle. Keying "which rows are already used" on the
+     ID collapsed two different children onto one key wherever an id is
+     shared, and silently dropped the second from the gap report. */
+  A.forEach(function (o, i) { o.__i = 'a' + i; });
+  B.forEach(function (o, i) { o.__i = 'b' + i; });
   var SUBJ = tA.hdr.filter(function (h) {
     return / %$/.test(h) && h !== 'Overall %' && h !== 'Target %';
   }).map(function (h) { return h.replace(/ %$/, ''); });
 
   var S = function (v) { return String(v == null ? '' : v).trim(); };
+  /* ── MATCHING A CHILD ACROSS THE TWO PAPERS (widened 5 Nov 2026) ──
+     The two sheets are typed up separately, so the same child can appear as
+     "K.SRUJANA REDDY" on one and "SRUJANA REDDY" on the other, or as
+     "CHIRASYA K L" and "Chirasya". Three tiers are tried in order, each one
+     only accepted when it identifies ONE child on each side:
+
+       1  ID          the admission number, when both sheets carry it
+       2  full name   punctuation and case removed, within branch and grade
+       3  name words  the same words in any order, so initials moved to the
+                      front or back, a dropped middle name, or "K L" written
+                      as "K.L." all still meet
+
+     WHAT IS DELIBERATELY NOT TRIED, and why. Partial name matching was
+     measured on this workbook and it does not find lost children, it invents
+     pairs. The closest candidates it produced were "SHREYANSH DHANANJAY
+     SHINDE" against "SAKSHI DHANANJAY SHINDE", "GUDURU AADHYA REDDY" against
+     "GUDURU SHIVANSH REDDY" and "MOHAMMED RASHEDUDDIN KHAN" against
+     "MOHAMMED AYAAN KHAN" — siblings and namesakes in different grades, every
+     one of them a different child. A comparison built on those would print a
+     fall for a child who never sat the paper. Tier 3 recovers what is really
+     recoverable; past it the honest answer is that the child is not there.
+
+     WHAT THE MISSING ONES ACTUALLY ARE. After the three tiers, 470 half-yearly
+     children remain unpaired, and almost none of them is a spelling problem:
+     269 sit in a branch and grade with NO PT-1 sheet at all (Gowdavalli
+     entirely, Pocharam's early years), and 514 PT-1 children sit in a grade
+     with no half-yearly sheet (Pocharam, Grades 1-8). The care-call roster —
+     the only list of who is actually on the roll — is read as a third source
+     to tell the two apart: a child on the roll with one paper missing is a
+     result that was never entered, a child not on the roll has left or has
+     not joined. Both are counted and reported under the tables, because
+     neither is something this page can fix. */
+  var norm = function (v) {
+    return S(v).toLowerCase().replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim();
+  };
+  var flat = function (v) { return norm(v).replace(/ /g, ''); };
+  /* the same words in any order; one-letter initials carry no weight on their
+     own but are kept when they are all there is */
+  var words = function (v) {
+    var w = norm(v).split(' ').filter(function (x) { return x.length > 1; });
+    if (!w.length) w = norm(v).split(' ').filter(Boolean);
+    return w.sort().join(' ');
+  };
   var nameKey = function (o) {
-    return S(o['Branch']) + '|' + S(o['Grade']) + '|' +
-           S(o['Student Name']).toLowerCase().replace(/[^a-z]/g, '');
+    return S(o['Branch']) + '|' + S(o['Grade']) + '|' + flat(o['Student Name']);
   };
   /* ── the join ── */
-  var byId = {}, nmA = {}, nmB = {};
-  A.forEach(function (o) { var k = S(o['ID']); if (k) byId[k] = o; });
-  A.forEach(function (o) { var k = nameKey(o); if (k.split('|')[2]) nmA[k] = (nmA[k] || 0) + 1; });
-  B.forEach(function (o) { var k = nameKey(o); if (k.split('|')[2]) nmB[k] = (nmB[k] || 0) + 1; });
-  var aByName = {};
-  A.forEach(function (o) { var k = nameKey(o); if (nmA[k] === 1) aByName[k] = o; });
+  var uniq = function (list, keyf) {
+    var n = {}, m = {};
+    list.forEach(function (o) { var k = keyf(o); if (k) n[k] = (n[k] || 0) + 1; });
+    list.forEach(function (o) { var k = keyf(o); if (k && n[k] === 1) m[k] = o; });
+    return { n: n, one: m };
+  };
+  var scoped = function (f) {
+    return function (o) {
+      var v = f(o['Student Name']);
+      return v ? S(o['Branch']) + '|' + S(o['Grade']) + '|' + v : '';
+    };
+  };
+  var kFlat = scoped(flat), kWords = scoped(words);
+  /* ── AN ID IS ONLY A KEY WHEN IT IS UNIQUE ──
+     Most rows carry a real admission number, "PISB1774". Some carry a bare
+     number instead, and those are not admission numbers at all: ID 93 is
+     VEMPATI PARMEETH ROSHAN on one row and CHALLA NIVEDITA REDDY on another,
+     ID 356 is a Grade 10 child and a Grade 9 child. 214 such ids in the PT-1
+     sheet and 243 in the half-yearly are shared by two or three different
+     children, and matching on them paired children who have nothing to do
+     with each other — a comparison that reads as a collapse for a child who
+     never sat the paper.
 
-  var pairs = [], viaId = 0, viaName = 0;
+     So an id is accepted only where it names ONE row on each side, the same
+     test the name tiers have always had to pass. A shared id falls through to
+     the name tiers, which is where those children get matched properly. */
+  var kId = function (o) { return S(o['ID']); };
+  var iA = uniq(A, kId), iB = uniq(B, kId);
+  var fA = uniq(A, kFlat), fB = uniq(B, kFlat);
+  var wA = uniq(A, kWords), wB = uniq(B, kWords);
+
+  var pairs = [], viaId = 0, viaName = 0, viaWords = 0, usedA = {};
+  var take = function (a, b, how) {
+    if (usedA[a.__i]) return false;              // one PT-1 row serves one child
+    usedA[a.__i] = 1; pairs.push({ a: a, b: b, how: how });
+    if (how === 'id') viaId++; else if (how === 'name') viaName++; else viaWords++;
+    return true;
+  };
   B.forEach(function (b) {
-    var id = S(b['ID']), a = null;
-    if (id && byId[id]) { a = byId[id]; viaId++; }
-    else {
-      var k = nameKey(b);
-      if (k.split('|')[2] && nmA[k] === 1 && nmB[k] === 1 && aByName[k]) { a = aByName[k]; viaName++; }
-    }
-    if (a) pairs.push({ a: a, b: b });
+    var id = kId(b);
+    if (id && iA.n[id] === 1 && iB.n[id] === 1 && take(iA.one[id], b, 'id')) return;
+    var k1 = kFlat(b);
+    if (k1 && fA.n[k1] === 1 && fB.n[k1] === 1 && take(fA.one[k1], b, 'name')) return;
+    var k2 = kWords(b);
+    if (k2 && wA.n[k2] === 1 && wB.n[k2] === 1 && take(wA.one[k2], b, 'words')) return;
   });
 
   /* ── the paper effect, per grade and subject ── */
@@ -15596,23 +15702,106 @@ function _exBuildCompare() {
              raw: raw, adj: raw - exp, k: com.length, per: per });
   });
 
-  /* ── who could not be compared, and why ── */
-  var inPair = {};
-  pairs.forEach(function (p) { inPair[S(p.a['ID']) || nameKey(p.a)] = 1; });
+  /* ── WHO COULD NOT BE COMPARED, AND WHY ──
+     Three different things were being counted as one. A child can be missing
+     from a comparison because the whole grade has no sheet for one sitting,
+     because that one child's result was never entered, or because the child
+     is not on the roll at all — joined after PT-1, or left before the
+     half-yearly. Only the first two are anybody's to fix, and they need
+     different people to fix them, so they are counted apart.
+
+     The care-call roster decides the last of the three: it is the only list
+     in the workbook of who is actually on the roll. */
+  var CARE = (typeof CARE_DATA !== 'undefined' && CARE_DATA) ? CARE_DATA : [];
+  var onRoll = {};
+  CARE.forEach(function (c) {
+    var k = S(c.Branch) + '|' + words(c.Student);
+    if (k.split('|')[1]) onRoll[k] = 1;
+  });
+  var rolled = function (o) { return !!onRoll[S(o['Branch']) + '|' + words(o['Student Name'])]; };
+
+  var gradeA = {}, gradeB = {};
+  A.forEach(function (o) { var k = S(o['Branch']) + '|' + S(o['Grade']); gradeA[k] = (gradeA[k] || 0) + 1; });
+  B.forEach(function (o) { var k = S(o['Branch']) + '|' + S(o['Grade']); gradeB[k] = (gradeB[k] || 0) + 1; });
+
+  var usedB = {};
+  pairs.forEach(function (p) { usedB[p.b.__i] = 1; });
+  var gaps = {}, lone = { pt1: 0, hy: 0 };
+  var tally = function (o, side) {
+    var k = S(o['Branch']) + '|' + S(o['Grade']);
+    var g = gaps[k] || (gaps[k] = { br: S(o['Branch']), gr: S(o['Grade']),
+                                    noSheet: 0, notEntered: 0, offRoll: 0, side: '' });
+    var other = side === 'pt1' ? gradeB[k] : gradeA[k];
+    if (!other) { g.noSheet++; g.side = side; lone[side]++; }
+    else if (rolled(o)) g.notEntered++;
+    else g.offRoll++;
+  };
+  A.forEach(function (o) { if (!usedA[o.__i]) tally(o, 'pt1'); });
+  B.forEach(function (o) { if (!usedB[o.__i]) tally(o, 'hy'); });
+  var gapRows = Object.keys(gaps).map(function (k) { return gaps[k]; })
+    .filter(function (g) { return g.noSheet + g.notEntered + g.offRoll > 0; })
+    .sort(function (x, y) {
+      return (y.noSheet + y.notEntered) - (x.noSheet + x.notEntered) ||
+             x.br.localeCompare(y.br); });
+
+  /* kept for anything still reading the old shape */
   var missA = {}, missB = {};
-  A.forEach(function (o) { if (!inPair[S(o['ID']) || nameKey(o)]) missA[S(o['Branch'])] = (missA[S(o['Branch'])] || 0) + 1; });
-  var pairedB = {}; pairs.forEach(function (p) { pairedB[S(p.b['ID']) || nameKey(p.b)] = 1; });
-  B.forEach(function (o) { if (!pairedB[S(o['ID']) || nameKey(o)]) missB[S(o['Branch'])] = (missB[S(o['Branch'])] || 0) + 1; });
+  A.forEach(function (o) { if (!usedA[o.__i]) missA[S(o['Branch'])] = (missA[S(o['Branch'])] || 0) + 1; });
+  B.forEach(function (o) { if (!usedB[o.__i]) missB[S(o['Branch'])] = (missB[S(o['Branch'])] || 0) + 1; });
 
   return { rows: P, subjects: SUBJ, gshift: gshift, mean: mean,
-           viaId: viaId, viaName: viaName,
-           nA: A.length, nB: B.length, missA: missA, missB: missB };
+           viaId: viaId, viaName: viaName, viaWords: viaWords,
+           nA: A.length, nB: B.length, missA: missA, missB: missB,
+           /* paired, and of those the ones with no subject sat at both
+              sittings — matched but nothing to compare */
+           nPairs: pairs.length, noCommon: pairs.length - P.length,
+           gaps: gapRows, lone: lone };
 }
 
 /* The comparison, drawn. Every table carries the raw change and the change
    against the cohort side by side: management asked where we gained and
    where we lost, and those two columns disagree often enough that printing
    only one of them would answer the question wrongly. */
+/* ── THE FIVE STAGES OF THE SCHOOL ──
+   Management reads the school in bands, not in eleven separate grades: the
+   early years together, then the pairs and triplets that share a teaching
+   approach. Every spelling the two mark sheets use lands in one of them —
+   "EY1", "PP2", "Nursery", "Stage 4", "Grade 4", "IV". */
+var EX_BANDS = [
+  { k: 'prep',  lab: 'Prep (EY, PP, Nursery)' },
+  { k: 'g12',   lab: 'Grades 1 & 2' },
+  { k: 'g35',   lab: 'Grades 3 to 5' },
+  { k: 'g68',   lab: 'Grades 6 to 8' },
+  { k: 'g910',  lab: 'Grades 9 & 10' }
+];
+var EX_BAND_LAB = {};
+EX_BANDS.forEach(function (b) { EX_BAND_LAB[b.k] = b.lab; });
+function _exBand(grade) {
+  var g = String(grade == null ? '' : grade).trim().toUpperCase();
+  if (!g) return '';
+  if (/NUR|^EY|^PP|^KG|^LKG|^UKG|PRE/.test(g)) return 'prep';
+  var m = g.match(/(\d{1,2})/);
+  var n = m ? parseInt(m[1], 10) : null;
+  if (n == null) {
+    /* roman numerals, which the half-yearly sheet uses for sections and
+       occasionally for the grade itself */
+    var R = { I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10 };
+    var t = g.replace(/[^IVX]/g, '');
+    if (R[t]) n = R[t];
+  }
+  if (n == null) return '';
+  if (n <= 2) return 'g12';
+  if (n <= 5) return 'g35';
+  if (n <= 8) return 'g68';
+  return 'g910';
+}
+var _exOpenBand = {};
+function exToggleBand(br) {
+  _exOpenBand[br] = !_exOpenBand[br];
+  _exRenderCompare();
+}
+
+function _admNum(n) { return (n == null ? 0 : n).toLocaleString('en-IN'); }
 function _exRenderCompare() {
   var el = document.getElementById('exm-compare'); if (!el) return;
   if (!_exCmp) _exCmp = _exBuildCompare();
@@ -15623,7 +15812,7 @@ function _exRenderCompare() {
       ' half-yearly rows with no student in common.</div>';
     return;
   }
-  var scope = (window._BRANCH_LOCK) || (typeof fBranch !== 'undefined' && fBranch !== 'ALL' ? fBranch : '');
+  var scope = _exBranch();
   var R = scope ? C.rows.filter(function (r) { return r.br === scope; }) : C.rows;
   if (!R.length) { el.innerHTML = '<div class="au-empty">No child at this branch sat both papers.</div>'; return; }
 
@@ -15673,7 +15862,7 @@ function _exRenderCompare() {
      out as a row of zeros, which reads as a broken table rather than as a
      property of the method. They get the raw move and the share of children
      who improved instead, which is what those two questions actually are. */
-  var tbl = function (title, data, note, nameCol, mode) {
+  var tbl = function (title, data, note, nameCol, mode, expand) {
     var rawMode = mode === 'raw';
     data = data.slice().sort(function (x, y) { return rawMode ? (y.raw - x.raw) : (y.adj - x.adj); });
     return '<div class="au-sec"><h3>' + e(title) + '</h3>' +
@@ -15682,10 +15871,17 @@ function _exRenderCompare() {
       '<th>' + e(nameCol) + '</th><th class="n">Pupils</th><th class="n">PT-1</th><th class="n">Half yearly</th>' +
       (rawMode
         ? '<th style="min-width:150px">Raw change</th><th class="n">&nbsp;</th><th class="n">Improved</th>'
-        : '<th class="n">Raw change</th><th style="min-width:150px">Against its cohort</th><th class="n">&nbsp;</th>') +
+        : '<th class="n">Raw change</th><th style="min-width:150px">After allowing for the easier paper</th><th class="n">&nbsp;</th>') +
       '</tr></thead><tbody>' +
       data.map(function (x) {
-        return '<tr><td style="font-weight:700">' + e(x.k) + '</td>' +
+        var sub = expand ? expand(x) : null;
+        var open = sub && _exOpenBand[x.k];
+        var head = sub
+          ? '<button class="na-secbtn" onclick="exToggleBand(' +
+              JSON.stringify(x.k).replace(/"/g, '&quot;') + ')" style="font-weight:700">' +
+              (open ? '\u25be ' : '\u25b8 ') + e(x.k) + '</button>'
+          : e(x.k);
+        return '<tr><td style="font-weight:700">' + head + '</td>' +
           '<td class="n" style="color:var(--txm)">' + x.n + '</td>' +
           '<td class="n">' + x.pt.toFixed(1) + '</td>' +
           '<td class="n">' + x.hy.toFixed(1) + '</td>' +
@@ -15696,7 +15892,19 @@ function _exRenderCompare() {
                 (x.up == null ? '\u2013' : x.up.toFixed(0) + '%') + '</td>'
             : '<td class="n" style="font-weight:700;color:' + (x.raw >= 0 ? '#059669' : '#DC2626') + '">' + sg(x.raw) + '</td>' +
               '<td>' + dbar(x.adj) + '</td>' +
-              '<td class="n" style="font-weight:800;color:' + col(x.adj) + '">' + sg(x.adj) + '</td>') + '</tr>';
+              '<td class="n" style="font-weight:800;color:' + col(x.adj) + '">' + sg(x.adj) + '</td>') + '</tr>' +
+          (open ? sub.map(function (y) {
+            return '<tr style="background:var(--pl)"><td style="padding-left:30px;color:var(--txm)">' +
+                e(y.k) + '</td>' +
+              '<td class="n" style="color:var(--txm)">' + y.n + '</td>' +
+              '<td class="n" style="color:var(--txm)">' + y.pt.toFixed(1) + '</td>' +
+              '<td class="n" style="color:var(--txm)">' + y.hy.toFixed(1) + '</td>' +
+              '<td class="n" style="font-weight:700;color:' + (y.raw >= 0 ? '#059669' : '#DC2626') + '">' + sg(y.raw) + '</td>' +
+              '<td>' + dbar(y.adj) + '</td>' +
+              '<td class="n" style="font-weight:800;color:' + col(y.adj) + '">' + sg(y.adj) + '</td></tr>';
+          }).join('') + (sub.length ? '' :
+            '<tr style="background:var(--pl)"><td colspan="7" style="padding-left:30px;color:var(--txm)">' +
+            'No stage at this branch has enough children who sat both papers.</td></tr>') : '');
       }).join('') + '</tbody></table></div></div>';
   };
 
@@ -15705,8 +15913,8 @@ function _exRenderCompare() {
     tile(R.length.toLocaleString('en-IN'), 'Children in the comparison',
       'sat both papers &middot; ' + C.viaId.toLocaleString('en-IN') + ' matched on ID, ' + C.viaName + ' on name') +
     tile(sg(allRaw), 'Raw change', 'average, same subjects both sittings', allRaw >= 0 ? '#059669' : '#DC2626') +
-    tile(ahead.toLocaleString('en-IN'), 'Genuinely ahead', 'gained 2+ points on their cohort', '#047857') +
-    tile(behind.toLocaleString('en-IN'), 'Genuinely behind', 'lost 2+ points against their cohort', '#DC2626') +
+    tile(ahead.toLocaleString('en-IN'), 'Really improved', 'rose 2+ points MORE than the easier paper gave everyone', '#047857') +
+    tile(behind.toLocaleString('en-IN'), 'Really slipped', 'rose 2+ points LESS than the easier paper gave everyone', '#DC2626') +
     '</div>';
 
   /* the finding that governs how every other number is read */
@@ -15717,11 +15925,35 @@ function _exRenderCompare() {
     '<b>The half-yearly paper was the easier of the two, so read the right-hand column, not the raw change.</b> ' +
     up + ' of ' + tot + ' subjects rose across every branch at once, by ' + sg(mean(C.subjects.map(function (s) {
       return C.gshift[s] || 0; }))) + ' points on average. Six thousand children do not improve in step. ' +
-    '<b>Against its cohort</b> is each group’s change minus what its own grade and subject did overall — ' +
-    'zero means it moved exactly with everyone else, not that nothing happened.</div>';
+    '<b>After allowing for the easier paper</b> takes each group’s change and subtracts what that same ' +
+    'grade and subject did across the whole group. <b>Zero means the group moved exactly as much as ' +
+    'everybody else did</b> — it is not a score of nought, and it does not mean nothing happened. ' +
+    'A positive figure is a group that rose by more than the paper alone would explain; a negative one ' +
+    'rose by less, or fell while others rose.</div>';
 
+  /* ── CLICK A BRANCH FOR ITS FIVE STAGES ──
+     Asked for on 5 November 2026: a branch average hides the thing management
+     needs, which is WHERE inside the branch the movement is. A branch can sit
+     at zero with its early years well up and its board years well down. */
+  var bandsOf = function (x) {
+    var m = {};
+    x.rows.forEach(function (r) {
+      var k = _exBand(r.gr); if (!k) return; (m[k] = m[k] || []).push(r); });
+    return EX_BANDS.filter(function (b) { return m[b.k] && m[b.k].length; })
+      .map(function (b) {
+        var g = m[b.k];
+        return { k: b.lab + '  \u00b7  ' + g.length + (g.length === 1 ? ' child' : ' children'),
+          n: g.length,
+          pt: mean(g.map(function (r) { return r.pt; })),
+          hy: mean(g.map(function (r) { return r.hy; })),
+          raw: mean(g.map(function (r) { return r.raw; })),
+          adj: mean(g.map(function (r) { return r.adj; })) };
+      });
+  };
   h += tbl('Branch', agg(function (r) { return r.br; }),
-    'Sorted by movement against the cohort, which is not the same order as the raw change.', 'Branch');
+    'Click a branch to open its five stages \u2014 Prep, 1 &amp; 2, 3 to 5, 6 to 8, 9 &amp; 10 \u2014 and see ' +
+    'where inside it the movement actually is. Sorted by the figure in the right-hand column, which is ' +
+    'not the same order as the raw change.', 'Branch', null, bandsOf);
   h += tbl('Subject', (function () {
       return C.subjects.map(function (sj) {
         var g = R.filter(function (r) { return r.per[sj]; });
@@ -15751,18 +15983,49 @@ function _exRenderCompare() {
   h += tbl('The eight rooms that lost the most', worst,
     'Twelve pupils or more. A negative figure here means the room fell behind a cohort that was rising.', 'Section');
 
-  /* who is not on this page */
-  var mk = function (o) { return Object.keys(o).sort(function (a, b) { return o[b] - o[a]; })
-    .map(function (k) { return e(k || '(no branch)') + ' ' + o[k]; }).join(' &middot; '); };
+  /* ── WHO IS NOT ON THIS PAGE, AND WHOSE JOB IT IS ──
+     "No half yearly found" was one heading over three different problems, and
+     the three need three different people. Separated here, with the care-call
+     roster deciding which is which. */
+  var G = (C.gaps || []).filter(function (g) { return !scope || g.br === scope; });
+  var tot = { noSheet: 0, notEntered: 0, offRoll: 0 };
+  G.forEach(function (g) { tot.noSheet += g.noSheet; tot.notEntered += g.notEntered; tot.offRoll += g.offRoll; });
+  var tiles = '<div class="au-kpis" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:14px">' +
+    tile(tot.noSheet.toLocaleString('en-IN'), 'No paper for the whole grade',
+         'the sitting was never held or never entered for that grade', tot.noSheet ? '#DC2626' : 'var(--tx)') +
+    tile(tot.notEntered.toLocaleString('en-IN'), 'On the roll, one result missing',
+         'the care-call register has the child; one mark sheet does not', tot.notEntered ? '#D97706' : 'var(--tx)') +
+    tile(tot.offRoll.toLocaleString('en-IN'), 'Not on the roll',
+         'joined after PT-1 or left before the half yearly — nothing to fix', 'var(--txm)') +
+    '</div>';
+  var gRows = G.filter(function (g) { return g.noSheet || g.notEntered; })
+               .slice(0, 22).map(function (g) {
+    return '<tr><td style="font-weight:700">' + e(g.br) + '</td><td>' + e(g.gr) + '</td>' +
+      '<td class="n" style="font-weight:800;color:' + (g.noSheet ? '#DC2626' : 'var(--txl)') + '">' +
+        (g.noSheet || '–') + '</td>' +
+      '<td style="color:var(--txm)">' + (g.noSheet
+        ? (g.side === 'pt1' ? 'half yearly missing for this grade' : 'PT-1 missing for this grade') : '') + '</td>' +
+      '<td class="n" style="font-weight:800;color:' + (g.notEntered ? '#D97706' : 'var(--txl)') + '">' +
+        (g.notEntered || '–') + '</td>' +
+      '<td class="n" style="color:var(--txm)">' + (g.offRoll || '–') + '</td></tr>';
+  }).join('');
   h += '<div class="au-sec"><h3>Who is not in this comparison</h3>' +
-    '<div class="sub">A child appears above only if both sittings can be tied to them. ' +
-    'Everyone else is named here rather than quietly dropped.</div>' +
-    '<div style="font-size:13px;line-height:1.7">' +
-    '<b>Sat PT-1, no half yearly found:</b> ' + mk(C.missA) + '<br>' +
-    '<b>Sat the half yearly, no PT-1 found:</b> ' + mk(C.missB) + '</div>' +
-    '<div class="au-note">Where the ID column is blank the join falls back to branch, grade and name, and only ' +
-    'where that name is unique in both sittings. Filling the ID column on every mark sheet is what would close ' +
-    'the remaining gap.</div></div>';
+    '<div class="sub">A child is above only where both papers can be tied to them. ' +
+    _admNum(C.nPairs) + ' children were matched out of ' + _admNum(C.nA) + ' PT-1 and ' +
+    _admNum(C.nB) + ' half-yearly rows' +
+    (C.noCommon ? ', and ' + C.noCommon + ' of those sat no subject at both sittings' : '') +
+    '. The rest are counted here by what is actually wrong, because the three need different people ' +
+    'to put them right.</div>' + tiles +
+    (gRows ? '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:760px"><thead><tr>' +
+      '<th>Branch</th><th>Grade</th><th class="n">Whole grade</th><th>&nbsp;</th>' +
+      '<th class="n">Result missing</th><th class="n">Not on roll</th></tr></thead><tbody>' +
+      gRows + '</tbody></table></div>' : '') +
+    '<div class="au-note"><b>Matched by:</b> admission number ' + _admNum(C.viaId) +
+    ' · full name ' + _admNum(C.viaName) + ' · same name words in a different order ' +
+    _admNum(C.viaWords) + '. An admission number is used only where it names one child on each sheet: ' +
+    'some rows carry a bare number instead, and those are shared by two or three different children. ' +
+    'Closer-than-exact name matching is deliberately not attempted — on this workbook its best ' +
+    'candidates were siblings in different grades.</div></div>';
 
   el.innerHTML = h;
 }
@@ -15800,7 +16063,10 @@ function _pt1Post(){
   f.contentWindow.postMessage({ type:'PBES_PT1_DATA', payload:pay,
                                 exam:{ eyebrow:S.eyebrow, footer:S.footer, title:S.title,
                                        headline:S.headline },
-                                branchLock: window._BRANCH_LOCK || null }, '*');
+                                /* A role lock still wins, but with no lock the global
+                                   dropdown is what the reader means by "this branch", and
+                                   the review honours it like every other tab. */
+                                branchLock: _exBranch() || null }, '*');
   exSyncSwitch();
   exCheckMarks(pay);
   exRenderPending();
