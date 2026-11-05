@@ -3439,7 +3439,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       <div class="au-sec">
         <h3>📅 The same point of the season, in earlier years</h3>
-        <div class="sub">Every year cut at the same day of its own season, counting from 1 October.</div>
+        <div class="sub">Every year cut at the same day of its own season, counting from 1 September.</div>
         <div id="adm-yoy"></div>
       </div>
 
@@ -22113,58 +22113,79 @@ function _admPlanPanel() {
 }
 
 // ── 3. the same point of the season, in earlier years ──────────────────────
+/* ═════ THREE REGISTERS, ONE TABLE ═════
+   Set on 5 November 2026, corrected on the same day after management checked
+   the figures. No single sheet carries every season, so each year is read
+   from the register that actually holds it, and the table names that register
+   in its own column rather than in a paragraph:
+
+     2027-28 and later  the counsellors' 27-28 branch tabs
+     2026-27            the CRM export, "Touched Leads"
+     2025-26 and before "All AY Admissions", dated by DATE OF ADMISSION
+
+   TWO CORRECTIONS, both reported by management against the sheets:
+
+   1. THE SEASON OPENS IN SEPTEMBER, NOT OCTOBER. Cut at 1 October the window
+      caught 11, 28 and 10 admissions for the three earlier seasons — a slice
+      so thin that the swing between years was noise, and the panel printed
+      changes of +1,380%. The admissions sheet shows why: September already
+      carries admissions in every year (17 in Sep 2024 for the 2025-26 season,
+      12 in Sep 2023 for 2024-25). Counting from 1 September gives 28, 40 and
+      11 on the same three seasons — the same shape, steadier ground.
+      This start is for THIS PANEL ONLY. The monthly plan still runs October
+      to June and the "Whole season" button still counts from 1 October,
+      because that is when the plan starts and when the tracker went live.
+
+   2. 2026-27's FULL INTAKE WAS UNDERSTATED. It was counted as the leads
+      CREATED inside a twelve-month window that were later admitted — 1,454 —
+      which silently dropped every admission won from a lead opened before the
+      window began. The CRM export is one season's worth of work, so its full
+      intake is simply every lead in it standing at stage 08: 1,648. No window
+      is applied to a total that is not a window.
+
+   The prose that used to sit under this table was removed at management's
+   request: this panel is figures only. What cannot be shown as a figure —
+   which register a row came from — is a column, not a sentence. */
+var ADM_YOY_MONTH = 9;                       // the season opens 1 September
+function _admYoyStart(ay) {
+  var y = parseInt(String(ay).slice(0, 4), 10);
+  return (y - 1) + '-' + _ad2(ADM_YOY_MONTH) + '-01';
+}
 function _admYoY() {
   var el = document.getElementById('adm-yoy'); if (!el) return;
   var S = _admSet(), R = _admRaw;
   var season = R.season || '';
-  var start = _admSeasonStart(season), today = _admIso(new Date());
+  var start = _admYoyStart(season), today = _admIso(new Date());
   var day = Math.round((new Date(today) - new Date(start)) / 86400000);
   if (day < 0) { el.innerHTML = '<div class="au-empty">The season has not opened yet.</div>'; return; }
 
-  /* ═════ THREE REGISTERS, ONE TABLE ═════
-     Set on 5 November 2026. No single sheet carries every season, so each
-     year is read from the register that actually holds it, and the table
-     names that register in its own column rather than in a paragraph:
-
-       2027-28 and later  the counsellors' 27-28 branch tabs
-       2026-27            the CRM export, "Touched Leads"
-       2025-26 and before "All AY Admissions", dated by DATE OF ADMISSION
-
-     Every row is cut at the same day of its own season, counting from
-     1 October, so a part-finished season is never set against a complete one.
-
-     The prose that used to sit under this table was removed at management's
-     request: this panel is figures only. What cannot be shown as a figure —
-     which register a row came from — is a column, not a sentence. */
   var LD = (typeof LEAD_DATES !== 'undefined' && LEAD_DATES) ? LEAD_DATES : [];
   var scope = S.scope;
-  var crmIn = function (a, b, wonOnly) {
+  var CRM_HIST = 'Touched Leads', TRK = '27-28 tabs';
+  var crmWon = function (a, b) {
     return LD.filter(function (r) {
-      return r && r.Date && r.Date >= a && r.Date <= b && r.Branch && (!scope || r.Branch === scope) &&
-             (!wonOnly || r.Stage === '08-Admission Completed');
+      return r && r.Stage === '08-Admission Completed' && r.Branch && (!scope || r.Branch === scope) &&
+             (!a || (r.Date && r.Date >= a && r.Date <= b));
     }).length;
   };
+  var trkWon = function () { return S.rows.filter(_admIsWon).length; };
 
-  var rows = [];
-  /* this season, from the tracker this whole tab is built on */
-  rows.push({ ay: season, src: '27-28 tabs', a: start, b: today,
-              n: S.rows.filter(_admIsWon).length, full: null, now: 1 });
-  /* last season, from the CRM — "All AY Admissions" has no row for it */
   var lastAy = _admLastSeason(season);
+  var rows = [];
+  rows.push({ ay: season, src: TRK, a: start, b: today, n: trkWon(), full: null, now: 1 });
   if (lastAy && LD.length) {
-    var la = _admSeasonStart(lastAy);
-    rows.push({ ay: lastAy, src: 'Touched Leads', a: la, b: _admAddDays(la, day),
-                n: crmIn(la, _admAddDays(la, day), 1),
-                full: crmIn(la, _admAddDays(la, 364), 1) });
+    var la = _admYoyStart(lastAy);
+    rows.push({ ay: lastAy, src: CRM_HIST, a: la, b: _admAddDays(la, day),
+                n: crmWon(la, _admAddDays(la, day)),
+                /* every lead in the export at stage 08 — a total, not a window */
+                full: crmWon('', '') });
   }
-  /* everything earlier, from the history sheet */
   (R.histAys || []).filter(function (ay) { return ay < season && ay !== lastAy; }).slice(-3).reverse()
     .forEach(function (ay) {
-      var a = _admSeasonStart(ay), b = _admAddDays(a, day);
+      var a = _admYoyStart(ay), b = _admAddDays(a, day);
       rows.push({ ay: ay, src: ADM_HIST_TAB, a: a, b: b,
         n: S.hist.filter(function (r) { return r.ay === ay && r.d && r.d >= a && r.d <= b; }).length,
-        full: S.hist.filter(function (r) { return r.ay === ay; }).length,
-        hist: 1 });
+        full: S.hist.filter(function (r) { return r.ay === ay; }).length, hist: 1 });
     });
   if (rows.length < 2) {
     el.innerHTML = '<div class="au-empty">No earlier season carries dated records to compare with.</div>';
@@ -22203,13 +22224,79 @@ function _admYoY() {
     '<td class="n">' + avg.toFixed(0) + '</td>' +
     '<td class="n" style="color:' + (now >= avg ? 'var(--ok)' : 'var(--bad)') + '">' +
       (avg ? (now >= avg ? '+' : '') + Math.round(100 * (now - avg) / avg) + '%' : '–') + '</td>' +
-    '<td class="n"></td><td class="n"></td></tr></tfoot>') + '</table></div>';
+    '<td class="n"></td><td class="n"></td></tr></tfoot>') + '</table></div>' +
+    _admYoYBranches(S, R, season, lastAy, scope);
   el.innerHTML = h;
+}
+
+/* ── EVERY YEAR, EVERY BRANCH ──
+   Asked for on 5 November 2026: the complete branch-by-branch comparison of
+   earlier academic years, not just the group line. Full-year intake, so the
+   finished seasons are whole; the season in progress is marked as such.
+   A branch shows a dash, not a zero, for a year before it opened — Gowdavalli
+   took its first admissions in 2026-27 and printing 0 against 2018-19 would
+   read as a branch that failed rather than a branch that did not exist. */
+function _admYoYBranches(S, R, season, lastAy, scope) {
+  var LD = (typeof LEAD_DATES !== 'undefined' && LEAD_DATES) ? LEAD_DATES : [];
+  var brs = (R.branches || []).slice();
+  if (scope) brs = [scope];
+  if (!brs.length) return '';
+  var ays = (R.histAys || []).filter(function (a) { return a < season && a !== lastAy; }).slice();
+  var rows = [];
+  ays.forEach(function (ay) {
+    rows.push({ ay: ay, src: ADM_HIST_TAB, by: function (b) {
+      return S.hist.filter(function (r) { return r.ay === ay && r.b === b; }).length; } });
+  });
+  if (lastAy && LD.length) {
+    rows.push({ ay: lastAy, src: 'Touched Leads', by: function (b) {
+      return LD.filter(function (r) { return r.Branch === b && r.Stage === '08-Admission Completed'; }).length; } });
+  }
+  rows.push({ ay: season, src: '27-28 tabs', now: 1, by: function (b) {
+    return S.rows.filter(function (r) { return r.b === b && _admIsWon(r); }).length; } });
+  rows.reverse();
+  /* a branch that never appears anywhere is not a column */
+  var live = brs.filter(function (b) {
+    return rows.some(function (r) { return r.by(b) > 0; }); });
+  if (!live.length) return '';
+
+  var h = '<div class="h4" style="margin:22px 0 10px;font-size:17px;font-weight:800;color:var(--tx)">' +
+    'Every year, branch by branch · full intake</div>' +
+    '<div style="overflow-x:auto"><table class="au-tbl au-yoy" style="min-width:' +
+      (320 + live.length * 120) + 'px"><thead><tr><th>Academic year</th><th>Read from</th>' +
+    live.map(function (b) { return '<th class="n">' + _admDot(b) + ' ' + _admEsc(b) + '</th>'; }).join('') +
+    '<th class="n">Total</th><th class="n">Year on year</th></tr></thead><tbody>';
+  var prev = null;
+  /* oldest first for the year-on-year arithmetic, printed newest first */
+  var ordered = rows.slice().reverse(), totals = {};
+  ordered.forEach(function (r) {
+    totals[r.ay] = live.reduce(function (t, b) { return t + r.by(b); }, 0);
+  });
+  rows.forEach(function (r, k) {
+    var tot = totals[r.ay];
+    var idx = ordered.map(function (x) { return x.ay; }).indexOf(r.ay);
+    var before = idx > 0 ? totals[ordered[idx - 1].ay] : null;
+    var chg = (r.now || !before) ? null : Math.round(100 * (tot - before) / before);
+    h += '<tr' + (r.now ? ' style="background:var(--pl)"' : '') + '>' +
+      '<td><b>' + _admEsc(r.ay) + '</b>' +
+        (r.now ? ' <span class="na-pill" style="background:var(--sur);color:var(--p)">in progress</span>' : '') + '</td>' +
+      '<td style="color:var(--txm)">' + _admEsc(r.src) + '</td>' +
+      live.map(function (b) {
+        var v = r.by(b);
+        return '<td class="n"' + (v ? '' : ' style="color:var(--txl)"') + '>' +
+          (v ? _admN(v) : '–') + '</td>';
+      }).join('') +
+      '<td class="n" style="font-weight:800">' + _admN(tot) + '</td>' +
+      '<td class="n" style="font-weight:800;color:' + (chg === null ? 'var(--txm)'
+        : chg >= 0 ? 'var(--ok)' : 'var(--bad)') + '">' +
+        (chg === null ? '–' : (chg >= 0 ? '+' : '') + chg + '%') + '</td></tr>';
+  });
+  return h + '</tbody></table></div>';
 }
 
 function admOpenYoY(ay, day) {
   var S = _admSet();
-  var a = _admSeasonStart(ay), b = _admAddDays(a, day);
+  /* the same window the table printed, so the drill-down cannot disagree */
+  var a = _admYoyStart(ay), b = _admAddDays(a, day);
   var rows = S.hist.filter(function (r) { return r.ay === ay && r.d && r.d >= a && r.d <= b; });
   var byB = {}, byC = {};
   rows.forEach(function (r) { byB[r.b] = (byB[r.b] || 0) + 1; byC[r.cls] = (byC[r.cls] || 0) + 1; });
