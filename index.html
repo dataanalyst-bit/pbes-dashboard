@@ -15730,7 +15730,11 @@ function _exBuildCompare() {
   var tally = function (o, side) {
     var k = S(o['Branch']) + '|' + S(o['Grade']);
     var g = gaps[k] || (gaps[k] = { br: S(o['Branch']), gr: S(o['Grade']),
-                                    noSheet: 0, notEntered: 0, offRoll: 0, side: '' });
+                                    noSheet: 0, notEntered: 0, offRoll: 0, side: '', who: [] });
+    /* the children themselves, so a count on the page can be opened and
+       chased rather than only read */
+    if (g.who.length < 400) g.who.push({ nm: S(o['Student Name']), id: S(o['ID']),
+      br: S(o['Branch']), gr: S(o['Grade']), sec: S(o['Section']), side: side });
     var other = side === 'pt1' ? gradeB[k] : gradeA[k];
     if (!other) { g.noSheet++; g.side = side; lone[side]++; }
     else if (rolled(o)) g.notEntered++;
@@ -15795,10 +15799,80 @@ function _exBand(grade) {
   if (n <= 8) return 'g68';
   return 'g910';
 }
-var _exOpenBand = {};
-function exToggleBand(br) {
-  _exOpenBand[br] = !_exOpenBand[br];
-  _exRenderCompare();
+/* ── EVERY NUMBER OPENS (5 Nov 2026) ──
+   Asked for after the first build: on this page a figure is only useful if
+   the children behind it can be read. Two things do that, and they are
+   different jobs.
+
+   TAP TO EXPAND opens the next level DOWN inside the table, so the shape of
+   a group stays on screen while its parts appear beneath it — branch into its
+   five stages, a stage into its rooms, a subject or a grade into the branches
+   that carry it. The open rows are remembered by path, so re-rendering after
+   a filter change does not fold them all shut.
+
+   CLICK TO VIEW opens the children themselves, named, with both their marks.
+   It is on every row and every headline tile, because the question a reader
+   asks of a number on this page is almost always "which children?". */
+var _exOpen = {};
+function exToggle(key) { _exOpen[key] = !_exOpen[key]; _exRenderCompare(); }
+function exToggleBand(br) { exToggle('branch|' + br); }          /* kept: older markup calls it */
+
+/* label → the children, drawn as a table that can be read across */
+function _exPupilTable(rows) {
+  var e = function (v) { return String(v == null ? '' : v).replace(/[&<>"]/g, function (m) {
+    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]; }); };
+  var sg = function (v) { return (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v).toFixed(1); };
+  var col = function (v) { return v >= 2 ? '#047857' : v >= 0.5 ? '#059669' : v > -0.5 ? '#64748B' : v > -2 ? '#D97706' : '#DC2626'; };
+  var L = rows.slice().sort(function (a, b) { return a.adj - b.adj; });
+  var cap = 400, more = L.length - cap;
+  return '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:820px"><thead><tr>' +
+    '<th>Child</th><th>Branch</th><th>Grade</th><th>Section</th><th>Class teacher</th>' +
+    '<th class="n">Subjects</th><th class="n">PT-1</th><th class="n">Half yearly</th>' +
+    '<th class="n">Raw</th><th class="n">After the paper</th></tr></thead><tbody>' +
+    L.slice(0, cap).map(function (r) {
+      return '<tr><td style="font-weight:700">' + e(r.nm || '(no name)') + '</td>' +
+        '<td style="color:var(--txm)">' + e(r.br) + '</td>' +
+        '<td style="color:var(--txm)">' + e(r.gr) + '</td>' +
+        '<td style="color:var(--txm)">' + e(r.sec) + '</td>' +
+        '<td style="color:var(--txm)">' + e(r.tch || '–') + '</td>' +
+        '<td class="n" style="color:var(--txm)">' + r.k + '</td>' +
+        '<td class="n">' + r.pt.toFixed(1) + '</td>' +
+        '<td class="n">' + r.hy.toFixed(1) + '</td>' +
+        '<td class="n" style="font-weight:700;color:' + (r.raw >= 0 ? '#059669' : '#DC2626') + '">' + sg(r.raw) + '</td>' +
+        '<td class="n" style="font-weight:800;color:' + col(r.adj) + '">' + sg(r.adj) + '</td></tr>';
+    }).join('') + '</tbody></table></div>' +
+    (more > 0 ? '<div class="au-note">Showing the 400 who moved furthest down. ' + more +
+      ' more are in this group.</div>' : '') +
+    '<div class="au-note"><b>Weakest first.</b> Subjects is how many papers the child sat at BOTH ' +
+    'sittings — only those count towards the two averages beside it, so a child who sat six in ' +
+    'October and four in December is compared on the four.</div>';
+}
+/* opened from a row or a tile; the selection is described, never recomputed */
+var _exPick = {};
+function exView(id) {
+  var P = _exPick[id];
+  if (!P || typeof openHTMLModal !== 'function') return;
+  if (P.gap) {
+    /* children who are NOT in the comparison have one paper at most, so they
+       are listed by who they are rather than by a change they do not have */
+    var e = function (v) { return String(v == null ? '' : v).replace(/[&<>"]/g, function (m) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]; }); };
+    openHTMLModal(P.title, P.gap.length.toLocaleString('en-IN') + ' children · ' + P.sub,
+      '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:620px"><thead><tr>' +
+      '<th>Child</th><th>Admission no.</th><th>Grade</th><th>Section</th><th>Has</th>' +
+      '</tr></thead><tbody>' + P.gap.map(function (r) {
+        return '<tr><td style="font-weight:700">' + e(r.nm || '(no name)') + '</td>' +
+          '<td style="color:var(--txm)">' + e(r.id || '–') + '</td>' +
+          '<td style="color:var(--txm)">' + e(r.gr) + '</td>' +
+          '<td style="color:var(--txm)">' + e(r.sec) + '</td>' +
+          '<td>' + (r.side === 'pt1' ? 'PT-1 only' : 'half yearly only') + '</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<div class="au-note">Either the other sitting was never held for this grade, or that one ' +
+      'result was never entered. Both are put right in the mark sheet, not here.</div>');
+    return;
+  }
+  openHTMLModal(P.title, P.rows.length.toLocaleString('en-IN') + ' children' +
+    (P.sub ? ' · ' + P.sub : ''), _exPupilTable(P.rows));
 }
 
 function _admNum(n) { return (n == null ? 0 : n).toLocaleString('en-IN'); }
@@ -15850,71 +15924,134 @@ function _exRenderCompare() {
   var ahead = R.filter(function (r) { return r.adj >= 2; }).length;
   var behind = R.filter(function (r) { return r.adj <= -2; }).length;
 
-  var tile = function (v, lab, sub, c) {
-    return '<div class="au-kpi" style="cursor:default">' +
+  /* Every tile opens the children behind it. A headline number nobody can
+     open is a number nobody can check. */
+  var pid = 0;
+  var pick = function (title, rows, sub) {
+    var id = 'p' + (++pid);
+    _exPick[id] = { title: title, rows: rows, sub: sub || '' };
+    return id;
+  };
+  var tile = function (v, lab, sub, c, rows, title) {
+    var id = rows && rows.length ? pick(title || lab, rows, sub) : '';
+    return '<button class="au-kpi" style="text-align:left;cursor:' + (id ? 'pointer' : 'default') + '"' +
+      (id ? ' onclick="exView(\'' + id + '\')"' : '') + '>' +
       '<div class="na-kh"><span class="v" style="color:' + (c || 'var(--tx)') + '">' + v + '</span></div>' +
-      '<div class="k">' + lab + '</div><div class="d">' + sub + '</div></div>';
+      '<div class="k">' + lab + '</div><div class="d">' + sub +
+      (id ? ' <span style="color:var(--p);font-weight:700;white-space:nowrap">· click to view</span>' : '') +
+      '</div></button>';
   };
 
-  /* mode 'adj' scores a group against its cohort; mode 'raw' is for the two
-     tables where that is meaningless. The adjustment is computed per grade and
-     subject, so a grade or a subject cannot beat itself — those columns came
-     out as a row of zeros, which reads as a broken table rather than as a
-     property of the method. They get the raw move and the share of children
-     who improved instead, which is what those two questions actually are. */
-  var tbl = function (title, data, note, nameCol, mode, expand) {
+  /* ── A ROW, AND WHAT IS UNDER IT ──
+     stats() turns any set of children into the figures a row prints, so a
+     branch, a stage, a room, a subject and a grade are all built the same
+     way and cannot drift apart. kids() is what tapping the row opens; a row
+     with no kids is a leaf and only carries "view". */
+  var stats = function (label, g, key, kids) {
+    return { k: label, n: g.length, rows: g, key: key || '', kids: kids || null,
+      pt: mean(g.map(function (r) { return r.pt; })),
+      hy: mean(g.map(function (r) { return r.hy; })),
+      raw: mean(g.map(function (r) { return r.raw; })),
+      up: 100 * g.filter(function (r) { return r.raw > 0; }).length / g.length,
+      adj: mean(g.map(function (r) { return r.adj; })) };
+  };
+  var groupBy = function (list, keyf) {
+    var m = {}, order = [];
+    list.forEach(function (r) { var k = keyf(r); if (!k) return;
+      if (!m[k]) { m[k] = []; order.push(k); } m[k].push(r); });
+    return { m: m, keys: order };
+  };
+  /* the rooms inside a group, biggest first; a room of one child is noise */
+  var roomsOf = function (x) {
+    var G = groupBy(x.rows, function (r) {
+      /* the section name usually repeats the grade in another notation —
+         "Grade V A" inside "Grade 5" — so the repeat is dropped and the
+         grade kept, because a stage mixes three grades together */
+      var sec = String(r.sec || '').replace(/^\s*(grade|stage|class)\s*/i, '').trim();
+      return r.gr + ' · ' + (sec || '(no section)');
+    });
+    return G.keys.map(function (k) { return stats(k, G.m[k], ''); })
+      .filter(function (x) { return x.n >= 3; })
+      .sort(function (a, b) { return a.adj - b.adj; });
+  };
+  /* branch → its five stages → the rooms in that stage */
+  var bandsOf = function (x) {
+    var m = {};
+    x.rows.forEach(function (r) { var k = _exBand(r.gr); if (k) (m[k] = m[k] || []).push(r); });
+    return EX_BANDS.filter(function (b) { return m[b.k] && m[b.k].length; })
+      .map(function (b) {
+        return stats(b.lab, m[b.k], x.key + '|' + b.k, roomsOf);
+      });
+  };
+  /* a subject or a grade → the branches that carry it */
+  var branchesOf = function (x) {
+    var G = groupBy(x.rows, function (r) { return r.br; });
+    return G.keys.map(function (k) { return stats(k, G.m[k], x.key + '|' + k, roomsOf); })
+      .sort(function (a, b) { return b.adj - a.adj; });
+  };
+
+  /* mode 'adj' scores a group after the paper effect is removed; mode 'raw'
+     is for the two tables where that is meaningless. The adjustment is
+     computed per grade and subject, so a grade or a subject cannot beat
+     itself — those columns came out as a row of zeros, which reads as a
+     broken table rather than as a property of the method. They get the raw
+     move and the share of children who improved instead. */
+  var tbl = function (title, data, note, nameCol, mode, opt) {
+    opt = opt || {};
     var rawMode = mode === 'raw';
     data = data.slice().sort(function (x, y) { return rawMode ? (y.raw - x.raw) : (y.adj - x.adj); });
+    var body = '';
+    var emit = function (x, depth) {
+      var kids = x.kids ? x.kids(x, depth) : null;
+      var open = kids && kids.length && x.key && _exOpen[x.key];
+      var pad = depth * 22;
+      var head = (kids && kids.length && x.key)
+        ? '<button class="na-secbtn" onclick="exToggle(' +
+            JSON.stringify(x.key).replace(/"/g, '&quot;') + ')" style="font-weight:' +
+            (depth ? '600' : '700') + '">' + (open ? '▾ ' : '▸ ') + e(x.k) + '</button>'
+        : '<span style="font-weight:' + (depth ? '500' : '700') + '">' + e(x.k) + '</span>';
+      var vid = pick((opt.what || nameCol) + ' · ' + x.k, x.rows, title);
+      body += '<tr' + (depth ? ' style="background:var(--pl)"' : '') + '>' +
+        '<td style="padding-left:' + (9 + pad) + 'px' + (depth ? ';color:var(--txm)' : '') + '">' + head + '</td>' +
+        '<td class="n" style="color:var(--txm)">' + x.n + '</td>' +
+        '<td class="n">' + x.pt.toFixed(1) + '</td>' +
+        '<td class="n">' + x.hy.toFixed(1) + '</td>' +
+        (rawMode
+          ? '<td>' + dbar(x.raw) + '</td>' +
+            '<td class="n" style="font-weight:800;color:' + (x.raw >= 0 ? '#059669' : '#DC2626') + '">' + sg(x.raw) + '</td>' +
+            '<td class="n" style="font-weight:700;color:' + (x.up >= 60 ? '#059669' : x.up >= 45 ? '#D97706' : '#DC2626') + '">' +
+              (x.up == null ? '–' : x.up.toFixed(0) + '%') + '</td>'
+          : '<td class="n" style="font-weight:700;color:' + (x.raw >= 0 ? '#059669' : '#DC2626') + '">' + sg(x.raw) + '</td>' +
+            '<td>' + dbar(x.adj) + '</td>' +
+            '<td class="n" style="font-weight:800;color:' + col(x.adj) + '">' + sg(x.adj) + '</td>') +
+        '<td class="n"><button class="na-secbtn" onclick="exView(\'' + vid + '\')" ' +
+          'style="color:var(--p);font-weight:700;white-space:nowrap">view ›</button></td></tr>';
+      if (open) kids.forEach(function (y) { emit(y, depth + 1); });
+      if (open && !kids.length)
+        body += '<tr style="background:var(--pl)"><td colspan="8" style="padding-left:' + (31 + pad) +
+          'px;color:var(--txm)">Nothing inside this group is big enough to show on its own.</td></tr>';
+    };
+    data.forEach(function (x) { emit(x, 0); });
     return '<div class="au-sec"><h3>' + e(title) + '</h3>' +
       (note ? '<div class="sub">' + note + '</div>' : '') +
-      '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:720px"><thead><tr>' +
+      '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:820px"><thead><tr>' +
       '<th>' + e(nameCol) + '</th><th class="n">Pupils</th><th class="n">PT-1</th><th class="n">Half yearly</th>' +
       (rawMode
         ? '<th style="min-width:150px">Raw change</th><th class="n">&nbsp;</th><th class="n">Improved</th>'
         : '<th class="n">Raw change</th><th style="min-width:150px">After allowing for the easier paper</th><th class="n">&nbsp;</th>') +
-      '</tr></thead><tbody>' +
-      data.map(function (x) {
-        var sub = expand ? expand(x) : null;
-        var open = sub && _exOpenBand[x.k];
-        var head = sub
-          ? '<button class="na-secbtn" onclick="exToggleBand(' +
-              JSON.stringify(x.k).replace(/"/g, '&quot;') + ')" style="font-weight:700">' +
-              (open ? '\u25be ' : '\u25b8 ') + e(x.k) + '</button>'
-          : e(x.k);
-        return '<tr><td style="font-weight:700">' + head + '</td>' +
-          '<td class="n" style="color:var(--txm)">' + x.n + '</td>' +
-          '<td class="n">' + x.pt.toFixed(1) + '</td>' +
-          '<td class="n">' + x.hy.toFixed(1) + '</td>' +
-          (rawMode
-            ? '<td>' + dbar(x.raw) + '</td>' +
-              '<td class="n" style="font-weight:800;color:' + (x.raw >= 0 ? '#059669' : '#DC2626') + '">' + sg(x.raw) + '</td>' +
-              '<td class="n" style="font-weight:700;color:' + (x.up >= 60 ? '#059669' : x.up >= 45 ? '#D97706' : '#DC2626') + '">' +
-                (x.up == null ? '\u2013' : x.up.toFixed(0) + '%') + '</td>'
-            : '<td class="n" style="font-weight:700;color:' + (x.raw >= 0 ? '#059669' : '#DC2626') + '">' + sg(x.raw) + '</td>' +
-              '<td>' + dbar(x.adj) + '</td>' +
-              '<td class="n" style="font-weight:800;color:' + col(x.adj) + '">' + sg(x.adj) + '</td>') + '</tr>' +
-          (open ? sub.map(function (y) {
-            return '<tr style="background:var(--pl)"><td style="padding-left:30px;color:var(--txm)">' +
-                e(y.k) + '</td>' +
-              '<td class="n" style="color:var(--txm)">' + y.n + '</td>' +
-              '<td class="n" style="color:var(--txm)">' + y.pt.toFixed(1) + '</td>' +
-              '<td class="n" style="color:var(--txm)">' + y.hy.toFixed(1) + '</td>' +
-              '<td class="n" style="font-weight:700;color:' + (y.raw >= 0 ? '#059669' : '#DC2626') + '">' + sg(y.raw) + '</td>' +
-              '<td>' + dbar(y.adj) + '</td>' +
-              '<td class="n" style="font-weight:800;color:' + col(y.adj) + '">' + sg(y.adj) + '</td></tr>';
-          }).join('') + (sub.length ? '' :
-            '<tr style="background:var(--pl)"><td colspan="7" style="padding-left:30px;color:var(--txm)">' +
-            'No stage at this branch has enough children who sat both papers.</td></tr>') : '');
-      }).join('') + '</tbody></table></div></div>';
+      '<th class="n">&nbsp;</th>' +
+      '</tr></thead><tbody>' + body + '</tbody></table></div></div>';
   };
 
-  var h = '';
-  h += '<div class="au-kpis">' +
-    tile(R.length.toLocaleString('en-IN'), 'Children in the comparison',
-      'sat both papers &middot; ' + C.viaId.toLocaleString('en-IN') + ' matched on ID, ' + C.viaName + ' on name') +
-    tile(sg(allRaw), 'Raw change', 'average, same subjects both sittings', allRaw >= 0 ? '#059669' : '#DC2626') +
-    tile(ahead.toLocaleString('en-IN'), 'Really improved', 'rose 2+ points MORE than the easier paper gave everyone', '#047857') +
-    tile(behind.toLocaleString('en-IN'), 'Really slipped', 'rose 2+ points LESS than the easier paper gave everyone', '#DC2626') +
+  var h = '<div class="au-kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">' +
+    tile(R.length.toLocaleString('en-IN'), 'Children compared', 'sat both papers', 'var(--tx)',
+         R, 'Every child in this comparison') +
+    tile(sg(allRaw), 'Raw change', 'average, same subjects both sittings',
+         allRaw >= 0 ? '#059669' : '#DC2626', R, 'Every child in this comparison') +
+    tile(ahead.toLocaleString('en-IN'), 'Really improved', 'rose 2+ points MORE than the easier paper gave everyone',
+         '#047857', R.filter(function (r) { return r.adj >= 2; }), 'Children who really improved') +
+    tile(behind.toLocaleString('en-IN'), 'Really slipped', 'rose 2+ points LESS than the easier paper gave everyone',
+         '#DC2626', R.filter(function (r) { return r.adj <= -2; }), 'Children who really slipped') +
     '</div>';
 
   /* the finding that governs how every other number is read */
@@ -15929,59 +16066,55 @@ function _exRenderCompare() {
     'grade and subject did across the whole group. <b>Zero means the group moved exactly as much as ' +
     'everybody else did</b> — it is not a score of nought, and it does not mean nothing happened. ' +
     'A positive figure is a group that rose by more than the paper alone would explain; a negative one ' +
-    'rose by less, or fell while others rose.</div>';
+    'rose by less, or fell while others rose.' +
+    '<br><br><b>Every row opens.</b> ▸ taps a group open into what is inside it — a branch into its ' +
+    'five stages, a stage into its rooms, a subject or grade into the branches carrying it. ' +
+    '<b>view ›</b> lists the children themselves with both their marks.</div>';
 
-  /* ── CLICK A BRANCH FOR ITS FIVE STAGES ──
-     Asked for on 5 November 2026: a branch average hides the thing management
-     needs, which is WHERE inside the branch the movement is. A branch can sit
-     at zero with its early years well up and its board years well down. */
-  var bandsOf = function (x) {
-    var m = {};
-    x.rows.forEach(function (r) {
-      var k = _exBand(r.gr); if (!k) return; (m[k] = m[k] || []).push(r); });
-    return EX_BANDS.filter(function (b) { return m[b.k] && m[b.k].length; })
-      .map(function (b) {
-        var g = m[b.k];
-        return { k: b.lab + '  \u00b7  ' + g.length + (g.length === 1 ? ' child' : ' children'),
-          n: g.length,
-          pt: mean(g.map(function (r) { return r.pt; })),
-          hy: mean(g.map(function (r) { return r.hy; })),
-          raw: mean(g.map(function (r) { return r.raw; })),
-          adj: mean(g.map(function (r) { return r.adj; })) };
-      });
-  };
-  h += tbl('Branch', agg(function (r) { return r.br; }),
-    'Click a branch to open its five stages \u2014 Prep, 1 &amp; 2, 3 to 5, 6 to 8, 9 &amp; 10 \u2014 and see ' +
-    'where inside it the movement actually is. Sorted by the figure in the right-hand column, which is ' +
-    'not the same order as the raw change.', 'Branch', null, bandsOf);
+  var brG = groupBy(R, function (r) { return r.br; });
+  h += tbl('Branch', brG.keys.map(function (k) {
+      return stats(k, brG.m[k], 'branch|' + k, bandsOf); }),
+    'Tap a branch for its five stages — Prep, 1 &amp; 2, 3 to 5, 6 to 8, 9 &amp; 10 — then a stage ' +
+    'for the rooms inside it. Sorted by the figure in the right-hand column, which is not the same ' +
+    'order as the raw change.', 'Branch', null, { what: 'Branch' });
+
   h += tbl('Subject', (function () {
       return C.subjects.map(function (sj) {
         var g = R.filter(function (r) { return r.per[sj]; });
         if (g.length < 20) return null;
-        return { k: sj, n: g.length,
-          pt: mean(g.map(function (r) { return +r.per[sj].pt0; })),
-          hy: mean(g.map(function (r) { return +r.per[sj].hy0; })),
-          raw: mean(g.map(function (r) { return r.per[sj].raw; })),
-          up: 100 * g.filter(function (r) { return r.per[sj].raw > 0; }).length / g.length,
-          adj: 0 };
+        var o = stats(sj, g, 'subject|' + sj, branchesOf);
+        /* a subject row shows that subject's own marks, not the child's average */
+        o.pt = mean(g.map(function (r) { return +r.per[sj].pt0; }));
+        o.hy = mean(g.map(function (r) { return +r.per[sj].hy0; }));
+        o.raw = mean(g.map(function (r) { return r.per[sj].raw; }));
+        o.up = 100 * g.filter(function (r) { return r.per[sj].raw > 0; }).length / g.length;
+        o.adj = 0;
+        return o;
       }).filter(Boolean);
     })(),
     'This is where the paper effect is visible. Every subject but one rose for everybody, so these are not ' +
     'teaching gains — they are the size of the shift each paper carried, and the figure the branch and ' +
-    'section tables are measured against.', 'Subject', 'raw');
-  h += tbl('Grade', agg(function (r) { return r.gr; }),
-    'Raw movement by grade, with the share of children who actually went up. A grade is part of how the ' +
-    'cohort figure is worked out, so it cannot be scored against itself — use the branch and section ' +
-    'tables for that.', 'Grade', 'raw');
+    'section tables are measured against. Tap a subject for the branches that carry it.', 'Subject', 'raw',
+    { what: 'Subject' });
 
-  var secs = agg(function (r) { return r.br + ' · ' + r.gr + ' · ' + r.sec; })
+  var grG = groupBy(R, function (r) { return r.gr; });
+  h += tbl('Grade', grG.keys.map(function (k) {
+      return stats(k, grG.m[k], 'grade|' + k, branchesOf); }),
+    'Raw movement by grade, with the share of children who actually went up. A grade is part of how the ' +
+    'paper adjustment is worked out, so it cannot be scored against itself — use the branch and ' +
+    'section tables for that. Tap a grade for the branches inside it.', 'Grade', 'raw', { what: 'Grade' });
+
+  var secG = groupBy(R, function (r) { return r.br + ' · ' + r.gr + ' · ' + r.sec; });
+  var secs = secG.keys.map(function (k) { return stats(k, secG.m[k], ''); })
     .filter(function (x) { return x.n >= 12; });
   var best = secs.slice().sort(function (a, b) { return b.adj - a.adj; }).slice(0, 8);
   var worst = secs.slice().sort(function (a, b) { return a.adj - b.adj; }).slice(0, 8);
   h += tbl('The eight rooms that gained the most', best,
-    'Twelve pupils or more. These teachers did something their colleagues did not.', 'Section');
+    'Twelve pupils or more. These teachers did something their colleagues did not. ' +
+    'Click view for the children in the room.', 'Section', null, { what: 'Room' });
   h += tbl('The eight rooms that lost the most', worst,
-    'Twelve pupils or more. A negative figure here means the room fell behind a cohort that was rising.', 'Section');
+    'Twelve pupils or more. A negative figure here means the room fell behind while others rose. ' +
+    'Click view for the children in the room.', 'Section', null, { what: 'Room' });
 
   /* ── WHO IS NOT ON THIS PAGE, AND WHOSE JOB IT IS ──
      "No half yearly found" was one heading over three different problems, and
@@ -15998,9 +16131,18 @@ function _exRenderCompare() {
     tile(tot.offRoll.toLocaleString('en-IN'), 'Not on the roll',
          'joined after PT-1 or left before the half yearly — nothing to fix', 'var(--txm)') +
     '</div>';
+  var gWho = function (g) {
+    var id = 'g' + (++pid);
+    _exPick[id] = { title: g.br + ' · ' + g.gr + ' · not compared',
+      sub: 'listed as they stand in the mark sheets', gap: g.who || [] };
+    return id;
+  };
   var gRows = G.filter(function (g) { return g.noSheet || g.notEntered; })
                .slice(0, 22).map(function (g) {
-    return '<tr><td style="font-weight:700">' + e(g.br) + '</td><td>' + e(g.gr) + '</td>' +
+    var gid = (g.who && g.who.length) ? gWho(g) : '';
+    return '<tr><td style="font-weight:700">' +
+      (gid ? '<button class="na-secbtn" onclick="exView(\'' + gid + '\')" style="font-weight:700">' +
+             e(g.br) + ' ›</button>' : e(g.br)) + '</td><td>' + e(g.gr) + '</td>' +
       '<td class="n" style="font-weight:800;color:' + (g.noSheet ? '#DC2626' : 'var(--txl)') + '">' +
         (g.noSheet || '–') + '</td>' +
       '<td style="color:var(--txm)">' + (g.noSheet
