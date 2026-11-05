@@ -21951,7 +21951,33 @@ function _admRange(p) {
             _admIso(new Date(t.getFullYear(), t.getMonth(), 0))];
   }
   var R = _admRaw;
-  return [_admSeasonStart((R && R.season) || ''), _admIso(t)];
+  /* ── WHERE THE SEASON STARTS, FOR COUNTING LEADS ──
+     1 October is when the PLAN starts, and that is what the plan table and
+     the targets are measured against. It is not necessarily when the TRACKER
+     starts: the 2027-28 export carries enquiries from January 2026, 293 of
+     them before October, because the counsellors were already working next
+     year's list. Cutting the whole-season count at 1 October dropped those
+     and left the tile reading 897 while the table below it read 586 — the
+     same two-answers-for-one-question the tile and the table had before.
+
+     So the whole-season window opens at the EARLIER of 1 October and the
+     first enquiry on the register. Nothing else moves: the plan still runs
+     October to June, and every other button still means exactly what it says. */
+  var open = _admSeasonStart((R && R.season) || '');
+  var first = _admFirstEnquiry();
+  if (first && first < open) open = first;
+  return [open, _admIso(t)];
+}
+/* The earliest created date on this season's register, or '' if none. */
+var _admFirstCache = null;
+function _admFirstEnquiry() {
+  var S = _admSet();
+  if (_admFirstCache && _admFirstCache.k === (S.season || '') + '|' + S.rows.length)
+    return _admFirstCache.v;
+  var m = '';
+  S.rows.forEach(function (r) { if (r.d && (!m || r.d < m)) m = r.d; });
+  _admFirstCache = { k: (S.season || '') + '|' + S.rows.length, v: m };
+  return m;
 }
 function _admPeriodLab(p) {
   for (var i = 0; i < ADM_PERIODS.length; i++) if (ADM_PERIODS[i][0] === p) return ADM_PERIODS[i][1];
@@ -22180,6 +22206,26 @@ function _admCompare() {
 
   /* Last year is not a window on this season, so it draws its own table. */
   if (_admPeriod === 'lastyear') { _admCompareYear(el, h); return; }
+
+  /* ── A ROW DATED IN THE FUTURE IS IN NO WINDOW ──
+     Every window ends today, so an enquiry created_at 10 December falls
+     outside all of them and the table below adds to less than the tile above.
+     Rather than leave two numbers disagreeing with nothing to explain it, the
+     count is stated here. It is a typo at source, not something this page can
+     put right. */
+  var ahead = S.rows.filter(function (r) { return r.d && r.d > _admIso(new Date()); });
+  if (ahead.length && _admPeriod === 'season') {
+    var ad = {};
+    ahead.forEach(function (r) { ad[r.d] = (ad[r.d] || 0) + 1; });
+    h += '<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;padding:10px 14px;' +
+      'margin-bottom:12px;font-size:13px;line-height:1.6;color:#78350F">' +
+      '<b>' + ahead.length + ' enquir' + (ahead.length === 1 ? 'y is' : 'ies are') +
+      ' dated after today</b> (' + Object.keys(ad).sort().map(function (k) {
+        return _admDate(k) + ' \u00d7 ' + ad[k]; }).join(', ') +
+      '), so they are in no window and the table below adds to ' +
+      _admN(S.rows.length - ahead.length) + ' rather than ' + _admN(S.rows.length) +
+      '. Correct the created date in the tracker and they join on the next refresh.</div>';
+  }
 
   var data = brs.map(function (br) {
     var rs  = S.rows.filter(function (r) { return r.b === br && r.d >= a && r.d <= b; });
