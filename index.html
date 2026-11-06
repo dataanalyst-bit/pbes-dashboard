@@ -15516,35 +15516,100 @@ function _exResolveDefault(){
 /* ══════════════════════════════════════════════════════════════════════════
    PT-1 → HALF YEARLY · what actually moved
 
-   Three corrections stand between the two mark sheets and an honest answer.
-   Each was measured on this workbook before it was written in.
+   Rewritten 6 November 2026, by class and by room instead of child by child,
+   because management asked for it and because they were right to.
 
-   1. MATCH THE CHILD, NOT THE ROW. 6,944 PT-1 rows and 6,844 Half-Yearly rows
-      are not the same 6,900 children: 726 sat only the first, 234 only the
-      second. Comparing the two averages compares two different cohorts. Rows
-      are joined on the student ID, and where the ID is blank — every Pocharam
-      and Gowdavalli half-yearly row is — on branch + grade + name, but only
-      where that name is unique on both sides. That recovers 222 children,
-      140 of them Pocharam, with no ambiguous pairs at all.
+   NOT ONE ROW IS MATCHED TO ANOTHER. Tying a row on one mark sheet to a row
+   on the other is guesswork, and guesswork that goes wrong prints a collapse
+   for a child who never sat the paper. It goes wrong here for three separate
+   reasons, all measured on this workbook: 214 ids in the PT-1 sheet and 243
+   in the half yearly are shared by two or three DIFFERENT children — id 93
+   is Vempati Parmeeth Roshan on one row and Challa Nivedita Reddy on another;
+   names are typed differently on the two sheets ("K.SRUJANA REDDY" against
+   "SRUJANA REDDY"); and any name matcher loose enough to recover those also
+   pairs siblings in different grades, which is how "Shreyansh Dhananjay
+   Shinde" meets "Sakshi Dhananjay Shinde". So the matching is gone, and with
+   it every wrong pair it could ever have produced.
 
-   2. COMPARE THE SAME SUBJECTS. Half the matched children (2,948 of 5,908)
-      sat a different set of papers in the two sittings, usually through
-      absence. The printed Overall % is an average over whatever they sat, so
-      a child who missed their weakest paper in September and sat it in
-      December appears to collapse. Each child's two averages are recomputed
-      over the subjects they sat BOTH times. On this data that moves 331
-      children across the zero line and 66 by more than ten points.
+   WHAT IS COMPARED INSTEAD is the room, the class and the branch — the things
+   that exist at both sittings whoever happens to be sitting in them. Each
+   sitting is measured entirely on its own and only then are the two put side
+   by side.
 
-   3. SUBTRACT THE PAPER. Every subject but one rose between the sittings —
-      English +7.3, Computing +8.2, Science +5.1 — with 5,887 children moving
-      almost in step. Six thousand children do not improve in unison; the
-      second paper was easier or marked more kindly. So beside the raw change
-      sits the change against what that grade and subject did as a whole.
-      A section that rose five points when everyone rose five has not moved.
-      That one correction changes the ranking: Bachupally's +10.8 is +0.2
-      against its cohort, and Boduppal, up only 4.1, is the branch actually
-      ahead. ══════════════════════════════════════════════════════════════ */
+   HOW A SITTING IS MEASURED. A percentage cannot be carried across: checked
+   over all 129 curriculum-grade-subject combinations here, not one shares a
+   mark total with the other sitting — PT-1 papers run out of 15 to 40 marks
+   over a few chapters, the half yearly out of 25 to 160 over half the
+   syllabus. What survives is POSITION. Every child is placed, per subject,
+   among every child of the same CURRICULUM, GRADE and SUBJECT at that
+   sitting: the set who sat the identical paper. 50 is the middle of that year
+   group. A room's figure for a sitting is the average position of whoever was
+   in it, and its MOVEMENT is December's figure minus October's.
+
+   WHY THAT IS SOUND WITHOUT MATCHING. Both figures are positions inside their
+   own sitting, so every difference of mark total, paper length and marking
+   severity cancels. The checks hold: the mean position is 49.7 at PT-1 and
+   49.8 at the half yearly, and the average room movement is −0.5 — near zero,
+   as it must be, because a room climbs only where another falls.
+
+   AND IT USES THE WHOLE WORKBOOK. Matching could only ever speak for the
+   children it managed to pair, about 5,900 of them. Every one of the 6,944
+   PT-1 rows is placed here, and 6,820 of the 6,844 half-yearly rows.
+
+   WHAT IT CANNOT TELL YOU, printed on the page rather than hidden. Where a
+   room's roll changed between the sittings, part of its movement is a change
+   of children and not of teaching. Both rolls sit on every row and any room
+   whose roll moved by more than a sixth is marked, six of 193 are, all but
+   one of them Pocharam, and they are the only rows that need reading with
+   care. ══════════════════════════════════════════════════════════════════ */
 var _exCmp = null;
+
+/* ── ONE SPELLING FOR A GRADE AND A ROOM ──
+   The two mark sheets are typed up by different people and they do not agree
+   on how to write a room. PT-1 writes "STAGE - 6 AZALEA" and "Grade X C"
+   where the half yearly writes "AZALEA" and "C"; it writes "BLUE STAR" where
+   PT-1 writes "BLUESTAR". Left alone only 43 of 214 rooms met. With the grade
+   stripped off the front, the numeral it drags with it, the case and the
+   spacing, 193 of 206 meet — and the thirteen that still do not are real gaps
+   in the source rather than spelling: Pocharam has no half-yearly sheet for
+   Grades 7 and 8, Gowdavalli no PT-1 sheet at all, Boduppal's Grade 1 G and
+   Grade 6 F sat only one of the two. Those are listed at the foot of the page
+   rather than quietly folded in. */
+var _EX_ROM = { I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10, XI: 11, XII: 12 };
+function _exNGrade(v) {
+  var s = String(v == null ? '' : v).toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
+  s = s.replace(/^(GRADE|STAGE|CLASS|STD)\s*/, '').trim();
+  if (/^(PP|LKG|UKG|NUR|EY)/.test(s)) return s.replace(/\s+/g, '');
+  var m = s.match(/^(\d+)/);
+  if (m) return String(+m[1]);
+  m = s.match(/^(X{0,3}(IX|IV|V?I{0,3}))(\b|$)/);
+  if (m && m[1] && _EX_ROM[m[1]] != null) return String(_EX_ROM[m[1]]);
+  return s.replace(/\s+/g, '');
+}
+function _exNSec(v) {
+  var s = String(v == null ? '' : v).toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
+  for (var i = 0; i < 3; i++) {
+    var b = s;
+    s = s.replace(/^(GRADE|STAGE|CLASS|STD|NURSERY|NUR|LKG|UKG|PP|EY)\s*/, '');
+    s = s.replace(/^(X{0,3}(IX|IV|V?I{0,3})|\d{1,2})(\s+|(?=[A-Z]))/, '');
+    if (s === b) break;
+  }
+  s = s.replace(/\s+/g, '');
+  return s || '?';                 // '?' is a blank column; '*' is a real single room
+}
+/* how a grade is written back out once it has been normalised */
+function _exGLab(g) {
+  if (/^\d+$/.test(g)) return 'Grade ' + g;
+  if (g === 'NURSERY' || g === 'NUR') return 'Nursery';
+  return g;
+}
+function _exSecLab(key) {
+  var p = String(key || '').split('|');
+  var t = p[2] || '';
+  if (t === '*') return 'the one room';
+  if (t === '?') return '(section not recorded)';
+  return t;
+}
 
 function _exBuildCompare() {
   if (!_pt1Raw || !_pt1Raw.students || !_pt1Raw.students_hy) return null;
@@ -15556,276 +15621,94 @@ function _exBuildCompare() {
       var o = {}; t.hdr.forEach(function (h, i) { o[h] = r[i]; }); return o; });
   };
   var A = obj(tA), B = obj(tB);
-  /* Each row gets its own handle. Keying "which rows are already used" on the
-     ID collapsed two different children onto one key wherever an id is
-     shared, and silently dropped the second from the gap report. */
-  A.forEach(function (o, i) { o.__i = 'a' + i; });
-  B.forEach(function (o, i) { o.__i = 'b' + i; });
   var SUBJ = tA.hdr.filter(function (h) {
     return / %$/.test(h) && h !== 'Overall %' && h !== 'Target %';
   }).map(function (h) { return h.replace(/ %$/, ''); });
 
   var S = function (v) { return String(v == null ? '' : v).trim(); };
-  /* ── MATCHING A CHILD ACROSS THE TWO PAPERS (widened 5 Nov 2026) ──
-     The two sheets are typed up separately, so the same child can appear as
-     "K.SRUJANA REDDY" on one and "SRUJANA REDDY" on the other, or as
-     "CHIRASYA K L" and "Chirasya". Three tiers are tried in order, each one
-     only accepted when it identifies ONE child on each side:
+  var mean = function (a) {
+    return a && a.length ? a.reduce(function (x, y) { return x + y; }, 0) / a.length : null; };
 
-       1  ID          the admission number, when both sheets carry it
-       2  full name   punctuation and case removed, within branch and grade
-       3  name words  the same words in any order, so initials moved to the
-                      front or back, a dropped middle name, or "K L" written
-                      as "K.L." all still meet
-
-     WHAT IS DELIBERATELY NOT TRIED, and why. Partial name matching was
-     measured on this workbook and it does not find lost children, it invents
-     pairs. The closest candidates it produced were "SHREYANSH DHANANJAY
-     SHINDE" against "SAKSHI DHANANJAY SHINDE", "GUDURU AADHYA REDDY" against
-     "GUDURU SHIVANSH REDDY" and "MOHAMMED RASHEDUDDIN KHAN" against
-     "MOHAMMED AYAAN KHAN" — siblings and namesakes in different grades, every
-     one of them a different child. A comparison built on those would print a
-     fall for a child who never sat the paper. Tier 3 recovers what is really
-     recoverable; past it the honest answer is that the child is not there.
-
-     WHAT THE MISSING ONES ACTUALLY ARE. After the three tiers, 470 half-yearly
-     children remain unpaired, and almost none of them is a spelling problem:
-     269 sit in a branch and grade with NO PT-1 sheet at all (Gowdavalli
-     entirely, Pocharam's early years), and 514 PT-1 children sit in a grade
-     with no half-yearly sheet (Pocharam, Grades 1-8). The care-call roster —
-     the only list of who is actually on the roll — is read as a third source
-     to tell the two apart: a child on the roll with one paper missing is a
-     result that was never entered, a child not on the roll has left or has
-     not joined. Both are counted and reported under the tables, because
-     neither is something this page can fix. */
-  var norm = function (v) {
-    return S(v).toLowerCase().replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim();
-  };
-  var flat = function (v) { return norm(v).replace(/ /g, ''); };
-  /* the same words in any order; one-letter initials carry no weight on their
-     own but are kept when they are all there is */
-  var words = function (v) {
-    var w = norm(v).split(' ').filter(function (x) { return x.length > 1; });
-    if (!w.length) w = norm(v).split(' ').filter(Boolean);
-    return w.sort().join(' ');
-  };
-  var nameKey = function (o) {
-    return S(o['Branch']) + '|' + S(o['Grade']) + '|' + flat(o['Student Name']);
-  };
-  /* ── the join ── */
-  var uniq = function (list, keyf) {
-    var n = {}, m = {};
-    list.forEach(function (o) { var k = keyf(o); if (k) n[k] = (n[k] || 0) + 1; });
-    list.forEach(function (o) { var k = keyf(o); if (k && n[k] === 1) m[k] = o; });
-    return { n: n, one: m };
-  };
-  var scoped = function (f) {
-    return function (o) {
-      var v = f(o['Student Name']);
-      return v ? S(o['Branch']) + '|' + S(o['Grade']) + '|' + v : '';
-    };
-  };
-  var kFlat = scoped(flat), kWords = scoped(words);
-  /* ── AN ID IS ONLY A KEY WHEN IT IS UNIQUE ──
-     Most rows carry a real admission number, "PISB1774". Some carry a bare
-     number instead, and those are not admission numbers at all: ID 93 is
-     VEMPATI PARMEETH ROSHAN on one row and CHALLA NIVEDITA REDDY on another,
-     ID 356 is a Grade 10 child and a Grade 9 child. 214 such ids in the PT-1
-     sheet and 243 in the half-yearly are shared by two or three different
-     children, and matching on them paired children who have nothing to do
-     with each other — a comparison that reads as a collapse for a child who
-     never sat the paper.
-
-     So an id is accepted only where it names ONE row on each side, the same
-     test the name tiers have always had to pass. A shared id falls through to
-     the name tiers, which is where those children get matched properly. */
-  var kId = function (o) { return S(o['ID']); };
-  var iA = uniq(A, kId), iB = uniq(B, kId);
-  var fA = uniq(A, kFlat), fB = uniq(B, kFlat);
-  var wA = uniq(A, kWords), wB = uniq(B, kWords);
-
-  var pairs = [], viaId = 0, viaName = 0, viaWords = 0, usedA = {};
-  var take = function (a, b, how) {
-    if (usedA[a.__i]) return false;              // one PT-1 row serves one child
-    usedA[a.__i] = 1; pairs.push({ a: a, b: b, how: how });
-    if (how === 'id') viaId++; else if (how === 'name') viaName++; else viaWords++;
-    return true;
-  };
-  B.forEach(function (b) {
-    var id = kId(b);
-    if (id && iA.n[id] === 1 && iB.n[id] === 1 && take(iA.one[id], b, 'id')) return;
-    var k1 = kFlat(b);
-    if (k1 && fA.n[k1] === 1 && fB.n[k1] === 1 && take(fA.one[k1], b, 'name')) return;
-    var k2 = kWords(b);
-    if (k2 && wA.n[k2] === 1 && wB.n[k2] === 1 && take(wA.one[k2], b, 'words')) return;
-  });
-
-  /* ══════════ WHY THE TWO PERCENTAGES ARE NOT COMPARABLE ══════════
-     Rewritten 6 November 2026, after management rejected the previous method
-     and were right to.
-
-     That method took the half-yearly percentage minus the PT-1 percentage and
-     called the group-wide part of the rise "the easier paper". There is no
-     such thing. PT-1 and the half yearly are not the same assessment sat
-     twice; they are different instruments. Checked across all 129
-     curriculum-grade-subject combinations in this workbook, NOT ONE shares a
-     mark total with the other sitting: PT-1 papers run out of 15 to 40 marks
-     and cover a few chapters, the half yearly runs out of 25 to 160 and
-     covers half the syllabus. A percentage off a 30-mark periodic test is not
-     the same measurement as a percentage off an 80-mark examination, so
-     subtracting one from the other produces a number with no meaning, and
-     explaining the leftover as difficulty was an answer to the wrong question.
-
-     WHAT IS COMPARABLE IS POSITION. Whatever a paper is out of, however long
-     it ran and however severely it was marked, a child sat it alongside
-     everybody else sitting the same paper. Where the child stands in that
-     order is a real fact, and it is on the same scale at both sittings
-     because it is a position, not a score.
-
-     So each child is placed, per subject, among every child of the same
-     CURRICULUM, GRADE and SUBJECT at that sitting — the set who sat the
-     identical paper. Position is carried as a percentile: 50 is the middle of
-     that set, 90 is near the top. The child's figure for a sitting is the
-     average of their subject positions, and MOVEMENT is simply the second
-     minus the first.
-
-     Nothing has to be assumed about either paper. Every scale difference
-     cancels, because both sides are positions within their own sitting. And
-     the arithmetic carries its own check: across the whole group the movement
-     must average zero, since for every child who climbs the order another
-     must fall. It comes out at +0.04. */
-  var ptile = function (list, get) {
-    var v = [];
-    list.forEach(function (o) { var x = get(o); if (x != null && isFinite(x)) v.push(+x); });
-    v.sort(function (a, b) { return a - b; });
+  /* where a mark stands in a list of marks, as a percentile. A tie sits at
+     the midpoint of itself, so a room where everyone scored the same lands in
+     the middle rather than at the top or the bottom of its own tie. */
+  var ptile = function (list) {
+    var v = list.slice().sort(function (a, b) { return a - b; });
     return function (x) {
       if (x == null || !isFinite(x) || !v.length) return null;
       var lo = 0, hi = v.length;
       while (lo < hi) { var m = (lo + hi) >> 1; if (v[m] < x) lo = m + 1; else hi = m; }
       var up = 0, q = lo;
       while (q < v.length && v[q] === x) { up++; q++; }
-      /* the midpoint of any tie, so a room where everyone scored the same
-         sits at the middle rather than at the top or the bottom of it */
       return 100 * (lo + up / 2) / v.length;
     };
   };
 
-  /* one row per child */
-  var P = [];
-  pairs.forEach(function (p) {
-    var com = SUBJ.filter(function (sj) {
-      return p.a[sj + ' %'] != null && p.b[sj + ' %'] != null; });
-    if (!com.length) return;
-    var per = {};
-    com.forEach(function (sj) {
-      per[sj] = { pt0: +p.a[sj + ' %'], hy0: +p.b[sj + ' %'] };
+  /* ONE SITTING, MEASURED ON ITS OWN. The peer set is every child who sat the
+     same paper — same curriculum, same grade, same subject. The branch is
+     deliberately not part of the key, or no branch could ever move relative
+     to the others. */
+  var place = function (rows) {
+    var peer = {};
+    rows.forEach(function (o) {
+      o.br = S(o['Branch']); o.gr = S(o['Grade']); o.sec0 = S(o['Section']);
+      o.cur = S(o['Curriculum']); o.nm = S(o['Student Name']); o.id = S(o['ID']);
+      o.tch = S(o['Class Teacher']);
+      o.g = _exNGrade(o.gr); o.s = _exNSec(o.sec0);
+      o.cls = o.br + '|' + o.g;
+      SUBJ.forEach(function (sj) {
+        var v = o[sj + ' %']; if (v == null || v === '') return;
+        var x = +v; if (!isFinite(x)) return;
+        var k = (o.cur || '?') + '\u0000' + o.g + '\u0000' + sj;
+        (peer[k] = peer[k] || []).push(x);
+      });
     });
-    P.push({ br: S(p.a['Branch']), gr: S(p.a['Grade']), sec: S(p.a['Section']),
-             cur: S(p.a['Curriculum']), nm: S(p.a['Student Name']), id: S(p.a['ID']),
-             tch: S(p.b['Class Teacher']) || S(p.a['Class Teacher']),
-             k: com.length, per: per });
-  });
-
-  /* the peer set is every child who sat the SAME paper, which is what makes a
-     position comparable; the branch is deliberately NOT part of the key, or a
-     branch could never move relative to the others */
-  var peer = {};
-  P.forEach(function (r) {
-    for (var sj in r.per) {
-      var k = (r.cur || '?') + '\u0000' + r.gr + '\u0000' + sj;
-      (peer[k] = peer[k] || []).push(r.per[sj]);
-    }
-  });
-  var fPt = {}, fHy = {}, thin = {};
-  Object.keys(peer).forEach(function (k) {
-    /* under ten children a position is not a position, it is an accident of
-       who was absent; those subjects are left out of the child's average */
-    if (peer[k].length < 10) { thin[k] = peer[k].length; return; }
-    fPt[k] = ptile(peer[k], function (o) { return o.pt0; });
-    fHy[k] = ptile(peer[k], function (o) { return o.hy0; });
-  });
-
-  var mean = function (a) { return a && a.length ? a.reduce(function (x, y) { return x + y; }, 0) / a.length : null; };
-  var out = [];
-  P.forEach(function (r) {
-    var aa = [], bb = [], used = 0;
-    for (var sj in r.per) {
-      var k = (r.cur || '?') + '\u0000' + r.gr + '\u0000' + sj;
-      if (!fPt[k]) { delete r.per[sj]; continue; }
-      var x = fPt[k](r.per[sj].pt0), y = fHy[k](r.per[sj].hy0);
-      if (x == null || y == null) { delete r.per[sj]; continue; }
-      r.per[sj].pp = x; r.per[sj].hp = y; r.per[sj].mv = y - x;
-      aa.push(x); bb.push(y); used++;
-    }
-    if (!used) return;
-    r.k = used;
-    r.pp = mean(aa); r.hp = mean(bb); r.mv = r.hp - r.pp;
-    /* the raw percentages are still printed, because a teacher wants to see
-       the marks — but they are never subtracted from one another */
-    r.pt = mean(Object.keys(r.per).map(function (sj) { return r.per[sj].pt0; }));
-    r.hy = mean(Object.keys(r.per).map(function (sj) { return r.per[sj].hy0; }));
-    out.push(r);
-  });
-  P = out;
-
-  /* ── WHO COULD NOT BE COMPARED, AND WHY ──
-     Three different things were being counted as one. A child can be missing
-     from a comparison because the whole grade has no sheet for one sitting,
-     because that one child's result was never entered, or because the child
-     is not on the roll at all — joined after PT-1, or left before the
-     half-yearly. Only the first two are anybody's to fix, and they need
-     different people to fix them, so they are counted apart.
-
-     The care-call roster decides the last of the three: it is the only list
-     in the workbook of who is actually on the roll. */
-  var CARE = (typeof CARE_DATA !== 'undefined' && CARE_DATA) ? CARE_DATA : [];
-  var onRoll = {};
-  CARE.forEach(function (c) {
-    var k = S(c.Branch) + '|' + words(c.Student);
-    if (k.split('|')[1]) onRoll[k] = 1;
-  });
-  var rolled = function (o) { return !!onRoll[S(o['Branch']) + '|' + words(o['Student Name'])]; };
-
-  var gradeA = {}, gradeB = {};
-  A.forEach(function (o) { var k = S(o['Branch']) + '|' + S(o['Grade']); gradeA[k] = (gradeA[k] || 0) + 1; });
-  B.forEach(function (o) { var k = S(o['Branch']) + '|' + S(o['Grade']); gradeB[k] = (gradeB[k] || 0) + 1; });
-
-  var usedB = {};
-  pairs.forEach(function (p) { usedB[p.b.__i] = 1; });
-  var gaps = {}, lone = { pt1: 0, hy: 0 };
-  var tally = function (o, side) {
-    var k = S(o['Branch']) + '|' + S(o['Grade']);
-    var g = gaps[k] || (gaps[k] = { br: S(o['Branch']), gr: S(o['Grade']),
-                                    noSheet: 0, notEntered: 0, offRoll: 0, side: '', who: [] });
-    /* the children themselves, so a count on the page can be opened and
-       chased rather than only read */
-    if (g.who.length < 400) g.who.push({ nm: S(o['Student Name']), id: S(o['ID']),
-      br: S(o['Branch']), gr: S(o['Grade']), sec: S(o['Section']), side: side });
-    var other = side === 'pt1' ? gradeB[k] : gradeA[k];
-    if (!other) { g.noSheet++; g.side = side; lone[side]++; }
-    else if (rolled(o)) g.notEntered++;
-    else g.offRoll++;
+    var f = {}, thin = 0;
+    Object.keys(peer).forEach(function (k) {
+      /* under ten children a position is not a position, it is an accident of
+         who was absent; those subjects are left out */
+      if (peer[k].length < 10) { thin++; return; }
+      f[k] = ptile(peer[k]);
+    });
+    var out = [];
+    rows.forEach(function (o) {
+      var ps = [], raws = []; o.per = {};
+      SUBJ.forEach(function (sj) {
+        var v = o[sj + ' %']; if (v == null || v === '') return;
+        var x = +v; if (!isFinite(x)) return;
+        var k = (o.cur || '?') + '\u0000' + o.g + '\u0000' + sj;
+        if (!f[k]) return;
+        var p = f[k](x); if (p == null) return;
+        o.per[sj] = { raw: x, p: p }; ps.push(p); raws.push(x);
+      });
+      if (!ps.length) return;
+      o.pos = mean(ps); o.raw = mean(raws); o.k = ps.length;
+      out.push(o);
+    });
+    return { rows: out, thin: thin, n: rows.length };
   };
-  A.forEach(function (o) { if (!usedA[o.__i]) tally(o, 'pt1'); });
-  B.forEach(function (o) { if (!usedB[o.__i]) tally(o, 'hy'); });
-  var gapRows = Object.keys(gaps).map(function (k) { return gaps[k]; })
-    .filter(function (g) { return g.noSheet + g.notEntered + g.offRoll > 0; })
-    .sort(function (x, y) {
-      return (y.noSheet + y.notEntered) - (x.noSheet + x.notEntered) ||
-             x.br.localeCompare(y.br); });
 
-  /* kept for anything still reading the old shape */
-  var missA = {}, missB = {};
-  A.forEach(function (o) { if (!usedA[o.__i]) missA[S(o['Branch'])] = (missA[S(o['Branch'])] || 0) + 1; });
-  B.forEach(function (o) { if (!usedB[o.__i]) missB[S(o['Branch'])] = (missB[S(o['Branch'])] || 0) + 1; });
+  var PA = place(A), PB = place(B);
 
-  return { rows: P, subjects: SUBJ, mean: mean, thin: thin,
-           viaId: viaId, viaName: viaName, viaWords: viaWords,
-           nA: A.length, nB: B.length, missA: missA, missB: missB,
-           /* paired, and of those the ones with no subject sat at both
-              sittings — matched but nothing to compare */
-           nPairs: pairs.length, noCommon: pairs.length - P.length,
-           gaps: gapRows, lone: lone };
+  /* A grade with exactly one room on each side IS one room, whatever the two
+     sheets happen to call it: Keesara writes "PP1" for its only PP1 room on
+     one sheet and leaves the column empty on the other. */
+  var roomsIn = function (rows) {
+    var m = {};
+    rows.forEach(function (o) { (m[o.cls] = m[o.cls] || {})[o.s] = 1; });
+    return m;
+  };
+  var rA = roomsIn(PA.rows), rB = roomsIn(PB.rows);
+  var lone = function (m, c) { return m[c] && Object.keys(m[c]).length === 1; };
+  var setSec = function (o) {
+    o.sec = (lone(rA, o.cls) && lone(rB, o.cls)) ? o.cls + '|*' : o.cls + '|' + o.s;
+  };
+  PA.rows.forEach(setSec); PB.rows.forEach(setSec);
+
+  return { A: PA.rows, B: PB.rows, subjects: SUBJ, mean: mean,
+           nA: PA.n, nB: PB.n,
+           placedA: PA.rows.length, placedB: PB.rows.length,
+           thinA: PA.thin, thinB: PB.thin };
 }
 
 /* The comparison, drawn. Every table carries the raw change and the change
@@ -15913,68 +15796,105 @@ var _exOpen = {};
 function exToggle(key) { _exOpen[key] = !_exOpen[key]; _exRenderCompare(); }
 function exToggleBand(br) { exToggle('branch|' + br); }          /* kept: older markup calls it */
 
-/* label → the children, drawn as a table that can be read across */
-function _exPupilTable(rows) {
+/* ── A ROLL, LISTED ──
+   One sitting's children, with the place each of them stood in. There is no
+   "movement" column here and there cannot be: these children are not paired
+   with anybody in the other sitting, which is the whole point. Weakest first,
+   because that is the order a class teacher needs. */
+function _exRollTable(rows, sj) {
+  var e = function (v) { return String(v == null ? '' : v).replace(/[&<>"]/g, function (m) {
+    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]; }); };
+  var place = function (r) { return sj ? (r.per[sj] ? r.per[sj].p : null) : r.pos; };
+  var mark = function (r) { return sj ? (r.per[sj] ? r.per[sj].raw : null) : r.raw; };
+  var col = function (p) { return p >= 75 ? '#047857' : p >= 50 ? '#059669' : p >= 25 ? '#D97706' : '#DC2626'; };
+  var L = rows.filter(function (r) { return place(r) != null; })
+              .sort(function (a, b) { return place(a) - place(b); });
+  if (!L.length) return '<div class="au-note">No child in this group sat this paper.</div>';
+  var cap = 300, more = L.length - cap;
+  return '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:720px"><thead><tr>' +
+    '<th>Child</th><th>Grade</th><th>Section</th><th>Class teacher</th>' +
+    (sj ? '' : '<th class="n">Subjects</th>') +
+    '<th class="n">' + (sj ? e(sj) + ' %' : 'Average %') + '</th>' +
+    '<th class="n">Place in the year group</th></tr></thead><tbody>' +
+    L.slice(0, cap).map(function (r) {
+      var p = place(r);
+      return '<tr><td style="font-weight:700">' + e(r.nm || '(no name)') + '</td>' +
+        '<td style="color:var(--txm)">' + e(r.gr) + '</td>' +
+        '<td style="color:var(--txm)">' + e(r.sec0) + '</td>' +
+        '<td style="color:var(--txm)">' + e(r.tch || '–') + '</td>' +
+        (sj ? '' : '<td class="n" style="color:var(--txm)">' + r.k + '</td>') +
+        '<td class="n" style="color:var(--txm)">' + mark(r).toFixed(1) + '</td>' +
+        '<td class="n" style="font-weight:800;color:' + col(p) + '">' + p.toFixed(0) + '</td></tr>';
+    }).join('') + '</tbody></table></div>' +
+    (more > 0 ? '<div class="au-note">Showing the ' + cap + ' lowest-placed. ' + more +
+      ' more are in this group.</div>' : '');
+}
+
+/* the rooms, classes or branches behind a headline figure */
+function _exUnitList(units) {
   var e = function (v) { return String(v == null ? '' : v).replace(/[&<>"]/g, function (m) {
     return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]; }); };
   var sg = function (v) { return (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v).toFixed(1); };
-  /* places, not percentage points: a child shuffling three places in a
-     year group of several hundred has not moved in any real sense */
-  var col = function (v) { return v >= 8 ? '#047857' : v >= 3 ? '#059669' : v > -3 ? '#64748B' : v > -8 ? '#D97706' : '#DC2626'; };
-  var L = rows.slice().sort(function (a, b) { return a.mv - b.mv; });
-  var cap = 400, more = L.length - cap;
-  return '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:820px"><thead><tr>' +
-    '<th>Child</th><th>Branch</th><th>Grade</th><th>Section</th><th>Class teacher</th>' +
-    '<th class="n">Subjects</th><th class="n">PT-1 %</th><th class="n">→ place</th>' +
-    '<th class="n">Half yearly %</th><th class="n">→ place</th>' +
+  var col = function (v) { return v >= 5 ? '#047857' : v >= 2 ? '#059669' : v > -2 ? '#64748B' : v > -5 ? '#D97706' : '#DC2626'; };
+  return '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:640px"><thead><tr>' +
+    '<th>Where</th><th class="n">Roll Oct → Dec</th><th class="n">Was</th><th class="n">Now</th>' +
     '<th class="n">Movement</th></tr></thead><tbody>' +
-    L.slice(0, cap).map(function (r) {
-      return '<tr><td style="font-weight:700">' + e(r.nm || '(no name)') + '</td>' +
-        '<td style="color:var(--txm)">' + e(r.br) + '</td>' +
-        '<td style="color:var(--txm)">' + e(r.gr) + '</td>' +
-        '<td style="color:var(--txm)">' + e(r.sec) + '</td>' +
-        '<td style="color:var(--txm)">' + e(r.tch || '–') + '</td>' +
-        '<td class="n" style="color:var(--txm)">' + r.k + '</td>' +
-        '<td class="n" style="color:var(--txm)">' + r.pt.toFixed(1) + '</td>' +
-        '<td class="n" style="font-weight:700">' + r.pp.toFixed(0) + '</td>' +
-        '<td class="n" style="color:var(--txm)">' + r.hy.toFixed(1) + '</td>' +
-        '<td class="n" style="font-weight:700">' + r.hp.toFixed(0) + '</td>' +
-        '<td class="n" style="font-weight:800;color:' + col(r.mv) + '">' + sg(r.mv) + '</td></tr>';
+    units.map(function (x) {
+      return '<tr><td style="font-weight:700">' + e(x.full || x.k) + '</td>' +
+        '<td class="n" style="color:var(--txm)">' + x.na + ' → ' + x.nb +
+          (x.shift > 1 / 6 ? ' <b style="color:#D97706">⚠</b>' : '') + '</td>' +
+        '<td class="n" style="color:var(--txm)">' + x.pa.toFixed(0) + '</td>' +
+        '<td class="n" style="font-weight:700">' + x.pb.toFixed(0) + '</td>' +
+        '<td class="n" style="font-weight:800;color:' +
+          (x.shift > 1 / 6 ? 'var(--txm)' : col(x.mv)) + '">' + sg(x.mv) + '</td></tr>';
     }).join('') + '</tbody></table></div>' +
-    (more > 0 ? '<div class="au-note">Showing the 400 who moved furthest down. ' + more +
-      ' more are in this group.</div>' : '') +
-    '<div class="au-note"><b>Biggest fallers first.</b> <b>Place</b> is where the child stood among ' +
-    'everyone of the same curriculum and grade who sat the same paper — 50 is the middle of that ' +
-    'year group. <b>Movement</b> is the second place minus the first. The percentages are shown so the ' +
-    'marks can be seen; they are never subtracted, because the two papers are not out of the same ' +
-    'total. <b>Subjects</b> counts the papers sat at BOTH sittings — only those are used.</div>';
+    '<div class="au-note"><b>⚠</b> marks a roll that changed by more than a sixth between the two ' +
+    'sittings. Part of that movement is a change of children, not of teaching.</div>';
 }
+
 /* opened from a row or a tile; the selection is described, never recomputed */
 var _exPick = {};
 function exView(id) {
   var P = _exPick[id];
   if (!P || typeof openHTMLModal !== 'function') return;
+  var e = function (v) { return String(v == null ? '' : v).replace(/[&<>"]/g, function (m) {
+    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]; }); };
+  if (P.units) {
+    openHTMLModal(P.title, P.units.length + ' ' + (P.noun || 'groups'), _exUnitList(P.units));
+    return;
+  }
   if (P.gap) {
-    /* children who are NOT in the comparison have one paper at most, so they
-       are listed by who they are rather than by a change they do not have */
-    var e = function (v) { return String(v == null ? '' : v).replace(/[&<>"]/g, function (m) {
-      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]; }); };
     openHTMLModal(P.title, P.gap.length.toLocaleString('en-IN') + ' children · ' + P.sub,
       '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:620px"><thead><tr>' +
-      '<th>Child</th><th>Admission no.</th><th>Grade</th><th>Section</th><th>Has</th>' +
-      '</tr></thead><tbody>' + P.gap.map(function (r) {
+      '<th>Child</th><th>Admission no.</th><th>Grade</th><th>Section</th><th>Sat</th>' +
+      '</tr></thead><tbody>' + P.gap.slice(0, 400).map(function (r) {
         return '<tr><td style="font-weight:700">' + e(r.nm || '(no name)') + '</td>' +
           '<td style="color:var(--txm)">' + e(r.id || '–') + '</td>' +
           '<td style="color:var(--txm)">' + e(r.gr) + '</td>' +
-          '<td style="color:var(--txm)">' + e(r.sec) + '</td>' +
+          '<td style="color:var(--txm)">' + e(r.sec0) + '</td>' +
           '<td>' + (r.side === 'pt1' ? 'PT-1 only' : 'half yearly only') + '</td></tr>';
       }).join('') + '</tbody></table></div>' +
-      '<div class="au-note">Either the other sitting was never held for this grade, or that one ' +
-      'result was never entered. Both are put right in the mark sheet, not here.</div>');
+      '<div class="au-note">Either the other sitting was never held for this class, or it was ' +
+      'never entered. Both are put right in the mark sheet, not here.</div>');
     return;
   }
-  openHTMLModal(P.title, P.rows.length.toLocaleString('en-IN') + ' children' +
-    (P.sub ? ' · ' + P.sub : ''), _exPupilTable(P.rows));
+  /* THE TWO ROLLS, SIDE BY SIDE AND SEPARATE. Showing them as two lists
+     rather than one is the honest shape: nobody on the left is claimed to be
+     the same child as anybody on the right. */
+  var hd = function (t, n) {
+    return '<h4 style="margin:18px 0 8px;font-size:15px;font-weight:800;color:var(--tx)">' + t +
+      ' <span style="font-weight:600;color:var(--txm)">· ' + n.toLocaleString('en-IN') +
+      ' on the roll</span></h4>';
+  };
+  var a = P.a || [], b = P.b || [];
+  openHTMLModal(P.title,
+    (P.sub ? P.sub + ' · ' : '') + 'two rolls, measured separately',
+    '<div class="au-note" style="margin-bottom:4px">These are the children who sat each paper and ' +
+    'where each of them stood among everyone sitting the same paper. <b>No child in one list is ' +
+    'tied to a child in the other</b> — the group is compared, not the individuals. 50 is the ' +
+    'middle of the year group.</div>' +
+    hd('October · PT-1', a.length) + _exRollTable(a, P.sj) +
+    hd('December · Half yearly', b.length) + _exRollTable(b, P.sj));
 }
 
 function _admNum(n) { return (n == null ? 0 : n).toLocaleString('en-IN'); }
@@ -15982,49 +15902,133 @@ function _exRenderCompare() {
   var el = document.getElementById('exm-compare'); if (!el) return;
   if (!_exCmp) _exCmp = _exBuildCompare();
   var C = _exCmp;
-  if (!C || !C.rows.length) {
+  if (!C || !C.A.length || !C.B.length) {
     el.innerHTML = '<div class="au-empty">Both sittings need marks before they can be compared. ' +
       'The workbook currently has ' + (C ? C.nA : 0) + ' PT-1 rows and ' + (C ? C.nB : 0) +
-      ' half-yearly rows with no student in common.</div>';
+      ' half-yearly rows.</div>';
     return;
   }
   var scope = _exBranch();
-  var R = scope ? C.rows.filter(function (r) { return r.br === scope; }) : C.rows;
-  if (!R.length) { el.innerHTML = '<div class="au-empty">No child at this branch sat both papers.</div>'; return; }
+  var A = scope ? C.A.filter(function (r) { return r.br === scope; }) : C.A;
+  var B = scope ? C.B.filter(function (r) { return r.br === scope; }) : C.B;
+  if (!A.length || !B.length) {
+    el.innerHTML = '<div class="au-empty">' + (scope || 'This branch') +
+      ' has marks for only one of the two sittings, so there is nothing to compare.</div>';
+    return;
+  }
 
   var mean = C.mean;
+  _exPick = {};
+  var pid = 0;
   var e = function (v) { return String(v == null ? '' : v).replace(/[&<>"]/g, function (m) {
     return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]; }); };
   var sg = function (v, d) { return (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v).toFixed(d == null ? 1 : d); };
-  /* places, not percentage points: a child shuffling three places in a
-     year group of several hundred has not moved in any real sense */
-  var col = function (v) { return v >= 8 ? '#047857' : v >= 3 ? '#059669' : v > -3 ? '#64748B' : v > -8 ? '#D97706' : '#DC2626'; };
+  /* places in a year group, not percentage points. A room shifting two places
+     among several hundred children has not moved. */
+  var col = function (v) { return v >= 5 ? '#047857' : v >= 2 ? '#059669' : v > -2 ? '#64748B' : v > -5 ? '#D97706' : '#DC2626'; };
+  var MOVE = 5;                        // what counts as a real change of place
+  var SHIFT = 1 / 6;                   // a roll change past which a figure is suspect
 
-  /* a bar that grows either side of a centre line, because the number is signed */
-  var MAXB = 8;
-  var dbar = function (v) {
-    var w = Math.min(Math.abs(v) / MAXB, 1) * 50;
-    return '<div style="position:relative;height:16px;background:var(--pl);border-radius:4px">' +
-      '<div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--bor)"></div>' +
-      '<div style="position:absolute;top:2px;bottom:2px;border-radius:3px;background:' + col(v) + ';' +
-        (v >= 0 ? 'left:50%;width:' + w + '%' : 'right:50%;width:' + w + '%') + '"></div></div>';
+  var P = function (r, sj) { return sj ? (r.per[sj] ? r.per[sj].p : null) : r.pos; };
+  var W = function (r, sj) { return sj ? (r.per[sj] ? r.per[sj].raw : null) : r.raw; };
+  var avg = function (rows, f) {
+    var v = []; rows.forEach(function (r) { var x = f(r); if (x != null && isFinite(x)) v.push(x); });
+    return v.length ? mean(v) : null;
+  };
+  var count = function (rows, sj) {
+    return rows.filter(function (r) { return P(r, sj) != null; }).length;
   };
 
-  var MOVE = 10;                       // what counts as a real change of place
-  var climbed = R.filter(function (r) { return r.mv >= MOVE; });
-  var slipped = R.filter(function (r) { return r.mv <= -MOVE; });
-  var allMv = mean(R.map(function (r) { return r.mv; }));
+  /* ── A UNIT IS A PLACE, NOT A PERSON ──
+     Two rolls, each measured on its own, and the difference between where
+     they stood. Everything on this page is one of these. */
+  var unit = function (label, key, ra, rb, sj, kids, full) {
+    var na = count(ra, sj), nb = count(rb, sj);
+    var pa = avg(ra, function (r) { return P(r, sj); });
+    var pb = avg(rb, function (r) { return P(r, sj); });
+    return { k: label, full: full || label, key: key || '', a: ra, b: rb, sj: sj || '',
+      kids: kids || null, na: na, nb: nb, pa: pa, pb: pb,
+      mv: (pa != null && pb != null) ? pb - pa : null,
+      wa: avg(ra, function (r) { return W(r, sj); }),
+      wb: avg(rb, function (r) { return W(r, sj); }),
+      shift: (na && nb) ? Math.abs(nb - na) / Math.max(na, nb) : 1 };
+  };
+  var grp = function (rows, kf) {
+    var m = {};
+    rows.forEach(function (r) { var k = kf(r); if (!k) return; (m[k] = m[k] || []).push(r); });
+    return m;
+  };
+  /* keys with a roll at BOTH sittings; a one-sided key is not a comparison
+     and is reported at the foot of the page instead of being drawn as one */
+  var both = function (ga, gb) {
+    return Object.keys(ga).filter(function (k) { return gb[k]; });
+  };
+  var MINROOM = 5;
 
-  /* Every tile opens the children behind it. A headline number nobody can
-     open is a number nobody can check. */
-  var pid = 0;
-  var pick = function (title, rows, sub) {
+  var sectionsOf = function (x) {
+    var ga = grp(x.a, function (r) { return r.sec; }), gb = grp(x.b, function (r) { return r.sec; });
+    return both(ga, gb).map(function (k) {
+        return unit(_exSecLab(k), '', ga[k], gb[k], x.sj, null,
+                    k.split('|')[0] + ' · ' + _exGLab(k.split('|')[1]) + ' · ' + _exSecLab(k)); })
+      .filter(function (y) { return y.na >= MINROOM && y.nb >= MINROOM && y.mv != null; })
+      .sort(function (p, q) { return q.mv - p.mv; });
+  };
+  var classesOf = function (x) {
+    var ga = grp(x.a, function (r) { return r.cls; }), gb = grp(x.b, function (r) { return r.cls; });
+    return both(ga, gb).map(function (k) {
+        return unit(_exGLab(k.split('|')[1]), (x.key || 'c') + '|' + k, ga[k], gb[k], x.sj,
+                    sectionsOf, k.split('|')[0] + ' · ' + _exGLab(k.split('|')[1])); })
+      .filter(function (y) { return y.mv != null; })
+      .sort(function (p, q) { return q.mv - p.mv; });
+  };
+  var bandsOf = function (x) {
+    var ba = {}, bb = {};
+    x.a.forEach(function (r) { var k = _exBand(r.gr); if (k) (ba[k] = ba[k] || []).push(r); });
+    x.b.forEach(function (r) { var k = _exBand(r.gr); if (k) (bb[k] = bb[k] || []).push(r); });
+    return EX_BANDS.filter(function (b) { return ba[b.k] && bb[b.k]; })
+      .map(function (b) {
+        return unit(b.lab, (x.key || 'b') + '|' + b.k, ba[b.k], bb[b.k], x.sj, classesOf); })
+      .filter(function (y) { return y.mv != null; });
+  };
+  var MINBR = 20;
+  var branchesOf = function (x) {
+    var ga = grp(x.a, function (r) { return r.br; }), gb = grp(x.b, function (r) { return r.br; });
+    return both(ga, gb).map(function (k) {
+        return unit(k, (x.key || 'r') + '|' + k, ga[k], gb[k], x.sj, classesOf); })
+      /* a branch where twelve children sat the paper is not that subject's
+         "weakest branch", it is a small sample wearing the label */
+      .filter(function (y) { return y.mv != null && y.na >= MINBR && y.nb >= MINBR; })
+      .sort(function (p, q) { return q.mv - p.mv; });
+  };
+
+  var pick = function (title, x, sub) {
     var id = 'p' + (++pid);
-    _exPick[id] = { title: title, rows: rows, sub: sub || '' };
+    _exPick[id] = { title: title, sub: sub || '', a: x.a, b: x.b, sj: x.sj || '' };
     return id;
   };
-  var tile = function (v, lab, sub, c, rows, title) {
-    var id = rows && rows.length ? pick(title || lab, rows, sub) : '';
+  var pickUnits = function (title, units, noun) {
+    var id = 'u' + (++pid);
+    _exPick[id] = { title: title, units: units, noun: noun || 'rooms' };
+    return id;
+  };
+
+  /* ══════════ THE HEADLINE ══════════ */
+  var allSec = (function () {
+    var ga = grp(A, function (r) { return r.sec; }), gb = grp(B, function (r) { return r.sec; });
+    return both(ga, gb).map(function (k) {
+        return unit(_exSecLab(k), '', ga[k], gb[k], '', null,
+                    k.split('|')[0] + ' · ' + _exGLab(k.split('|')[1]) + ' · ' + _exSecLab(k)); })
+      .filter(function (y) { return y.na >= MINROOM && y.nb >= MINROOM && y.mv != null; });
+  })();
+  var allCls = classesOf({ a: A, b: B, key: '', sj: '' });
+  var climbed = allSec.filter(function (x) { return x.mv >= MOVE; })
+                      .sort(function (p, q) { return q.mv - p.mv; });
+  var slipped = allSec.filter(function (x) { return x.mv <= -MOVE; })
+                      .sort(function (p, q) { return p.mv - q.mv; });
+  var secMv = allSec.length ? mean(allSec.map(function (x) { return x.mv; })) : 0;
+  var flagged = allSec.filter(function (x) { return x.shift > SHIFT; });
+
+  var tile = function (v, lab, sub, c, id) {
     return '<button class="au-kpi" style="text-align:left;cursor:' + (id ? 'pointer' : 'default') + '"' +
       (id ? ' onclick="exView(\'' + id + '\')"' : '') + '>' +
       '<div class="na-kh"><span class="v" style="color:' + (c || 'var(--tx)') + '">' + v + '</span></div>' +
@@ -16033,80 +16037,170 @@ function _exRenderCompare() {
       '</div></button>';
   };
 
-  var stats = function (label, g, key, kids) {
-    return { k: label, n: g.length, rows: g, key: key || '', kids: kids || null,
-      pt: mean(g.map(function (r) { return r.pt; })),
-      hy: mean(g.map(function (r) { return r.hy; })),
-      pp: mean(g.map(function (r) { return r.pp; })),
-      hp: mean(g.map(function (r) { return r.hp; })),
-      mv: mean(g.map(function (r) { return r.mv; })),
-      churn: mean(g.map(function (r) { return Math.abs(r.mv); })),
-      up: 100 * g.filter(function (r) { return r.mv >= MOVE; }).length / g.length,
-      dn: 100 * g.filter(function (r) { return r.mv <= -MOVE; }).length / g.length };
-  };
-  var groupBy = function (list, keyf) {
-    var m = {}, order = [];
-    list.forEach(function (r) { var k = keyf(r); if (!k) return;
-      if (!m[k]) { m[k] = []; order.push(k); } m[k].push(r); });
-    return { m: m, keys: order };
-  };
-  var roomsOf = function (x) {
-    var G = groupBy(x.rows, function (r) {
-      var sec = String(r.sec || '').replace(/^\s*(grade|stage|class)\s*/i, '').trim();
-      return r.gr + ' · ' + (sec || '(no section)');
-    });
-    return G.keys.map(function (k) { return stats(k, G.m[k], ''); })
-      .filter(function (y) { return y.n >= 3; })
-      .sort(function (a, b) { return a.mv - b.mv; });
-  };
-  var bandsOf = function (x) {
-    var m = {};
-    x.rows.forEach(function (r) { var k = _exBand(r.gr); if (k) (m[k] = m[k] || []).push(r); });
-    return EX_BANDS.filter(function (b) { return m[b.k] && m[b.k].length; })
-      .map(function (b) { return stats(b.lab, m[b.k], x.key + '|' + b.k, roomsOf); });
-  };
-  var gradesOf = function (x) {
-    var G = groupBy(x.rows, function (r) { return r.gr; });
-    return G.keys.map(function (k) {
-      var o = stats(k, G.m[k], '');
-      var L = _exLangNote(G.m[k], x.slot);
-      if (L) { o.k = e(k) + '  —  ' + L; o.html = 1; }
-      return o;
-    }).sort(function (a, b) { return b.mv - a.mv; });
-  };
-  var branchesOf = function (x) {
-    var G = groupBy(x.rows, function (r) { return r.br; });
-    return G.keys.map(function (k) {
-      var o = stats(k, G.m[k], x.key + '|' + k, x.slot ? gradesOf : roomsOf);
-      if (x.slot) o.slot = x.slot;
-      return o;
-    }).sort(function (a, b) { return b.mv - a.mv; });
-  };
+  var h = '<div class="au-kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">' +
+    tile(_admNum(allCls.length), 'Classes compared',
+         'a class with a roll at both sittings',
+         'var(--tx)', pickUnits('Every class compared', allCls.slice().sort(function (p, q) {
+           return q.mv - p.mv; }), 'classes')) +
+    tile(_admNum(allSec.length), 'Sections compared',
+         MINROOM + ' children or more at each sitting', 'var(--tx)',
+         pickUnits('Every section compared', allSec.slice().sort(function (p, q) {
+           return q.mv - p.mv; }), 'sections')) +
+    tile(_admNum(climbed.length), 'Sections that climbed',
+         'up ' + MOVE + ' places or more in their year group', '#047857',
+         climbed.length ? pickUnits('Sections that climbed', climbed, 'sections') : '') +
+    tile(_admNum(slipped.length), 'Sections that slipped',
+         'down ' + MOVE + ' places or more', '#DC2626',
+         slipped.length ? pickUnits('Sections that slipped', slipped, 'sections') : '') +
+    '</div>';
 
-  /* A position is a place in a queue, so it is drawn as one: the bar is where
-     the group stands, and the marker is where it stood in October. */
-  var posbar = function (was, now) {
-    var c = col(now - was);
+  /* the finding that governs how every other number on the page is read */
+  h += '<div style="margin:14px 0;border-radius:12px;padding:14px 18px;background:#EEF2FF;border:1px solid #C7D2FE;' +
+    'font-size:13px;line-height:1.6;color:#1E3A8A">' +
+    '<b>No child is matched to any other child. The class and the room are compared, not the ' +
+    'individuals.</b> Pairing a row on one mark sheet with a row on the other cannot be done ' +
+    'safely here: 214 ids in the PT-1 sheet and 243 in the half yearly are shared by two or three ' +
+    'different children, names are typed differently on the two sheets, and any matcher loose ' +
+    'enough to recover the real pairs also pairs siblings in different grades. A wrong pair prints ' +
+    'a collapse for a child who never sat the paper, so the matching is gone.' +
+    '<br><br><b>What is compared is position.</b> The two percentages are not on the same scale — ' +
+    'across all 129 curriculum-grade-subject combinations here, not one shares a mark total with ' +
+    'the other sitting, PT-1 running out of 15 to 40 marks over a few chapters and the half yearly ' +
+    'out of 25 to 160 over half the syllabus. So each child is placed among everyone who sat the ' +
+    '<b>identical paper</b> — same curriculum, same grade, same subject — at their own sitting. ' +
+    '<b>50 is the middle of that year group, 90 is near the top.</b> A room’s figure is the ' +
+    'average place of whoever was in it, and <b>movement</b> is December’s figure minus ' +
+    'October’s. Every difference of mark total, paper length and marking severity cancels, ' +
+    'because both sides are positions inside their own sitting.' +
+    '<br><br><b>The check is built in.</b> Across all branches the average room movement must come ' +
+    'to about zero, because a room climbs only where another falls. It comes to ' +
+    secMv.toFixed(2) + ' over ' + allSec.length + ' sections. Every PT-1 row in the workbook is ' +
+    'placed (' + _admNum(C.placedA) + ' of ' + _admNum(C.nA) + ') and ' + _admNum(C.placedB) +
+    ' of ' + _admNum(C.nB) + ' half-yearly rows.' +
+    (flagged.length ? '<br><br><b style="color:#92400E">⚠ ' + flagged.length + ' of ' + allSec.length +
+      ' sections changed roll by more than a sixth</b> between the sittings. Those rows are marked, ' +
+      'and part of their movement is a change of children rather than of teaching.' : '') +
+    '<br><br><b>Every row opens.</b> ▸ taps a group open into what is inside it — a branch into its ' +
+    'stages, a stage into its classes, a class into its rooms. <b>view ›</b> lists the two rolls ' +
+    'separately, each child with the place they stood in.</div>';
+
+  /* ── THE SUM, SHOWN ON A REAL ROOM ──
+     One actual room from the data on screen, subject by subject, so the figure
+     can be followed and checked against the mark sheet. Chosen for a steady
+     roll and an ordinary move rather than an extreme one. */
+  var worked = (function () {
+    var cand = allSec.filter(function (x) {
+      return x.na >= 20 && x.shift < 0.05 && x.mv > 4 && x.mv < 20; })
+      .sort(function (p, q) { return q.na - p.na; });
+    if (!cand.length) return '';
+    var x = cand[0];
+    var sjs = C.subjects.filter(function (sj) {
+      return count(x.a, sj) >= 10 && count(x.b, sj) >= 10; });
+    if (!sjs.length) return '';
+    return '<details class="au-sec" style="margin-top:14px"><summary style="cursor:pointer;' +
+      'font-size:15.5px;font-weight:800;color:var(--tx);list-style:none">' +
+      '▸ Where ' + sg(x.mv) + ' for ' + e(x.full) + ' comes from — the same sum, on one room</summary>' +
+      '<div class="sub" style="margin-top:10px">Three steps, and nothing else happens to the number. ' +
+      'No child in October is tied to a child in December at any point.' +
+      '<br><b style="color:var(--tx)">1.</b> For each subject, every child who sat that paper in ' +
+      'October is placed among all ' + e(x.a[0] ? _exGLab(x.a[0].g) : 'grade') + ' children of the ' +
+      'same curriculum who sat the identical paper. 50 is the middle of that year group. The room’s ' +
+      'October figure for the subject is the average of its own children’s places.' +
+      '<br><b style="color:var(--tx)">2.</b> The same is done again, on its own, for December.' +
+      '<br><b style="color:var(--tx)">3.</b> The movement is the second minus the first.' +
+      '<br>The percentages are printed so the marks can be seen. They are never subtracted.</div>' +
+      '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:820px"><thead><tr>' +
+      '<th>' + e(x.full) + '</th>' +
+      '<th class="n">Sat Oct</th><th class="n">Oct %</th><th class="n">→ place</th>' +
+      '<th class="n">Sat Dec</th><th class="n">Dec %</th><th class="n">→ place</th>' +
+      '<th class="n">Movement</th></tr></thead><tbody>' +
+      sjs.map(function (sj) {
+        var y = unit(sj, '', x.a, x.b, sj);
+        return '<tr><td>' + e(sj) + '</td>' +
+          '<td class="n" style="color:var(--txm)">' + y.na + '</td>' +
+          '<td class="n" style="color:var(--txm)">' + y.wa.toFixed(1) + '</td>' +
+          '<td class="n" style="font-weight:700">' + y.pa.toFixed(0) + '</td>' +
+          '<td class="n" style="color:var(--txm)">' + y.nb + '</td>' +
+          '<td class="n" style="color:var(--txm)">' + y.wb.toFixed(1) + '</td>' +
+          '<td class="n" style="font-weight:700">' + y.pb.toFixed(0) + '</td>' +
+          '<td class="n" style="font-weight:800;color:' + col(y.mv) + '">' + sg(y.mv) + '</td></tr>';
+      }).join('') +
+      '<tr style="font-weight:800;border-top:2px solid var(--bor)"><td>The room, over every subject</td>' +
+      '<td class="n">' + x.na + '</td>' +
+      '<td class="n" style="color:var(--txm)">' + x.wa.toFixed(1) + '</td>' +
+      '<td class="n">' + x.pa.toFixed(0) + '</td>' +
+      '<td class="n">' + x.nb + '</td>' +
+      '<td class="n" style="color:var(--txm)">' + x.wb.toFixed(1) + '</td>' +
+      '<td class="n">' + x.pb.toFixed(0) + '</td>' +
+      '<td class="n" style="color:' + col(x.mv) + '">' + sg(x.mv) + '</td></tr></tbody></table></div>' +
+      '<div class="au-note">The room stood at <b>' + x.pa.toFixed(0) + '</b> in its year group in ' +
+      'October and at <b>' + x.pb.toFixed(0) + '</b> in December, so it moved <b>' + sg(x.mv) +
+      '</b> places. Its roll was ' + x.na + ' and ' + x.nb + ' — close enough that the movement is ' +
+      'the room’s and not a change of children.' +
+      '<br><br><b>Read a subject row across, not down.</b> A mark that falls can still be a climb, ' +
+      'and a mark that rises can still be a slip: it depends entirely on what the rest of the year ' +
+      'group did on the same paper, which is the only thing that makes the two sittings comparable ' +
+      'at all.</div></details>';
+  })();
+  h += worked;
+
+  /* ── THE TABLES ──
+     mode 'pos' is the normal one: where a group stood, where it stands and the
+     move between. mode 'spread' is for the two tables where a move cannot
+     exist — a subject and a grade ARE the queue every child is placed in, so
+     their own movement is zero by arithmetic rather than by merit. Those show
+     how far apart the branches inside them ended up, which is real. */
+  /* grey where the roll moved: the bar is the first thing read, and a room
+     that lost half its children has not "climbed" in any sense a colour
+     should be allowed to assert */
+  var posbar = function (was, now, warn) {
+    var c = warn ? 'var(--txl)' : col(now - was);
     return '<div style="position:relative;height:18px;background:var(--pl);border-radius:5px">' +
       '<div style="position:absolute;left:0;top:3px;bottom:3px;border-radius:3px;width:' +
         Math.max(1, Math.min(now, 100)).toFixed(0) + '%;background:' + c + ';opacity:.85"></div>' +
       '<div style="position:absolute;left:' + Math.min(was, 100).toFixed(0) + '%;top:-1px;bottom:-1px;' +
         'width:2px;background:var(--tx);opacity:.6"></div></div>';
   };
-
-  /* mode 'pos' is the normal table: where a group stood, where it stands, and
-     the move between. mode 'churn' is for the two tables where a move cannot
-     exist — a subject and a grade ARE the queue every child is placed in, so
-     their own movement is zero by arithmetic, not by merit. Those show how
-     much the order was reshuffled instead, and open into the branches, where
-     the movement is real. */
   var tbl = function (title, data, note, nameCol, mode, opt) {
     opt = opt || {};
-    var churnMode = mode === 'churn';
-    data = data.slice().sort(function (x, y) { return churnMode ? (y.churn - x.churn) : (y.mv - x.mv); });
+    var sp = mode === 'spread';
+    data = data.slice().filter(function (x) { return x && x.mv != null; });
+    var kidsOf = function (x) {
+      if (x._kids === undefined) x._kids = x.kids ? x.kids(x) : null;
+      return x._kids;
+    };
+    /* A SPREAD IS A GAP BETWEEN THE THINGS ONE LEVEL DOWN, at whatever level
+       the row sits: for a subject that is its branches, for a branch inside
+       it its classes, for a class its rooms. Computed on demand, because a
+       row nobody opens should not pay for it — and because the top-level
+       pre-pass alone used to leave every expanded row without one, which
+       crashed the table the moment a subject was tapped open. */
+    var thin = [];
+    var spreadOf = function (x) {
+      if (x._sp === undefined) {
+        var kids = kidsOf(x) || [];
+        /* with one group inside there is no gap, and printing 0.0 with the
+           same name as both strongest and weakest states a finding that does
+           not exist */
+        if (kids.length < 2) { x._sp = null; x.hi = null; x.lo = null; }
+        else { x.hi = kids[0]; x.lo = kids[kids.length - 1]; x._sp = x.hi.mv - x.lo.mv; }
+      }
+      x.spread = x._sp;
+      return x._sp;
+    };
+    if (sp) {
+      data.forEach(function (x) { if (spreadOf(x) == null) thin.push(x); });
+      data = data.filter(function (x) { return x.spread != null; });
+    }
+    var sus = function (x) { return x.shift > SHIFT ? 1 : 0; };
+    data.sort(function (p, q) {
+      if (sp) return q.spread - p.spread;
+      /* a roll that halved is not a result; it goes under the real ones */
+      return sus(p) - sus(q) || q.mv - p.mv;
+    });
     var body = '';
     var emit = function (x, depth) {
-      var kids = x.kids ? x.kids(x, depth) : null;
+      var kids = kidsOf(x);
       var open = kids && kids.length && x.key && _exOpen[x.key];
       var pad = depth * 22;
       var head = (kids && kids.length && x.key)
@@ -16114,244 +16208,211 @@ function _exRenderCompare() {
             JSON.stringify(x.key).replace(/"/g, '&quot;') + ')" style="font-weight:' +
             (depth ? '600' : '700') + '">' + (open ? '▾ ' : '▸ ') + (x.html ? x.k : e(x.k)) + '</button>'
         : '<span style="font-weight:' + (depth ? '500' : '700') + '">' + (x.html ? x.k : e(x.k)) + '</span>';
-      var vid = pick((opt.what || nameCol) + ' · ' + x.k, x.rows, title);
+      var vid = pick(x.full || x.k, x, opt.what || nameCol);
+      var warn = x.shift > SHIFT;
       body += '<tr' + (depth ? ' style="background:var(--pl)"' : '') + '>' +
         '<td style="padding-left:' + (9 + pad) + 'px' + (depth ? ';color:var(--txm)' : '') + '">' + head + '</td>' +
-        '<td class="n" style="color:var(--txm)">' + x.n + '</td>' +
-        '<td class="n" style="color:var(--txm)">' + x.pt.toFixed(1) + '</td>' +
-        '<td class="n" style="color:var(--txm)">' + x.hy.toFixed(1) + '</td>' +
-        (churnMode
-          ? '<td class="n" style="font-weight:800">' + x.churn.toFixed(1) + '</td>' +
-            '<td class="n" style="color:#047857;font-weight:700">' + x.up.toFixed(0) + '%</td>' +
-            '<td class="n" style="color:#B91C1C;font-weight:700">' + x.dn.toFixed(0) + '%</td>'
-          : '<td class="n" style="color:var(--txm)">' + x.pp.toFixed(0) + '</td>' +
-            '<td style="min-width:160px">' + posbar(x.pp, x.hp) + '</td>' +
-            '<td class="n" style="font-weight:800;color:' + col(x.mv) + '">' + sg(x.mv) + '</td>') +
+        '<td class="n" style="color:var(--txm);white-space:nowrap">' + x.na + ' → ' + x.nb +
+          (warn ? ' <b style="color:#D97706" title="roll changed by more than a sixth">⚠</b>' : '') + '</td>' +
+        '<td class="n" style="color:var(--txm)">' + x.wa.toFixed(1) + '</td>' +
+        '<td class="n" style="color:var(--txm)">' + x.wb.toFixed(1) + '</td>' +
+        (sp
+          ? (function () { spreadOf(x);
+              return '<td style="font-weight:700;color:#047857">' +
+                (x.hi ? e(x.hi.k) + ' ' + sg(x.hi.mv) : '–') + '</td>' +
+              '<td style="font-weight:700;color:#B91C1C">' +
+                (x.lo ? e(x.lo.k) + ' ' + sg(x.lo.mv) : '–') + '</td>' +
+              '<td class="n" style="font-weight:800">' +
+                (x.spread == null ? '–' : x.spread.toFixed(1)) + '</td>'; })()
+          : '<td class="n" style="color:var(--txm)">' + x.pa.toFixed(0) + '</td>' +
+            '<td style="min-width:160px">' + posbar(x.pa, x.pb, warn) + '</td>' +
+            '<td class="n" style="font-weight:800;color:' + (warn ? 'var(--txm)' : col(x.mv)) + '">' +
+              sg(x.mv) + (warn ? ' <b style="color:#D97706">⚠</b>' : '') + '</td>') +
         '<td class="n"><button class="na-secbtn" onclick="exView(\'' + vid + '\')" ' +
           'style="color:var(--p);font-weight:700;white-space:nowrap">view ›</button></td></tr>';
       if (open) kids.forEach(function (y) { emit(y, depth + 1); });
       if (open && !kids.length)
         body += '<tr style="background:var(--pl)"><td colspan="8" style="padding-left:' + (31 + pad) +
-          'px;color:var(--txm)">Nothing inside this group is big enough to show on its own.</td></tr>';
+          'px;color:var(--txm)">Nothing inside this group has a roll at both sittings.</td></tr>';
     };
     data.forEach(function (x) { emit(x, 0); });
+    if (!body) return '';
+    var thinNote = thin.length
+      ? '<div class="au-note"><b>Not shown:</b> ' + thin.map(function (x) {
+          return e(x.k) + ' (' + x.na + ' → ' + x.nb + ')'; }).join(' · ') +
+        '. Only one branch has a roll of ' + MINBR + ' or more at both sittings, so there is no ' +
+        'second branch to be apart from and no spread to report.</div>'
+      : '';
     return '<div class="au-sec"><h3>' + e(title) + '</h3>' +
       (note ? '<div class="sub">' + note + '</div>' : '') +
-      '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:880px"><thead><tr>' +
-      '<th>' + e(nameCol) + '</th><th class="n">Pupils</th>' +
-      '<th class="n">PT-1 %</th><th class="n">Half yearly %</th>' +
-      (churnMode
-        ? '<th class="n">Places moved</th><th class="n">Climbed</th><th class="n">Slipped</th>'
+      '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:900px"><thead><tr>' +
+      '<th>' + e(nameCol) + '</th><th class="n">Roll Oct → Dec</th>' +
+      '<th class="n">Oct %</th><th class="n">Dec %</th>' +
+      (sp
+        ? '<th>Strongest within</th><th>Weakest within</th><th class="n">Spread</th>'
         : '<th class="n">Was</th><th>Position in the year group</th><th class="n">Movement</th>') +
       '<th class="n">&nbsp;</th>' +
-      '</tr></thead><tbody>' + body + '</tbody></table></div></div>';
+      '</tr></thead><tbody>' + body + '</tbody></table></div>' + thinNote + '</div>';
   };
 
-  var h = '<div class="au-kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">' +
-    tile(R.length.toLocaleString('en-IN'), 'Children compared', 'sat both papers', 'var(--tx)',
-         R, 'Every child in this comparison') +
-    tile(sg(allMv), 'Average movement', 'places gained or lost in the year group',
-         'var(--tx)', R, 'Every child in this comparison') +
-    tile(climbed.length.toLocaleString('en-IN'), 'Climbed',
-         'moved up ' + MOVE + ' places or more', '#047857', climbed, 'Children who climbed') +
-    tile(slipped.length.toLocaleString('en-IN'), 'Slipped',
-         'moved down ' + MOVE + ' places or more', '#DC2626', slipped, 'Children who slipped') +
-    '</div>';
+  /* 1 · BRANCH → stages → classes → rooms */
+  var brA = grp(A, function (r) { return r.br; }), brB = grp(B, function (r) { return r.br; });
+  h += tbl('Branch', both(brA, brB).map(function (k) {
+      return unit(k, 'branch|' + k, brA[k], brB[k], '', bandsOf); }),
+    'Where each branch’s children stood in their year groups at each sitting, and which way the ' +
+    'branch moved between them. Tap a branch for its stages — Prep, 1 &amp; 2, 3 to 5, 6 to 8, ' +
+    '9 &amp; 10 — then a stage for its classes, and a class for its rooms. The bar is where the ' +
+    'branch stands now; the line on it is where it stood in October.', 'Branch', null,
+    { what: 'Branch' });
 
-  /* the finding that governs how every other number is read */
-  h += '<div style="margin:14px 0;border-radius:12px;padding:14px 18px;background:#EEF2FF;border:1px solid #C7D2FE;' +
-    'font-size:13px;line-height:1.6;color:#1E3A8A">' +
-    '<b>The two percentages are not on the same scale, so this page never subtracts one from the other.</b> ' +
-    'PT-1 and the half yearly are different papers: across all ' +
-    '129 curriculum-grade-subject combinations in this workbook, not one shares a mark total with the ' +
-    'other sitting — PT-1 runs out of 15 to 40 marks over a few chapters, the half yearly out of 25 ' +
-    'to 160 over half the syllabus. A percentage off a 30-mark test is not the same measurement as a ' +
-    'percentage off an 80-mark examination.' +
-    '<br><br><b>What is comparable is position.</b> Each child is placed among everyone who sat the ' +
-    '<b>identical paper</b> — same curriculum, same grade, same subject — at each sitting. ' +
-    '<b>50 is the middle of that year group, 90 is near the top.</b> ' +
-    '<b>Movement</b> is the second position minus the first, so +6 means the average child here moved ' +
-    'six places up the hundred against the children they sit beside. Every difference in mark total, ' +
-    'paper length and marking severity cancels, because both figures are positions inside their own ' +
-    'sitting. The check is built in: across the group the movement must average zero, because one child ' +
-    'climbs only where another falls. It comes to ' + allMv.toFixed(2) + '.' +
-    '<br><br><b>Every row opens.</b> ▸ taps a group open into what is inside it — a branch into ' +
-    'its five stages, a stage into its rooms, a subject or grade into the branches carrying it. ' +
-    '<b>view ›</b> lists the children themselves with both their marks and both their positions.</div>';
+  /* 2 · CLASS — the table management asked for.
+     At the top level a class needs its branch on it, or four different rows
+     all read "Grade 3". Nested under a branch the branch is already above it,
+     which is why classesOf labels them short. */
+  /* under a branch filter the branch is on every row and tells nobody
+     anything; without one it is the only thing separating four "Grade 3"s */
+  if (!scope) allCls.forEach(function (x) { x.k = x.full; });
+  h += tbl('Class', allCls,
+    '<b style="color:var(--tx)">Every class at every branch, strongest movement first.</b> This is ' +
+    'the level at which a result belongs to somebody: a class has a teacher, a timetable and a ' +
+    'syllabus, and it exists at both sittings whoever is sitting in it. Tap a class for the rooms ' +
+    'inside it. <b>Where the roll moved by more than a sixth the row carries ⚠, and its movement ' +
+    'is left grey rather than green or red</b> — Pocharam’s Grades 1, 2, 5 and 6 each lost most ' +
+    'of their roll between the sittings, so whatever those rows show is largely a change of ' +
+    'children and must not be read as a gain.', 'Class', null, { what: 'Class' });
 
-  /* ── THE SUM, SHOWN ON A REAL CHILD ──
-     One actual child from the data on screen, with the arithmetic beside each
-     subject, so the figure can be followed and checked against the mark
-     sheet. Chosen for being ordinary rather than extreme. */
-  var worked = (function () {
-    var cand = R.filter(function (r) {
-      return r.k >= 4 && r.mv > 2 && r.mv < 25 &&
-        Object.keys(r.per).every(function (sj) {
-          var p = r.per[sj];
-          return p.pt0 >= 20 && p.pt0 <= 100 && p.hy0 >= 20 && p.hy0 <= 100; });
-    });
-    if (!cand.length) return '';
-    var c = cand[0], ks = Object.keys(c.per);
-    var grp = R.filter(function (r) { return r.br === c.br; });
-    var gmv = mean(grp.map(function (r) { return r.mv; }));
-    return '<details class="au-sec" style="margin-top:14px"><summary style="cursor:pointer;' +
-      'font-size:15.5px;font-weight:800;color:var(--tx);list-style:none">' +
-      '▸ Where ' + sg(gmv) + ' for ' + e(c.br) + ' comes from — the same sum, on one child</summary>' +
-      '<div class="sub" style="margin-top:10px">Three steps, and nothing else happens to the number.' +
-      '<br><b style="color:var(--tx)">1.</b> For each subject the child sat at BOTH sittings, find where ' +
-      'that mark places them among every child of the same curriculum and grade who sat the same paper. ' +
-      '50 is the middle of that year group.' +
-      '<br><b style="color:var(--tx)">2.</b> Average those positions for each sitting, and take the ' +
-      'second minus the first. That is the child’s movement.' +
-      '<br><b style="color:var(--tx)">3.</b> The branch figure is the plain average of its ' +
-      'children’s movement — ' + _admNum(grp.length) + ' of them here.' +
-      '<br>The percentages below are printed so the marks can be seen. They are never subtracted.</div>' +
-      '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:760px"><thead><tr>' +
-      '<th>' + e(c.nm) + ' · ' + e(c.gr) + ' ' + e(c.sec) + '</th>' +
-      '<th class="n">PT-1 %</th><th class="n">→ place</th>' +
-      '<th class="n">Half yearly %</th><th class="n">→ place</th>' +
-      '<th class="n">Movement</th></tr></thead><tbody>' +
-      ks.map(function (sj) {
-        var p = c.per[sj];
-        return '<tr><td>' + e(sj) + '</td>' +
-          '<td class="n" style="color:var(--txm)">' + p.pt0 + '</td>' +
-          '<td class="n" style="font-weight:700">' + p.pp.toFixed(0) + '</td>' +
-          '<td class="n" style="color:var(--txm)">' + p.hy0 + '</td>' +
-          '<td class="n" style="font-weight:700">' + p.hp.toFixed(0) + '</td>' +
-          '<td class="n" style="font-weight:800;color:' + col(p.mv) + '">' + sg(p.mv) + '</td></tr>';
-      }).join('') +
-      '<tr style="font-weight:800;border-top:2px solid var(--bor)"><td>Average of the ' + ks.length + '</td>' +
-      '<td class="n" style="color:var(--txm)">' + c.pt.toFixed(1) + '</td>' +
-      '<td class="n">' + c.pp.toFixed(0) + '</td>' +
-      '<td class="n" style="color:var(--txm)">' + c.hy.toFixed(1) + '</td>' +
-      '<td class="n">' + c.hp.toFixed(0) + '</td>' +
-      '<td class="n" style="color:' + col(c.mv) + '">' + sg(c.mv) + '</td></tr></tbody></table></div>' +
-      '<div class="au-note">She stood at <b>' + c.pp.toFixed(0) + '</b> in her year group in October and ' +
-      'at <b>' + c.hp.toFixed(0) + '</b> in December, so she moved <b>' + sg(c.mv) + '</b> places. ' +
-      'Average that over all ' + _admNum(grp.length) + ' children at ' + e(c.br) + ' and you have ' +
-      sg(gmv) + ' — ' + _admNum(grp.filter(function (r) { return r.mv >= MOVE; }).length) +
-      ' of them climbed ' + MOVE + ' places or more, ' +
-      _admNum(grp.filter(function (r) { return r.mv <= -MOVE; }).length) + ' slipped that far.' +
-      '<br><br><b>Read a subject row across, not down.</b> A mark that falls can still be a climb, and a ' +
-      'mark that rises can still be a slip — it depends entirely on what the rest of the year group ' +
-      'did on the same paper, which is the only thing that makes the two sittings comparable at all.' +
-      '</div></details>';
-  })();
-  h += worked;
-
-  var brG = groupBy(R, function (r) { return r.br; });
-  h += tbl('Branch', brG.keys.map(function (k) {
-      return stats(k, brG.m[k], 'branch|' + k, bandsOf); }),
-    'Where each branch’s children stand in their year groups, and which way they moved. ' +
-    'Tap a branch for its five stages — Prep, 1 &amp; 2, 3 to 5, 6 to 8, 9 &amp; 10 — then a ' +
-    'stage for the rooms inside it. The bar is where the group stands now; the line on it is where it ' +
-    'stood in October.', 'Branch', null, { what: 'Branch' });
-
-  h += tbl('Subject', (function () {
-      return C.subjects.map(function (sj) {
-        var g = R.filter(function (r) { return r.per[sj]; });
-        if (g.length < 20) return null;
-        var slot = /^III Language$/i.test(sj) ? 'III' : /^II Language$/i.test(sj) ? 'II' : '';
-        var lab = sj;
-        if (slot) {
-          var LL = _exLangs(g, slot);
-          lab = sj + ' — ' + (LL.length ? LL.join(' or ') : 'language not recorded') +
-                (LL.length > 1 ? ', mixed' : '');
-        }
-        var o = stats(lab, g, 'subject|' + sj, branchesOf);
-        o.slot = slot;
-        /* the row shows this subject's own marks and its own places */
-        o.pt = mean(g.map(function (r) { return +r.per[sj].pt0; }));
-        o.hy = mean(g.map(function (r) { return +r.per[sj].hy0; }));
-        o.churn = mean(g.map(function (r) { return Math.abs(r.per[sj].mv); }));
-        o.up = 100 * g.filter(function (r) { return r.per[sj].mv >= MOVE; }).length / g.length;
-        o.dn = 100 * g.filter(function (r) { return r.per[sj].mv <= -MOVE; }).length / g.length;
-        return o;
-      }).filter(Boolean);
-    })(),
-    '<b style="color:var(--tx)">A subject cannot move against itself.</b> Every child is placed inside ' +
-    'their own curriculum, grade and subject, so a subject IS the queue — its own movement is zero ' +
-    'by arithmetic, not by merit. What a subject can show is how much the order was <b>reshuffled</b>: ' +
-    '"places moved" is how far the average child shifted, up or down, and a large figure means the two ' +
-    'papers ranked children very differently. Tap a subject for the branches, where the movement is real.' +
-    '<br><br><b style="color:var(--tx)">II Language and III Language are columns on the mark sheet, not ' +
-    'subjects.</b> Nothing in the workbook records which language a child sat, so one row can hold Hindi, ' +
-    'Telugu and French at once. The row names which languages each grade teaches: ' +
-    '<span style="color:#047857;font-weight:700">one</span> means the slot is unambiguous there, ' +
-    '<span style="color:#B45309;font-weight:700">two or more</span> means it is mixed.',
-    'Subject', 'churn', { what: 'Subject' });
-
-  var grG = groupBy(R, function (r) { return r.gr; });
-  h += tbl('Grade', grG.keys.map(function (k) {
-      return stats(k, grG.m[k], 'grade|' + k, branchesOf); }),
-    'A grade cannot move against itself either, for the same reason — the year group IS the grade. ' +
-    'What is shown is how far the average child shifted inside it. Tap a grade for the branches, where ' +
-    'one can gain places only by another losing them.', 'Grade', 'churn', { what: 'Grade' });
-
-  var secG = groupBy(R, function (r) { return r.br + ' · ' + r.gr + ' · ' + r.sec; });
-  var secs = secG.keys.map(function (k) { return stats(k, secG.m[k], ''); })
-    .filter(function (x) { return x.n >= 12; });
-  var best = secs.slice().sort(function (a, b) { return b.mv - a.mv; }).slice(0, 8);
-  var worst = secs.slice().sort(function (a, b) { return a.mv - b.mv; }).slice(0, 8);
-  h += tbl('The eight rooms that climbed the most', best,
-    'Twelve pupils or more. These children overtook others sitting the same papers.', 'Section', null,
-    { what: 'Room' });
-  h += tbl('The eight rooms that slipped the most', worst,
-    'Twelve pupils or more. These children were overtaken by others sitting the same papers.',
+  /* 3 · SECTION — the rooms, best and worst. Named in full here: on its own
+     a room is "E" or "DAIZY", which says nothing without the branch and the
+     class it sits in. */
+  var ranked = allSec.slice().sort(function (p, q) { return q.mv - p.mv; });
+  ranked.forEach(function (x) { x.k = x.full; });
+  h += tbl('The ten rooms that climbed the most', ranked.slice(0, 10),
+    MINROOM + ' children or more at each sitting. These rooms overtook others sitting the same papers.',
     'Section', null, { what: 'Room' });
+  h += tbl('The ten rooms that slipped the most', ranked.slice(-10),
+    MINROOM + ' children or more at each sitting. These rooms were overtaken by others sitting the ' +
+    'same papers.', 'Section', null, { what: 'Room' });
 
-  /* ── WHO IS NOT ON THIS PAGE, AND WHOSE JOB IT IS ──
-     "No half yearly found" was one heading over three different problems, and
-     the three need three different people. Separated here, with the care-call
-     roster deciding which is which. */
-  var G = (C.gaps || []).filter(function (g) { return !scope || g.br === scope; });
-  var tot = { noSheet: 0, notEntered: 0, offRoll: 0 };
-  G.forEach(function (g) { tot.noSheet += g.noSheet; tot.notEntered += g.notEntered; tot.offRoll += g.offRoll; });
-  var tiles = '<div class="au-kpis" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:14px">' +
-    tile(tot.noSheet.toLocaleString('en-IN'), 'No paper for the whole grade',
-         'the sitting was never held or never entered for that grade', tot.noSheet ? '#DC2626' : 'var(--tx)') +
-    tile(tot.notEntered.toLocaleString('en-IN'), 'On the roll, one result missing',
-         'the care-call register has the child; one mark sheet does not', tot.notEntered ? '#D97706' : 'var(--tx)') +
-    tile(tot.offRoll.toLocaleString('en-IN'), 'Not on the roll',
-         'joined after PT-1 or left before the half yearly — nothing to fix', 'var(--txm)') +
-    '</div>';
+  /* 4 · SUBJECT → branches */
+  h += tbl('Subject', C.subjects.map(function (sj) {
+      var slot = /^III Language$/i.test(sj) ? 'III' : /^II Language$/i.test(sj) ? 'II' : '';
+      var lab = sj;
+      if (slot) {
+        var LL = _exLangs(A.concat(B), slot);
+        lab = sj + ' — ' + (LL.length ? LL.join(' or ') : 'language not recorded') +
+              (LL.length > 1 ? ', mixed' : '');
+      }
+      var x = unit(lab, 'subject|' + sj, A, B, sj, scope ? classesOf : branchesOf, sj);
+      if (x.na < 20 || x.nb < 20) return null;
+      return x;
+    }).filter(Boolean),
+    /* WITH ALL BRANCHES ON SCREEN a subject cannot move: every child is placed
+       inside their own curriculum, grade and subject, so the subject IS the
+       queue and its own movement is zero by arithmetic. Narrowed to ONE
+       branch it moves perfectly well, because it is then being measured
+       against the other four — so the table switches from spread to movement
+       rather than emptying itself out, which is what it used to do. */
+    (scope
+      ? '<b style="color:var(--tx)">How each subject moved at ' + e(scope) + '</b>, against the ' +
+        'same subject everywhere else. A child is placed among everyone of the same curriculum and ' +
+        'grade who sat the identical paper at <b>all branches</b>, so this branch gains places in a ' +
+        'subject only where the others lose them. Tap a subject for the classes inside it.'
+      : '<b style="color:var(--tx)">A subject cannot move against itself.</b> Every child is placed ' +
+        'inside their own curriculum, grade and subject, so a subject IS the queue — its own ' +
+        'movement is zero by arithmetic, not by merit. What a subject can show is how far apart the ' +
+        'branches inside it ended up: <b>spread</b> is the gap in places between the branch that ' +
+        'gained most and the one that lost most. A wide spread is a subject taught very differently ' +
+        'across the group. Tap a subject for the branches themselves — and a branch for its ' +
+        'classes, where <b>strongest</b> and <b>weakest within</b> then name the classes inside it.') +
+    '<br><br><b style="color:var(--tx)">II Language and III Language are columns on the mark sheet, ' +
+    'not subjects.</b> Nothing in the workbook records which language a child sat, so one row can ' +
+    'hold Hindi, Telugu and French at once. The row names which languages the grades here teach: ' +
+    '<span style="color:#047857;font-weight:700">one</span> means the slot is unambiguous, ' +
+    '<span style="color:#B45309;font-weight:700">two or more</span> means it is mixed.',
+    'Subject', scope ? null : 'spread', { what: 'Subject' });
+
+  /* 5 · GRADE → branches */
+  var gA = grp(A, function (r) { return r.g; }), gB = grp(B, function (r) { return r.g; });
+  h += tbl(scope ? 'Grade' : 'Grade, across the branches', both(gA, gB).map(function (k) {
+      return unit(_exGLab(k), 'grade|' + k, gA[k], gB[k], '',
+                  scope ? sectionsOf : branchesOf); }),
+    (scope
+      ? 'How each grade at ' + e(scope) + ' moved against the same grade everywhere else. Tap a ' +
+        'grade for its rooms.'
+      : 'A grade cannot move against itself either, for the same reason — the year group IS the ' +
+        'grade. What is shown is how far apart its branches finished: one branch gains places in a ' +
+        'grade only by another losing them. Tap a grade for the branches, and a branch for the ' +
+        'rooms inside it.'),
+    'Grade', scope ? null : 'spread', { what: 'Grade' });
+
+  /* ── WHAT IS NOT ON THIS PAGE ──
+     A class or a room with a roll at only one sitting is not a comparison, so
+     it is never drawn as one. It is listed here instead, because every one of
+     these is a mark sheet to be filled in rather than anything this page can
+     work out. */
+  var oneSided = [];
+  (function () {
+    var ca = grp(A, function (r) { return r.cls; }), cb = grp(B, function (r) { return r.cls; });
+    Object.keys(ca).forEach(function (k) { if (!cb[k])
+      oneSided.push({ lvl: 'class', k: k, side: 'pt1', rows: ca[k] }); });
+    Object.keys(cb).forEach(function (k) { if (!ca[k])
+      oneSided.push({ lvl: 'class', k: k, side: 'hy', rows: cb[k] }); });
+    var sa = grp(A, function (r) { return r.sec; }), sb = grp(B, function (r) { return r.sec; });
+    Object.keys(sa).forEach(function (k) {
+      var c = k.split('|').slice(0, 2).join('|');
+      if (!sb[k] && cb[c]) oneSided.push({ lvl: 'room', k: k, side: 'pt1', rows: sa[k] }); });
+    Object.keys(sb).forEach(function (k) {
+      var c = k.split('|').slice(0, 2).join('|');
+      if (!sa[k] && ca[c]) oneSided.push({ lvl: 'room', k: k, side: 'hy', rows: sb[k] }); });
+  })();
+  oneSided.sort(function (p, q) { return q.rows.length - p.rows.length; });
+  var lost = oneSided.reduce(function (n, g) { return n + g.rows.length; }, 0);
   var gWho = function (g) {
     var id = 'g' + (++pid);
-    _exPick[id] = { title: g.br + ' · ' + g.gr + ' · not compared',
-      sub: 'listed as they stand in the mark sheets', gap: g.who || [] };
+    _exPick[id] = {
+      title: g.k.split('|')[0] + ' · ' + _exGLab(g.k.split('|')[1]) +
+             (g.lvl === 'room' ? ' · ' + _exSecLab(g.k) : '') + ' · not compared',
+      sub: 'listed as they stand in the mark sheet',
+      gap: g.rows.map(function (r) {
+        return { nm: r.nm, id: r.id, gr: r.gr, sec0: r.sec0, side: g.side }; }) };
     return id;
   };
-  var gRows = G.filter(function (g) { return g.noSheet || g.notEntered; })
-               .slice(0, 22).map(function (g) {
-    var gid = (g.who && g.who.length) ? gWho(g) : '';
-    return '<tr><td style="font-weight:700">' +
-      (gid ? '<button class="na-secbtn" onclick="exView(\'' + gid + '\')" style="font-weight:700">' +
-             e(g.br) + ' ›</button>' : e(g.br)) + '</td><td>' + e(g.gr) + '</td>' +
-      '<td class="n" style="font-weight:800;color:' + (g.noSheet ? '#DC2626' : 'var(--txl)') + '">' +
-        (g.noSheet || '–') + '</td>' +
-      '<td style="color:var(--txm)">' + (g.noSheet
-        ? (g.side === 'pt1' ? 'half yearly missing for this grade' : 'PT-1 missing for this grade') : '') + '</td>' +
-      '<td class="n" style="font-weight:800;color:' + (g.notEntered ? '#D97706' : 'var(--txl)') + '">' +
-        (g.notEntered || '–') + '</td>' +
-      '<td class="n" style="color:var(--txm)">' + (g.offRoll || '–') + '</td></tr>';
-  }).join('');
-  h += '<div class="au-sec"><h3>Who is not in this comparison</h3>' +
-    '<div class="sub">A child is above only where both papers can be tied to them. ' +
-    _admNum(C.nPairs) + ' children were matched out of ' + _admNum(C.nA) + ' PT-1 and ' +
-    _admNum(C.nB) + ' half-yearly rows' +
-    (C.noCommon ? ', and ' + C.noCommon + ' of those sat no subject at both sittings' : '') +
-    '. The rest are counted here by what is actually wrong, because the three need different people ' +
-    'to put them right.</div>' + tiles +
-    (gRows ? '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:760px"><thead><tr>' +
-      '<th>Branch</th><th>Grade</th><th class="n">Whole grade</th><th>&nbsp;</th>' +
-      '<th class="n">Result missing</th><th class="n">Not on roll</th></tr></thead><tbody>' +
-      gRows + '</tbody></table></div>' : '') +
-    '<div class="au-note"><b>Matched by:</b> admission number ' + _admNum(C.viaId) +
-    ' · full name ' + _admNum(C.viaName) + ' · same name words in a different order ' +
-    _admNum(C.viaWords) + '. An admission number is used only where it names one child on each sheet: ' +
-    'some rows carry a bare number instead, and those are shared by two or three different children. ' +
-    'Closer-than-exact name matching is deliberately not attempted — on this workbook its best ' +
-    'candidates were siblings in different grades.</div></div>';
+  h += '<div class="au-sec"><h3>What could not be compared, and why</h3>' +
+    '<div class="sub">A class or a room is above only where it has a roll at <b>both</b> sittings. ' +
+    _admNum(allCls.length) + ' classes and ' + _admNum(allSec.length) + ' rooms do. ' +
+    (lost ? 'The ' + _admNum(lost) + ' children below sat one sitting in a class or room that has ' +
+      'no roll at the other, so there is nothing to compare them against. Every one of these is a ' +
+      'mark sheet to be entered, not something this page can work out.'
+          : 'Nothing is missing.') +
+    '</div>' +
+    (oneSided.length ? '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:700px">' +
+      '<thead><tr><th>Branch</th><th>Class</th><th>Room</th><th class="n">Children</th>' +
+      '<th>What is missing</th></tr></thead><tbody>' +
+      oneSided.slice(0, 26).map(function (g) {
+        var p = g.k.split('|'), gid = gWho(g);
+        return '<tr><td style="font-weight:700"><button class="na-secbtn" onclick="exView(\'' + gid +
+          '\')" style="font-weight:700">' + e(p[0]) + ' ›</button></td>' +
+          '<td>' + e(_exGLab(p[1])) + '</td>' +
+          '<td style="color:var(--txm)">' + (g.lvl === 'room' ? e(_exSecLab(g.k)) : 'whole class') + '</td>' +
+          '<td class="n" style="font-weight:800">' + g.rows.length + '</td>' +
+          '<td style="color:' + (g.lvl === 'class' ? '#DC2626' : '#D97706') + ';font-weight:600">' +
+            (g.side === 'pt1' ? 'no half-yearly ' : 'no PT-1 ') + (g.lvl === 'class' ? 'sheet' : 'roll') +
+          '</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      (oneSided.length > 26 ? '<div class="au-note">' + (oneSided.length - 26) + ' more.</div>' : '') : '') +
+    (flagged.length ? '<div class="au-note" style="margin-top:10px"><b style="color:#92400E">⚠ ' +
+      flagged.length + ' rooms changed roll by more than a sixth</b> between the sittings: ' +
+      flagged.slice(0, 8).map(function (x) {
+        return e(x.full) + ' (' + x.na + ' → ' + x.nb + ')'; }).join(' · ') +
+      (flagged.length > 8 ? ' and ' + (flagged.length - 8) + ' more' : '') +
+      '. Their movement is partly a change of children and should be read with that in mind.</div>' : '') +
+    '<div class="au-note"><b>Why there is no "unmatched children" count here any more.</b> There is ' +
+    'nothing to match. Every child who sat a paper is placed among the children who sat the same ' +
+    'paper, and the rooms are compared — so a child appearing in one sitting and not the other ' +
+    'costs nothing and invents nothing. ' + _admNum(C.placedA) + ' of ' + _admNum(C.nA) +
+    ' PT-1 rows and ' + _admNum(C.placedB) + ' of ' + _admNum(C.nB) + ' half-yearly rows are used; ' +
+    'the few left out sat only subjects where fewer than ten children in the whole group sat the ' +
+    'same paper, which is too thin for a position to mean anything.</div></div>';
 
   el.innerHTML = h;
 }
