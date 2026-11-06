@@ -3453,16 +3453,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
 
       <div class="au-sec">
-        <h3>⏳ Leads nobody has worked yet</h3>
-        <div class="sub">A stage tells you where a lead stands; this panel tells you whether anybody has
-          actually picked up the phone. A lead sitting at "new" for a fortnight is not a slow parent, it is
-          an unmade call — and it was already paid for. The second tile is the one to act on today.
-          Click any tile for the parents behind it, with their number and the last thing written against
-          them.</div>
-        <div id="adm-work"></div>
-      </div>
-
-      <div class="au-sec">
         <h3>📣 What each source is actually worth</h3>
         <div class="sub">Volume and conversion are different questions and a source can win one while losing
           the other. The column to read is <b>admitted per hundred leads</b>: a source that sends fewer
@@ -3486,6 +3476,27 @@ document.addEventListener('DOMContentLoaded', async () => {
           money behind it. Whether this season is ahead or behind is answered by the day-for-day panel
           above, not by this one. Click a year for its months.</div>
         <div id="adm-pace"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>👥 Counsellor performance, branch by branch</h3>
+        <div class="sub">Every lead in this season carries the name of the counsellor holding it, so this is
+          the one place the work can be read per person. Tap a branch for its counsellors. <b>Admitted per
+          100</b> is the column that matters: a counsellor holding two hundred leads and converting six per
+          hundred is doing less for the school than one holding sixty and converting fifteen. The two
+          columns beside it say why — how many of their leads nobody has reached yet, and how many
+          call tasks they are carrying past their due date.</div>
+        <div id="adm-couns"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>⏰ Follow-ups — what is due, what was done</h3>
+        <div class="sub">The export carries every follow-up task against every lead, each with the day it
+          is due and whether it has been done. Only the tasks a person has to carry out are counted here:
+          calls, visit reminders, re-engagement and decision deadlines. The automatic WhatsApp and silence
+          nudges are left out — they fire by themselves and complete themselves, and counting them
+          would show every counsellor near perfect. Tap a branch for its counsellors.</div>
+        <div id="adm-follow"></div>
       </div>
 
       <div class="au-sec">
@@ -21569,6 +21580,520 @@ function _admWork() {
     'does about the source.</div>';
   el.innerHTML = h;
 }
+/* ══════════════════════════════════════════════════════════════════════════
+   COUNSELLOR PERFORMANCE AND FOLLOW-UPS                      6 November 2026
+
+   The export now names the counsellor on every lead and carries every
+   follow-up task against it, which is the first time either can be read from
+   this dashboard at all.
+
+   ── WHAT COUNTS AS WORK ──
+   The follow-up slots hold two different kinds of thing and they must never
+   be added together. 1,045 of the 1,534 tasks in the current file are
+   automatic — "whatsapp nudge" and "silence auto nudge" fire on a timer and
+   mark themselves Done the moment they fire, which is why they are 99.8%
+   complete. The 489 that a person has to carry out — a call, a visit
+   reminder, a re-engagement, a decision deadline — are 36% complete. Count
+   them together and every counsellor reads as near perfect; count only the
+   human ones and the real picture appears. So the automatic ones are
+   excluded, and the panel says so rather than quietly dropping them.
+
+   ── WHY ADMITTED-PER-100 AND NOT ADMISSIONS ──
+   Leads are not handed out evenly. One counsellor in this file holds 203 and
+   another holds 52, so a raw admission count ranks the person who was given
+   the most leads, not the person doing the most with them. The rate is the
+   comparable figure and the count sits beside it, because a high rate on
+   eleven leads is not yet evidence of anything.
+
+   ── WHAT THIS CANNOT SAY ──
+   The file opens on 3 October. Every lead in it is at most five weeks old and
+   many are days old, so a counsellor holding newer leads will show a lower
+   conversion rate for no fault of their own. The panel reports the age of
+   each counsellor's book alongside the rate for exactly that reason.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── ONE FOLLOW-UP SLOT, PARSED ──
+   The export writes each slot as one string:
+     "07 Nov 2026, 10:29 am · call task · Done (06 Nov 2026, 10:29 am) · note"
+     "09 Nov 2026, 02:25 pm · call task · Pending"
+   Parsed here rather than in Apps Script, because what is "due today" depends
+   on the reader's own clock, and a server that computed it at build time
+   would be wrong by the time anybody looked. */
+var ADM_FU_MON = { jan:0, feb:1, mar:2, apr:3, may:4, jun:5, jul:6, aug:7, sep:8, oct:9, nov:10, dec:11 };
+var ADM_FU_RE = /^(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{4}),\s*(\d{1,2}):(\d{2})\s*([ap]m)\s*·\s*([\s\S]*)$/i;
+var ADM_FU_DONE = /^Done\s*\((\d{1,2})\s+([A-Za-z]{3,})\s+(\d{4}),\s*(\d{1,2}):(\d{2})\s*([ap]m)\)\s*(?:·\s*([\s\S]*))?$/i;
+/* the tasks that fire and complete themselves; see the header */
+var ADM_FU_AUTO = { 'whatsapp nudge': 1, 'silence auto nudge': 1 };
+
+function _admFuDate(d, mon, y, hh, mm, ap) {
+  var m = ADM_FU_MON[String(mon).slice(0, 3).toLowerCase()];
+  if (m == null) return null;
+  var h = parseInt(hh, 10) % 12;
+  if (/p/i.test(ap)) h += 12;
+  return new Date(parseInt(y, 10), m, parseInt(d, 10), h, parseInt(mm, 10));
+}
+function _admFuParse(str) {
+  var m = ADM_FU_RE.exec(String(str || '').trim());
+  if (!m) return null;
+  var due = _admFuDate(m[1], m[2], m[3], m[4], m[5], m[6]);
+  if (!due) return null;
+  var rest = String(m[7] || '');
+  var i = rest.indexOf('·');
+  var kind = (i < 0 ? rest : rest.slice(0, i)).trim().toLowerCase();
+  var tail = (i < 0 ? '' : rest.slice(i + 1)).trim();
+  var dm = ADM_FU_DONE.exec(tail);
+  if (dm) {
+    return { due: due, kind: kind, done: _admFuDate(dm[1], dm[2], dm[3], dm[4], dm[5], dm[6]),
+             open: false, note: (dm[7] || '').trim(), auto: !!ADM_FU_AUTO[kind] };
+  }
+  return { due: due, kind: kind, done: null, open: /^pending/i.test(tail),
+           note: tail.replace(/^pending\s*·?\s*/i, '').trim(), auto: !!ADM_FU_AUTO[kind] };
+}
+/* every HUMAN follow-up in scope, each carrying its lead */
+var _admFuCache = null;
+function _admFollowUps() {
+  var S = _admSet();
+  var sig = S.scope + '|' + S.season + '|' + S.rows.length;
+  if (_admFuCache && _admFuCache.sig === sig) return _admFuCache.list;
+  var out = [];
+  S.rows.forEach(function (r) {
+    (r.fu || []).forEach(function (raw) {
+      var f = _admFuParse(raw);
+      if (!f || f.auto) return;            // automatic nudges are not somebody's work
+      f.r = r; f.br = r.b; f.c = _admCName(r);
+      out.push(f);
+    });
+  });
+  _admFuCache = { sig: sig, list: out };
+  return out;
+}
+/* a counsellor's name, normalised only for case and spacing: two spellings of
+   one person would otherwise be two rows */
+function _admCName(r) {
+  var v = String((r && r.owner) || '').trim();
+  if (!v) return '(not assigned)';
+  return v.replace(/\s+/g, ' ');
+}
+function _admCKey(n) { return String(n).toLowerCase(); }
+
+function _admDay(d) {
+  if (!d) return '';
+  return d.getFullYear() + '-' + _ad2(d.getMonth() + 1) + '-' + _ad2(d.getDate());
+}
+function _admToday() { return _admDay(new Date()); }
+function _admShiftDay(n) {
+  var d = new Date(); d.setDate(d.getDate() + n); return _admDay(d);
+}
+
+/* ══ COUNSELLOR PERFORMANCE ═══════════════════════════════════════════════ */
+/* ══ COUNSELLOR PERFORMANCE ═══════════════════════════════════════════════
+   SPLIT BY SOURCE, AND THE REASON MATTERS MORE THAN THE PANEL.
+
+   Ranking counsellors on overall conversion ranks the allocation of walk-ins,
+   not the counsellors. Measured on the 6 November export: a walk-in converts
+   at 37.9 admissions per 100 and a digital lead at 0.4. Three of the season's
+   70 admissions came from the 752 digital leads; the other 67 came from 177
+   walk-ins. The correlation between how much of a counsellor's book is
+   walk-in and their overall rate is r = 0.68.
+
+   So Kavya at Boduppal shows 0.0 per 100 on 119 leads — and was handed zero
+   walk-ins. Nobody in this file converts digital leads at any rate worth
+   measuring, so that figure is forced by the allocation and says nothing
+   about her. Publishing it as a performance ranking would have had management
+   disciplining her for a number she was never given the chance to move.
+
+   The two sides are therefore reported apart:
+
+     EFFORT  — leads nobody has reached, tasks overdue, tasks done. This is
+               the counsellor's own, whatever they were given, and it is where
+               Kavya's real problem is: 110 of her 119 leads have never been
+               touched, 60 of them more than a week old.
+
+     OUTCOME — walk-in conversion, which is the only rate with any signal in
+               it, and where real spread exists (82 per 100 down to 14). And
+               for digital leads the column that matters is not admissions but
+               VISITS BOOKED, because 93% of admissions happen within a week
+               of the parent being on campus. Digital's job is to produce a
+               campus visit; this is the column that says whether it did.
+
+   A counsellor with fewer than five walk-ins is shown but not ranked. */
+function _admIsWalkSrc(r) {
+  var L = (_admRaw && _admRaw.walkinSources) || ['walk_in', 'referral', 'manual'];
+  return L.indexOf(String(r.src || '').toLowerCase()) >= 0;
+}
+function _admCStats(rows, fus) {
+  var won = rows.filter(_admIsWon).length;
+  var shut = rows.filter(function (r) { return _admIsClosed(r) && !_admIsWon(r); }).length;
+  var unreached = rows.filter(function (r) { return r.st === 'new' || r.st === 'not_connected'; }).length;
+  var onCampus = function (r) {
+    return r.st === 'visit_scheduled' || r.st === 'visited' ||
+           r.st === 'admission_form_issued' || r.st === 'admitted'; };
+  var walk = rows.filter(_admIsWalkSrc);
+  var dig  = rows.filter(function (r) { return !_admIsWalkSrc(r); });
+  var ages = rows.map(_admAge).filter(function (n) { return n > 0; });
+  var today = _admToday();
+  var od = fus.filter(function (f) { return f.open && _admDay(f.due) < today; }).length;
+  var done = fus.filter(function (f) { return !!f.done; }).length;
+  return {
+    n: rows.length, won: won, shut: shut, open: rows.length - won - shut,
+    unreached: unreached, unPct: rows.length ? 100 * unreached / rows.length : 0,
+    w: walk.length, wWon: walk.filter(_admIsWon).length,
+    wRate: walk.length ? 100 * walk.filter(_admIsWon).length / walk.length : null,
+    d: dig.length, dWon: dig.filter(_admIsWon).length,
+    dVisit: dig.filter(onCampus).length,
+    dVisitRate: dig.length ? 100 * dig.filter(onCampus).length / dig.length : null,
+    age: ages.length ? Math.round(ages.reduce(function (a, b) { return a + b; }, 0) / ages.length) : 0,
+    fu: fus.length, fuDone: done, fuOver: od,
+    fuPct: fus.length ? 100 * done / fus.length : null,
+    rows: rows, walkRows: walk, digRows: dig, fus: fus
+  };
+}
+var _admCPick = {};
+function admOpenC(id) {
+  var P = _admCPick[id]; if (!P) return;
+  _admModal(P.t, P.s, _admByBranchAcc(P.rows));
+}
+var ADM_CMIN_W = 5;                      // below this a walk-in rate is noise
+function _admCouns() {
+  var el = document.getElementById('adm-couns'); if (!el) return;
+  var S = _admSet();
+  if (!S.rows.length) { el.innerHTML = '<div class="au-empty">No leads in this scope.</div>'; return; }
+  var named = S.rows.filter(function (r) { return String(r.owner || '').trim(); });
+  if (!named.length) {
+    el.innerHTML = '<div class="au-empty">No lead in this scope names a counsellor. The export has to ' +
+      'carry the <b>Counsellor</b> column for this panel to have anything to report.</div>';
+    return;
+  }
+  var FU = _admFollowUps();
+  var fuBy = {};
+  FU.forEach(function (f) {
+    (fuBy['c|' + f.br + '|' + _admCKey(f.c)] = fuBy['c|' + f.br + '|' + _admCKey(f.c)] || []).push(f);
+    (fuBy['b|' + f.br] = fuBy['b|' + f.br] || []).push(f);
+  });
+  var brs = _admBranches(S).filter(function (b) {
+    return S.rows.some(function (r) { return r.b === b; }); });
+  var pid = 0; _admCPick = {};
+  var pick = function (t, sub, rows) {
+    var id = 'c' + (++pid); _admCPick[id] = { t: t, s: sub, rows: rows }; return id; };
+
+  var G = _admCStats(S.rows, FU);
+  var col = function (v, good, ok) {
+    return v == null ? 'var(--txm)' : v >= good ? '#047857' : v >= ok ? '#1E4FD8' :
+           v > 0 ? '#D97706' : '#DC2626';
+  };
+  var body = '';
+  var row = function (o, depth) {
+    var pad = depth * 20, x = o.s;
+    var head = o.key
+      ? '<button class="na-secbtn" onclick="admTog(' + JSON.stringify(o.key).replace(/"/g, '&quot;') +
+        ')" style="font-weight:' + (depth ? '600' : '700') + '">' +
+        (_admOpen[o.key] ? '▾ ' : '▸ ') + _admEsc(o.lab) + '</button>'
+      : '<span style="font-weight:' + (depth ? '500' : '700') + '">' + _admEsc(o.lab) + '</span>';
+    var thin = x.w < ADM_CMIN_W;
+    body += '<tr' + (depth ? ' style="background:var(--pl)"' : '') + '>' +
+      '<td style="padding-left:' + (9 + pad) + 'px">' + head + '</td>' +
+      '<td class="n" style="font-weight:700">' + _admN(x.n) + '</td>' +
+      '<td class="n" style="color:var(--txm)">' + x.age + 'd</td>' +
+      /* ── effort ── */
+      '<td class="n" style="font-weight:800;color:' + (x.unPct >= 40 ? '#DC2626' : x.unPct >= 20 ? '#D97706' : 'var(--txm)') + '">' +
+        _admN(x.unreached) + '<span style="font-weight:600;font-size:.82em;color:var(--txm)"> ' +
+        x.unPct.toFixed(0) + '%</span></td>' +
+      '<td class="n" style="font-weight:700;color:' + (x.fuOver ? '#DC2626' : 'var(--txm)') + '">' +
+        (x.fu ? _admN(x.fuOver) : '–') + '</td>' +
+      '<td class="n" style="color:var(--txm)">' +
+        (x.fuPct == null ? '–' : x.fuPct.toFixed(0) + '%') + '</td>' +
+      /* ── outcome, walk-in ── */
+      '<td class="n" style="color:var(--txm);border-left:1px solid var(--bor)">' + _admN(x.w) + '</td>' +
+      '<td class="n" style="font-weight:800">' + _admN(x.wWon) + '</td>' +
+      '<td class="n" style="font-weight:800;color:' + (thin ? 'var(--txl)' : col(x.wRate, 40, 25)) + '">' +
+        (x.wRate == null ? '–' : x.wRate.toFixed(0) + (thin ? '*' : '')) + '</td>' +
+      /* ── outcome, digital ── */
+      '<td class="n" style="color:var(--txm);border-left:1px solid var(--bor)">' + _admN(x.d) + '</td>' +
+      '<td class="n" style="font-weight:700;color:' + col(x.dVisitRate, 12, 6) + '">' +
+        _admN(x.dVisit) + '<span style="font-weight:600;font-size:.82em;color:var(--txm)"> ' +
+        (x.dVisitRate == null ? '' : x.dVisitRate.toFixed(0) + '%') + '</span></td>' +
+      '<td class="n" style="font-weight:700">' + _admN(x.dWon) + '</td>' +
+      '<td class="n"><button class="na-secbtn" onclick="admOpenC(\'' +
+        pick(o.lab, _admN(x.n) + ' leads · ' + x.won + ' admitted', x.rows) +
+        '\')" style="color:var(--p);font-weight:700;white-space:nowrap">view ›</button></td></tr>';
+  };
+
+  var people = [];
+  brs.map(function (b) {
+    var rows = S.rows.filter(function (r) { return r.b === b; });
+    return { lab: b, key: 'couns|' + b, b: b, rows: rows,
+             s: _admCStats(rows, fuBy['b|' + b] || []) };
+  }).sort(function (p, q) { return (q.s.wRate || 0) - (p.s.wRate || 0); })
+    .forEach(function (B) {
+      row(B, 0);
+      var by = {}, order = [];
+      B.rows.forEach(function (r) {
+        var n = _admCName(r), k = _admCKey(n);
+        if (!by[k]) { by[k] = { lab: n, rows: [] }; order.push(k); }
+        by[k].rows.push(r);
+      });
+      var kids = order.map(function (k) {
+        var st = _admCStats(by[k].rows, fuBy['c|' + B.b + '|' + k] || []);
+        if (by[k].lab !== '(not assigned)' && st.n >= 25) people.push({ b: B.b, nm: by[k].lab, s: st });
+        return { lab: by[k].lab, key: '', s: st };
+      }).sort(function (p, q) {
+        var a = p.s.w >= ADM_CMIN_W ? p.s.wRate : -1, b2 = q.s.w >= ADM_CMIN_W ? q.s.wRate : -1;
+        return b2 - a || q.s.n - p.s.n; });
+      if (!_admOpen[B.key]) return;
+      kids.forEach(function (K) { row(K, 1); });
+      if (!kids.length)
+        body += '<tr style="background:var(--pl)"><td colspan="12" style="padding-left:29px;' +
+          'color:var(--txm)">No lead at this branch names a counsellor.</td></tr>';
+    });
+
+  var h = '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:1120px"><thead>' +
+    '<tr><th rowspan="2" style="vertical-align:bottom">Branch · counsellor</th>' +
+    '<th rowspan="2" class="n" style="vertical-align:bottom">Leads</th>' +
+    '<th rowspan="2" class="n" style="vertical-align:bottom" title="Average age of the leads held">Age</th>' +
+    '<th colspan="3" style="text-align:center;border-bottom:1px solid var(--bor)">Effort · theirs</th>' +
+    '<th colspan="3" style="text-align:center;border-left:1px solid var(--bor);border-bottom:1px solid var(--bor)">' +
+      'Walk-in leads</th>' +
+    '<th colspan="3" style="text-align:center;border-left:1px solid var(--bor);border-bottom:1px solid var(--bor)">' +
+      'Digital leads</th>' +
+    '<th rowspan="2" class="n">&nbsp;</th></tr>' +
+    '<tr><th class="n" title="Still at new or could not connect">Unreached</th>' +
+    '<th class="n" title="Call and visit tasks past their due date and still open">Overdue</th>' +
+    '<th class="n" title="Human follow-up tasks completed, of those raised">Tasks done</th>' +
+    '<th class="n" style="border-left:1px solid var(--bor)">Leads</th>' +
+    '<th class="n">Admitted</th><th class="n" title="Admissions per 100 walk-in leads">Per 100</th>' +
+    '<th class="n" style="border-left:1px solid var(--bor)">Leads</th>' +
+    '<th class="n" title="Reached a booked visit, a visit, an application or an admission">To campus</th>' +
+    '<th class="n">Admitted</th></tr></thead><tbody>' + body + '</tbody></table></div>';
+
+  /* ── the reading ── */
+  var wRate = G.w ? 100 * G.wWon / G.w : 0, dRate = G.d ? 100 * G.dWon / G.d : 0;
+  h += '<div style="margin-top:13px;border-radius:12px;padding:13px 16px;background:#FFFBEB;' +
+    'border:1px solid #FDE68A;font-size:14.5px;line-height:1.65;color:#1F2937">' +
+    '<b>Do not rank these people on overall conversion — it ranks who was given the walk-ins.</b> ' +
+    'In this scope a walk-in converts at <b>' + wRate.toFixed(1) + ' per 100</b> and a digital lead at ' +
+    '<b>' + dRate.toFixed(1) + '</b>: ' + _admN(G.wWon) + ' of the season’s ' + _admN(G.won) +
+    ' admissions came from ' + _admN(G.w) + ' walk-ins, and ' + _admN(G.dWon) + ' from ' +
+    _admN(G.d) + ' digital leads. A counsellor handed no walk-ins cannot show a rate, however well ' +
+    'they work. So the table keeps the two apart, and <b>Effort</b> — which is theirs whatever ' +
+    'they were given — sits in its own block on the left.' +
+    '<br><br><b>For digital leads the column that matters is "To campus", not "Admitted".</b> ' +
+    'Admissions happen within a week of the parent being on the campus, so a digital lead’s whole ' +
+    'job is to produce a visit. Across this scope ' + _admN(G.dVisit) + ' of ' + _admN(G.d) +
+    ' digital leads got that far — ' + (G.dVisitRate == null ? '–' : G.dVisitRate.toFixed(1) + '%') +
+    '. That is the number to manage, and it is the one that would move the season.</div>';
+
+  if (people.length >= 2) {
+    var ranked = people.filter(function (x) { return x.s.w >= ADM_CMIN_W; })
+                       .sort(function (p, q) { return q.s.wRate - p.s.wRate; });
+    var byEffort = people.slice().sort(function (p, q) { return q.s.unPct - p.s.unPct; });
+    var worst = byEffort[0], best = byEffort[byEffort.length - 1];
+    var late = people.slice().sort(function (p, q) { return q.s.fuOver - p.s.fuOver; })[0];
+    h += '<div style="margin-top:10px;border-radius:12px;padding:13px 16px;background:var(--sur);' +
+      'border:1px solid var(--bor);font-size:14.5px;line-height:1.65">' +
+      (ranked.length >= 2
+        ? '<b>On walk-ins, where the comparison is fair, there is still real spread.</b> ' +
+          _admEsc(ranked[0].nm) + ' at ' + _admEsc(ranked[0].b) + ' converts <b style="color:#047857">' +
+          ranked[0].s.wRate.toFixed(0) + ' per 100</b> of ' + _admN(ranked[0].s.w) + ' walk-ins; ' +
+          _admEsc(ranked[ranked.length - 1].nm) + ' at ' + _admEsc(ranked[ranked.length - 1].b) +
+          ' converts <b style="color:#D97706">' + ranked[ranked.length - 1].s.wRate.toFixed(0) +
+          '</b> of ' + _admN(ranked[ranked.length - 1].s.w) + '. That gap is worth asking about, ' +
+          'because it is not explained by what they were handed.<br><br>'
+        : '') +
+      '<b>On effort, which is nobody else’s doing:</b> ' + _admEsc(worst.nm) + ' at ' +
+      _admEsc(worst.b) + ' has <b style="color:#DC2626">' + _admN(worst.s.unreached) + ' of ' +
+      _admN(worst.s.n) + ' leads (' + worst.s.unPct.toFixed(0) + '%) that nobody has reached</b>, ' +
+      'against ' + _admEsc(best.nm) + ' at ' + best.s.unPct.toFixed(0) + '%. Every one of those was ' +
+      'already paid for.' +
+      (late && late.s.fuOver >= 10
+        ? ' ' + _admEsc(late.nm) + ' is carrying ' + _admN(late.s.fuOver) +
+          ' follow-up tasks past their due date — the panel below breaks those down by day.'
+        : '') +
+      '<br><br><b style="color:var(--txm)">An asterisk marks a rate on fewer than ' + ADM_CMIN_W +
+      ' walk-ins</b>, which is not yet evidence of anything. Every lead in this file arrived within ' +
+      'the last few weeks, so read the rates with the age column beside them.</div>';
+  }
+  el.innerHTML = h;
+}
+
+/* ══ FOLLOW-UPS ═══════════════════════════════════════════════════════════ */
+var _admFPick = {};
+function admOpenF(id) {
+  var P = _admFPick[id]; if (!P) return;
+  var L = P.list.slice().sort(function (a, b) { return a.due - b.due; });
+  if (!L.length) { _admModal(P.t, 'Nothing here', '<div class="au-empty">Nothing in this group.</div>'); return; }
+  var e = _admEsc;
+  var body = L.slice(0, 400).map(function (f) {
+    var r = f.r;
+    var od = f.open && _admDay(f.due) < _admToday();
+    return '<tr><td style="font-weight:700">' + e(r.name || r.parent || '(no name)') + '</td>' +
+      '<td style="color:var(--txm)">' + e(r.b) + '</td>' +
+      '<td style="color:var(--txm)">' + e(_admCName(r)) + '</td>' +
+      '<td style="color:var(--txm)">' + e(r.ph || '–') + '</td>' +
+      '<td>' + e(f.kind) + '</td>' +
+      '<td style="white-space:nowrap' + (od ? ';color:#DC2626;font-weight:700' : '') + '">' +
+        e(_admFmtDay(f.due)) + '</td>' +
+      '<td style="white-space:nowrap">' + (f.done
+        ? '<b style="color:#047857">done ' + e(_admFmtDay(f.done)) + '</b>'
+        : (od ? '<b style="color:#DC2626">overdue</b>' : '<span style="color:var(--txm)">pending</span>')) +
+      '</td>' +
+      '<td style="color:var(--txm);max-width:320px">' + e(f.note || '–') + '</td>' +
+      '<td>' + e(_admStageLab(r.st)) + '</td></tr>';
+  }).join('');
+  _admModal(P.t, _admN(L.length) + ' follow-up' + (L.length === 1 ? '' : 's') + ' · ' + P.s,
+    '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:980px"><thead><tr>' +
+    '<th>Parent / child</th><th>Branch</th><th>Counsellor</th><th>Phone</th><th>Task</th>' +
+    '<th>Due</th><th>State</th><th>Note</th><th>Stage now</th></tr></thead><tbody>' + body +
+    '</tbody></table></div>' +
+    (L.length > 400 ? '<div class="au-note">Showing the 400 earliest by due date.</div>' : ''));
+}
+function _admFmtDay(d) {
+  if (!d) return '–';
+  var M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return d.getDate() + ' ' + M[d.getMonth()];
+}
+/* the six windows the report asks for, each a plain test on one task */
+function _admFWindows() {
+  var today = _admToday(), tom = _admShiftDay(1);
+  var wkA = _admShiftDay(-7), wkB = _admShiftDay(-1), next = _admShiftDay(7);
+  return [
+    { k: 'tdone', lab: 'Done today',        col: '#047857',
+      note: 'completed today, whenever they were due',
+      f: function (f) { return f.done && _admDay(f.done) === today; } },
+    { k: 'tdue',  lab: 'Due today',         col: '#1E4FD8',
+      note: 'scheduled for today',
+      f: function (f) { return _admDay(f.due) === today; } },
+    { k: 'tleft', lab: 'Still open today',  col: '#D97706',
+      note: 'due today and not done yet',
+      f: function (f) { return _admDay(f.due) === today && f.open; } },
+    { k: 'tom',   lab: 'Due tomorrow',      col: '#1E4FD8',
+      note: 'scheduled for tomorrow',
+      f: function (f) { return _admDay(f.due) === tom; } },
+    { k: 'week',  lab: 'Done last 7 days',  col: '#047857',
+      note: 'completed in the seven days to yesterday',
+      f: function (f) { return f.done && _admDay(f.done) >= wkA && _admDay(f.done) <= wkB; } },
+    { k: 'next',  lab: 'Due next 7 days',   col: '#6366F1',
+      note: 'scheduled from tomorrow to seven days out',
+      f: function (f) { var d = _admDay(f.due); return d > today && d <= next; } },
+    { k: 'over',  lab: 'Overdue',           col: '#DC2626',
+      note: 'past their due date and still open',
+      f: function (f) { return f.open && _admDay(f.due) < today; } }
+  ];
+}
+function _admFollow() {
+  var el = document.getElementById('adm-follow'); if (!el) return;
+  var S = _admSet();
+  var FU = _admFollowUps();
+  if (!FU.length) {
+    el.innerHTML = '<div class="au-empty">No lead in this scope carries a follow-up task. The export ' +
+      'has to carry the <b>Follow-up 1–10</b> columns for this panel to have anything to report.</div>';
+    return;
+  }
+  var W = _admFWindows();
+  var pid = 0; _admFPick = {};
+  var pick = function (t, sub, list) {
+    var id = 'f' + (++pid); _admFPick[id] = { t: t, s: sub, list: list }; return id; };
+
+  /* the headline tiles, over everything in scope */
+  var h = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px">';
+  W.forEach(function (w) {
+    var list = FU.filter(w.f);
+    var id = pick(w.lab, w.note, list);
+    h += '<button class="au-kpi na-kpi-b" onclick="admOpenF(\'' + id + '\')" style="text-align:left">' +
+      '<div class="na-kh"><span class="v" style="color:' + (list.length ? w.col : 'var(--txm)') + '">' +
+        _admN(list.length) + '</span></div>' +
+      '<div class="k">' + w.lab + '</div><div class="d">' + w.note + '</div>' +
+      '<div class="na-click">Click to view ›</div></button>';
+  });
+  h += '</div>';
+
+  /* branch → counsellor, one column per window */
+  var byBr = {}, brOrder = [];
+  FU.forEach(function (f) {
+    if (!byBr[f.br]) { byBr[f.br] = { n: f.br, all: [], c: {}, order: [] }; brOrder.push(f.br); }
+    var B = byBr[f.br];
+    B.all.push(f);
+    var k = _admCKey(f.c);
+    if (!B.c[k]) { B.c[k] = { n: f.c, all: [] }; B.order.push(k); }
+    B.c[k].all.push(f);
+  });
+  var cell = function (list, w, lab) {
+    var n = list.filter(w.f).length;
+    var id = n ? pick(lab + ' · ' + w.lab, w.note, list.filter(w.f)) : '';
+    return '<td class="n">' + (n
+      ? '<button class="na-secbtn" onclick="admOpenF(\'' + id + '\')" style="font-weight:800;color:' +
+        w.col + '">' + _admN(n) + '</button>'
+      : '<span style="color:var(--txl)">·</span>') + '</td>';
+  };
+  var body = '';
+  brOrder.sort(function (a, b) { return byBr[b].all.length - byBr[a].all.length; })
+    .forEach(function (bn) {
+      var B = byBr[bn], key = 'follow|' + bn;
+      body += '<tr><td><button class="na-secbtn" onclick="admTog(' +
+        JSON.stringify(key).replace(/"/g, '&quot;') + ')" style="font-weight:700">' +
+        (_admOpen[key] ? '▾ ' : '▸ ') + _admEsc(bn) + '</button></td>' +
+        '<td class="n" style="color:var(--txm)">' + _admN(B.all.length) + '</td>' +
+        W.map(function (w) { return cell(B.all, w, bn); }).join('') + '</tr>';
+      if (!_admOpen[key]) return;
+      B.order.sort(function (x, y) { return B.c[y].all.length - B.c[x].all.length; })
+        .forEach(function (k) {
+          var C = B.c[k];
+          body += '<tr style="background:var(--pl)"><td style="padding-left:31px;color:var(--txm)">' +
+            _admEsc(C.n) + '</td>' +
+            '<td class="n" style="color:var(--txm)">' + _admN(C.all.length) + '</td>' +
+            W.map(function (w) { return cell(C.all, w, bn + ' · ' + C.n); }).join('') + '</tr>';
+        });
+    });
+  h += '<div style="overflow-x:auto;margin-top:14px"><table class="au-tbl" style="min-width:940px">' +
+    '<thead><tr><th>Branch · counsellor</th><th class="n">Tasks</th>' +
+    W.map(function (w) { return '<th class="n" title="' + _admEsc(w.note) + '">' +
+      _admEsc(w.lab) + '</th>'; }).join('') + '</tr></thead><tbody>' + body + '</tbody></table></div>';
+
+  /* ── the reading ── */
+  var over = FU.filter(function (f) { return f.open && _admDay(f.due) < _admToday(); });
+  var doneAll = FU.filter(function (f) { return !!f.done; }).length;
+  var pct = FU.length ? Math.round(100 * doneAll / FU.length) : 0;
+  var autoN = 0;
+  S.rows.forEach(function (r) { (r.fu || []).forEach(function (raw) {
+    var f = _admFuParse(raw); if (f && f.auto) autoN++; }); });
+  /* who is carrying the overdue pile */
+  var oBy = {}, oOrd = [];
+  over.forEach(function (f) { var k = f.br + ' · ' + f.c;
+    if (!oBy[k]) { oBy[k] = 0; oOrd.push(k); } oBy[k]++; });
+  oOrd.sort(function (a, b) { return oBy[b] - oBy[a]; });
+  var oldest = over.slice().sort(function (a, b) { return a.due - b.due; })[0];
+
+  h += '<div style="margin-top:13px;border-radius:12px;padding:13px 16px;font-size:14.5px;line-height:1.65;' +
+    'background:' + (over.length ? '#FEF2F2' : 'var(--sur)') + ';border:1px solid ' +
+    (over.length ? '#FECACA' : 'var(--bor)') + '">' +
+    (over.length
+      ? '<b>' + _admN(over.length) + ' follow-up task' + (over.length === 1 ? '' : 's') +
+        ' are past their due date and still open</b> — ' + _admPct(over.length, FU.length) +
+        '% of every task raised in this scope' +
+        (oldest ? ', the oldest due ' + _admFmtDay(oldest.due) : '') + '. ' +
+        (oOrd.length ? 'Most of them sit with <b>' + _admEsc(oOrd[0]) + '</b> (' + oBy[oOrd[0]] +
+          ')' + (oOrd[1] ? ' and <b>' + _admEsc(oOrd[1]) + '</b> (' + oBy[oOrd[1]] + ')' : '') + '. ' : '')
+      : '<b>Nothing is overdue.</b> ') +
+    _admN(doneAll) + ' of ' + _admN(FU.length) + ' tasks are done, ' + pct + '%.' +
+    (autoN ? '<br><br><b style="color:var(--txm)">' + _admN(autoN) + ' automatic nudges are excluded ' +
+      'from every figure on this panel.</b> WhatsApp and silence nudges fire on a timer and mark ' +
+      'themselves done the moment they fire, so counting them would put every counsellor near 100% and ' +
+      'hide exactly the gap this panel exists to show.' : '') +
+    '</div>';
+  el.innerHTML = h;
+}
+
+/* ── TAP TO EXPAND ──
+   The Admissions tab had no in-table expand of its own: every other panel
+   here opens a modal instead. These two need the branch to stay on screen
+   while its counsellors appear beneath it, so the open rows are remembered by
+   key and only the panel that owns the key is redrawn. */
+var _admOpen = {};
+function admTog(k) {
+  _admOpen[k] = !_admOpen[k];
+  if (k.indexOf('couns|') === 0) { _admCouns(); return; }
+  if (k.indexOf('follow|') === 0) { _admFollow(); return; }
+}
+
 function _admSource() {
   var el = document.getElementById('adm-source'); if (!el) return;
   var S = _admSet();
@@ -21728,9 +22253,15 @@ function admOpenClass(k) {
 function _admPace() {
   var el = document.getElementById('adm-pace'); if (!el) return;
   var S = _admSet(), R = _admRaw;
-  var MON = R.months || ['APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC','JAN','FEB','MAR'];
+  /* ── THE SEASON RUNS SEPTEMBER TO AUGUST (corrected 6 Nov 2026) ──
+     The row used to start at April, which is the financial year, not the
+     admissions season. Enquiries for an academic year open the September
+     before it, so an April-first row cut every season in half and put its
+     opening months at the far right of its own line, where they read as the
+     tail of the year before. The months are re-ordered here rather than in
+     the source so nothing else that reads the trend tab has to change. */
+  var MON = ['SEP','OCT','NOV','DEC','JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG'];
   var adm = S.trend.filter(function (r) { return r.t === 'Admission'; });
-  if (!adm.length) { el.innerHTML = '<div class="au-empty">The monthly trend tab has no admissions in this scope.</div>'; return; }
 
   var ays = {}, cell = {}, tot = {};
   adm.forEach(function (r) {
@@ -21738,6 +22269,35 @@ function _admPace() {
     cell[r.ay + '|' + r.m] = (cell[r.ay + '|' + r.m] || 0) + r.n;
     tot[r.ay] = (tot[r.ay] || 0) + r.n;
   });
+
+  /* ── THIS SEASON, FROM THE TRACKER (added 6 Nov 2026) ──
+     2027-28 was missing from this chart altogether, and the reason was that
+     the Monthly Trends tab is filled in by hand at the end of a month: the
+     season in progress is not in it yet and will not be for months. But the
+     season IS in the tracker, lead by lead, and an admitted lead carries the
+     date it reached that stage. So the current season's row is built from
+     those dates instead of waiting for the tab. It is marked as the live
+     count on the page, because a month still running is not the same kind of
+     number as a closed one. */
+  var liveN = 0;
+  if (S.season) {
+    S.rows.forEach(function (r) {
+      if (!_admIsWon(r)) return;
+      var iso = r.sent || r.d;                 // when it reached "admitted"
+      if (!iso || String(iso).length < 7) return;
+      var mi = parseInt(String(iso).slice(5, 7), 10);
+      if (!(mi >= 1 && mi <= 12)) return;
+      var m = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][mi - 1];
+      ays[S.season] = 1;
+      cell[S.season + '|' + m] = (cell[S.season + '|' + m] || 0) + 1;
+      tot[S.season] = (tot[S.season] || 0) + 1;
+      liveN++;
+    });
+  }
+  if (!Object.keys(ays).length) {
+    el.innerHTML = '<div class="au-empty">Neither the monthly trend tab nor the tracker has an ' +
+      'admission in this scope.</div>'; return;
+  }
   var years = Object.keys(ays).sort();
   var max = 0;
   Object.keys(cell).forEach(function (k) { if (cell[k] > max) max = cell[k]; });
@@ -21752,7 +22312,7 @@ function _admPace() {
     h += '<tr' + (cur ? ' style="background:#6366F10D"' : '') + '>' +
       '<td><button class="na-secbtn" onclick="admOpenPace(' + JSON.stringify(ay).replace(/"/g, '&quot;') +
         ')">' + _admEsc(ay) + ' ›</button>' +
-        (cur ? ' <span class="na-pill" style="background:#6366F120;color:#6366F1">this season</span>' : '') + '</td>';
+        (cur ? ' <span class="na-pill" style="background:#6366F120;color:#6366F1">this season · live</span>' : '') + '</td>';
     MON.forEach(function (m) {
       var v = cell[ay + '|' + m] || 0;
       var sh = v / max;
@@ -21770,11 +22330,36 @@ function _admPace() {
      branches were being measured by one, and a month label here does not pin
      down a calendar month well enough to set a part-month against complete
      ones. The day-for-day panel above answers it properly. */
+  /* which months actually carry the intake, from the closed seasons only */
+  var shape = {};
+  MON.forEach(function (m) { shape[m] = 0; });
+  var closedTot = 0;
+  years.forEach(function (ay) {
+    if (ay === S.season) return;
+    MON.forEach(function (m) { shape[m] += (cell[ay + '|' + m] || 0); });
+    closedTot += (tot[ay] || 0);
+  });
+  var peak = MON.slice().sort(function (a, b) { return shape[b] - shape[a]; })
+                .filter(function (m) { return shape[m] > 0; }).slice(0, 3);
   h += '<div style="font-size:14px;color:var(--txm);margin-top:12px;line-height:1.6">' +
-    'Darker is busier. Read this for <b style="color:var(--tx)">when</b> a season is won rather than ' +
-    'for how this one is doing: the intake lands in February and March, and the months before that ' +
-    'are when the people and the money have to be in place. Whether this season is ahead or behind ' +
-    'is the day-for-day panel higher up the page, which cuts every year at the same point.</div>';
+    'Darker is busier. The season runs <b style="color:var(--tx)">September to August</b> — ' +
+    'enquiries for an academic year open the September before it, so that is where the row starts. ' +
+    (peak.length && closedTot
+      ? 'Across the closed seasons the intake lands in <b style="color:var(--tx)">' +
+        peak.join(', ') + '</b>, carrying ' +
+        _admPct(peak.reduce(function (n, m) { return n + shape[m]; }, 0), closedTot) +
+        '% of every admission between them, and the months before that are when the people and the ' +
+        'money have to be in place. '
+      : '') +
+    (liveN
+      ? '<b style="color:var(--tx)">' + S.season + ' is the live row</b>, built from the ' +
+        _admN(liveN) + ' admission' + (liveN === 1 ? '' : 's') + ' in the tracker and dated by the day ' +
+        'each one reached that stage — the Monthly Trends tab is written up at the end of a ' +
+        'month, so a season in progress is never in it. Its months are still filling. '
+      : '') +
+    'Read this for <b style="color:var(--tx)">when</b> a season is won rather than for how this one ' +
+    'is doing: whether it is ahead or behind is the day-for-day panel higher up the page, which cuts ' +
+    'every year at the same point.</div>';
 
   var tc = S.trend.filter(function (r) { return r.t === 'TC'; });
   if (tc.length) {
@@ -21972,7 +22557,8 @@ function _admPaint() {
       return t.kind === 'enquiry' && (!S.scope || t.branch === S.scope); }).length === 1) ? '' : 's') + ' read';
   _admNotes(); _admKpis();
   _admCompare(); _admPlanPanel(); _admYoY();
-  _admFunnel(); _admWork(); _admSource(); _admClassPanel(); _admPace(); _admHist();
+  _admFunnel(); _admSource(); _admClassPanel(); _admPace();
+  _admCouns(); _admFollow(); _admHist();
   _admModel(); _admMethod();
   _admClean();
   var l = document.getElementById('adm-loader'), b = document.getElementById('adm-body');
