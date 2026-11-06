@@ -15891,6 +15891,19 @@ function _exGLab(g) {
   if (g === 'NURSERY' || g === 'NUR') return 'Nursery';
   return g;
 }
+/* ── CBSE OR CAIE ──
+   The two sheets write three values between them: CBSE, CAIE and CAIE-EY.
+   CAIE-EY is the Cambridge early years, so it belongs with CAIE rather than
+   on a strand of its own — otherwise the switch would hide 194 children from
+   both positions. Anything unrecognised keeps its own name instead of being
+   forced into one of the two. */
+function _exCurr(v) {
+  var s = String(v == null ? '' : v).toUpperCase().replace(/[^A-Z]/g, '');
+  if (!s) return '';
+  if (s.indexOf('CBSE') === 0) return 'CBSE';
+  if (s.indexOf('CAIE') === 0 || s.indexOf('CAMBRIDGE') === 0 || s.indexOf('IGCSE') >= 0) return 'CAIE';
+  return String(v).trim();
+}
 function _exSecLab(key) {
   var p = String(key || '').split('|');
   var t = p[2] || '';
@@ -15909,9 +15922,45 @@ function _exBuildCompare() {
       var o = {}; t.hdr.forEach(function (h, i) { o[h] = r[i]; }); return o; });
   };
   var A = obj(tA), B = obj(tB);
-  var SUBJ = tA.hdr.filter(function (h) {
-    return / %$/.test(h) && h !== 'Overall %' && h !== 'Target %';
-  }).map(function (h) { return h.replace(/ %$/, ''); });
+
+  /* ── THE TWO SHEETS DO NOT SPELL A SUBJECT THE SAME WAY ──
+     Found 6 November 2026. The PT-1 sheet heads one column "Humanities /
+     Social %" and the half yearly heads the same subject "Humanities / Social
+     Studies %". The subject list was taken from the PT-1 header and then
+     looked up on the half-yearly rows by that exact name, so 4,700 recorded
+     half-yearly Humanities marks were read as "not sat" and dropped out of
+     every half-yearly average on this page. The error is invisible: nothing
+     is blank, the figures are simply computed over a different set of papers
+     on one side than the other.
+
+     So a subject is matched on a NORMALISED name — case, spacing, slashes and
+     the words "studies" and "study" removed — and the two columns are tied
+     together wherever that matches. The label shown is the PT-1 sheet's, and
+     anything the normaliser cannot pair is reported rather than dropped. */
+  var subKey = function (h) {
+    return String(h).replace(/ %$/, '')
+      .toLowerCase()
+      .replace(/\bstudies\b|\bstudy\b/g, '')
+      .replace(/[^a-z0-9]/g, '');
+  };
+  var subCols = function (t) {
+    var m = {};
+    t.hdr.forEach(function (h) {
+      if (!/ %$/.test(h) || h === 'Overall %' || h === 'Target %') return;
+      m[subKey(h)] = h;                      // normalised key -> that sheet's column
+    });
+    return m;
+  };
+  var colA = subCols(tA), colB = subCols(tB);
+  var SUBJ = [], SUB_COL = {}, subOnly = { a: [], b: [] };
+  Object.keys(colA).forEach(function (k) {
+    var lab = colA[k].replace(/ %$/, '');
+    if (colB[k]) { SUBJ.push(lab); SUB_COL[lab] = { a: colA[k], b: colB[k] }; }
+    else subOnly.a.push(lab);
+  });
+  Object.keys(colB).forEach(function (k) {
+    if (!colA[k]) subOnly.b.push(colB[k].replace(/ %$/, ''));
+  });
 
   var S = function (v) { return String(v == null ? '' : v).trim(); };
   var mean = function (a) {
@@ -15919,7 +15968,7 @@ function _exBuildCompare() {
 
   /* One child, one percentage: the average of the subject percentages on
      their own row. Nothing is weighted, adjusted or ranked. */
-  var read = function (rows) {
+  var read = function (rows, side) {
     var out = [];
     rows.forEach(function (o) {
       o.br = S(o['Branch']); o.gr = S(o['Grade']); o.sec0 = S(o['Section']);
@@ -15927,9 +15976,10 @@ function _exBuildCompare() {
       o.tch = S(o['Class Teacher']);
       o.g = _exNGrade(o.gr); o.s = _exNSec(o.sec0);
       o.cls = o.br + '|' + o.g;
+      o.cu = _exCurr(o.cur);
       var v = []; o.per = {};
       SUBJ.forEach(function (sj) {
-        var x = o[sj + ' %'];
+        var x = o[SUB_COL[sj][side]];        // each sheet read by its own header
         if (x == null || x === '') return;
         x = +x;
         if (!isFinite(x)) return;
@@ -15942,7 +15992,7 @@ function _exBuildCompare() {
     return out;
   };
 
-  var RA = read(A), RB = read(B);
+  var RA = read(A, 'a'), RB = read(B, 'b');
 
   /* a grade with exactly one room on each side IS one room, whatever the two
      sheets happen to call it */
@@ -15958,7 +16008,7 @@ function _exBuildCompare() {
   };
   RA.forEach(setSec); RB.forEach(setSec);
 
-  return { A: RA, B: RB, subjects: SUBJ, mean: mean,
+  return { A: RA, B: RB, subjects: SUBJ, mean: mean, subOnly: subOnly,
            nA: A.length, nB: B.length, placedA: RA.length, placedB: RB.length };
 }
 
@@ -16024,17 +16074,40 @@ function _exBand(grade) {
    what the slot can contain where that child sits. Where a grade teaches one
    language the slot is unambiguous; where it teaches two, the row is mixed
    and the page says so rather than letting it pass as a subject. */
+/* ── WHICH LANGUAGE, NAMED ONCE ──
+   The syllabus ledger writes the same language a dozen ways: "Hindi",
+   "2nd Language - Hindi", "Hindi text book", "Hindi (II Lang)". Listing them
+   verbatim turned one table row's label into forty words of near-duplicates
+   and made the row unreadable. Each entry is therefore reduced to the
+   language itself and the duplicates collapse. A spelling that names no known
+   language is kept as written rather than dropped, because an unrecognised
+   language is still a fact about that grade. */
+var _EX_LANG = ['Hindi', 'Telugu', 'French', 'Sanskrit', 'Urdu', 'German', 'Spanish', 'Kannada',
+                'Tamil', 'Marathi', 'Malayalam', 'Odia', 'Bengali'];
+function _exLangName(n) {
+  var t = String(n || '');
+  for (var i = 0; i < _EX_LANG.length; i++) {
+    if (new RegExp('\\b' + _EX_LANG[i] + '\\b', 'i').test(t)) return _EX_LANG[i];
+  }
+  return t.replace(/\s*\((II|III)\s*Lang\.?\)\s*/ig, '')
+          .replace(/^\s*(2nd|3rd|second|third)\s*language\s*[-:]?\s*/i, '')
+          .replace(/\s*text\s*book\s*$/i, '').trim();
+}
 function _exLangs(rows, slot) {
-  var M = (_pt1Raw && _pt1Raw.langs) || {}, seen = {};
+  var M = (_pt1Raw && _pt1Raw.langs) || {}, seen = {}, order = [];
   rows.forEach(function (r) {
     var k = String(r.br || '') + '|' + String(r.gr || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     (M[k] || []).forEach(function (n) {
-      var m = n.match(/^(.*?)\s*\((II|III)\)$/);
-      if (m) { if (!slot || m[2] === slot) seen[m[1]] = 1; }
-      else seen[n] = 1;                       // the ledger did not state a slot
+      var m = String(n).match(/\((II|III)\s*Lang\.?\)/i);
+      /* an entry that names its own slot is only used for that slot; one that
+         names none could belong to either and is allowed through */
+      if (m && slot && m[1].toUpperCase() !== slot) return;
+      var nm = _exLangName(n);
+      if (!nm) return;
+      if (!seen[nm]) { seen[nm] = 1; order.push(nm); }
     });
   });
-  return Object.keys(seen).sort();
+  return order.sort();
 }
 function _exLangNote(rows, slot) {
   var L = _exLangs(rows, slot);
@@ -16044,6 +16117,26 @@ function _exLangNote(rows, slot) {
     : '<span style="color:#B45309;font-weight:700">' + L.join(' or ') + '</span>';
 }
 var _exOpen = {};
+/* ── CBSE / CAIE ──
+   The two strands sit the same papers only in name: CBSE runs out of a
+   different total, on a different syllabus, marked by different people. Read
+   together they average into a figure that describes neither, and on this
+   workbook they move very differently — CBSE rose 3.3 points between the
+   sittings and CAIE 17.7. The switch is therefore a real question, not a
+   convenience, and it drives every table on the panel at once. */
+var _exCur = '';                      // '' = both strands
+/* which subject the chart below the subject table is showing, and whether it
+   is broken down by class or by section */
+var _exSubj = '', _exSubLvl = 'class';
+function exSubPick(sj) { if (sj === _exSubj) return; _exSubj = sj; _exRenderCompare(); }
+function exSubLvl(v) { if (v === _exSubLvl) return; _exSubLvl = v; _exRenderCompare(); }
+function exSetCur(v) {
+  v = v || '';
+  if (v === _exCur) return;
+  _exCur = v;
+  _exOpen = {};                       // the open rows belong to the old scope
+  _exRenderCompare();
+}
 function exToggle(key) { _exOpen[key] = !_exOpen[key]; _exRenderCompare(); }
 function exToggleBand(br) { exToggle('branch|' + br); }          /* kept: older markup calls it */
 
@@ -16132,6 +16225,23 @@ function exView(id) {
 }
 
 function _admNum(n) { return (n == null ? 0 : n).toLocaleString('en-IN'); }
+/* the strand switch, offered only where there is more than one strand to pick */
+function _exCurBar(list) {
+  if (!list || list.length < 2) return '';
+  var btn = function (v, lab) {
+    return '<button class="ex-sw' + (_exCur === v ? ' on' : '') + '" onclick="exSetCur(' +
+      JSON.stringify(v).replace(/"/g, '&quot;') + ')">' + lab + '</button>';
+  };
+  return '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 13px">' +
+    '<div class="ex-switch">' + btn('', 'Both strands') +
+      list.map(function (c) { return btn(c, c); }).join('') + '</div>' +
+    '<span style="font-size:12.5px;color:var(--txm);line-height:1.5">' +
+      (_exCur
+        ? '<b style="color:var(--tx)">' + _exCur + ' only.</b> Every figure below counts this strand alone.'
+        : 'CBSE and CAIE sit different papers out of different totals. ' +
+          'Pick a strand to compare like with like.') +
+    '</span></div>';
+}
 function _exRenderCompare() {
   var el = document.getElementById('exm-compare'); if (!el) return;
   if (!_exCmp) _exCmp = _exBuildCompare();
@@ -16145,8 +16255,22 @@ function _exRenderCompare() {
   var scope = _exBranch();
   var A = scope ? C.A.filter(function (r) { return r.br === scope; }) : C.A;
   var B = scope ? C.B.filter(function (r) { return r.br === scope; }) : C.B;
+
+  /* which strands this scope actually holds, so the switch never offers a
+     button that would empty the page */
+  var curSeen = {};
+  A.forEach(function (r) { if (r.cu) curSeen[r.cu] = (curSeen[r.cu] || 0); });
+  A.concat(B).forEach(function (r) { if (r.cu) curSeen[r.cu] = (curSeen[r.cu] || 0) + 1; });
+  var curList = Object.keys(curSeen).sort();
+  if (_exCur && curList.indexOf(_exCur) < 0) _exCur = '';
+  if (_exCur) {
+    A = A.filter(function (r) { return r.cu === _exCur; });
+    B = B.filter(function (r) { return r.cu === _exCur; });
+  }
+
   if (!A.length || !B.length) {
-    el.innerHTML = '<div class="au-empty">' + (scope || 'This branch') +
+    el.innerHTML = _exCurBar(curList) +
+      '<div class="au-empty">' + (_exCur ? _exCur + ' at ' + (scope || 'this group') : (scope || 'This branch')) +
       ' has marks for only one of the two sittings, so there is nothing to compare.</div>';
     return;
   }
@@ -16199,6 +16323,22 @@ function _exRenderCompare() {
       .filter(function (y) { return y.ch != null; })
       .sort(function (p, q) { return q.ch - p.ch; });
   };
+  /* ── THE FIVE STAGES, BETWEEN A BRANCH AND ITS CLASSES ──
+     Management reads a branch in stages rather than in eleven separate
+     grades, so the branch opens into Prep, 1 & 2, 3 to 5, 6 to 8 and 9 & 10,
+     and a stage then opens into its own classes and those into their rooms.
+     A stage with nothing on one side of the comparison is left out rather
+     than drawn as an empty row. */
+  var bandsOf = function (x) {
+    var ba = {}, bb = {};
+    x.a.forEach(function (r) { var k = _exBand(r.gr); if (k) (ba[k] = ba[k] || []).push(r); });
+    x.b.forEach(function (r) { var k = _exBand(r.gr); if (k) (bb[k] = bb[k] || []).push(r); });
+    return EX_BANDS.filter(function (bd) { return ba[bd.k] && bb[bd.k]; })
+      .map(function (bd) {
+        return unit(bd.lab, (x.key || 'b') + '|' + bd.k, ba[bd.k], bb[bd.k], x.sj, classesOf,
+                    (x.full || x.k) + ' · ' + bd.lab); })
+      .filter(function (y) { return y.ch != null; });
+  };
   var branchesOf = function (x) {
     var ga = grp(x.a, function (r) { return r.br; }), gb = grp(x.b, function (r) { return r.br; });
     return both(ga, gb).map(function (k) {
@@ -16244,7 +16384,8 @@ function _exRenderCompare() {
       '</div></button>';
   };
 
-  var h = '<div class="au-kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">' +
+  var h = _exCurBar(curList) +
+    '<div class="au-kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">' +
     tile(_admNum(clsUp.length) + ' <span style="font-size:.55em;color:var(--txm)">of ' +
            allCls.length + '</span>', 'Classes improved',
          'half-yearly % higher than PT-1', up,
@@ -16339,8 +16480,9 @@ function _exRenderCompare() {
   /* 1 · BRANCH */
   var brA = grp(A, function (r) { return r.br; }), brB = grp(B, function (r) { return r.br; });
   h += tbl('Branch', both(brA, brB).map(function (k) {
-      return unit(k, 'branch|' + k, brA[k], brB[k], '', classesOf); }),
-    'Tap a branch for its classes, and a class for its sections.', 'Branch', { what: 'Branch' });
+      return unit(k, 'branch|' + k, brA[k], brB[k], '', bandsOf); }),
+    'Tap a branch for its five stages — Prep, 1 &amp; 2, 3 to 5, 6 to 8, 9 &amp; 10 — then a ' +
+    'stage for its classes, and a class for its sections.', 'Branch', { what: 'Branch' });
 
   /* 2 · CLASS */
   if (!scope) allCls.forEach(function (x) { x.k = x.full; });
@@ -16375,7 +16517,11 @@ function _exRenderCompare() {
       var lab = sj;
       if (slot) {
         var LL = _exLangs(A.concat(B), slot);
-        if (LL.length) lab = sj + ' — ' + LL.join(' or ');
+        /* four names is already a row saying "it depends"; past that the list
+           is noise and the count carries the same information */
+        if (LL.length) lab = sj + ' — ' + (LL.length > 4
+          ? LL.slice(0, 4).join(', ') + ' and ' + (LL.length - 4) + ' more'
+          : LL.join(' or '));
       }
       var x = unit(lab, 'subject|' + sj, A, B, sj, scope ? classesOf : branchesOf, sj);
       if (x.na < 20 || x.nb < 20) return null;
@@ -16397,53 +16543,87 @@ function _exRenderCompare() {
       'misleading.</div>';
   }
 
-  /* ── WHAT IS NOT HERE ── */
-  var oneSided = [];
-  (function () {
-    var ca = grp(A, function (r) { return r.cls; }), cb = grp(B, function (r) { return r.cls; });
-    Object.keys(ca).forEach(function (k) { if (!cb[k]) oneSided.push({ lvl: 'class', k: k, side: 'pt1', rows: ca[k] }); });
-    Object.keys(cb).forEach(function (k) { if (!ca[k]) oneSided.push({ lvl: 'class', k: k, side: 'hy', rows: cb[k] }); });
-    var sa = grp(A, function (r) { return r.sec; }), sb2 = grp(B, function (r) { return r.sec; });
-    Object.keys(sa).forEach(function (k) {
-      var c = k.split('|').slice(0, 2).join('|');
-      if (!sb2[k] && cb[c]) oneSided.push({ lvl: 'room', k: k, side: 'pt1', rows: sa[k] }); });
-    Object.keys(sb2).forEach(function (k) {
-      var c = k.split('|').slice(0, 2).join('|');
-      if (!sa[k] && ca[c]) oneSided.push({ lvl: 'room', k: k, side: 'hy', rows: sb2[k] }); });
-  })();
-  oneSided.sort(function (p, q) { return q.rows.length - p.rows.length; });
-  var lost = oneSided.reduce(function (n, g) { return n + g.rows.length; }, 0);
-  var gWho = function (g) {
-    var id = 'g' + (++pid);
-    _exPick[id] = {
-      title: g.k.split('|')[0] + ' · ' + _exGLab(g.k.split('|')[1]) +
-             (g.lvl === 'room' ? ' · ' + _exSecLab(g.k) : '') + ' · not compared',
-      sub: 'listed as they stand in the mark sheet',
-      gap: g.rows.map(function (r) {
-        return { nm: r.nm, id: r.id, gr: r.gr, sec0: r.sec0, side: g.side }; }) };
-    return id;
-  };
-  if (oneSided.length) {
-    h += '<div class="au-sec"><h3>Classes and sections with only one sitting</h3>' +
-      '<div class="sub">These have a mark sheet for one sitting and not the other, so they are not ' +
-      'in the tables above. ' + _admNum(lost) + ' children. Every one of these is a mark sheet to ' +
-      'be entered.</div>' +
-      '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:680px"><thead><tr>' +
-      '<th>Branch</th><th>Class</th><th>Section</th><th class="n">Children</th>' +
-      '<th>What is missing</th></tr></thead><tbody>' +
-      oneSided.slice(0, 26).map(function (g) {
-        var p = g.k.split('|'), gid = gWho(g);
-        return '<tr><td style="font-weight:700"><button class="na-secbtn" onclick="exView(\'' + gid +
-          '\')" style="font-weight:700">' + e(p[0]) + ' ›</button></td>' +
-          '<td>' + e(_exGLab(p[1])) + '</td>' +
-          '<td style="color:var(--txm)">' + (g.lvl === 'room' ? e(_exSecLab(g.k)) : 'whole class') + '</td>' +
-          '<td class="n" style="font-weight:800">' + g.rows.length + '</td>' +
-          '<td style="color:' + (g.lvl === 'class' ? dn : '#D97706') + ';font-weight:600">' +
-            (g.side === 'pt1' ? 'no half-yearly ' : 'no PT-1 ') + (g.lvl === 'class' ? 'sheet' : 'roll') +
-          '</td></tr>';
-      }).join('') + '</tbody></table></div>' +
-      (oneSided.length > 26 ? '<div class="au-note">' + (oneSided.length - 26) + ' more.</div>' : '') +
-      '</div>';
+  /* ══ ONE SUBJECT, CLASS BY CLASS ══════════════════════════════════════════
+     The Subject table above answers "which subject moved"; it cannot answer
+     "and where". A subject that rose two points across the group may have
+     risen twelve in four classes and fallen eight in four others, and those
+     are two different pieces of news needing two different conversations.
+
+     So: pick a subject, pick classes or sections, and read the spread. The
+     chart is drawn from the same rows as every table on this page and each
+     bar opens the children behind it. Sections carry a floor of five children
+     at each sitting, because a room of three is a name, not a measurement. */
+  var subList = C.subjects.filter(function (sj) {
+    return count(A, sj) >= 20 && count(B, sj) >= 20; });
+  if (subList.length) {
+    if (subList.indexOf(_exSubj) < 0) _exSubj = subList[0];
+    var lvl = _exSubLvl === 'section' ? 'section' : 'class';
+    var keyf = lvl === 'section' ? function (r) { return r.sec; } : function (r) { return r.cls; };
+    var ga = grp(A, keyf), gb = grp(B, keyf);
+    var floor = lvl === 'section' ? MINROOM : 1;
+    var data = both(ga, gb).map(function (k) {
+        var pr = k.split('|');
+        return unit(lvl === 'section'
+            ? pr[0] + ' · ' + _exGLab(pr[1]) + ' · ' + _exSecLab(k)
+            : pr[0] + ' · ' + _exGLab(pr[1]),
+          '', ga[k], gb[k], _exSubj); })
+      .filter(function (y) { return y.ch != null && y.na >= floor && y.nb >= floor; })
+      .sort(function (x, y) { return y.ch - x.ch; });
+
+    var swBtn = function (v, lab) {
+      return '<button class="ex-sw' + (lvl === v ? ' on' : '') + '" onclick="exSubLvl(' +
+        JSON.stringify(v).replace(/"/g, '&quot;') + ')">' + lab + '</button>'; };
+    var pills = subList.map(function (sj) {
+      return '<button class="ex-sw' + (sj === _exSubj ? ' on' : '') + '" onclick="exSubPick(' +
+        JSON.stringify(sj).replace(/"/g, '&quot;') + ')">' + e(sj) + '</button>'; }).join('');
+
+    var chart = '';
+    if (!data.length) {
+      chart = '<div class="au-empty">No ' + lvl + ' has ' + floor + ' or more children sitting ' +
+        e(_exSubj) + ' at both sittings.</div>';
+    } else {
+      var span = Math.max.apply(null, data.map(function (x) { return Math.abs(x.ch); }).concat([1]));
+      var sAvg = avg(A, _exSubj), sAvgB = avg(B, _exSubj);
+      var gch = (sAvg != null && sAvgB != null) ? sAvgB - sAvg : 0;
+      chart = '<div style="margin-top:4px">' + data.map(function (x) {
+        var w = Math.min(Math.abs(x.ch) / span, 1) * 50;
+        var vid = pick(x, 'Subject');
+        return '<div style="display:grid;grid-template-columns:210px 68px 1fr 74px 52px;gap:10px;' +
+          'align-items:center;padding:4px 0;border-bottom:1px solid var(--bor)">' +
+          '<div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;' +
+            'white-space:nowrap" title="' + e(x.k) + '">' + e(x.k) + '</div>' +
+          '<div class="n" style="font-size:11.5px;color:var(--txm);text-align:right">' +
+            x.na + ' → ' + x.nb + '</div>' +
+          '<div style="position:relative;height:17px;background:var(--pl);border-radius:4px">' +
+            '<div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--bor)"></div>' +
+            '<div style="position:absolute;top:2px;bottom:2px;border-radius:3px;background:' +
+              (x.ch >= 0 ? up : dn) + ';' +
+              (x.ch >= 0 ? 'left:50%;width:' + w + '%' : 'right:50%;width:' + w + '%') + '"></div>' +
+          '</div>' +
+          '<div class="n" style="font-size:12px;color:var(--txm);text-align:right">' +
+            x.pa.toFixed(1) + ' → ' + x.pb.toFixed(1) + '</div>' +
+          '<div class="n" style="font-weight:800;font-size:13px;color:' + (x.ch >= 0 ? up : dn) +
+            ';text-align:right"><button class="na-secbtn" onclick="exView(\'' + vid +
+            '\')" style="font-weight:800;color:inherit">' + sg(x.ch) + '</button></div>' +
+          '</div>';
+      }).join('') + '</div>';
+      var rose = data.filter(function (x) { return x.ch > 0; }).length;
+      chart += '<div class="au-note"><b>' + e(_exSubj) + '</b> moved ' + sg(gch) +
+        ' points across this scope, and that single figure covers <b>' + rose + ' of ' +
+        data.length + '</b> ' + lvl + 'es that rose and <b>' + (data.length - rose) +
+        '</b> that fell — from ' + sg(data[0].ch) + ' at ' + e(data[0].k) + ' to ' +
+        sg(data[data.length - 1].ch) + ' at ' + e(data[data.length - 1].k) +
+        '. Click any change for the children behind it.</div>';
+    }
+    h += '<div class="au-sec"><h3>One subject, ' +
+      (lvl === 'section' ? 'section by section' : 'class by class') + '</h3>' +
+      '<div class="sub">The subject table above says which subject moved. This says <b>where</b> — ' +
+      'a subject that rose two points across the group can be hiding twelve up in one class and eight ' +
+      'down in another, and those are two different conversations.</div>' +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:0 0 12px">' +
+        '<div class="ex-switch" style="flex-wrap:wrap">' + pills + '</div>' +
+        '<div class="ex-switch">' + swBtn('class', 'Classes') + swBtn('section', 'Sections') + '</div>' +
+      '</div>' + chart + '</div>';
   }
 
   el.innerHTML = h;
