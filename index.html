@@ -22420,7 +22420,80 @@ function _admCouns() {
 
 /* ══ FOLLOW-UPS ═══════════════════════════════════════════════════════════ */
 var _admFPick = {};
+/* ── EVERY FIGURE OPENS THE SAME THING: the leads behind it, each with its own
+      written history. One table rather than three, because whichever number
+      was clicked the question is the same — who are they and what was said. */
+function _admLeadTable(rows, hiTasks) {
+  var e = _admEsc;
+  if (!rows.length) return '<div class="au-empty">Nothing in this group.</div>';
+  var cut = rows.slice(0, 200);
+  var body = cut.map(function (r) {
+    var ns = _admNextStep(r), tl = _admTimeline(r);
+    var today = _admToday();
+    var nsCell = !ns
+      ? '<span style="color:#DC2626;font-weight:700">none recorded</span>'
+      : ns.src === 'event'
+        ? '<span style="color:var(--txm)">' + e(ns.note) + '</span><div style="font-size:11px;' +
+          'color:var(--txl)">no date given</div>'
+        : '<b style="color:' + (ns.day < today ? '#DC2626' : ns.day === today ? '#1E4FD8' : '#047857') +
+          '">' + e(_admFmtDay(new Date(ns.day + 'T00:00:00'))) + '</b>' +
+          '<div style="font-size:11px;color:var(--txl)">' +
+          (ns.src === 'task' ? 'pending ' + e(ns.note) : 'from the note: “' + e(ns.note) + '”') +
+          (ns.day < today ? ' · overdue' : '') + '</div>';
+    var hist = tl.length
+      ? '<div style="max-height:150px;overflow:auto;font-size:12.5px;line-height:1.5">' +
+        tl.map(function (x) {
+          var col = x.src === 'task' ? (x.open ? '#D97706' : '#047857') : (x.sys ? 'var(--txl)' : '#1E4FD8');
+          return '<div style="margin-bottom:4px"><span style="color:var(--txl);white-space:nowrap">' +
+            e(_admFmtDay(x.at)) + '</span> <span style="color:' + col + ';font-weight:700">' +
+            e(x.kind) + (x.src === 'task' ? (x.open ? ' · pending' : ' · done') : '') + '</span>' +
+            (x.text ? ' <span style="color:var(--txm)">' + e(x.text) + '</span>' : '') + '</div>';
+        }).join('') + '</div>'
+      : '<span style="color:var(--txl)">nothing written</span>';
+    return '<tr><td style="font-weight:700;white-space:nowrap">' + e(r.name || r.parent || '(no name)') +
+      '<div style="font-size:11px;color:var(--txm);font-weight:500">' + e(r.ph || '') + '</div></td>' +
+      '<td style="color:var(--txm);white-space:nowrap">' + _admDot(r.b) + ' ' + e(r.b) + '</td>' +
+      '<td style="color:var(--txm);white-space:nowrap">' + e(_admCName(r)) + '</td>' +
+      '<td style="white-space:nowrap"><span class="na-pill" style="background:' + _admStageCol(r.st) +
+        '1A;color:' + _admStageCol(r.st) + '">' + e(_admStageLab(r.st)) + '</span></td>' +
+      '<td style="white-space:nowrap">' + nsCell + '</td>' +
+      '<td style="min-width:320px">' + hist + '</td></tr>';
+  }).join('');
+  return '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:1020px"><thead><tr>' +
+    '<th>Parent / child</th><th>Branch</th><th>Counsellor</th><th>Stage now</th>' +
+    '<th>Next follow-up</th><th>Everything written against this lead</th>' +
+    '</tr></thead><tbody>' + body + '</tbody></table></div>' +
+    (rows.length > 200 ? '<div class="au-note">Showing 200 of ' + _admN(rows.length) + '.</div>' : '') +
+    '<div class="au-note"><b>Next follow-up</b> is a pending task’s own due date where there is one, ' +
+    'and otherwise a phrase in the newest note resolved against the day that note was written. The ' +
+    'sheet’s Next Action Date column is empty on every row, and the dates people type into their ' +
+    'notes are stamps for the day they called — none of the 280 in this export is in the future — ' +
+    'so they are not read as a next step. <b>none recorded</b> means nobody has scheduled anything.</div>';
+}
+
 function admOpenF(id) {
+  var P = _admFPick[id]; if (!P) return;
+  /* a task group is shown through its leads, so the remarks come with it */
+  if (P.list) {
+    var seen = {}, lr = [];
+    P.list.forEach(function (f) {
+      var k = f.r.id || (f.r.b + '|' + f.r.name + '|' + f.r.ph);
+      if (!seen[k]) { seen[k] = 1; lr.push(f.r); }
+    });
+    _admModal(P.t, _admN(P.list.length) + ' task' + (P.list.length === 1 ? '' : 's') +
+      ' across ' + _admN(lr.length) + ' lead' + (lr.length === 1 ? '' : 's') + ' · ' + P.s,
+      _admLeadTable(lr));
+    return;
+  }
+  if (P.leads) {
+    _admModal(P.t, _admN(P.leads.length) + ' lead' + (P.leads.length === 1 ? '' : 's') + ' · ' + P.s,
+      _admLeadTable(P.leads.slice().sort(function (a, b) {
+        return String(_admWorkedOn(b)).localeCompare(String(_admWorkedOn(a))); })));
+    return;
+  }
+  return _admOpenFOld(id);
+}
+function _admOpenFOld(id) {
   var P = _admFPick[id]; if (!P) return;
   /* the movement cells hold LEADS, not tasks, so they get their own view —
      what moved, where it moved to, and when */
@@ -22545,6 +22618,120 @@ function _admWorkedOn(r) {
   var d = _admTouchDays(r);
   return d.length ? d[d.length - 1] : '';
 }
+
+/* ══ WHEN IS THIS LEAD NEXT DUE A CALL ═════════════════════════════════════
+   Added 7 November 2026, because the NEXT ACTION DATE column is empty on all
+   970 rows of the export. Nothing fills it, so the date has to be recovered
+   from what people actually write.
+
+   WHAT A DATE IN THE TEXT MEANS, which decides the whole method. The comment
+   and follow-up bodies are full of dates — "not lifting -06/11/2026",
+   "RNR-5/11", "Will confirm adms tom-5/11". Every one of them was checked
+   against the timestamp of the entry it sits in: of 280 such dates, 246 are
+   the day the note was written and 34 are earlier. NOT ONE is in the future.
+   They are log stamps — "I rang on this date" — and reading them as a next
+   action would schedule every lead in the past.
+
+   So two things are forward-looking, and only two:
+
+     A PENDING TASK carries its own due date, which is the real next action
+       date and needs no interpretation. 214 of the 612 open leads have one.
+
+     A PHRASE IN THE NEWEST NOTE — "call back tomorrow", "next week", "will
+       visit on Saturday", "this weekend" — resolved against the timestamp of
+       the entry that contains it, never against today, because a note written
+       on the 2nd saying "next week" means the 9th and not the 14th. Another
+       28 leads.
+
+   A few more name an event with no date ("after Diwali", "asap"); those are
+   shown as written rather than turned into a date nobody stated.
+
+   That leaves 365 of the 612 open leads — SIXTY PER CENT — with no next step
+   recorded anywhere, in any column. That number is the point of this
+   function: it is not a gap in the reading, it is a gap in the follow-up. */
+var ADM_DOW = { monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6, sunday: 0,
+                mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6, sun: 0 };
+var ADM_REL = new RegExp('\\b(day after tomorrow|tomorrow|next week|this week|this weekend|weekend|' +
+  'next month|(?:next|coming|on|by)\\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|' +
+  'mon|tue|wed|thu|fri|sat|sun)|in\\s+\\d{1,2}\\s+days?|after\\s+\\d{1,2}\\s+days?)\\b', 'i');
+var ADM_EVENT = new RegExp('\\b(after diwali|post diwali|after the diwali|after festival|' +
+  'after holidays|after dussera|asap)\\b', 'i');
+function _admRelDate(phrase, anchor) {
+  var p = String(phrase).toLowerCase().trim(), d = new Date(anchor.getTime()), m;
+  var add = function (n) { d.setDate(d.getDate() + n); return _admDay(d); };
+  if (p === 'tomorrow') return add(1);
+  if (p === 'day after tomorrow') return add(2);
+  if (p === 'next week') return add(7);
+  if (p === 'this week') return add(3);
+  if (p === 'next month') return add(30);
+  if (p === 'this weekend' || p === 'weekend') return add(((6 - d.getDay()) % 7) || 7);
+  m = p.match(/^(?:next|coming|on|by)\s+(\w+)$/);
+  if (m && ADM_DOW[m[1]] !== undefined) return add(((ADM_DOW[m[1]] - d.getDay()) % 7 + 7) % 7 || 7);
+  m = p.match(/^(?:in|after)\s+(\d{1,2})\s+days?$/);
+  if (m) return add(parseInt(m[1], 10));
+  return '';
+}
+function _admNextStep(r) {
+  if (!r) return null;
+  if (r.__ns !== undefined) return r.__ns;
+  var out = null, best = null;
+  /* a pending human task is the next action, with no interpretation needed */
+  (r.fu || []).forEach(function (raw) {
+    var f = _admFuParse(raw);
+    if (!f || f.auto || !f.open || !f.due) return;
+    if (!best || f.due < best.due) best = f;
+  });
+  if (best) out = { day: _admDay(best.due), src: 'task', note: best.kind || 'follow-up task' };
+  if (!out) {
+    /* otherwise the newest note that looks forward */
+    var ents = [];
+    (r.cm || []).forEach(function (raw) {
+      var c = _admCmParse(raw); if (c && !c.sys) ents.push({ at: c.at, t: c.body }); });
+    (r.fu || []).forEach(function (raw) {
+      var f = _admFuParse(raw); if (f && !f.auto && f.note) ents.push({ at: f.done || f.due, t: f.note }); });
+    ents.sort(function (a, b) { return b.at - a.at; });
+    for (var i = 0; i < ents.length && !out; i++) {
+      var m = ADM_REL.exec(ents[i].t);
+      if (m) {
+        var day = _admRelDate(m[0], ents[i].at);
+        if (day) out = { day: day, src: 'text', note: m[0] };
+      } else {
+        var e2 = ADM_EVENT.exec(ents[i].t);
+        if (e2) out = { day: '', src: 'event', note: e2[0] };
+      }
+    }
+  }
+  try { r.__ns = out; } catch (e) {}
+  return out;
+}
+
+/* every dated entry against a lead, newest first — the whole written history */
+function _admTimeline(r) {
+  var out = [];
+  (r.cm || []).forEach(function (raw) {
+    var c = _admCmParse(raw);
+    if (c) out.push({ at: c.at, kind: c.sys ? 'system' : (c.kind || 'comment'),
+                      text: c.body, sys: c.sys, src: 'comment' });
+  });
+  (r.fu || []).forEach(function (raw) {
+    var f = _admFuParse(raw);
+    if (!f) return;
+    out.push({ at: f.done || f.due, due: f.due, done: f.done, open: f.open, auto: f.auto,
+               kind: f.kind || 'task', text: f.note, src: 'task' });
+  });
+  /* pending tasks first, then everything else newest-first. The next
+     follow-up date is driven by the OLDEST pending task, which on a badly
+     neglected lead can be months old and would otherwise sit below the fold
+     of the history box — the figure and its reason have to be visible
+     together. */
+  out.sort(function (a, b) {
+    var ao = (a.src === 'task' && a.open) ? 1 : 0, bo = (b.src === 'task' && b.open) ? 1 : 0;
+    if (ao !== bo) return bo - ao;
+    if (ao) return a.due - b.due;                 // oldest pending first
+    return b.at - a.at;
+  });
+  return out;
+}
 /* the leads in scope a person worked on a given day, or across a window */
 function _admMoved(rows, from, to) {
   var hi = to || from;
@@ -22600,6 +22787,7 @@ function _admFollow() {
      Counted in LEADS, not tasks, which is why they sit apart from the rest
      both here and in the table below. */
   var today = _admToday(), yest = _admShiftDay(-1), wkA = _admShiftDay(-7), wkB = _admShiftDay(-1);
+  var openRows = S.rows.filter(_admFollowable);
   var MV = [
     { k: 'wtoday', lab: 'Worked today', col: '#047857',
       note: 'a note, a stage change or a task completed today',
@@ -22615,6 +22803,25 @@ function _admFollow() {
       sel: function (rows) { return _admMoved(rows, wkA, wkB); } }
   ];
 
+  /* ── WHAT IS OWED NEXT, per lead rather than per task ──
+     The task windows below count TASKS, and only the 214 open leads carrying
+     one. These count LEADS, across all of them, on the next date
+     _admNextStep can recover from either log. Two different units, so they
+     keep their own column group. */
+  var NS = [
+    { k: 'nsdue', lab: 'Next step today', col: '#1E4FD8',
+      note: 'the next follow-up falls today',
+      sel: function (rows) { return rows.filter(function (r) {
+        var n = _admNextStep(r); return n && n.day === today; }); } },
+    { k: 'nslate', lab: 'Next step overdue', col: '#DC2626',
+      note: 'the day it was meant to happen has passed',
+      sel: function (rows) { return rows.filter(function (r) {
+        var n = _admNextStep(r); return n && n.day && n.day < today; }); } },
+    { k: 'nsnone', lab: 'No next step', col: '#B45309',
+      note: 'nothing scheduled and nothing in the notes that sets a date',
+      sel: function (rows) { return rows.filter(function (r) { return !_admNextStep(r); }); } }
+  ];
+
   var h = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:10px">';
   MV.forEach(function (w) {
     var rows = w.sel(S.rows);
@@ -22625,6 +22832,16 @@ function _admFollow() {
         _admN(rows.length) + '</span></div>' +
       '<div class="k">' + w.lab + '</div><div class="d">' + w.note +
       '</div><div class="na-click">Click to view ›</div></button>';
+  });
+  NS.forEach(function (w) {
+    var rows = w.sel(openRows);
+    var id = rows.length ? pickL(w.lab, w.note, rows) : '';
+    h += '<button class="au-kpi na-kpi-b"' + (id ? ' onclick="admOpenF(\'' + id + '\')"' : '') +
+      ' style="text-align:left;border-left:4px solid ' + w.col + '">' +
+      '<div class="na-kh"><span class="v" style="color:' + (rows.length ? w.col : 'var(--txm)') + '">' +
+        _admN(rows.length) + '</span></div>' +
+      '<div class="k">' + w.lab + '</div><div class="d">' + w.note +
+      '</div><div class="na-click">Click to view \u203a</div></button>';
   });
   W.forEach(function (w) {
     var list = FU.filter(w.f);
@@ -22667,6 +22884,22 @@ function _admFollow() {
         w.col + '">' + _admN(n) + '</button>'
       : '<span style="color:var(--txl)">·</span>') + '</td>';
   };
+  /* the lead count and the task count open too — every figure on this panel
+     leads to the names behind it */
+  var lcell = function (rows, lab, note) {
+    var id = rows.length ? pickL(lab, note, rows) : '';
+    return '<td class="n">' + (rows.length
+      ? '<button class="na-secbtn" onclick="admOpenF(\'' + id + '\')" style="color:var(--txm)">' +
+        _admN(rows.length) + '</button>'
+      : '<span style="color:var(--txl)">·</span>') + '</td>';
+  };
+  var tcell = function (list, lab, note) {
+    var id = list.length ? pick(lab, note, list) : '';
+    return '<td class="n" style="border-left:1px solid var(--bor)">' + (list.length
+      ? '<button class="na-secbtn" onclick="admOpenF(\'' + id + '\')" style="color:var(--txm)">' +
+        _admN(list.length) + '</button>'
+      : '<span style="color:var(--txl)">·</span>') + '</td>';
+  };
   var mcell = function (rows, w, lab, first) {
     var sel = w.sel(rows), n = sel.length;
     var id = n ? pickL(lab + ' · ' + w.lab, w.note, sel) : '';
@@ -22682,9 +22915,10 @@ function _admFollow() {
       body += '<tr><td><button class="na-secbtn" onclick="admTog(' +
         JSON.stringify(key).replace(/"/g, '&quot;') + ')" style="font-weight:700">' +
         (_admOpen[key] ? '▾ ' : '▸ ') + _admEsc(bn) + '</button></td>' +
-        '<td class="n" style="color:var(--txm)">' + _admN(B.open.length) + '</td>' +
+        lcell(B.open, bn + ' · open leads', 'still on one of the seven stages') +
         MV.map(function (w, i) { return mcell(B.rows, w, bn, i === 0); }).join('') +
-        '<td class="n" style="color:var(--txm);border-left:1px solid var(--bor)">' + _admN(B.all.length) + '</td>' +
+        NS.map(function (w, i) { return mcell(B.open, w, bn, i === 0); }).join('') +
+        tcell(B.all, bn + ' · tasks raised', 'every human follow-up task on an open lead') +
         W.map(function (w) { return cell(B.all, w, bn); }).join('') + '</tr>';
       if (!_admOpen[key]) return;
       B.order.sort(function (x, y) { return B.c[y].all.length - B.c[x].all.length; })
@@ -22692,9 +22926,10 @@ function _admFollow() {
           var C = B.c[k];
           body += '<tr style="background:var(--pl)"><td style="padding-left:31px;color:var(--txm)">' +
             _admEsc(C.n) + '</td>' +
-            '<td class="n" style="color:var(--txm)">' + _admN(C.open.length) + '</td>' +
+            lcell(C.open, bn + ' · ' + C.n + ' · open leads', 'still on one of the seven stages') +
             MV.map(function (w, i) { return mcell(C.rows, w, bn + ' · ' + C.n, i === 0); }).join('') +
-            '<td class="n" style="color:var(--txm);border-left:1px solid var(--bor)">' + _admN(C.all.length) + '</td>' +
+            NS.map(function (w, i) { return mcell(C.open, w, bn + ' · ' + C.n, i === 0); }).join('') +
+            tcell(C.all, bn + ' · ' + C.n + ' · tasks raised', 'every human follow-up task') +
             W.map(function (w) { return cell(C.all, w, bn + ' · ' + C.n); }).join('') + '</tr>';
         });
     });
@@ -22705,12 +22940,18 @@ function _admFollow() {
     '<th colspan="' + MV.length + '" style="text-align:center;border-left:1px solid var(--bor);' +
       'border-bottom:1px solid var(--bor)">Leads worked · from the logs ' +
       '<span style="font-weight:600;opacity:.8">(every lead, closed ones too)</span></th>' +
+    '<th colspan="' + NS.length + '" style="text-align:center;border-left:1px solid var(--bor);' +
+      'border-bottom:1px solid var(--bor)">Next follow-up · owed ' +
+      '<span style="font-weight:600;opacity:.8">(leads)</span></th>' +
     '<th colspan="' + (W.length + 1) + '" style="text-align:center;border-left:1px solid var(--bor);' +
       'border-bottom:1px solid var(--bor)">Follow-up tasks ' +
       '<span style="font-weight:600;opacity:.8">(open leads only)</span></th></tr><tr>' +
     MV.map(function (w, i) { return '<th class="n"' +
       (i === 0 ? ' style="border-left:1px solid var(--bor)"' : '') +
       ' title="' + _admEsc(w.note) + '">' + _admEsc(w.lab.replace('Worked ', '')) + '</th>'; }).join('') +
+    NS.map(function (w, i) { return '<th class="n"' +
+      (i === 0 ? ' style="border-left:1px solid var(--bor)"' : '') +
+      ' title="' + _admEsc(w.note) + '">' + _admEsc(w.lab.replace('Next step ', '')) + '</th>'; }).join('') +
     '<th class="n" style="border-left:1px solid var(--bor)">Raised</th>' +
     W.map(function (w) { return '<th class="n" title="' + _admEsc(w.note) + '">' +
       _admEsc(w.lab) + '</th>'; }).join('') + '</tr></thead><tbody>' + body + '</tbody></table></div>';
