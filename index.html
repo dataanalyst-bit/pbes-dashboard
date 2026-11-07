@@ -1194,8 +1194,38 @@ table.vckt tr.vck-c td.nm{font-weight:600;color:var(--tx)}
 #pane-adm27{--amb-ok:#15803D; --amb-warn:#C2870B; --amb-bad:#DC2626; --amb-na:#8793A8}
 :root[data-theme="dark"] #pane-adm27{--amb-ok:#34D399; --amb-warn:#FBBF24;
   --amb-bad:#F87171; --amb-na:#7F8DA4}
-#pane-adm27 .amb-row{display:flex;justify-content:flex-end}
-#pane-adm27 .amb-row>div{width:100%;max-width:580px}
+#pane-adm27 .amb-row{display:flex;justify-content:flex-end;gap:16px;align-items:flex-start;flex-wrap:wrap}
+#pane-adm27 .amb-row>#adm-trend{flex:1 1 440px;min-width:0;display:flex}
+#pane-adm27 .amb-row>#adm-month{flex:0 1 580px;min-width:0}
+@media(max-width:1100px){
+  #pane-adm27 .amb-row>#adm-trend,#pane-adm27 .amb-row>#adm-month{flex:1 1 100%;max-width:none}
+}
+
+/* ── the day-by-day line ──
+   The two line colours are variables rather than literals so the dark theme
+   can lift them: #1E4FD8 against a near-black panel is readable but heavy,
+   and a line two pixels wide has far less area to carry its colour than a
+   filled shape does. */
+#pane-adm27{--amt-l:#1E4FD8;--amt-a:#059669}
+:root[data-theme="dark"] #pane-adm27{--amt-l:#6E9BFF;--amt-a:#34D399}
+#pane-adm27 .amt{background:var(--sur);border:1px solid var(--bor);border-radius:16px;
+  box-shadow:var(--sh);padding:16px 18px 14px;display:flex;flex-direction:column;width:100%}
+#pane-adm27 .amt-h{font-size:17px;font-weight:800;letter-spacing:-.01em}
+#pane-adm27 .amt-s{font-size:12.5px;color:var(--txm);margin-top:3px;line-height:1.5}
+#pane-adm27 .amt-bar{display:flex;flex-wrap:wrap;gap:5px;margin:11px 0 4px;align-items:center}
+#pane-adm27 .amt-bar .sep{width:1px;height:18px;background:var(--bor);margin:0 4px}
+#pane-adm27 .amt-b{border:1px solid var(--bor);background:var(--sur);color:var(--txm);
+  border-radius:99px;padding:4px 11px;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;
+  line-height:1.3;display:inline-flex;align-items:center;gap:5px}
+#pane-adm27 .amt-b:hover{border-color:var(--p);color:var(--p)}
+#pane-adm27 .amt-b.on{background:var(--p);border-color:var(--p);color:#fff;font-weight:700}
+#pane-adm27 .amt-b.on .bd{outline:1.5px solid rgba(255,255,255,.75)}
+#pane-adm27 .amt-svg{width:100%;height:auto;display:block;margin-top:6px}
+#pane-adm27 .amt-leg{display:flex;gap:16px;font-size:12px;font-weight:600;color:var(--txm);
+  margin-top:2px;flex-wrap:wrap}
+#pane-adm27 .amt-leg i{display:inline-block;width:18px;height:3px;border-radius:3px;
+  margin-right:6px;vertical-align:middle}
+#pane-adm27 .amt-ft{font-size:11.5px;color:var(--txl);line-height:1.55;margin-top:9px}
 #pane-adm27 .amb{background:var(--sur);border:1px solid var(--bor);border-radius:16px;
   box-shadow:var(--sh);overflow:hidden}
 #pane-adm27 .amb-hd{background:#17294A;color:#fff;padding:20px 22px 18px}
@@ -3489,6 +3519,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       <!-- The group's own circulated format, sitting beside the tiles rather
            than in a section of its own: it is a headline, not an analysis. -->
       <div class="amb-row" id="adm-month-row" style="display:none">
+        <div id="adm-trend"></div>
         <div id="adm-month"></div>
       </div>
 
@@ -3563,12 +3594,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
 
       <div class="au-sec">
-        <h3>⏰ Follow-ups — what is due, what was done</h3>
-        <div class="sub">The export carries every follow-up task against every lead, each with the day it
-          is due and whether it has been done. Only the tasks a person has to carry out are counted here:
-          calls, visit reminders, re-engagement and decision deadlines. The automatic WhatsApp and silence
-          nudges are left out — they fire by themselves and complete themselves, and counting them
-          would show every counsellor near perfect. Tap a branch for its counsellors.</div>
+        <h3>⏰ Follow-up report as on today</h3>
+        <div class="sub">Where the follow-up stands this morning: what was worked today and yesterday, what
+          is due today, what is still open, and what has run past its date. Work is read from the
+          <b>Comment</b> and <b>Follow-up</b> columns — a note written, a stage changed or a task completed
+          — because those are the only entries that carry their own date. Only what a person has to do is
+          counted: calls, visit reminders, re-engagement and decision deadlines. The automatic WhatsApp and
+          silence nudges are left out; they fire and complete themselves, and counting them would show
+          every counsellor near perfect. Tap a branch for its counsellors.</div>
         <div id="adm-follow"></div>
       </div>
 
@@ -22341,6 +22374,9 @@ function _admFWindows() {
     { k: 'tdue',  lab: 'Due today',         col: '#1E4FD8',
       note: 'scheduled for today',
       f: function (f) { return _admDay(f.due) === today; } },
+    { k: 'ydone', lab: 'Done yesterday',     col: '#047857',
+      note: 'tasks a person completed yesterday',
+      f: function (f) { return !!f.done && _admDay(f.done) === _admShiftDay(-1); } },
     { k: 'tleft', lab: 'Still open today',  col: '#D97706',
       note: 'due today and not done yet',
       f: function (f) { return _admDay(f.due) === today && f.open; } },
@@ -22374,11 +22410,17 @@ function _admFollow() {
   /* ── THE TWO MOVEMENT WINDOWS ──
      Counted in LEADS, not tasks, which is why they sit apart from the rest
      both here and in the table below. */
-  var today = _admToday(), wkA = _admShiftDay(-7), wkB = _admShiftDay(-1);
+  var today = _admToday(), yest = _admShiftDay(-1), wkA = _admShiftDay(-7), wkB = _admShiftDay(-1);
   var MV = [
     { k: 'wtoday', lab: 'Worked today', col: '#047857',
       note: 'a note, a stage change or a task completed today',
       sel: function (rows) { return _admMoved(rows, today, today); } },
+    /* yesterday earns a column of its own: this report is read first thing in
+       the morning, when today is still nearly empty and the only fair measure
+       of a working day is the one that has finished */
+    { k: 'wyest', lab: 'Worked yesterday', col: '#047857',
+      note: 'the same, for yesterday — the last full working day',
+      sel: function (rows) { return _admMoved(rows, yest, yest); } },
     { k: 'wweek', lab: 'Worked last 7 days', col: '#047857',
       note: 'worked in the seven days to yesterday',
       sel: function (rows) { return _admMoved(rows, wkA, wkB); } }
@@ -22466,7 +22508,7 @@ function _admFollow() {
   h += '<div style="overflow-x:auto;margin-top:14px"><table class="au-tbl" style="min-width:1020px">' +
     '<thead><tr><th rowspan="2" style="vertical-align:bottom">Branch · counsellor</th>' +
     '<th rowspan="2" class="n" style="vertical-align:bottom">Leads</th>' +
-    '<th colspan="2" style="text-align:center;border-left:1px solid var(--bor);' +
+    '<th colspan="' + MV.length + '" style="text-align:center;border-left:1px solid var(--bor);' +
       'border-bottom:1px solid var(--bor)">Leads worked · from the logs</th>' +
     '<th colspan="' + (W.length + 1) + '" style="text-align:center;border-left:1px solid var(--bor);' +
       'border-bottom:1px solid var(--bor)">Follow-up tasks</th></tr><tr>' +
@@ -22743,6 +22785,24 @@ function _admPace() {
      same kind of number as a closed one. */
   var liveN = 0;
   if (S.season) {
+    /* ── THE TRACKER IS THE ONLY SOURCE FOR THE LIVE SEASON ──
+       Corrected 7 November 2026. Whatever the Monthly Trends tab already held
+       for the season in progress was ADDED TO the tracker's count rather than
+       replacing it, so any month somebody had already written up by hand was
+       counted twice over. On the 7 November file that is Gowdavalli's six
+       October admissions: the row read 57 for October and 79 for the season,
+       against the 73 admissions actually in the tracker.
+
+       The hand-entered figure is the one to drop. It is a month somebody
+       summarised early, while the tracker holds the season lead by lead and
+       can be clicked into. The tab's own rows for closed seasons are left
+       exactly as they are — this only clears the season still running, and
+       only when the tracker has something to put in its place. */
+    var liveWon = S.rows.filter(function (r) { return _admIsWon(r) && _admWonDay(r); });
+    if (liveWon.length) {
+      MON.forEach(function (m) { delete cell[S.season + '|' + m]; });
+      delete tot[S.season];
+    }
     S.rows.forEach(function (r) {
       if (!_admIsWon(r)) return;
       var iso = _admWonDay(r);                 // the day the admission was done
@@ -23017,7 +23077,7 @@ function _admPaint() {
       return t.kind === 'enquiry' && (!S.scope || t.branch === S.scope); }).length) +
     ' branch tracker' + (((R.tabs || []).filter(function (t) {
       return t.kind === 'enquiry' && (!S.scope || t.branch === S.scope); }).length === 1) ? '' : 's') + ' read';
-  _admNotes(); _admKpis(); _ambMonthStatus();
+  _admNotes(); _admKpis(); _ambMonthStatus(); _admTrend();
   _admCompare(); _admPlanPanel(); _admYoY();
   _admFunnel(); _admSource(); _admClassPanel(); _admPace();
   _admCouns(); _admFollow(); _admHist();
@@ -23900,6 +23960,170 @@ function ambOpenMonth(id) {
   _admModal(P.t, _admN(P.rows.length) + ' admission' + (P.rows.length === 1 ? '' : 's') +
     ' won in ' + P.m + ' · "Added" is the day the enquiry first arrived, which is ' +
     'often an earlier month', P.grp ? _admByBranchAcc(P.rows) : _admEnqTable(P.rows, false));
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LEADS AND ADMISSIONS, DAY BY DAY            added 7 November 2026
+
+   The two figures the tab is really about, on one pair of lines, for one month
+   at a time: how many enquiries arrived on each day of the month and how many
+   admissions were completed on each.
+
+   THE TWO DATES ARE DIFFERENT COLUMNS, and that is the whole point of drawing
+   them together. A lead is dated by CREATED, the day the enquiry arrived. An
+   admission is dated by UPDATED, the day it was actually done. They are not
+   the same lead on the same day — an admission on the 12th usually belongs to
+   an enquiry that arrived weeks earlier — so this is not a conversion curve
+   and nothing here divides one line by the other. It is two separate daily
+   rhythms side by side: when enquiry comes in, and when admission closes.
+
+   ONE SHARED AXIS, deliberately. Leads run an order of magnitude above
+   admissions, and a second axis scaled to the admissions line would blow it up
+   to the same visual height and quietly suggest the two are comparable. They
+   are not, and the gap between the lines is the most useful thing on the
+   chart, so both are drawn against the same scale.
+
+   THE MONTH IN PROGRESS STOPS AT TODAY. Plotting the rest of November at zero
+   would draw a cliff that reads as a collapse rather than as a month that has
+   not happened yet. */
+var _admTrBr = '', _admTrYm = '';
+function admTrBr(v) { _admTrBr = v; _admTrend(); }
+function admTrYm(v) { _admTrYm = v; _admTrend(); }
+
+/* every month this season has a lead or an admission in, oldest first */
+function _admTrMonths(S) {
+  var m = {}, out = [];
+  S.rows.forEach(function (r) {
+    if (r.d && String(r.d).length >= 7) m[String(r.d).slice(0, 7)] = 1;
+    var w = _admWonDay(r); if (w) m[w.slice(0, 7)] = 1;
+  });
+  for (var k in m) if (m.hasOwnProperty(k)) out.push(k);
+  return out.sort();
+}
+function _admTrend() {
+  var el = document.getElementById('adm-trend'); if (!el) return;
+  var S = _admSet(), R = _admRaw;
+  if (!R) { el.innerHTML = ''; return; }
+
+  var months = _admTrMonths(S);
+  if (!months.length) {
+    el.innerHTML = '<div class="amt"><div class="amt-h">Leads and admissions, day by day</div>' +
+      '<div class="au-empty">No lead in this scope carries a date yet.</div></div>';
+    return;
+  }
+  var nowYm = _ambMonthKey();
+  if (months.indexOf(_admTrYm) < 0)
+    _admTrYm = months.indexOf(nowYm) >= 0 ? nowYm : months[months.length - 1];
+  var ym = _admTrYm;
+
+  /* the global branch filter wins: its own buttons only offer what is in scope */
+  var brs = _admBranches(S);
+  if (S.scope) _admTrBr = '';
+  if (_admTrBr && brs.indexOf(_admTrBr) < 0) _admTrBr = '';
+  var pick = _admTrBr ? [_admTrBr] : brs;
+  var inBr = function (r) { return !_admTrBr || r.b === _admTrBr; };
+
+  var days = _admDaysIn(ym);
+  var last = days;
+  if (ym === nowYm) last = Math.min(days, new Date().getDate());   // no future days
+
+  var L = [], A = [], i;
+  for (i = 0; i <= days; i++) { L[i] = 0; A[i] = 0; }
+  S.rows.forEach(function (r) {
+    if (!inBr(r)) return;
+    var d = String(r.d || '');
+    if (d.slice(0, 7) === ym) { var dd = +d.slice(8, 10); if (dd >= 1 && dd <= days) L[dd]++; }
+    if (_admIsWon(r)) {
+      var w = _admWonDay(r);
+      if (w && w.slice(0, 7) === ym) { var ad = +w.slice(8, 10); if (ad >= 1 && ad <= days) A[ad]++; }
+    }
+  });
+  var sumL = 0, sumA = 0;
+  for (i = 1; i <= last; i++) { sumL += L[i]; sumA += A[i]; }
+
+  /* ── the drawing ── */
+  var W = 760, H = 250, padL = 42, padR = 12, padT = 14, padB = 30;
+  var pw = W - padL - padR, ph = H - padT - padB;
+  var peak = 1;
+  for (i = 1; i <= last; i++) { if (L[i] > peak) peak = L[i]; if (A[i] > peak) peak = A[i]; }
+  var step = Math.max(1, Math.ceil(peak / 4));
+  var top = step * 4;
+  var X = function (d) { return padL + (last < 2 ? pw / 2 : pw * (d - 1) / (last - 1)); };
+  var Y = function (v) { return padT + ph - ph * v / top; };
+  var path = function (arr) {
+    var p = '';
+    for (var d = 1; d <= last; d++) p += (d === 1 ? 'M' : 'L') + X(d).toFixed(1) + ' ' + Y(arr[d]).toFixed(1);
+    return p;
+  };
+  var dots = function (arr, col, lab) {
+    var o = '';
+    for (var d = 1; d <= last; d++) {
+      o += '<circle cx="' + X(d).toFixed(1) + '" cy="' + Y(arr[d]).toFixed(1) + '" r="' +
+        (last > 20 ? 2.2 : 3) + '" fill="' + col + '"><title>' + d + ' ' +
+        _ambMonthShort(ym) + ' · ' + arr[d] + ' ' + lab + '</title></circle>';
+    }
+    return o;
+  };
+  var grid = '', g;
+  for (g = 0; g <= 4; g++) {
+    var gy = (padT + ph - ph * g / 4).toFixed(1);
+    grid += '<line x1="' + padL + '" y1="' + gy + '" x2="' + (W - padR) + '" y2="' + gy +
+      '" stroke="var(--bor)" stroke-width="1"/>' +
+      '<text x="' + (padL - 7) + '" y="' + (+gy + 3.5) + '" text-anchor="end" font-size="10" ' +
+      'fill="var(--txl)">' + (step * g) + '</text>';
+  }
+  /* every day gets a tick; the label is thinned only when they would collide */
+  var every = last > 24 ? 2 : 1;
+  var xlab = '';
+  for (var d = 1; d <= last; d++) {
+    if (d !== 1 && d !== last && (d % every)) continue;
+    xlab += '<text x="' + X(d).toFixed(1) + '" y="' + (H - padB + 15) + '" text-anchor="middle" ' +
+      'font-size="10" fill="var(--txm)">' + d + '</text>';
+  }
+
+  var CL = 'var(--amt-l)', CA = 'var(--amt-a)';
+  var svg = '<svg class="amt-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" ' +
+    'aria-label="Leads and admissions by day of ' + _ambMonthFull(ym) + '">' + grid +
+    '<path d="' + path(L) + '" fill="none" stroke="' + CL + '" stroke-width="2.2" ' +
+      'stroke-linejoin="round" stroke-linecap="round"/>' +
+    '<path d="' + path(A) + '" fill="none" stroke="' + CA + '" stroke-width="2.2" ' +
+      'stroke-linejoin="round" stroke-linecap="round"/>' +
+    dots(L, CL, 'leads') + dots(A, CA, 'admissions') + xlab + '</svg>';
+
+  /* ── the switches ── */
+  var btn = function (on, call, inner) {
+    return '<button class="amt-b' + (on ? ' on' : '') + '" onclick="' + call + '">' + inner + '</button>';
+  };
+  var brBar = '';
+  if (!S.scope && brs.length > 1) {
+    brBar = btn(!_admTrBr, "admTrBr('')", 'All branches') +
+      brs.map(function (b) {
+        return btn(_admTrBr === b, "admTrBr('" + b.replace(/'/g, "\\'") + "')",
+          _admDot(b) + _admEsc(b));
+      }).join('');
+  }
+  var moBar = months.map(function (m) {
+    return btn(m === ym, "admTrYm('" + m + "')", _ambMonthShort(m));
+  }).join('');
+
+  el.innerHTML = '<div class="amt">' +
+    '<div class="amt-h">Leads and admissions, day by day</div>' +
+    '<div class="amt-s">' + _admEsc(_ambMonthFull(ym)) + ' · ' +
+      _admEsc(_admTrBr || (S.scope || 'all five branches')) + ' · ' +
+      '<b style="color:var(--tx)">' + _admN(sumL) + '</b> lead' + (sumL === 1 ? '' : 's') + ' and ' +
+      '<b style="color:var(--tx)">' + _admN(sumA) + '</b> admission' + (sumA === 1 ? '' : 's') +
+      (ym === nowYm ? ' to the ' + _ambOrd(last) : '') + '</div>' +
+    '<div class="amt-bar">' + brBar + (brBar && moBar ? '<span class="sep"></span>' : '') + moBar + '</div>' +
+    svg +
+    '<div class="amt-leg">' +
+      '<span><i style="background:' + CL + '"></i>Leads · by the day the enquiry arrived</span>' +
+      '<span><i style="background:' + CA + '"></i>Admissions · by the day it was completed</span>' +
+    '</div>' +
+    '<div class="amt-ft">Both lines share one scale, so the distance between them is real. They are not ' +
+      'the same leads: an admission on any day usually belongs to an enquiry from weeks before, so this ' +
+      'is two rhythms side by side rather than a conversion rate.' +
+      (ym === nowYm ? ' The line stops at today; the rest of the month has not happened.' : '') +
+    '</div></div>';
 }
 
 function _ambMonthStatus() {
