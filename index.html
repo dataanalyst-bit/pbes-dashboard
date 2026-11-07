@@ -3544,9 +3544,30 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
 
       <div class="au-sec">
-        <h3>📅 The same point of the season, in earlier years</h3>
-        <div class="sub">Every year cut at the same day of its own season, counting from 1 September.</div>
-        <div id="adm-yoy"></div>
+        <h3>⏰ Follow-up report as on today</h3>
+        <div class="sub">Where the follow-up stands this morning: what was worked today and yesterday, what
+          is due today, what is still open, and what has run past its date. Everything on the pending side
+          counts only the leads a counsellor still follows up — <b>01 Untouched, 02 Not Connected,
+          03 Followup, 04 Interested, 05 Visit Scheduled, 06 Visited</b> and <b>07 Application Done</b>.
+          A lead that is Lost, Not Interested or already Admitted is finished with and is owed nothing.
+          Work is read from the
+          <b>Comment</b> and <b>Follow-up</b> columns — a note written, a stage changed or a task completed
+          — because those are the only entries that carry their own date. Only what a person has to do is
+          counted: calls, visit reminders, re-engagement and decision deadlines. The automatic WhatsApp and
+          silence nudges are left out; they fire and complete themselves, and counting them would show
+          every counsellor near perfect. Tap a branch for its counsellors.</div>
+        <div id="adm-follow"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>👥 Counsellor performance, branch by branch</h3>
+        <div class="sub">Every lead in this season carries the name of the counsellor holding it, so this is
+          the one place the work can be read per person. Tap a branch for its counsellors. <b>Admitted per
+          100</b> is the column that matters: a counsellor holding two hundred leads and converting six per
+          hundred is doing less for the school than one holding sixty and converting fifteen. The two
+          columns beside it say why — how many of their leads nobody has reached yet, and how many
+          call tasks they are carrying past their due date.</div>
+        <div id="adm-couns"></div>
       </div>
 
       <div class="au-sec">
@@ -3556,6 +3577,21 @@ document.addEventListener('DOMContentLoaded', async () => {
           and then stopped. Click any stage for the parents inside it, with their number and the last thing
           the counsellor wrote.</div>
         <div id="adm-funnel"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>📈 When admissions actually happen</h3>
+        <div class="sub">The month-by-month shape of a season, from the group's own monthly figures. It is
+          here for the seasonality — which months carry the intake, and therefore when to put people and
+          money behind it. Whether this season is ahead or behind is answered by the day-for-day panel
+          above, not by this one. Click a year for its months.</div>
+        <div id="adm-pace"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>📅 The same point of the season, in earlier years</h3>
+        <div class="sub">Every year cut at the same day of its own season, counting from 1 September.</div>
+        <div id="adm-yoy"></div>
       </div>
 
       <div class="au-sec">
@@ -3573,42 +3609,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           where a waiting list will form. Cells naming a range of grades are counted as leads but left
           out of this chart, because placing them on one grade would invent demand that was never stated.</div>
         <div id="adm-class"></div>
-      </div>
-
-      <div class="au-sec">
-        <h3>📈 When admissions actually happen</h3>
-        <div class="sub">The month-by-month shape of a season, from the group's own monthly figures. It is
-          here for the seasonality — which months carry the intake, and therefore when to put people and
-          money behind it. Whether this season is ahead or behind is answered by the day-for-day panel
-          above, not by this one. Click a year for its months.</div>
-        <div id="adm-pace"></div>
-      </div>
-
-      <div class="au-sec">
-        <h3>👥 Counsellor performance, branch by branch</h3>
-        <div class="sub">Every lead in this season carries the name of the counsellor holding it, so this is
-          the one place the work can be read per person. Tap a branch for its counsellors. <b>Admitted per
-          100</b> is the column that matters: a counsellor holding two hundred leads and converting six per
-          hundred is doing less for the school than one holding sixty and converting fifteen. The two
-          columns beside it say why — how many of their leads nobody has reached yet, and how many
-          call tasks they are carrying past their due date.</div>
-        <div id="adm-couns"></div>
-      </div>
-
-      <div class="au-sec">
-        <h3>⏰ Follow-up report as on today</h3>
-        <div class="sub">Where the follow-up stands this morning: what was worked today and yesterday, what
-          is due today, what is still open, and what has run past its date. Everything on the pending side
-          counts only the leads a counsellor still follows up — <b>01 Untouched, 02 Not Connected,
-          03 Followup, 04 Interested, 05 Visit Scheduled, 06 Visited</b> and <b>07 Application Done</b>.
-          A lead that is Lost, Not Interested or already Admitted is finished with and is owed nothing.
-          Work is read from the
-          <b>Comment</b> and <b>Follow-up</b> columns — a note written, a stage changed or a task completed
-          — because those are the only entries that carry their own date. Only what a person has to do is
-          counted: calls, visit reminders, re-engagement and decision deadlines. The automatic WhatsApp and
-          silence nudges are left out; they fire and complete themselves, and counting them would show
-          every counsellor near perfect. Tap a branch for its counsellors.</div>
-        <div id="adm-follow"></div>
       </div>
 
       <div class="au-sec">
@@ -22824,37 +22824,13 @@ function _admFollow() {
       sel: function (rows) { return rows.filter(function (r) { return !_admNextStep(r); }); } }
   ];
 
-  var h = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:10px">';
-  MV.forEach(function (w) {
-    var rows = w.sel(S.rows);
-    var id = rows.length ? pickL(w.lab, w.note, rows) : '';
-    h += '<button class="au-kpi na-kpi-b"' + (id ? ' onclick="admOpenF(\'' + id + '\')"' : '') +
-      ' style="text-align:left;border-left:4px solid ' + w.col + '">' +
-      '<div class="na-kh"><span class="v" style="color:' + (rows.length ? w.col : 'var(--txm)') + '">' +
-        _admN(rows.length) + '</span></div>' +
-      '<div class="k">' + w.lab + '</div><div class="d">' + w.note +
-      '</div><div class="na-click">Click to view ›</div></button>';
-  });
-  NS.forEach(function (w) {
-    var rows = w.sel(openRows);
-    var id = rows.length ? pickL(w.lab, w.note, rows) : '';
-    h += '<button class="au-kpi na-kpi-b"' + (id ? ' onclick="admOpenF(\'' + id + '\')"' : '') +
-      ' style="text-align:left;border-left:4px solid ' + w.col + '">' +
-      '<div class="na-kh"><span class="v" style="color:' + (rows.length ? w.col : 'var(--txm)') + '">' +
-        _admN(rows.length) + '</span></div>' +
-      '<div class="k">' + w.lab + '</div><div class="d">' + w.note +
-      '</div><div class="na-click">Click to view \u203a</div></button>';
-  });
-  W.forEach(function (w) {
-    var list = FU.filter(w.f);
-    var id = pick(w.lab, w.note, list);
-    h += '<button class="au-kpi na-kpi-b" onclick="admOpenF(\'' + id + '\')" style="text-align:left">' +
-      '<div class="na-kh"><span class="v" style="color:' + (list.length ? w.col : 'var(--txm)') + '">' +
-        _admN(list.length) + '</span></div>' +
-      '<div class="k">' + w.lab + '</div><div class="d">' + w.note + '</div>' +
-      '<div class="na-click">Click to view ›</div></button>';
-  });
-  h += '</div>';
+  /* NO TILES (7 November 2026). The panel opened on twelve of them and every
+     one repeated a column of the table underneath, so the same twelve numbers
+     were printed twice and the table — the only place the figures break
+     down by branch and counsellor — started below the fold. The tiles are
+     gone and the group totals they carried have moved into the table's own
+     foot, where they sit against the branches that make them up. */
+  var h = '';
 
   /* ── BRANCH → COUNSELLOR, over both units ──
      Every branch and counsellor who holds a LEAD appears, not only those who
@@ -22956,7 +22932,17 @@ function _admFollow() {
       ' title="' + _admEsc(w.note) + '">' + _admEsc(w.lab.replace('Next step ', '')) + '</th>'; }).join('') +
     '<th class="n" style="border-left:1px solid var(--bor)">Raised</th>' +
     W.map(function (w) { return '<th class="n" title="' + _admEsc(w.note) + '">' +
-      _admEsc(w.lab) + '</th>'; }).join('') + '</tr></thead><tbody>' + body + '</tbody></table></div>';
+      _admEsc(w.lab) + '</th>'; }).join('') + '</tr></thead><tbody>' + body + '</tbody>' +
+    /* the group line, carrying what the tiles used to say */
+    (brOrder.length < 2 ? '' :
+      '<tfoot><tr style="font-weight:800;border-top:2px solid var(--bor)">' +
+      '<td>' + (S.scope ? _admEsc(S.scope) : 'All five branches') + '</td>' +
+      lcell(openRows, 'All branches \u00b7 open leads', 'still on one of the seven stages') +
+      MV.map(function (w, i) { return mcell(S.rows, w, 'All branches', i === 0); }).join('') +
+      NS.map(function (w, i) { return mcell(openRows, w, 'All branches', i === 0); }).join('') +
+      tcell(FU, 'All branches \u00b7 tasks raised', 'every human follow-up task on an open lead') +
+      W.map(function (w) { return cell(FU, w, 'All branches'); }).join('') +
+      '</tr></tfoot>') + '</table></div>';
 
   /* ── the reading ── */
   var over = FU.filter(function (f) { return f.open && _admDay(f.due) < _admToday(); });
