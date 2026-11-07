@@ -12679,6 +12679,14 @@ var ADMPNLP = (function () {
     /* numbered lists are the commonest shape here: "1. … 2. … 3. …" */
     t = t.replace(/(^|[\s\n])(\d{1,2})[.)]\s+/g, '\n');
     t = t.replace(/\b(but|however|though|whereas)\b/gi, '\n$1 ');
+    /* THE COMMA IS THIS SHEET'S REAL SEPARATOR, and ignoring it cost the
+       reading. "flyers received and distribution started,prospectus yet to be
+       received" is two statements of opposite weight, and read as one clause
+       the strongest half wins and the "yet to be received" is thrown away.
+       Splitting on every comma would break "Visited 24 Pre-schools, 8 MOUs
+       signed", which is one thought, so the split happens only where what
+       follows the comma opens with a stage word of its own. */
+    t = t.replace(/,\s*(?=(?:prospectus |flyers? |hoardings? |yet to|still |pending|awaiting|waiting|will |planning|planned|scheduled|next |one |following|visiting|started|completed|done|received|submitted|submited|shared|identified|ready|in progress|on hold)\b)/gi, '\n');
     return t.split(/[\n;]+|(?<=[a-z0-9)])\.\s+(?=[A-Za-z])/)
             .map(function (x) { return x.trim(); })
             .filter(function (x) { return x.replace(/[^a-z0-9]/gi, '').length > 2; });
@@ -12689,20 +12697,33 @@ var ADMPNLP = (function () {
      from this sheet's own text, so the scorer is reading the language the
      branches really use rather than a generic vocabulary. */
   var LEX = [
-    /* finished */
+    /* finished.
+       Spellings are taken as the branches type them: "submited", "sighned" and
+       "instertion" are all in this sheet, and a lexicon that only knows the
+       correct spelling silently scores those rows as having said nothing. */
     { s: 'done',       w: 1.00, p: ['completed', 'is complete', 'has been done', 'done and', 'finalized', 'finalised',
-                                    'all set', 'submitted', 'signed', 'approved', 'closure of', 'closed the', 'received the',
-                                    'is ready', 'are ready', 'fully ready', 'place finalized', 'places finalized'] },
+                                    'all set', 'submitted', 'submited', 'signed', 'sighned', 'approved', 'closure of',
+                                    'closed the', 'received the', 'is ready', 'are ready', 'fully ready',
+                                    'place finalized', 'places finalized',
+                                    'been distributed', 'event done', 'calls to previous enquiries done',
+                                    'admissions done', 'done with', 'are up', 'hoardings are up',
+                                    'printing completed', 'mou signed', 'mous signed', 'mous sighned'] },
     /* substantive work already carried out */
-    { s: 'strong',     w: 0.80, p: ['visited', 'sent to', 'requisition sent', 'shared with', 'collected', 'listed out',
-                                    'took ', 'conducted', 'completed the', 'prepared', 'fixed', 'informed', 'trained',
-                                    'checked their', 'gathering all'] },
+    { s: 'strong',     w: 0.80, p: ['visited', 'sent to', 'requisition sent', 'shared with', 'shared changes',
+                                    'collected', 'listed out', 'took ', 'conducted', 'completed the', 'prepared',
+                                    'fixed', 'informed', 'trained', 'checked their', 'gathering all',
+                                    'received ', 'we got', 'placed ', 'distributed', 'insertion started',
+                                    'instertion started', 'distribution started'] },
     /* under way right now */
     { s: 'active',     w: 0.50, p: ['in process', 'in progress', 'are happening', 'is happening', 'happening',
                                     'ongoing', 'going on', 'started connecting', 'started', 'working on', 'being in touch',
                                     'in touch with', 'connecting with', 'coordinating', 'cordinating', 'following up',
                                     'follow up', 'followup', 'visiting', 'addressing', 'streamline', 'streamlining',
-                                    'discussing', 'regularly', 'day to day', 'daily visit', 'postings are'] },
+                                    'discussing', 'regularly', 'day to day', 'daily visit', 'postings are',
+                                    'are active', 'is active', 'are running', 'is running', 'currently running',
+                                    'ads on', 'campaigns are', 'campaign is', 'keeps improving', 'keep adding',
+                                    'focusing on', 'working with', 'workig on', 'workig', 'taking help',
+                                    'getting leads', 'on daily basis', 'daily basis', 'playing all'] },
     /* groundwork done, the work itself not yet */
     /* being ready to start is not the task: "ready with list of communities,
        will start visiting" is groundwork, not a community activation done */
@@ -12714,10 +12735,17 @@ var ADMPNLP = (function () {
                                     'upcoming', 'need to', 'needs to', 'yet to', 'to be done', 'offering', 'expecting',
                                     'after dussera', 'after holidays', 'next week', 'next saturday', 'next month',
                                     'from next', 'from oct', 'from october', 'from november', 'in the month of'] },
-    /* stopped, waiting on somebody else */
+    /* stopped, waiting on somebody else.
+       A request handed to another team, and an offer nobody has accepted yet,
+       belong here rather than among the work carried out: "requested DDC team
+       to run campaigns" and "offered our campus ground" both leave the point
+       exactly where it was until the other side moves. */
     { s: 'blocked',    w: 0.10, p: ['waiting for', 'waiting on', 'awaiting', 'pending with', 'is pending', 'are pending',
                                     'pending', 'no response', 'not responding', 'support required', 'support from',
-                                    'on hold', 'blocker', 'stuck'] },
+                                    'on hold', 'blocker', 'stuck',
+                                    'requested ', 'asked for', 'yet to be received', 'yet to be', 'need more',
+                                    'needs approval', 'approval is pending', 'offered our', 'offering our',
+                                    'has to be fixed', 'needs to be fixed'] },
     /* explicitly nothing */
     { s: 'none',       w: 0.00, p: ['not started', 'not yet started', 'no action', 'nothing done', 'not done'] }
   ];
@@ -12785,8 +12813,23 @@ var ADMPNLP = (function () {
     var m;
     DOING.lastIndex = 0; while ((m = DOING.exec(text))) out.done = Math.max(out.done || 0, +m[2]);
     PREVERB.lastIndex = 0; while ((m = PREVERB.exec(text))) out.done = Math.max(out.done || 0, +m[1]);
-    var ex = text.match(OUTOF);
-    if (ex && +ex[1] > 0 && +ex[2] <= +ex[1]) { out.done = Math.max(out.done || 0, +ex[2]); out.stated = +ex[1]; }
+    /* ══ A SENTENCE THAT COUNTS ITSELF WINS ══ (7 Nov 2026)
+       "Out of 24, 8 pre school have signed the MOU" states both halves of its
+       own fraction, and nothing else in the row can be a better description of
+       where that point stands. It used to lose: the same row also said
+       "Visited 24 Pre-schools", so the reader took 24 as the work done and the
+       sheet's Target of 30 as the denominator, and Gowdavalli's eight MOUs out
+       of twenty-four read as 80% instead of 33%. The visits are not the
+       deliverable — the tie-ups are, and the branch said so. So an explicit
+       fraction in the text is taken as the answer and the derived one is not
+       computed at all. */
+    var ex = text.match(OUTOF) || text.match(RATIO);
+    if (ex && +ex[1] > 0 && +ex[2] <= +ex[1]) {
+      out.ratio = +ex[2] / +ex[1];
+      out.basis = ex[2] + ' of ' + ex[1] + ' (stated in the text)';
+      out.explicit = true;
+      return out;
+    }
     FOUND.lastIndex = 0; while ((m = FOUND.exec(text))) out.found = Math.max(out.found || 0, +m[2]);
     if (out.done === null) { BARE.lastIndex = 0; while ((m = BARE.exec(text))) {
       /* a bare count only counts as work done when the clause also says it was done */
@@ -12918,8 +12961,54 @@ var ADMPNLP = (function () {
                Math.round(nums.ratio * 100) + ') \u00f7 2 = ' + Math.round(base * 100) + '%.');
     }
 
-    /* the row's own status bounds the result */
-    if (/^completed$/i.test(status) && base < 1) { base = 1; why.push('Current Status is Completed, which sets it to 100%.'); }
+    /* ══ THE STATUS WORD NO LONGER OVERRIDES WHAT THE BRANCH WROTE ══
+       Corrected 7 November 2026.
+
+       A row ticked Completed used to be forced to 100% whatever was written
+       against it, which is the opposite of what this panel says it does. On
+       the 7 November sheet that happened on 14 of the 16 Completed rows, and
+       what it buried was not a rounding difference:
+
+         Pocharam · Campaign Creatives read 100% while both its text columns
+           said "prospectus approval is pending from director sir" — the row
+           was even LABELLED "waiting on someone" beside the 100%.
+         Gowdavalli · Pre School Tie-ups read 100% on its own sentence
+           "Out of 24, 8 pre school have signed the MOU" — a third done.
+         Boduppal · Open House read 100% on "a coffee meet has been scheduled
+           for tomorrow", which has not happened.
+         Pocharam · Admission Readiness read 100% on "few are ready and keeps
+           improving", with "Books rack and pots pending" beside it.
+
+       A tick is a claim; the sentence under it is the evidence. So the score
+       is now whatever the writing supports, and where the two disagree the row
+       is MARKED rather than quietly rounded up — that disagreement is the most
+       useful thing on the page for anyone deciding where to push.
+
+       Completed still counts for something: it lifts a row whose wording is
+       merely thin, and it is taken at face value when there is no text at all
+       to contradict it (handled above, at low confidence). What it can no
+       longer do is overrule a sentence that says the work is not done. */
+    var claimDone = /^completed$/i.test(status);
+    var claimGap = false;
+    if (claimDone) {
+      if (base < 0.5) {
+        /* the tick and the sentence are far apart: split the difference, so
+           the row is neither taken at its word nor written off */
+        claimGap = true;
+        var b0 = base;
+        base = Math.min(0.75, (base + 1) / 2);
+        why.push('Current Status reads Completed but the wording scores ' + Math.round(b0 * 100) +
+                 '%, so the two are averaged to ' + Math.round(base * 100) +
+                 '% and the point is flagged: a tick is a claim, the sentence under it is the evidence.');
+      } else if (base < 0.9) {
+        claimGap = true;
+        why.push('Current Status reads Completed, which the wording at ' + Math.round(base * 100) +
+                 '% does not bear out. The figure follows the wording and the point is flagged.');
+      } else {
+        base = 1;
+        why.push('Current Status reads Completed and the wording agrees, so it stands at 100%.');
+      }
+    }
     if (/not started/i.test(status) && base > 0.25 && !anyDone) {
       base = Math.min(base, 0.25);
       why.push('Current Status is Not Started, so it is held at 25% however the text reads.');
@@ -12942,7 +13031,9 @@ var ADMPNLP = (function () {
     if ((stage === 'done' || stage === 'strong') && base < 0.65)
       stage = base >= 0.45 ? 'active' : base >= 0.30 ? 'groundwork' : 'planned';
     if (stage === 'done' && anyBlocked) stage = 'strong';
-    return { pct: Math.round(base * 100), conf: conf, stage: stage,
+    /* the label and the figure must still agree after all of the above */
+    if (stage === 'done' && base < 0.9) stage = base >= 0.65 ? 'strong' : base >= 0.45 ? 'active' : 'planned';
+    return { pct: Math.round(base * 100), conf: conf, stage: stage, claimGap: claimGap,
              hits: hits, nums: nums, raw: raw, clauses: cl, why: why };
   }
 
@@ -13035,8 +13126,11 @@ function renderAdmpProgress(){
     var mix = {}; STAGES.forEach(function (s){ mix[s] = 0; });
     ss.forEach(function (x){ mix[x.stage] = (mix[x.stage] || 0) + 1; });
     var conf = ss.length ? ss.reduce(function (a, x){ return a + x.conf; }, 0) / ss.length : 0;
+    /* points this branch has ticked Completed that the writing does not bear out */
+    var ticked = rs.filter(function (r){ return /^completed$/i.test(String(r.Status || '').trim()); }).length;
+    var gaps = ss.filter(function (x){ return x.claimGap; }).length;
     return { n: rs.length, withText: withText, pct: pct, evid: evid, mix: mix, conf: conf,
-             blocked: mix.blocked, done: mix.done + mix.strong };
+             blocked: mix.blocked, done: mix.done + mix.strong, ticked: ticked, gaps: gaps };
   };
 
   var bar = function (mix, n){
@@ -13062,6 +13156,9 @@ function renderAdmpProgress(){
         (st.evid === null ? '\u2013' : st.evid + '%') + '</td>' +
       '<td style="text-align:center">' + st.withText + ' / ' + st.n +
         '<div style="font-size:10px;color:#94A3B8">points written up</div></td>' +
+      '<td style="text-align:center;font-weight:800;color:' + (st.gaps ? '#DC2626' : '#94A3B8') + '">' +
+        (st.gaps ? st.gaps : '\u00b7') +
+        '<div style="font-size:10px;font-weight:600;color:#94A3B8">of ' + st.ticked + ' ticked</div></td>' +
       '<td style="text-align:center;color:' + (st.conf >= 0.6 ? '#059669' : st.conf >= 0.45 ? '#D97706' : '#DC2626') +
         ';font-weight:700">' + Math.round(st.conf * 100) + '%</td></tr>';
   }).join('');
@@ -13071,6 +13168,10 @@ function renderAdmpProgress(){
     .map(function (r){ return _ADMP_SCORE[r.__k]; });
   var gPct = allS.length ? Math.round(allS.reduce(function (a, x){ return a + x.pct; }, 0) / allS.length) : null;
   var gText = allS.filter(function (x){ return x.raw; }).length;
+  var gGaps = allS.filter(function (x){ return x.claimGap; }).length;
+  var gTicked = branches.reduce(function (a, b){
+    return a + (byB[b] || []).filter(function (r){
+      return /^completed$/i.test(String(r.Status || '').trim()); }).length; }, 0);
 
   host.innerHTML =
     '<div style="overflow-x:auto"><table class="dt brfz" style="min-width:720px">' +
@@ -13078,18 +13179,31 @@ function renderAdmpProgress(){
     '<th>Progress<div style="font-size:10px;font-weight:600;color:#94A3B8">read from the text</div></th>' +
     '<th style="text-align:left">What that progress is made of</th>' +
     '<th>Where written up<div style="font-size:10px;font-weight:600;color:#94A3B8">points with text only</div></th>' +
-    '<th>Coverage</th><th>Confidence</th></tr></thead><tbody>' + body +
+    '<th>Coverage</th>' +
+    '<th>Ticked, not shown<div style="font-size:10px;font-weight:600;color:#94A3B8">Completed, writing says otherwise</div></th>' +
+    '<th>Confidence</th></tr></thead><tbody>' + body +
     '<tr style="background:#F8FAFF;font-weight:800"><td style="text-align:left">' +
       (branches.length > 1 ? 'All branches' : branches[0]) + '</td>' +
     '<td style="text-align:center;font-size:19px;color:' + _admpPctColor(gPct) + '">' +
       (gPct === null ? '\u2013' : gPct + '%') + '</td><td></td><td></td>' +
-    '<td style="text-align:center">' + gText + ' / ' + allS.length + '</td><td></td></tr>' +
+    '<td style="text-align:center">' + gText + ' / ' + allS.length + '</td>' +
+    '<td style="text-align:center;color:' + (gGaps ? '#DC2626' : '#94A3B8') + '">' +
+      (gGaps ? gGaps : '\u00b7') + ' of ' + gTicked + '</td><td></td></tr>' +
     '</tbody></table></div>' +
     '<div class="fnote" style="display:block;padding:9px 14px 4px">Click a branch for every point it wrote, with the ' +
       'phrases that moved the figure. <b>Progress</b> counts all 17 points, so a point nobody wrote up counts as ' +
       '<b>0% for every branch</b> \u2014 whether its status column says In Progress or Not Started, a status word with ' +
       'nothing behind it is a claim rather than evidence. <b>Where written up</b> ignores the silent points, which is ' +
-      'the fairer read of the work actually being done.</div>' +
+      'the fairer read of the work actually being done.' +
+      (gTicked
+        ? ' <b style="color:' + (gGaps ? '#B91C1C' : '#047857') + '">Ticked, not shown</b> counts the points marked ' +
+          '<b>Completed</b> in the status column whose own sentences do not say the work is finished' +
+          (gGaps
+            ? ' \u2014 ' + gGaps + ' of the ' + gTicked + ' ticks on this sheet. The figure follows the sentence, ' +
+              'not the tick: a point reading "prospectus approval is pending from director sir" is not at 100% ' +
+              'because somebody chose Completed from a dropdown.'
+            : ' \u2014 none on this sheet; every tick is borne out by what is written beside it.')
+        : '') + '</div>' +
     '<div class="fnote" style="display:block;padding:0 14px 14px">' +
       STAGES.map(function (s){ return '<span style="display:inline-block;margin-right:12px"><i style="display:inline-block;' +
         'width:9px;height:9px;border-radius:2px;background:' + ADMPNLP.STAGE_COLOR[s] + ';margin-right:4px"></i>' +
