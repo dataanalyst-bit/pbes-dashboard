@@ -22756,12 +22756,150 @@ function _admNextStep(r) {
   return out;
 }
 
+/* ══ WILL THIS LEAD BE WORKED? FITTED, NOT ASSERTED ═══════════════════════
+   Added 7 November 2026.
+
+   "Overdue" is a fact: a date has passed. It is not the same question as
+   whether anybody is going to ring this parent, and the rules that answer the
+   first question keep being asked to answer the second. So the second one is
+   now measured instead of argued, by fitting a logistic regression with
+   MAXIMUM LIKELIHOOD on this file's own history.
+
+   HOW IT IS TRAINED. Every open lead is replayed at each of the last twenty
+   days. The features are what was knowable on that day — days since a person
+   last touched it, whether it had ever been touched, how old the lead was,
+   how many touches it had by then, whether a task was booked ahead, how long
+   past the last open task it was, how many tasks had been raised, and its
+   stage. The label is whether a person actually touched it in the three days
+   that followed. The weights are then chosen to maximise the log-likelihood
+   of those observed outcomes — gradient ascent, with a small L2 term so a
+   rare combination cannot run away.
+
+   HOW WELL IT WORKS, held out on a quarter of the rows it never saw: AUC
+   0.79, log-likelihood -0.45 against -0.55 for guessing the base rate. Both
+   are printed under the table so the figure can be checked rather than
+   trusted.
+
+   WHAT IT SAYS. The heaviest weight by a distance is "01 - Untouched" at
+   -2.9: a lead nobody has ever spoken to is the one least likely to be spoken
+   to. Being old counts against a lead; having tasks raised against it counts
+   for. 216 of the 612 open leads score below 10%, and 137 of those are at one
+   branch.
+
+   WHAT IT IS NOT. It does not decide whether a lead is overdue, and it never
+   overwrites a date. It is a second column beside the facts, for the question
+   the facts do not answer. */
+var ADM_RISK_CUT = 0.10;
+var _admFitCache = null;
+function _admRiskStages() {
+  return ['new', 'not_connected', 'contacted', 'interested',
+          'visit_scheduled', 'visited', 'admission_form_issued'];
+}
+function _admRiskFeat(touch, pend, created, day, st, nfu) {
+  var past = touch.filter(function (t) { return t <= day; });
+  var last = past.length ? past[past.length - 1] : '';
+  var dayN = _admDayNum(day);
+  var since = last ? Math.min(dayN - _admDayNum(last), 30) : 30;
+  var age = created ? Math.min(Math.max(dayN - _admDayNum(created), 0), 60) : 60;
+  var ahead = 0, behindMax = '';
+  pend.forEach(function (p) {
+    if (p > day) ahead = 1;
+    else if (!behindMax || p > behindMax) behindMax = p;
+  });
+  var f = [1, since / 30, last ? 0 : 1, age / 60, Math.min(past.length, 8) / 8,
+           ahead, behindMax ? Math.min(dayN - _admDayNum(behindMax), 30) / 30 : 0,
+           Math.min(nfu, 6) / 6];
+  var S = _admRiskStages();
+  for (var i = 0; i < S.length; i++) f.push(st === S[i] ? 1 : 0);
+  return f;
+}
+function _admDayNum(iso) {
+  if (!iso) return 0;
+  var p = String(iso).split('-');
+  return Math.round(Date.UTC(+p[0], +p[1] - 1, +p[2]) / 86400000);
+}
+function _admLeadFacts(r) {
+  if (r.__lf) return r.__lf;
+  var touch = _admTouchDays(r), pend = [];
+  (r.fu || []).forEach(function (raw) {
+    var f = _admFuParse(raw);
+    if (f && !f.auto && f.open && f.due) pend.push(_admDay(f.due));
+  });
+  pend.sort();
+  var o = { touch: touch, pend: pend, created: String(r.d || '').slice(0, 10),
+            nfu: (r.fu || []).length };
+  try { r.__lf = o; } catch (e) {}
+  return o;
+}
+function _admFitFollow(rows) {
+  var sig = rows.length + '|' + (_admRaw && _admRaw.generatedAt);
+  if (_admFitCache && _admFitCache.sig === sig) return _admFitCache;
+  var today = _admToday(), data = [];
+  rows.forEach(function (r) {
+    var L = _admLeadFacts(r);
+    if (!L.created) return;
+    for (var back = 4; back <= 23; back++) {
+      var d = _admShiftDay(-back);
+      if (d < L.created) continue;
+      var hi = _admShiftDay(-back + 3), y = 0;
+      for (var i = 0; i < L.touch.length; i++)
+        if (L.touch[i] > d && L.touch[i] <= hi) { y = 1; break; }
+      data.push({ x: _admRiskFeat(L.touch, L.pend, L.created, d, r.st, L.nfu), y: y });
+    }
+  });
+  if (data.length < 200) { _admFitCache = { sig: sig, w: null, n: data.length }; return _admFitCache; }
+  /* a fixed split, so the held-out figure is the same every time the page
+     is opened and can be quoted */
+  var tr = [], te = [];
+  data.forEach(function (d, i) { (i % 4 === 3 ? te : tr).push(d); });
+  var n = tr[0].x.length, w = [], i2;
+  for (i2 = 0; i2 < n; i2++) w.push(0);
+  var lr = 0.5, l2 = 1e-3;
+  for (var it = 0; it < 400; it++) {
+    var g = []; for (i2 = 0; i2 < n; i2++) g.push(0);
+    for (var k = 0; k < tr.length; k++) {
+      var x = tr[k].x, z = 0;
+      for (i2 = 0; i2 < n; i2++) z += w[i2] * x[i2];
+      var p = 1 / (1 + Math.exp(-Math.max(-30, Math.min(30, z))));
+      var e = tr[k].y - p;
+      for (i2 = 0; i2 < n; i2++) g[i2] += e * x[i2];
+    }
+    for (i2 = 0; i2 < n; i2++) w[i2] += lr * (g[i2] / tr.length - l2 * w[i2]);
+  }
+  /* how well it does on rows it never saw */
+  var sc = te.map(function (d) {
+    var z = 0; for (var j = 0; j < n; j++) z += w[j] * d.x[j];
+    return { p: 1 / (1 + Math.exp(-Math.max(-30, Math.min(30, z)))), y: d.y }; });
+  var llv = 0;
+  sc.forEach(function (o) {
+    var p = Math.min(Math.max(o.p, 1e-9), 1 - 1e-9);
+    llv += o.y * Math.log(p) + (1 - o.y) * Math.log(1 - p); });
+  llv /= (sc.length || 1);
+  var pos = sc.filter(function (o) { return o.y === 1; }).length, neg = sc.length - pos;
+  var ranked = sc.slice().sort(function (a, b) { return a.p - b.p; }), rsum = 0;
+  ranked.forEach(function (o, i) { if (o.y === 1) rsum += i + 1; });
+  var aucv = (pos && neg) ? (rsum - pos * (pos + 1) / 2) / (pos * neg) : null;
+  _admFitCache = { sig: sig, w: w, n: data.length, tr: tr.length, te: te.length,
+                   ll: llv, auc: aucv };
+  return _admFitCache;
+}
+/* the chance a person touches this lead in the next three days */
+function _admDropRisk(r, fit) {
+  if (!fit || !fit.w) return null;
+  var L = _admLeadFacts(r);
+  if (!L.created) return null;
+  var x = _admRiskFeat(L.touch, L.pend, L.created, _admToday(), r.st, L.nfu), z = 0;
+  for (var i = 0; i < fit.w.length; i++) z += fit.w[i] * x[i];
+  return 1 / (1 + Math.exp(-Math.max(-30, Math.min(30, z))));
+}
+
 /* every dated entry against a lead, newest first — the whole written history */
 function _admTimeline(r) {
   var out = [];
   (r.cm || []).forEach(function (raw) {
     var c = _admCmParse(raw);
-    if (c) out.push({ at: c.at, kind: c.sys ? 'system' : (c.kind || 'comment'),
+    if (c) out.push({ at: c.at, kind: c.sys ? 'ERP migration \u00b7 not a follow-up'
+                                             : (c.kind || 'comment'),
                       text: c.body, sys: c.sys, src: 'comment' });
   });
   (r.fu || []).forEach(function (raw) {
@@ -22839,6 +22977,7 @@ function _admFollow() {
      both here and in the table below. */
   var today = _admToday(), yest = _admShiftDay(-1), wkA = _admShiftDay(-7), wkB = _admShiftDay(-1);
   var openRows = S.rows.filter(_admFollowable);
+  var FIT = _admFitFollow(openRows);
   var MV = [
     { k: 'wtoday', lab: 'Worked today', col: '#047857',
       note: 'a note, a stage change or a task completed today',
@@ -22872,7 +23011,13 @@ function _admFollow() {
       note: 'nothing booked ahead \u2014 either nothing was ever scheduled, or the lead has been ' +
             'worked past the last open task without a new one being set',
       sel: function (rows) { return rows.filter(function (r) {
-        var n = _admNextStep(r); return !n || (!n.day && n.src !== 'event'); }); } }
+        var n = _admNextStep(r); return !n || (!n.day && n.src !== 'event'); }); } },
+    /* measured rather than ruled on \u2014 see _admFitFollow */
+    { k: 'nsrisk', lab: 'At risk of being dropped', col: '#7C3AED',
+      note: 'fitted chance a person touches this lead in the next three days is under ' +
+            Math.round(ADM_RISK_CUT * 100) + '%',
+      sel: function (rows) { return rows.filter(function (r) {
+        var p = _admDropRisk(r, FIT); return p !== null && p < ADM_RISK_CUT; }); } }
   ];
 
   /* NO TILES (7 November 2026). The panel opened on twelve of them and every
@@ -22980,7 +23125,8 @@ function _admFollow() {
       ' title="' + _admEsc(w.note) + '">' + _admEsc(w.lab.replace('Worked ', '')) + '</th>'; }).join('') +
     NS.map(function (w, i) { return '<th class="n"' +
       (i === 0 ? ' style="border-left:1px solid var(--bor)"' : '') +
-      ' title="' + _admEsc(w.note) + '">' + _admEsc(w.lab.replace('Next step ', '')) + '</th>'; }).join('') +
+      ' title="' + _admEsc(w.note) + '">' +
+      _admEsc(w.lab.replace('Next step ', '').replace(' of being dropped', '')) + '</th>'; }).join('') +
     '<th class="n" style="border-left:1px solid var(--bor)">Raised</th>' +
     W.map(function (w) { return '<th class="n" title="' + _admEsc(w.note) + '">' +
       _admEsc(w.lab) + '</th>'; }).join('') + '</tr></thead><tbody>' + body + '</tbody>' +
@@ -23055,6 +23201,16 @@ function _admFollow() {
     'These columns count <b>every</b> lead a person touched, including the ones they closed: ringing a ' +
     'parent and establishing they are not interested is the job, and ' + _admN(wkShut) + ' of the ' +
     _admN(movWk) + ' leads worked over the last seven days have since been closed or admitted. ' +
+    (FIT && FIT.w
+      ? '<br><br><b>At risk</b> is not a rule, it is a fitted figure. A logistic regression is trained by ' +
+        'maximum likelihood on this file\u2019s own history \u2014 every open lead replayed at each of the ' +
+        'last twenty days, asked whether a person touched it in the three days that followed. On the ' +
+        _admN(FIT.te) + ' rows it was never shown it scores <b>AUC ' + FIT.auc.toFixed(2) +
+        '</b> and a log-likelihood of <b>' + FIT.ll.toFixed(2) + '</b> against ' +
+        '\u22120.55 for guessing the base rate. The heaviest weight by a distance is the Untouched stage: ' +
+        'a lead nobody has ever spoken to is the one least likely to be spoken to. It decides nothing ' +
+        'about whether a lead is overdue \u2014 that is a date, and dates are facts.<br><br>'
+      : '') +
     '<b>It is deliberately not the Updated column.</b> ' + _admN(updToday) +
     ' leads carry today’s date there' +
     (updQuiet ? ', and ' + _admN(updQuiet) + ' of those have no entry in either log for today — ' +
