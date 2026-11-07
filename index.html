@@ -22099,6 +22099,30 @@ function _admCouns() {
 var _admFPick = {};
 function admOpenF(id) {
   var P = _admFPick[id]; if (!P) return;
+  /* the movement cells hold LEADS, not tasks, so they get their own view —
+     what moved, where it moved to, and when */
+  if (P.leads) {
+    var e2 = _admEsc;
+    var L2 = P.leads.slice().sort(function (a, b) {
+      return String(_admWorkedOn(b)).localeCompare(String(_admWorkedOn(a))); });
+    _admModal(P.t, _admN(L2.length) + ' lead' + (L2.length === 1 ? '' : 's') + ' · ' + P.s,
+      '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:900px"><thead><tr>' +
+      '<th>Parent / child</th><th>Branch</th><th>Counsellor</th><th>Phone</th><th>Class</th>' +
+      '<th>Moved to</th><th>On</th></tr></thead><tbody>' +
+      L2.slice(0, 400).map(function (r) {
+        return '<tr><td style="font-weight:700">' + e2(r.name || r.parent || '(no name)') + '</td>' +
+          '<td style="color:var(--txm)">' + e2(r.b) + '</td>' +
+          '<td style="color:var(--txm)">' + e2(_admCName(r)) + '</td>' +
+          '<td style="color:var(--txm)">' + e2(r.ph || '–') + '</td>' +
+          '<td style="color:var(--txm)">' + e2(r.cls || '–') + '</td>' +
+          '<td style="font-weight:700">' + e2(_admStageLab(r.st)) + '</td>' +
+          '<td style="white-space:nowrap">' + e2(_admWorkedOn(r)) + '</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      (L2.length > 400 ? '<div class="au-note">Showing the 400 most recent.</div>' : '') +
+      '<div class="au-note">A lead counts as worked on the day it reached the stage it is at now. ' +
+      'Stages 01 Untouched and 02 Not Connected are not counted — the lead has not moved.</div>');
+    return;
+  }
   var L = P.list.slice().sort(function (a, b) { return a.due - b.due; });
   if (!L.length) { _admModal(P.t, 'Nothing here', '<div class="au-empty">Nothing in this group.</div>'); return; }
   var e = _admEsc;
@@ -22131,14 +22155,52 @@ function _admFmtDay(d) {
   var M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   return d.getDate() + ' ' + M[d.getMonth()];
 }
-/* the six windows the report asks for, each a plain test on one task */
+/* ══ WHEN WAS A LEAD ACTUALLY WORKED ═══════════════════════════════════════
+   Corrected 6 November 2026, on the counsellors' own objection.
+
+   "Done today" used to count follow-up TASK SLOTS marked Done. It is the
+   wrong signal twice over. A counsellor moves a lead forward without always
+   ticking a task against it, so real work goes uncounted: over the last
+   seven days this file shows 67 task ticks against 287 leads that actually
+   moved stage — it under-reported by a factor of four. And the ticks that do
+   exist are mostly not a person's work at all, because the automatic
+   WhatsApp and silence nudges tick themselves the moment they fire.
+
+   What the ERP records reliably is the STAGE and the day it was reached. A
+   lead that has moved to 03 Followup, 04 Interested, 05 Visit Scheduled,
+   06 Visited, 07 Application Done, 08 Lost, 09 Not Interested or
+   10 Admission Completed has been worked by somebody, and Stage Entered says
+   when. That is the measure now.
+
+   NOT the Updated column, which is what prompted this. Updated moves for any
+   reason at all: 586 leads carry today's date in it and 367 of those are
+   still sitting at Untouched or Not Connected, so nothing was done to them.
+   Keyed off Updated the figure would have been inflated six-fold.
+
+   01 Untouched and 02 Not Connected are deliberately excluded, as the
+   counsellors listed them. An unanswered call is effort, but the lead has
+   not moved, and this column is about movement. */
+var ADM_WORKED_ST = { contacted: 1, interested: 1, visit_scheduled: 1, visited: 1,
+                      admission_form_issued: 1, admitted: 1, lost: 1, not_interested: 1 };
+/* the day this lead reached the stage it is at now, if that stage counts as worked */
+function _admWorkedOn(r) {
+  if (!r || !ADM_WORKED_ST[r.st]) return '';
+  var d = r.sent || '';
+  return (d && String(d).length >= 10) ? String(d).slice(0, 10) : '';
+}
+/* the leads in scope that moved on a given day, or across a window */
+function _admMoved(rows, from, to) {
+  return rows.filter(function (r) {
+    var d = _admWorkedOn(r);
+    return d && d >= from && d <= (to || from);
+  });
+}
+
+/* the windows: the first two count LEADS MOVED, the rest count TASKS */
 function _admFWindows() {
   var today = _admToday(), tom = _admShiftDay(1);
   var wkA = _admShiftDay(-7), wkB = _admShiftDay(-1), next = _admShiftDay(7);
   return [
-    { k: 'tdone', lab: 'Done today',        col: '#047857',
-      note: 'completed today, whenever they were due',
-      f: function (f) { return f.done && _admDay(f.done) === today; } },
     { k: 'tdue',  lab: 'Due today',         col: '#1E4FD8',
       note: 'scheduled for today',
       f: function (f) { return _admDay(f.due) === today; } },
@@ -22148,9 +22210,6 @@ function _admFWindows() {
     { k: 'tom',   lab: 'Due tomorrow',      col: '#1E4FD8',
       note: 'scheduled for tomorrow',
       f: function (f) { return _admDay(f.due) === tom; } },
-    { k: 'week',  lab: 'Done last 7 days',  col: '#047857',
-      note: 'completed in the seven days to yesterday',
-      f: function (f) { return f.done && _admDay(f.done) >= wkA && _admDay(f.done) <= wkB; } },
     { k: 'next',  lab: 'Due next 7 days',   col: '#6366F1',
       note: 'scheduled from tomorrow to seven days out',
       f: function (f) { var d = _admDay(f.due); return d > today && d <= next; } },
@@ -22172,9 +22231,33 @@ function _admFollow() {
   var pid = 0; _admFPick = {};
   var pick = function (t, sub, list) {
     var id = 'f' + (++pid); _admFPick[id] = { t: t, s: sub, list: list }; return id; };
+  var pickL = function (t, sub, rows) {
+    var id = 'l' + (++pid); _admFPick[id] = { t: t, s: sub, leads: rows }; return id; };
 
-  /* the headline tiles, over everything in scope */
-  var h = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px">';
+  /* ── THE TWO MOVEMENT WINDOWS ──
+     Counted in LEADS, not tasks, which is why they sit apart from the rest
+     both here and in the table below. */
+  var today = _admToday(), wkA = _admShiftDay(-7), wkB = _admShiftDay(-1);
+  var MV = [
+    { k: 'wtoday', lab: 'Worked today', col: '#047857',
+      note: 'leads whose stage moved today',
+      sel: function (rows) { return _admMoved(rows, today, today); } },
+    { k: 'wweek', lab: 'Worked last 7 days', col: '#047857',
+      note: 'stage moved in the seven days to yesterday',
+      sel: function (rows) { return _admMoved(rows, wkA, wkB); } }
+  ];
+
+  var h = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:10px">';
+  MV.forEach(function (w) {
+    var rows = w.sel(S.rows);
+    var id = rows.length ? pickL(w.lab, w.note, rows) : '';
+    h += '<button class="au-kpi na-kpi-b"' + (id ? ' onclick="admOpenF(\'' + id + '\')"' : '') +
+      ' style="text-align:left;border-left:4px solid ' + w.col + '">' +
+      '<div class="na-kh"><span class="v" style="color:' + (rows.length ? w.col : 'var(--txm)') + '">' +
+        _admN(rows.length) + '</span></div>' +
+      '<div class="k">' + w.lab + '</div><div class="d">' + w.note +
+      '</div><div class="na-click">Click to view ›</div></button>';
+  });
   W.forEach(function (w) {
     var list = FU.filter(w.f);
     var id = pick(w.lab, w.note, list);
@@ -22186,20 +22269,36 @@ function _admFollow() {
   });
   h += '</div>';
 
-  /* branch → counsellor, one column per window */
+  /* ── BRANCH → COUNSELLOR, over both units ──
+     Every branch and counsellor who holds a LEAD appears, not only those who
+     happen to carry a task: a counsellor moving leads without raising tasks
+     was invisible in the old table, which is the same bug in another place. */
   var byBr = {}, brOrder = [];
+  var slot = function (br, c) {
+    if (!byBr[br]) { byBr[br] = { n: br, all: [], rows: [], c: {}, order: [] }; brOrder.push(br); }
+    var B = byBr[br];
+    var k = _admCKey(c);
+    if (!B.c[k]) { B.c[k] = { n: c, all: [], rows: [] }; B.order.push(k); }
+    return { B: B, C: B.c[k] };
+  };
+  S.rows.forEach(function (r) {
+    var x = slot(r.b, _admCName(r)); x.B.rows.push(r); x.C.rows.push(r);
+  });
   FU.forEach(function (f) {
-    if (!byBr[f.br]) { byBr[f.br] = { n: f.br, all: [], c: {}, order: [] }; brOrder.push(f.br); }
-    var B = byBr[f.br];
-    B.all.push(f);
-    var k = _admCKey(f.c);
-    if (!B.c[k]) { B.c[k] = { n: f.c, all: [] }; B.order.push(k); }
-    B.c[k].all.push(f);
+    var x = slot(f.br, f.c); x.B.all.push(f); x.C.all.push(f);
   });
   var cell = function (list, w, lab) {
     var n = list.filter(w.f).length;
     var id = n ? pick(lab + ' · ' + w.lab, w.note, list.filter(w.f)) : '';
     return '<td class="n">' + (n
+      ? '<button class="na-secbtn" onclick="admOpenF(\'' + id + '\')" style="font-weight:800;color:' +
+        w.col + '">' + _admN(n) + '</button>'
+      : '<span style="color:var(--txl)">·</span>') + '</td>';
+  };
+  var mcell = function (rows, w, lab, first) {
+    var sel = w.sel(rows), n = sel.length;
+    var id = n ? pickL(lab + ' · ' + w.lab, w.note, sel) : '';
+    return '<td class="n"' + (first ? ' style="border-left:1px solid var(--bor)"' : '') + '>' + (n
       ? '<button class="na-secbtn" onclick="admOpenF(\'' + id + '\')" style="font-weight:800;color:' +
         w.col + '">' + _admN(n) + '</button>'
       : '<span style="color:var(--txl)">·</span>') + '</td>';
@@ -22211,7 +22310,9 @@ function _admFollow() {
       body += '<tr><td><button class="na-secbtn" onclick="admTog(' +
         JSON.stringify(key).replace(/"/g, '&quot;') + ')" style="font-weight:700">' +
         (_admOpen[key] ? '▾ ' : '▸ ') + _admEsc(bn) + '</button></td>' +
-        '<td class="n" style="color:var(--txm)">' + _admN(B.all.length) + '</td>' +
+        '<td class="n" style="color:var(--txm)">' + _admN(B.rows.length) + '</td>' +
+        MV.map(function (w, i) { return mcell(B.rows, w, bn, i === 0); }).join('') +
+        '<td class="n" style="color:var(--txm);border-left:1px solid var(--bor)">' + _admN(B.all.length) + '</td>' +
         W.map(function (w) { return cell(B.all, w, bn); }).join('') + '</tr>';
       if (!_admOpen[key]) return;
       B.order.sort(function (x, y) { return B.c[y].all.length - B.c[x].all.length; })
@@ -22219,12 +22320,23 @@ function _admFollow() {
           var C = B.c[k];
           body += '<tr style="background:var(--pl)"><td style="padding-left:31px;color:var(--txm)">' +
             _admEsc(C.n) + '</td>' +
-            '<td class="n" style="color:var(--txm)">' + _admN(C.all.length) + '</td>' +
+            '<td class="n" style="color:var(--txm)">' + _admN(C.rows.length) + '</td>' +
+            MV.map(function (w, i) { return mcell(C.rows, w, bn + ' · ' + C.n, i === 0); }).join('') +
+            '<td class="n" style="color:var(--txm);border-left:1px solid var(--bor)">' + _admN(C.all.length) + '</td>' +
             W.map(function (w) { return cell(C.all, w, bn + ' · ' + C.n); }).join('') + '</tr>';
         });
     });
-  h += '<div style="overflow-x:auto;margin-top:14px"><table class="au-tbl" style="min-width:940px">' +
-    '<thead><tr><th>Branch · counsellor</th><th class="n">Tasks</th>' +
+  h += '<div style="overflow-x:auto;margin-top:14px"><table class="au-tbl" style="min-width:1020px">' +
+    '<thead><tr><th rowspan="2" style="vertical-align:bottom">Branch · counsellor</th>' +
+    '<th rowspan="2" class="n" style="vertical-align:bottom">Leads</th>' +
+    '<th colspan="2" style="text-align:center;border-left:1px solid var(--bor);' +
+      'border-bottom:1px solid var(--bor)">Leads moved · stage changed</th>' +
+    '<th colspan="' + (W.length + 1) + '" style="text-align:center;border-left:1px solid var(--bor);' +
+      'border-bottom:1px solid var(--bor)">Follow-up tasks</th></tr><tr>' +
+    MV.map(function (w, i) { return '<th class="n"' +
+      (i === 0 ? ' style="border-left:1px solid var(--bor)"' : '') +
+      ' title="' + _admEsc(w.note) + '">' + _admEsc(w.lab.replace('Worked ', '')) + '</th>'; }).join('') +
+    '<th class="n" style="border-left:1px solid var(--bor)">Raised</th>' +
     W.map(function (w) { return '<th class="n" title="' + _admEsc(w.note) + '">' +
       _admEsc(w.lab) + '</th>'; }).join('') + '</tr></thead><tbody>' + body + '</tbody></table></div>';
 
@@ -22241,6 +22353,14 @@ function _admFollow() {
     if (!oBy[k]) { oBy[k] = 0; oOrd.push(k); } oBy[k]++; });
   oOrd.sort(function (a, b) { return oBy[b] - oBy[a]; });
   var oldest = over.slice().sort(function (a, b) { return a.due - b.due; })[0];
+  /* the three comparisons the note makes, measured rather than asserted */
+  var movWk = _admMoved(S.rows, wkA, wkB).length;
+  var tickWk = FU.filter(function (f) {
+    return f.done && _admDay(f.done) >= wkA && _admDay(f.done) <= wkB; }).length;
+  var updToday = S.rows.filter(function (r) {
+    return String(r.upd || '').slice(0, 10) === today; }).length;
+  var updIdle = S.rows.filter(function (r) {
+    return String(r.upd || '').slice(0, 10) === today && (r.st === 'new' || r.st === 'not_connected'); }).length;
 
   h += '<div style="margin-top:13px;border-radius:12px;padding:13px 16px;font-size:14.5px;line-height:1.65;' +
     'background:' + (over.length ? '#FEF2F2' : 'var(--sur)') + ';border:1px solid ' +
@@ -22255,10 +22375,21 @@ function _admFollow() {
       : '<b>Nothing is overdue.</b> ') +
     _admN(doneAll) + ' of ' + _admN(FU.length) + ' tasks are done, ' + pct + '%.' +
     (autoN ? '<br><br><b style="color:var(--txm)">' + _admN(autoN) + ' automatic nudges are excluded ' +
-      'from every figure on this panel.</b> WhatsApp and silence nudges fire on a timer and mark ' +
+      'from every task figure on this panel.</b> WhatsApp and silence nudges fire on a timer and mark ' +
       'themselves done the moment they fire, so counting them would put every counsellor near 100% and ' +
       'hide exactly the gap this panel exists to show.' : '') +
-    '</div>';
+    '</div>' +
+    '<div class="au-note" style="margin-top:9px"><b>Why this panel counts two different things.</b> ' +
+    '<b>Leads moved</b> is the real measure of work done: a lead that reached 03 Followup, 04 Interested, ' +
+    '05 Visit Scheduled, 06 Visited, 07 Application Done, 08 Lost, 09 Not Interested or ' +
+    '10 Admission Completed was worked by somebody, and the stage date says when. It replaced a count of ' +
+    'follow-up task ticks, which missed most of the work — in this file ' + _admN(movWk) +
+    ' leads moved over the last seven days against ' + _admN(tickWk) + ' task ticks. ' +
+    '<b>It is deliberately not the Updated column</b>, which changes for any reason at all: ' +
+    _admN(updToday) + ' leads carry today’s date there and ' + _admN(updIdle) +
+    ' of those are still sitting at Untouched or Not Connected, so nothing was done to them. ' +
+    '<b>Follow-up tasks</b> is the other half — what is scheduled and what is late. The two are ' +
+    'kept in separate column groups because they count different things.</div>';
   el.innerHTML = h;
 }
 
