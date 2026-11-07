@@ -23108,10 +23108,11 @@ function _admSource() {
     h += '<div style="margin-top:13px;border-radius:12px;padding:13px 15px;font-size:15px;' +
       'line-height:1.65;background:' + (sev ? '#FFFBEB' : 'var(--sur)') + ';border:1px solid ' +
       (sev ? '#FDE68A' : 'var(--bor)') + ';color:' + (sev ? '#78350F' : 'inherit') + '">' +
-      '<b>Digital has brought ' + _admN(dN) + ' leads and ' +
-        (dW ? _admN(dW) + ' admission' + (dW === 1 ? '' : 's') : 'no admission at all') + '.</b> ' +
-      'Walk-in brought ' + _admN(oN) + ' and ' + _admN(oW) + ' \u2014 ' +
-      (oN ? _admPct1(oW, oN) : '0') + ' per hundred against ' + (dN ? _admPct1(dW, dN) : '0') + '. ' +
+      '<b>Walk-in has brought ' + _admN(oN) + ' leads and ' + _admN(oW) + ' admission' +
+        (oW === 1 ? '' : 's') + ' — ' + (oN ? _admPct1(oW, oN) : '0') + ' per hundred.</b> ' +
+      'Digital brought ' + _admN(dN) + ' and ' +
+      (dW ? _admN(dW) + ' admission' + (dW === 1 ? '' : 's') : 'no admission at all') + ', ' +
+      (dN ? _admPct1(dW, dN) : '0') + ' per hundred. ' +
       (sev && dOld.length >= 50
         ? 'The usual explanation is that digital needs longer, and that can be checked rather than ' +
           'argued: of the <b>' + _admN(dOld.length) + '</b> digital leads now at least ' + MATURE +
@@ -24094,9 +24095,9 @@ function _admCompareYear(el, hdr) {
       '<td>' + label + '</td>' +
       '<td><span class="na-pill" style="background:' + (opt.now ? 'var(--pl)' : 'transparent') +
         ';color:' + (opt.now ? 'var(--p)' : 'var(--txm)') + '">' + tag + '</span></td>' +
-      numCell(o.n, 1) + numCell(o.won, 1) + pcCell(o.won, o.n, 25, 15) +
+      numCell(o.wL) + numCell(o.wA) + pcCell(o.wA, o.wL, 40, 25) +
       numCell(o.dL) + numCell(o.dA) + pcCell(o.dA, o.dL, 10, 5) +
-      numCell(o.wL) + numCell(o.wA) + pcCell(o.wA, o.wL, 40, 25) + '</tr>';
+      numCell(o.n, 1) + numCell(o.won, 1) + pcCell(o.won, o.n, 25, 15) + '</tr>';
   };
 
   var BL = 'border-left:2px solid var(--bor)';
@@ -24104,9 +24105,9 @@ function _admCompareYear(el, hdr) {
     '<div style="overflow-x:auto"><table class="au-tbl au-yr" style="min-width:1320px"><thead>' +
     '<tr><th rowspan="2" style="vertical-align:bottom">Branch</th>' +
     '<th rowspan="2" style="vertical-align:bottom">Season</th>' +
-    '<th colspan="3" class="n" style="text-align:center">Everything</th>' +
+    '<th colspan="3" class="n" style="text-align:center">Walk-in</th>' +
     '<th colspan="3" class="n" style="text-align:center;' + BL + '">Digital</th>' +
-    '<th colspan="3" class="n" style="text-align:center;' + BL + '">Walk-in</th></tr>' +
+    '<th colspan="3" class="n" style="text-align:center;' + BL + '">Everything</th></tr>' +
     '<tr>' + ['', BL, BL].map(function (bl) {
       return '<th class="n" style="' + bl + '">Leads</th><th class="n">Admissions</th>' +
              '<th class="n">Conv %</th>';
@@ -24213,13 +24214,19 @@ function _admCompare() {
     return;
   }
 
+  /* WALK-IN FIRST, THEN DIGITAL, THEN THE TOTAL (7 November 2026). The table
+     used to open on the total and put walk-in last of the three, which reads
+     the season backwards: 70 of this file's 73 admissions came from 181
+     walk-ins and 3 from 789 digital leads, so walk-in is the column that
+     decides the number and the total is the sum of the two beside it. */
   h += '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:1120px"><thead><tr>' +
-    '<th>Branch</th><th class="n">Total Leads</th><th class="n">Total Admissions</th>' +
-    '<th class="n">Converted %</th>' +
+    '<th>Branch</th>' +
+    '<th class="n">Walk-in Leads</th>' +
+    '<th class="n">Walk-in Admissions</th><th class="n">Walk-in Conv %</th>' +
     '<th class="n" style="border-left:1px solid var(--bor)">Digital Leads</th>' +
     '<th class="n">Digital Admissions</th><th class="n">Digital Conv %</th>' +
-    '<th class="n" style="border-left:1px solid var(--bor)">Walk-in Leads</th>' +
-    '<th class="n">Walk-in Admissions</th><th class="n">Walk-in Conv %</th>' +
+    '<th class="n" style="border-left:1px solid var(--bor)">Total Leads</th>' +
+    '<th class="n">Total Admissions</th><th class="n">Converted %</th>' +
     '<th class="n" style="border-left:1px solid var(--bor)">Target (full year)</th>' +
     '<th class="n">Season vs target</th></tr></thead><tbody>';
   var pc = function (v) {
@@ -24232,18 +24239,18 @@ function _admCompare() {
     h += '<tr><td><button class="na-secbtn" onclick="admOpenCompare(' +
         JSON.stringify(d.b).replace(/"/g, '&quot;') + ')">' + _admDot(d.b) + ' ' +
         _admEsc(d.b) + ' \u203a</button></td>' +
-      '<td class="n" style="font-weight:800">' + _admN(d.n) + '</td>' +
-      '<td class="n" style="font-weight:800;color:' + (d.won ? '#059669' : 'var(--txm)') + '">' +
-        _admN(d.won) + '</td>' +
-      '<td class="n">' + pc(d.n ? d.conv : null) + '</td>' +
+      '<td class="n">' + _admN(d.wL) + '</td>' +
+      '<td class="n" style="font-weight:700;color:' + (d.wA ? '#059669' : 'var(--txm)') + '">' +
+        _admN(d.wA) + '</td>' +
+      '<td class="n">' + pc(d.wC) + '</td>' +
       '<td class="n" style="border-left:1px solid var(--bor)">' + _admN(d.dL) + '</td>' +
       '<td class="n" style="font-weight:700;color:' + (d.dA ? '#059669' : 'var(--txm)') + '">' +
         _admN(d.dA) + '</td>' +
       '<td class="n">' + pc(d.dC) + '</td>' +
-      '<td class="n" style="border-left:1px solid var(--bor)">' + _admN(d.wL) + '</td>' +
-      '<td class="n" style="font-weight:700;color:' + (d.wA ? '#059669' : 'var(--txm)') + '">' +
-        _admN(d.wA) + '</td>' +
-      '<td class="n">' + pc(d.wC) + '</td>' +
+      '<td class="n" style="border-left:1px solid var(--bor);font-weight:800">' + _admN(d.n) + '</td>' +
+      '<td class="n" style="font-weight:800;color:' + (d.won ? '#059669' : 'var(--txm)') + '">' +
+        _admN(d.won) + '</td>' +
+      '<td class="n">' + pc(d.n ? d.conv : null) + '</td>' +
       '<td class="n" style="border-left:1px solid var(--bor);color:var(--txm)">' +
         (d.tgt ? _admN(d.tgt) : '\u2013') + '</td>' +
       '<td class="n" style="font-weight:800;color:' + (sp === null ? 'var(--txm)'
@@ -24254,15 +24261,15 @@ function _admCompare() {
   h += '</tbody>' + (data.length < 2 ? '' :
     '<tfoot><tr style="font-weight:800;border-top:2px solid var(--bor)">' +
     '<td>' + (S.scope ? _admEsc(S.scope) : 'All five branches') + '</td>' +
-    '<td class="n">' + _admN(T.n) + '</td>' +
-    '<td class="n" style="color:#059669">' + _admN(T.won) + '</td>' +
-    '<td class="n">' + (T.n ? (100 * T.won / T.n).toFixed(1) : '0.0') + '%</td>' +
+    '<td class="n">' + _admN(T.wL) + '</td>' +
+    '<td class="n" style="color:#059669">' + _admN(T.wA) + '</td>' +
+    '<td class="n">' + (T.wL ? (100 * T.wA / T.wL).toFixed(1) + '%' : '\u2013') + '</td>' +
     '<td class="n" style="border-left:1px solid var(--bor)">' + _admN(T.dL) + '</td>' +
     '<td class="n" style="color:#059669">' + _admN(T.dA) + '</td>' +
     '<td class="n">' + (T.dL ? (100 * T.dA / T.dL).toFixed(1) + '%' : '\u2013') + '</td>' +
-    '<td class="n" style="border-left:1px solid var(--bor)">' + _admN(T.wL) + '</td>' +
-    '<td class="n" style="color:#059669">' + _admN(T.wA) + '</td>' +
-    '<td class="n">' + (T.wL ? (100 * T.wA / T.wL).toFixed(1) + '%' : '\u2013') + '</td>' +
+    '<td class="n" style="border-left:1px solid var(--bor)">' + _admN(T.n) + '</td>' +
+    '<td class="n" style="color:#059669">' + _admN(T.won) + '</td>' +
+    '<td class="n">' + (T.n ? (100 * T.won / T.n).toFixed(1) : '0.0') + '%</td>' +
     '<td class="n" style="border-left:1px solid var(--bor)">' + _admN(T.tgt) + '</td>' +
     '<td class="n">' + (spT === null ? '\u2013' : _admN(T.seasonWon) + ' \u00b7 ' + spT.toFixed(1) + '%') +
     '</td></tr></tfoot>') + '</table></div>';
