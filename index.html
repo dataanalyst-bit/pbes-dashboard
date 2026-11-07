@@ -24363,12 +24363,32 @@ function _ambWonMonth(r) {
   var d = _admWonDay(r);
   return d ? d.slice(0, 7) : '';
 }
-function _ambMonthRows(ym) {
+/* ══ THE WINDOW: THE SEASON SO FAR, NOT THE MONTH ══ (7 November 2026)
+   The card used to read the current month alone, which on the 7th of a month
+   measures the group against a target it has had a week to meet and says
+   nothing about whether the season is on course. It now runs from the plan's
+   FIRST month to today — 1 October to now — so the target is everything that
+   has been asked for so far and the achieved figure is everything taken.
+
+   The months in between are taken from the plan rather than assumed, so a
+   plan that opens in a different month needs no change here, and a month that
+   has not started yet is never counted into the target. */
+function _ambMonths() {
+  var R = _admRaw, MM = (R && R.planMonths) || [];
+  if (!MM.length) return [];
+  var now = _ambMonthKey(), out = [];
+  for (var i = 0; i < MM.length; i++) { if (MM[i] <= now) out.push(MM[i]); }
+  /* before the plan opens there is nothing to measure; show its first month */
+  return out.length ? out : [MM[0]];
+}
+function _ambMonthRows(months) {
   var S = _admSet(), R = _admRaw, PLAN = (R && R.plan) || {};
+  var inWin = {}; (months || []).forEach(function (m) { inWin[m] = 1; });
   return _admBranches(S).map(function (b) {
-    var tgt = +(((PLAN[b] || {}).adms || {})[ym] || 0) || 0;
+    var pb = (PLAN[b] || {}).adms || {}, tgt = 0;
+    (months || []).forEach(function (m) { tgt += +(pb[m] || 0) || 0; });
     var won = S.rows.filter(function (r) {
-      return r.b === b && _admIsWon(r) && _ambWonMonth(r) === ym;
+      return r.b === b && _admIsWon(r) && inWin[_ambWonMonth(r)];
     });
     /* the curriculum split of what was actually taken, where it was recorded.
        The plan sets no per-strand target, so this is the achieved side alone —
@@ -24393,16 +24413,16 @@ var _ambPick = {};
 function ambOpenMonth(id) {
   var P = _ambPick[id]; if (!P) return;
   if (!P.rows.length) {
-    _admModal(P.t, 'Nothing yet', '<div class="au-empty">No admission has been taken at ' +
-      _admEsc(P.t) + ' in ' + _admEsc(P.m) + '.</div>');
+    _admModal(P.t, 'Nothing yet', '<div class="au-empty">No admission has been completed at ' +
+      _admEsc(P.t) + ' between ' + _admEsc(P.m) + '.</div>');
     return;
   }
   /* the Added column is the day the ENQUIRY arrived, which for several of these
      is the month before — said here so nobody reads an October date under a
      November heading as an error */
   _admModal(P.t, _admN(P.rows.length) + ' admission' + (P.rows.length === 1 ? '' : 's') +
-    ' won in ' + P.m + ' · "Added" is the day the enquiry first arrived, which is ' +
-    'often an earlier month', P.grp ? _admByBranchAcc(P.rows) : _admEnqTable(P.rows, false));
+    ' completed ' + P.m + ' · "Added" is the day the enquiry first arrived, which is ' +
+    'often earlier', P.grp ? _admByBranchAcc(P.rows) : _admEnqTable(P.rows, false));
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -24577,12 +24597,19 @@ function _ambMonthStatus() {
   var S = _admSet(), R = _admRaw;
   if (!R) { show(false); return; }
 
-  var ym = _ambMonthKey(), full = _ambMonthFull(ym), rows = _ambMonthRows(ym);
+  var months = _ambMonths();
+  var ym = months.length ? months[months.length - 1] : _ambMonthKey();
+  var first = months.length ? months[0] : ym;
+  var full = _ambMonthFull(ym);
+  var span = months.length > 1
+    ? _ambMonthShort(first).replace(/ '\d\d$/, '') + '\u2013' + _ambMonthShort(ym)
+    : _ambMonthShort(ym);
+  var rows = _ambMonthRows(months);
   if (!rows.some(function (r) { return r.tgt > 0; })) {
-    /* no target for this month is not a figure of zero — say so and show
-       nothing, rather than printing a row of 0 / 0 / 0% that reads as failure */
+    /* no target yet is not a figure of zero — say so and show nothing, rather
+       than printing a row of 0 / 0 / 0% that reads as failure */
     show(true);
-    el.innerHTML = '<div class="au-empty">The monthly plan carries no admission target for ' +
+    el.innerHTML = '<div class="au-empty">The monthly plan carries no admission target up to ' +
       _admEsc(full) + ', so there is nothing on this card to measure against. ' +
       'The plan table below shows the months it does cover.</div>';
     return;
@@ -24594,8 +24621,11 @@ function _ambMonthStatus() {
   var today = new Date();
 
   var pid = 0; _ambPick = {};
+  var winLab = months.length > 1
+    ? '1 ' + _ambMonthFull(first).split(' ')[0] + ' to ' + today.getDate() + ' ' + full
+    : full;
   var pick = function (t, rs, grp) {
-    var id = 'a' + (++pid); _ambPick[id] = { t: t, m: full, rows: rs, grp: !!grp }; return id; };
+    var id = 'a' + (++pid); _ambPick[id] = { t: t, m: winLab, rows: rs, grp: !!grp }; return id; };
   var cell = function (p) {
     var c = _ambBand(p);
     return '<td class="amb-p ' + c + '"><span>' +
@@ -24620,12 +24650,13 @@ function _ambMonthStatus() {
   el.innerHTML =
     '<div class="amb">' +
       '<div class="amb-hd">' +
-        '<div class="amb-ttl">Admission Status – <span>' + _ambMonthShort(ym) + '</span></div>' +
-        '<div class="amb-sb">Target against achieved · as on ' +
-          _ambOrd(today.getDate()) + ' ' + full + '</div>' +
+        '<div class="amb-ttl">Admission Status – <span>' + _admEsc(span) + '</span></div>' +
+        '<div class="amb-sb">Target against achieved · ' + _admEsc(winLab) +
+          (months.length > 1 ? ' · the season so far, not this month alone' : '') + '</div>' +
         '<div class="amb-kpis">' +
           '<div class="amb-k"><b>' + _admN(T) + '</b><span>' +
-            _ambMonthShort(ym).split(' ')[0].toUpperCase() + ' TARGET</span></div>' +
+            (months.length > 1 ? 'TARGET TO DATE' : _ambMonthShort(ym).split(' ')[0].toUpperCase() +
+             ' TARGET') + '</span></div>' +
           '<div class="amb-k"><b>' + _admN(G) + '</b><span>ACHIEVED</span></div>' +
           '<div class="amb-k"><b>' + (pct == null ? '–' : pct.toFixed(1) + '%') +
             '</b><span>% ACHIEVED</span></div>' +
@@ -24645,9 +24676,11 @@ function _ambMonthStatus() {
         '<span class="amb-warn"><i></i>20–29%</span>' +
         '<span class="amb-bad"><i></i>Below 20%</span>' +
       '</div>' +
-      '<div class="amb-ft">Target is the branch’s own monthly plan for ' + _admEsc(full) +
-        ', not pro-rated for the days gone · an admission counts in the month it was ' +
-        'completed, not the month its enquiry arrived · click a branch for the students' +
+      '<div class="amb-ft">Target is the branch’s own monthly plan added up across ' +
+        _admN(months.length) + ' month' + (months.length === 1 ? '' : 's') +
+        ', with the month still running counted in full rather than pro-rated \u00b7 ' +
+        'an admission counts on the day it was completed, not the day its enquiry arrived \u00b7 ' +
+        'click a branch for the students' +
       '</div>' +
     '</div>';
   show(true);
