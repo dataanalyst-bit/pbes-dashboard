@@ -12708,12 +12708,38 @@ var ADMPNLP = (function () {
                                     'been distributed', 'event done', 'calls to previous enquiries done',
                                     'admissions done', 'done with', 'are up', 'hoardings are up',
                                     'printing completed', 'mou signed', 'mous signed', 'mous sighned'] },
+    /* ══ OPERATING, AND BEING KEPT UP ══ (added 7 Nov 2026)
+       Several of the seventeen points are not deliverables with an end — TV
+       Content, Enquiry Follow-up, Conversion Funnel, Lead Sources, Digital
+       Campaign Performance, Counsellor Action Plan. For those, RUNNING IS THE
+       FINISHED STATE: there is no further condition to reach, only keeping it
+       going. Scoring a routine that runs every week at the same 50% as "we
+       have begun" is a category error, and it was the commonest reading on
+       this sheet — 23 of the 85 rows sat at exactly 50%, most of them
+       describing something plainly already in operation.
+
+       Two kinds of wording prove an operation rather than an intention, and
+       both are promoted to this stage by the rule further down rather than
+       listed here phrase by phrase:
+         A CADENCE — weekly, daily, every Saturday, regularly, day to day. You
+           can only say "we add content weekly" if the thing already runs.
+         ALREADY — "already playing", "already started". The adverb is the
+           whole claim, and dropping it loses the difference between having
+           begun and being up.
+       A future marker still demotes first, so "will be doing on daily basis"
+       stays a plan. */
+    { s: 'running',    w: 0.85, p: ['currently running', 'are active now', 'is active now', 'are live',
+                                    'keep adding', 'keeps improving', 'runs every', 'happens every',
+                                    'every saturday and sunday', 'on daily basis'] },
     /* substantive work already carried out */
     { s: 'strong',     w: 0.80, p: ['visited', 'sent to', 'requisition sent', 'shared with', 'shared changes',
                                     'collected', 'listed out', 'took ', 'conducted', 'completed the', 'prepared',
                                     'fixed', 'informed', 'trained', 'checked their', 'gathering all',
                                     'received ', 'we got', 'placed ', 'distributed', 'insertion started',
-                                    'instertion started', 'distribution started'] },
+                                    'instertion started', 'distribution started',
+                                    'coordinated', 'cordinated', 'counselling', 'councelling',
+                                    'sharing creatives', 'messages for', 'calls for', 'boost on',
+                                    'identified nearby', 'invited'] },
     /* under way right now */
     { s: 'active',     w: 0.50, p: ['in process', 'in progress', 'are happening', 'is happening', 'happening',
                                     'ongoing', 'going on', 'started connecting', 'started', 'working on', 'being in touch',
@@ -12749,12 +12775,13 @@ var ADMPNLP = (function () {
     /* explicitly nothing */
     { s: 'none',       w: 0.00, p: ['not started', 'not yet started', 'no action', 'nothing done', 'not done'] }
   ];
-  var STAGE_LABEL = { done: 'finished', strong: 'work carried out', active: 'under way',
-                      groundwork: 'groundwork done', planned: 'planned only',
+  var STAGE_LABEL = { done: 'finished', running: 'running and kept up', strong: 'work carried out',
+                      active: 'under way', groundwork: 'groundwork done', planned: 'planned only',
                       blocked: 'waiting on someone', none: 'not started',
                       unevidenced: 'nothing written \u2014 no evidence' };
-  var STAGE_COLOR = { done: '#059669', strong: '#15803D', active: '#2563EB', groundwork: '#7C3AED',
-                      planned: '#D97706', blocked: '#DC2626', none: '#64748B', unevidenced: '#94A3B8' };
+  var STAGE_COLOR = { done: '#059669', running: '#0D9488', strong: '#15803D', active: '#2563EB',
+                      groundwork: '#7C3AED', planned: '#D97706', blocked: '#DC2626', none: '#64748B',
+                      unevidenced: '#94A3B8' };
 
   /* longest phrase first, so "will start" is never read as the bare "will" */
   var PHRASES = [];
@@ -12789,6 +12816,9 @@ var ADMPNLP = (function () {
     for (var i = 0; i < spans.length; i++) if (spans[i] <= idx && idx - spans[i] <= 32) return true;
     return false;
   }
+
+  /* the words that mark an operation rather than an intention */
+  var OPERATING = /\b(already|regularly|weekly|daily|day to day|every (?:day|saturday|sunday|week|month)|on daily basis|currently|keeps?|routinely|continuously)\b/;
 
   /* ── 6. numbers that carry evidence ──────────────────────────────────── */
   var DOING = /(visited|contacted|covered|conducted|collected|completed|signed|tied up|met)\s+(?:with\s+)?(\d{1,4})\b/g;
@@ -12907,9 +12937,25 @@ var ADMPNLP = (function () {
       var cr = clauseRatio(t);
       /* future tense demotes only what follows the marker */
       var spans = futureSpans(t);
+      /* A cadence or an "already" says the work is not merely started but in
+         operation. It lifts the clause's own cue rather than scoring on its
+         own, so "will start regular follow-ups" is still a plan: the future
+         demotion runs first and a demoted hit is never promoted. */
+      /* The marker itself must not sit in the future. "Followup calls will be
+         doing on daily basis" carries a cadence AND a promise, and the cadence
+         belongs to the promise: the calls are not happening daily yet. The
+         word "Followup" stands before "will", so the future demotion never
+         reaches it, and a clause-wide cadence test would have promoted it to
+         an operation. So the marker is located, and ignored when it falls
+         inside a future span. */
+      var opWord = null, opAt = t.search(OPERATING);
+      if (opAt >= 0 && !inFuture(spans, opAt)) opWord = t.match(OPERATING);
       found.forEach(function (f) {
         if (f.w > 0.15 && f.stage !== 'blocked' && inFuture(spans, f.at)) {
           f.w = 0.15; f.stage = 'planned'; f.demoted = true;
+        }
+        if (opWord && !f.demoted && f.stage !== 'blocked' && f.w >= 0.5 && f.w < 0.85) {
+          f.w = 0.85; f.stage = 'running'; f.promoted = opWord[0];
         }
         if (!best || f.w > best.w) best = f;
       });
@@ -13028,11 +13074,12 @@ var ADMPNLP = (function () {
     /* The label must agree with the figure. "Out of 17, 6 signed" has its
        strongest word at "signed", but the count brought the row down to 45% —
        calling that "finished" would contradict the number beside it. */
-    if ((stage === 'done' || stage === 'strong') && base < 0.65)
+    if ((stage === 'done' || stage === 'running' || stage === 'strong') && base < 0.65)
       stage = base >= 0.45 ? 'active' : base >= 0.30 ? 'groundwork' : 'planned';
     if (stage === 'done' && anyBlocked) stage = 'strong';
     /* the label and the figure must still agree after all of the above */
-    if (stage === 'done' && base < 0.9) stage = base >= 0.65 ? 'strong' : base >= 0.45 ? 'active' : 'planned';
+    if (stage === 'done' && base < 0.9) stage = base >= 0.78 ? 'running' : base >= 0.65 ? 'strong' : 'active';
+    if (stage === 'running' && base >= 0.95) stage = 'done';
     return { pct: Math.round(base * 100), conf: conf, stage: stage, claimGap: claimGap,
              hits: hits, nums: nums, raw: raw, clauses: cl, why: why };
   }
@@ -13116,7 +13163,7 @@ function renderAdmpProgress(){
   var byB = {}; branches.forEach(function (b){ byB[b] = rows.filter(function (r){ return r.Branch === b; }); });
 
   /* every stage, so the bar shows WHAT the progress is made of */
-  var STAGES = ['done', 'strong', 'active', 'groundwork', 'planned', 'blocked', 'none', 'unevidenced'];
+  var STAGES = ['done', 'running', 'strong', 'active', 'groundwork', 'planned', 'blocked', 'none', 'unevidenced'];
   var branchStat = function (b){
     var rs = byB[b] || [], ss = rs.map(function (r){ return _ADMP_SCORE[r.__k]; });
     var withText = ss.filter(function (x){ return x.raw; }).length;
@@ -13130,7 +13177,8 @@ function renderAdmpProgress(){
     var ticked = rs.filter(function (r){ return /^completed$/i.test(String(r.Status || '').trim()); }).length;
     var gaps = ss.filter(function (x){ return x.claimGap; }).length;
     return { n: rs.length, withText: withText, pct: pct, evid: evid, mix: mix, conf: conf,
-             blocked: mix.blocked, done: mix.done + mix.strong, ticked: ticked, gaps: gaps };
+             blocked: mix.blocked, done: mix.done + mix.running + mix.strong,
+             ticked: ticked, gaps: gaps };
   };
 
   var bar = function (mix, n){
