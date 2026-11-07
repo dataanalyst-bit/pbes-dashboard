@@ -1183,6 +1183,73 @@ table.vckt tr.vck-c td.nm{font-weight:600;color:var(--tx)}
 /* ── bars and meters, thicker so they register ── */
 #pane-adm27 .au-yoy td,#pane-adm27 .au-yoy th{white-space:nowrap}
 #pane-adm27 .au-bar{height:12px}
+
+/* ══ ADMISSION STATUS — this month, target against achieved ══
+   Added 7 Nov 2026, to the layout the group circulates for its other schools
+   so the five branches can be read beside them without anybody translating
+   between two reports. The band colours are CSS variables rather than inline
+   hex because the dark theme has to lift them: #15803D on a near-black
+   surface fails contrast, and the whole point of this card is that the
+   colour and the number say the same thing. */
+#pane-adm27{--amb-ok:#15803D; --amb-warn:#C2870B; --amb-bad:#DC2626; --amb-na:#8793A8}
+:root[data-theme="dark"] #pane-adm27{--amb-ok:#34D399; --amb-warn:#FBBF24;
+  --amb-bad:#F87171; --amb-na:#7F8DA4}
+#pane-adm27 .amb-row{display:flex;justify-content:flex-end}
+#pane-adm27 .amb-row>div{width:100%;max-width:580px}
+#pane-adm27 .amb{background:var(--sur);border:1px solid var(--bor);border-radius:16px;
+  box-shadow:var(--sh);overflow:hidden}
+#pane-adm27 .amb-hd{background:#17294A;color:#fff;padding:20px 22px 18px}
+#pane-adm27 .amb-ttl{font-size:27px;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+#pane-adm27 .amb-ttl span{color:#F2C14E}
+#pane-adm27 .amb-sb{font-size:12.5px;color:#AEBAD0;margin-top:5px;line-height:1.45}
+#pane-adm27 .amb-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:14px}
+#pane-adm27 .amb-k{background:rgba(255,255,255,.09);border-radius:9px;padding:9px 11px}
+#pane-adm27 .amb-k b{display:block;font-size:23px;font-weight:800;line-height:1.05}
+#pane-adm27 .amb-k span{display:block;font-size:9.5px;letter-spacing:.09em;color:#AEBAD0;
+  margin-top:3px;font-weight:600}
+#pane-adm27 .amb-grp{background:#FBEFD2;color:#5B4A1E;font-size:11.5px;
+  font-weight:800;letter-spacing:.07em;padding:9px 18px;border-bottom:1px solid #EFE2C2}
+:root[data-theme="dark"] #pane-adm27 .amb-grp{background:#2C2313;color:#F0DCA8;
+  border-bottom-color:#3E3117}
+#pane-adm27 .amb-tbl{width:100%;border-collapse:collapse;font-size:15px}
+#pane-adm27 .amb-tbl th{font-size:9.5px;letter-spacing:.07em;color:var(--txm);font-weight:700;
+  text-align:left;padding:10px 11px 7px;border-bottom:1px solid var(--bor);background:none}
+#pane-adm27 .amb-tbl th.n{text-align:right}
+#pane-adm27 .amb-tbl td{padding:9px 11px;border-bottom:1px solid var(--bor);vertical-align:middle;
+  white-space:normal}
+#pane-adm27 .amb-tbl td.n{text-align:right}
+#pane-adm27 .amb-tbl tbody tr:hover td{background:var(--pl)}
+#pane-adm27 .amb-br{background:none;border:0;padding:0;font:inherit;font-size:15px;font-weight:800;
+  color:var(--tx);cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px}
+#pane-adm27 .amb-br:hover{color:var(--p)}
+#pane-adm27 .amb-sub{font-size:10.5px;color:var(--txm);margin-top:2px;font-weight:600;
+  padding-left:20px}
+#pane-adm27 .amb-t{font-size:19px;font-weight:700;color:var(--txm)}
+#pane-adm27 .amb-a{font-size:19px;font-weight:800;color:var(--tx)}
+#pane-adm27 .amb-p{width:148px;text-align:right}
+#pane-adm27 .amb-p>span{font-size:16px;font-weight:800;display:block;line-height:1.1}
+#pane-adm27 .amb-track{height:5px;background:#E6EAF1;border-radius:5px;overflow:hidden;
+  margin-top:5px}
+:root[data-theme="dark"] #pane-adm27 .amb-track{background:#212B3E}
+#pane-adm27 .amb-track i{display:block;height:100%;border-radius:5px;background:currentColor}
+#pane-adm27 .amb-tot td{background:#F5F8FD;font-weight:800;border-bottom:none}
+:root[data-theme="dark"] #pane-adm27 .amb-tot td{background:#101828}
+#pane-adm27 .amb-tot .amb-br{cursor:pointer;font-size:15px}
+#pane-adm27 .amb-leg{display:flex;gap:16px;justify-content:center;padding:11px;font-size:11px;
+  color:var(--txm);font-weight:600;border-top:1px solid var(--bor)}
+#pane-adm27 .amb-leg i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;
+  background:currentColor}
+#pane-adm27 .amb-ft{font-size:10.5px;color:var(--txl);text-align:center;padding:0 16px 13px;
+  line-height:1.55}
+#pane-adm27 .amb-ok{color:var(--amb-ok)}
+#pane-adm27 .amb-warn{color:var(--amb-warn)}
+#pane-adm27 .amb-bad{color:var(--amb-bad)}
+#pane-adm27 .amb-na{color:var(--amb-na)}
+@media(max-width:620px){
+  #pane-adm27 .amb-ttl{font-size:22px}
+  #pane-adm27 .amb-k b{font-size:19px}
+  #pane-adm27 .amb-p{width:104px}
+}
 </style>
 <script>
 /*****************************************************************
@@ -3418,6 +3485,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div id="adm-notes"></div>
 
       <div class="au-kpis" id="adm-kpis"></div>
+
+      <!-- The group's own circulated format, sitting beside the tiles rather
+           than in a section of its own: it is a headline, not an analysis. -->
+      <div class="amb-row" id="adm-month-row" style="display:none">
+        <div id="adm-month"></div>
+      </div>
 
       
       <div class="au-sec">
@@ -22866,7 +22939,7 @@ function _admPaint() {
       return t.kind === 'enquiry' && (!S.scope || t.branch === S.scope); }).length) +
     ' branch tracker' + (((R.tabs || []).filter(function (t) {
       return t.kind === 'enquiry' && (!S.scope || t.branch === S.scope); }).length === 1) ? '' : 's') + ' read';
-  _admNotes(); _admKpis();
+  _admNotes(); _admKpis(); _ambMonthStatus();
   _admCompare(); _admPlanPanel(); _admYoY();
   _admFunnel(); _admSource(); _admClassPanel(); _admPace();
   _admCouns(); _admFollow(); _admHist();
@@ -23634,6 +23707,195 @@ function admOpenCompare(br) {
     _admEnqTable(rows, false));
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   ADMISSION STATUS — THIS MONTH, TARGET AGAINST ACHIEVED      added 7 Nov 2026
+
+   Built to the layout the group circulates for its other schools, so the five
+   branches can be read beside them without anybody having to translate between
+   two reports: the same dark header carrying three figures, the same group
+   band, the same four columns, the same traffic lights (30%+ green, 20–29%
+   amber, below 20% red).
+
+   THE TWO NUMBERS COME FROM DIFFERENT PLACES, which is worth saying plainly.
+
+   TARGET is the branch's own monthly admission target out of the consolidated
+   plan. It is fixed and nothing here adjusts it.
+
+   ACHIEVED is counted off the tracker and dated by the day the lead REACHED
+   "admitted" — the stage-entered column — and not by the day its enquiry was
+   created. A lead that arrived last month and admitted this month belongs to
+   this month, because that is what a monthly admission target measures. The
+   two rules are not close: for November 2026 it is 20 admissions won against
+   10 enquiries-arrived, a factor of two. The plan table directly below counts
+   admissions the same way, for the same reason — two panels on one tab are
+   not allowed to disagree about the same month.
+
+   The percentage is deliberately NOT pro-rated for the days elapsed. The
+   month's target is the month's target, and management reads this knowing
+   what day it is; a pace-adjusted figure that flattered an empty month would
+   be the one number on the page nobody could check. The subtitle carries the
+   as-on date instead, so the reader supplies that judgement themselves.
+
+   Named _amb* throughout: _admMonthLab() already exists and means something
+   else ("Nov 26", for the plan table's column heads).
+   ═══════════════════════════════════════════════════════════════════════════ */
+function _ambMonthKey(d) {
+  d = d || new Date();
+  return d.getFullYear() + '-' + _ad2(d.getMonth() + 1);
+}
+function _ambMonthFull(ym) {
+  var M = ['January', 'February', 'March', 'April', 'May', 'June',
+           'July', 'August', 'September', 'October', 'November', 'December'];
+  var p = String(ym).split('-');
+  return (M[(+p[1] || 1) - 1] || '') + ' ' + p[0];
+}
+function _ambMonthShort(ym) {
+  var M = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+           'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  var p = String(ym).split('-');
+  return (M[(+p[1] || 1) - 1] || '') + " '" + String(p[0]).slice(2);
+}
+function _ambOrd(n) {
+  return n + ((n % 10 === 1 && n !== 11) ? 'st' : (n % 10 === 2 && n !== 12) ? 'nd'
+            : (n % 10 === 3 && n !== 13) ? 'rd' : 'th');
+}
+/* 30%+ green, 20–29% amber, below that red — the circulated report's own bands */
+function _ambBand(pct) {
+  return pct == null ? 'amb-na' : pct >= 30 ? 'amb-ok' : pct >= 20 ? 'amb-warn' : 'amb-bad';
+}
+/* the month an admission belongs to: the day it reached the stage, not the day
+   the enquiry arrived. _admWorkedOn() applies the same rule to the follow-up
+   panel, which is why the two agree. */
+function _ambWonMonth(r) {
+  var iso = r.sent || r.d || '';
+  return String(iso).length >= 7 ? String(iso).slice(0, 7) : '';
+}
+function _ambMonthRows(ym) {
+  var S = _admSet(), R = _admRaw, PLAN = (R && R.plan) || {};
+  return _admBranches(S).map(function (b) {
+    var tgt = +(((PLAN[b] || {}).adms || {})[ym] || 0) || 0;
+    var won = S.rows.filter(function (r) {
+      return r.b === b && _admIsWon(r) && _ambWonMonth(r) === ym;
+    });
+    /* the curriculum split of what was actually taken, where it was recorded.
+       The plan sets no per-strand target, so this is the achieved side alone —
+       printing it as a fraction of something that does not exist would invent
+       a target. Blanks are counted and named rather than quietly dropped. */
+    var cur = {}, order = [];
+    won.forEach(function (r) {
+      var k = String(r.cur || '').trim(); if (!k) return;
+      if (!cur[k]) { cur[k] = 0; order.push(k); }
+      cur[k]++;
+    });
+    order.sort(function (x, y) { return cur[y] - cur[x]; });
+    var named = order.reduce(function (n, k) { return n + cur[k]; }, 0);
+    return { b: b, tgt: tgt, got: won.length, rows: won,
+             pct: tgt ? won.length / tgt * 100 : null,
+             split: order.map(function (k) { return k + ' ' + cur[k]; }).join(' · '),
+             unrec: won.length - named };
+  });
+}
+
+var _ambPick = {};
+function ambOpenMonth(id) {
+  var P = _ambPick[id]; if (!P) return;
+  if (!P.rows.length) {
+    _admModal(P.t, 'Nothing yet', '<div class="au-empty">No admission has been taken at ' +
+      _admEsc(P.t) + ' in ' + _admEsc(P.m) + '.</div>');
+    return;
+  }
+  /* the Added column is the day the ENQUIRY arrived, which for several of these
+     is the month before — said here so nobody reads an October date under a
+     November heading as an error */
+  _admModal(P.t, _admN(P.rows.length) + ' admission' + (P.rows.length === 1 ? '' : 's') +
+    ' won in ' + P.m + ' · "Added" is the day the enquiry first arrived, which is ' +
+    'often an earlier month', P.grp ? _admByBranchAcc(P.rows) : _admEnqTable(P.rows, false));
+}
+
+function _ambMonthStatus() {
+  var row = document.getElementById('adm-month-row');
+  var el = document.getElementById('adm-month');
+  if (!el) return;
+  var show = function (on) { if (row) row.style.display = on ? 'flex' : 'none'; };
+  var S = _admSet(), R = _admRaw;
+  if (!R) { show(false); return; }
+
+  var ym = _ambMonthKey(), full = _ambMonthFull(ym), rows = _ambMonthRows(ym);
+  if (!rows.some(function (r) { return r.tgt > 0; })) {
+    /* no target for this month is not a figure of zero — say so and show
+       nothing, rather than printing a row of 0 / 0 / 0% that reads as failure */
+    show(true);
+    el.innerHTML = '<div class="au-empty">The monthly plan carries no admission target for ' +
+      _admEsc(full) + ', so there is nothing on this card to measure against. ' +
+      'The plan table below shows the months it does cover.</div>';
+    return;
+  }
+
+  var T = 0, G = 0, all = [];
+  rows.forEach(function (r) { T += r.tgt; G += r.got; all = all.concat(r.rows); });
+  var pct = T ? G / T * 100 : null;
+  var today = new Date();
+
+  var pid = 0; _ambPick = {};
+  var pick = function (t, rs, grp) {
+    var id = 'a' + (++pid); _ambPick[id] = { t: t, m: full, rows: rs, grp: !!grp }; return id; };
+  var cell = function (p) {
+    var c = _ambBand(p);
+    return '<td class="amb-p ' + c + '"><span>' +
+      (p == null ? '–' : p.toFixed(1) + '%') + '</span>' +
+      '<div class="amb-track"><i style="width:' +
+      Math.max(0, Math.min(100, p || 0)).toFixed(0) + '%"></i></div></td>';
+  };
+
+  var body = rows.slice().sort(function (x, y) {
+      return (y.pct == null ? -1 : y.pct) - (x.pct == null ? -1 : x.pct); })
+    .map(function (r) {
+      return '<tr><td><button class="amb-br" onclick="ambOpenMonth(\'' +
+          pick(r.b, r.rows) + '\')">' + _admDot(r.b) + _admEsc(r.b) + '</button>' +
+          (r.split || r.unrec
+            ? '<div class="amb-sub">' + _admEsc(r.split) +
+              (r.unrec ? (r.split ? ' · ' : '') + r.unrec + ' not recorded' : '') + '</div>'
+            : '') + '</td>' +
+        '<td class="n amb-t">' + _admN(r.tgt) + '</td>' +
+        '<td class="n amb-a">' + _admN(r.got) + '</td>' + cell(r.pct) + '</tr>';
+    }).join('');
+
+  el.innerHTML =
+    '<div class="amb">' +
+      '<div class="amb-hd">' +
+        '<div class="amb-ttl">Admission Status – <span>' + _ambMonthShort(ym) + '</span></div>' +
+        '<div class="amb-sb">Target against achieved · as on ' +
+          _ambOrd(today.getDate()) + ' ' + full + '</div>' +
+        '<div class="amb-kpis">' +
+          '<div class="amb-k"><b>' + _admN(T) + '</b><span>' +
+            _ambMonthShort(ym).split(' ')[0].toUpperCase() + ' TARGET</span></div>' +
+          '<div class="amb-k"><b>' + _admN(G) + '</b><span>ACHIEVED</span></div>' +
+          '<div class="amb-k"><b>' + (pct == null ? '–' : pct.toFixed(1) + '%') +
+            '</b><span>% ACHIEVED</span></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="amb-grp">' + _admEsc(S.scope ? S.scope.toUpperCase() : 'PALLAVI GROUP') + '</div>' +
+      '<table class="amb-tbl"><thead><tr><th>BRANCH</th><th class="n">TARGET</th>' +
+        '<th class="n">ACHIEVED</th><th class="n">%</th></tr></thead><tbody>' + body +
+        (rows.length < 2 ? '' :
+          '<tr class="amb-tot"><td><button class="amb-br" onclick="ambOpenMonth(\'' +
+            pick('Pallavi Group', all, true) + '\')">PALLAVI TOTAL</button></td>' +
+          '<td class="n amb-t">' + _admN(T) + '</td>' +
+          '<td class="n amb-a">' + _admN(G) + '</td>' + cell(pct) + '</tr>') +
+      '</tbody></table>' +
+      '<div class="amb-leg">' +
+        '<span class="amb-ok"><i></i>30%+</span>' +
+        '<span class="amb-warn"><i></i>20–29%</span>' +
+        '<span class="amb-bad"><i></i>Below 20%</span>' +
+      '</div>' +
+      '<div class="amb-ft">Target is the branch’s own monthly plan for ' + _admEsc(full) +
+        ', not pro-rated for the days gone · an admission counts in the month it ' +
+        'reached that stage, not the month its enquiry arrived · click a branch for the students' +
+      '</div>' +
+    '</div>';
+  show(true);
+}
+
 // ── 2. the fixed monthly plan, against what has come in ────────────────────
 function admSetPlanMetric(m) { _admPlanMetric = m; _admPlanPanel(); }
 
@@ -23645,16 +23907,27 @@ function _admPlanPanel() {
   var isL = _admPlanMetric === 'leads';
   var today = _admIso(new Date()), thisYm = today.slice(0, 7);
 
-  /* Achieved is counted by the month the LEAD ARRIVED, for admissions as well
-     as for leads. The tracker stores the day an enquiry was created and
-     nothing else: a status becoming "admitted" is not dated anywhere, so an
-     admission cannot be placed in the month it was actually won. Said here
-     because it matters from the second month onward. */
+  /* WHICH MONTH A FIGURE BELONGS TO — corrected 7 Nov 2026.
+
+     A lead belongs to the month it ARRIVED: that is what a lead target is.
+     An admission belongs to the month it was WON, which is what an admission
+     target is, and until now this table could not tell the difference. It
+     counted admissions by arrival date too, with a note underneath admitting
+     the tracker carried no conversion date and asking for one.
+
+     That column now exists and is read — the stage-entered date, every one of
+     this season's admitted rows carries it — so the note was describing a gap
+     that had been closed. The difference is not cosmetic: for November 2026
+     the old rule showed 10 admissions and the correct one shows 20, because
+     ten leads that arrived in October were won in November. The Admission
+     Status card above counts them the same way, and two panels on one tab do
+     not get to disagree about the same month. */
   var got = {};
   S.rows.forEach(function (r) {
-    if (!r.d) return;
     if (!isL && !_admIsWon(r)) return;
-    got[r.b + '|' + r.d.slice(0, 7)] = (got[r.b + '|' + r.d.slice(0, 7)] || 0) + 1;
+    var ym = isL ? String(r.d || '').slice(0, 7) : _ambWonMonth(r);
+    if (!ym) return;
+    got[r.b + '|' + ym] = (got[r.b + '|' + ym] || 0) + 1;
   });
 
   var h = '<div style="display:flex;gap:6px;margin-bottom:12px">' +
@@ -23721,10 +23994,11 @@ function _admPlanPanel() {
     (dueT ? '(' + Math.round(100 * dueG / dueT) + '%) ' : '') + 'have come in' +
     (thisYm === MM[0] ? ', with ' + _admMonthLab(thisYm) + ' still running' : '') + '. ' +
     'These targets are fixed and nothing on this page adjusts them.' +
-    (isL ? '' : ' One thing to know about the admissions row: the tracker records the day an enquiry ' +
-      'was created and never the day it converted, so an admission is counted in the month its <b ' +
-      'style="color:var(--tx)">lead arrived</b>. In the opening month those are the same; from the ' +
-      'second month on they are not, and a dated admission column in the tracker would fix it.') +
+    (isL ? ' A lead is counted in the month it <b style="color:var(--tx)">arrived</b>.'
+         : ' An admission is counted in the month it was <b style="color:var(--tx)">won</b> \u2014 the ' +
+           'day the lead reached that stage \u2014 and not the month its enquiry arrived. Those are the ' +
+           'same thing in the opening month and not afterwards: a lead that came in during October and ' +
+           'admitted in November is November\u2019s. The card at the top of the tab counts it the same way.') +
     '</div>';
   el.innerHTML = h;
 }
@@ -34754,7 +35028,7 @@ window.renderCivilTab = function (raw) {
   table.brfz > tbody > tr > *:first-child,
   table.brfz > tfoot > tr > *:first-child,
   table.brfz > tr > *:first-child{
-    position: sticky; left: 0; z-index: 2; box-shadow: 1px 0 0 #E2E8F0;
+    position: sticky; left: 0; z-index: 2; box-shadow: 1px 0 0 var(--bor, #E2E8F0);
   }
   table.brfz > thead > tr > *:first-child{ z-index: 3; }
 </style>
@@ -34804,10 +35078,24 @@ window.renderCivilTab = function (raw) {
       }
     }
   }
+  /* The colour above is sampled once and written into the cell, and __fz stops
+     it ever being sampled again — which is right while the theme holds still
+     and wrong the moment it does not. Switching to dark used to leave every
+     pinned branch column painted in its light-mode colour: a white strip down
+     the left of eight tables on a near-black page, cleared only by a reload.
+     So when data-theme changes, the baked colour is thrown away and the cells
+     are measured again against the theme now in force. */
+  function reseat(){
+    var cs = document.querySelectorAll('table.brfz > * > tr > *:first-child, table.brfz > tr > *:first-child');
+    for (var i = 0; i < cs.length; i++){ cs[i].__fz = 0; cs[i].style.backgroundColor = ''; }
+    try { scan(); } catch(e){}
+  }
   var timer = null;
   function soon(){ if (timer) return; timer = setTimeout(function(){ timer = null; try { scan(); } catch(e){} }, 150); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', soon); else soon();
   new MutationObserver(soon).observe(document.documentElement, { childList: true, subtree: true });
+  new MutationObserver(function(){ setTimeout(reseat, 0); })
+    .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   window.addEventListener('resize', soon);
 })();
 </script>
