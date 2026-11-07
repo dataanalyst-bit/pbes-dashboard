@@ -21520,6 +21520,23 @@ function _admBranches(S) {
   if (S.scope) return [S.scope];
   return (R.branches || []).slice();
 }
+/* ══ THE PIPELINE ORDER, ONCE ══
+   The server now sends all ten statuses under the names the Status column
+   itself uses — "03 - Followup", not "Contacted" — so the dashboard stops
+   renaming them and a counsellor sees the same words here and in the sheet.
+   Lost and Not Interested used to live only in R.closed and were appended
+   after the list; now they sit in their own numbered places inside it, and
+   this helper is what keeps them from being added twice. R.closed is
+   untouched: being closed is still a real property the page asks about, it is
+   just no longer where those two names come from. */
+function _admStageOrder(extra) {
+  var out = [], seen = {};
+  var add = function (k) { if (k && !seen[k]) { seen[k] = 1; out.push(k); } };
+  ((_admRaw && _admRaw.stages) || []).forEach(function (s) { add(s[0]); });
+  Object.keys((_admRaw && _admRaw.closed) || {}).forEach(add);
+  (extra || []).forEach(add);
+  return out;
+}
 function _admStageLab(code) {
   var L = _admRaw && _admRaw.stages || [];
   for (var i = 0; i < L.length; i++) if (L[i][0] === code) return L[i][1];
@@ -21678,8 +21695,7 @@ function admOpenBranch(b) {
   var won = rows.filter(_admIsWon).length, t = _admTarget(b);
   var byStage = {};
   rows.forEach(function (r) { byStage[r.st] = (byStage[r.st] || 0) + 1; });
-  var order = (_admRaw.stages || []).map(function (s) { return s[0]; })
-    .concat(Object.keys(_admRaw.closed || {}))
+  var order = _admStageOrder(Object.keys(byStage))
     .filter(function (k) { return byStage[k]; });
 
   var head = '<div style="font-size:15px;color:var(--txm);line-height:1.7;margin-bottom:12px">' +
@@ -21710,9 +21726,7 @@ function _admFunnel() {
   if (!S.rows.length) { el.innerHTML = '<div class="au-empty">No leads in this scope.</div>'; return; }
   var cnt = {}; S.rows.forEach(function (r) { cnt[r.st] = (cnt[r.st] || 0) + 1; });
 
-  var order = (R.stages || []).map(function (s) { return s[0]; });
-  Object.keys(R.closed || {}).forEach(function (k) { order.push(k); });
-  Object.keys(cnt).forEach(function (k) { if (order.indexOf(k) < 0) order.push(k); });
+  var order = _admStageOrder(Object.keys(cnt));
 
   var max = Math.max.apply(null, order.map(function (k) { return cnt[k] || 0; }).concat([1]));
   var h = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:10px">';
@@ -21987,6 +22001,14 @@ function _admCStats(rows, fus) {
   var today = _admToday();
   var od = fus.filter(function (f) { return f.open && _admDay(f.due) < today; }).length;
   var done = fus.filter(function (f) { return !!f.done; }).length;
+  /* LEADS WORKED IN THE LAST SEVEN DAYS, from the two logs. Tasks done sits
+     beside it and is not the same measure: a task tick is one slot somebody
+     filled in, while this is a lead somebody wrote a note on, moved a stage
+     on, or completed a task against. Across this scope the gap is wide —
+     419 leads worked in seven days against 186 task ticks all season — and
+     a counsellor who works the phone without raising tasks shows as nothing
+     in the tick column and correctly as busy in this one. */
+  var wk = _admMoved(rows, _admShiftDay(-7), today).length;
   return {
     n: rows.length, won: won, shut: shut, open: rows.length - won - shut,
     unreached: unreached, unPct: rows.length ? 100 * unreached / rows.length : 0,
@@ -21996,7 +22018,8 @@ function _admCStats(rows, fus) {
     dVisit: dig.filter(onCampus).length,
     dVisitRate: dig.length ? 100 * dig.filter(onCampus).length / dig.length : null,
     age: ages.length ? Math.round(ages.reduce(function (a, b) { return a + b; }, 0) / ages.length) : 0,
-    fu: fus.length, fuDone: done, fuOver: od,
+    fu: fus.length, fuDone: done, fuOver: od, wk: wk,
+    wkPct: rows.length ? 100 * wk / rows.length : 0,
     fuPct: fus.length ? 100 * done / fus.length : null,
     rows: rows, walkRows: walk, digRows: dig, fus: fus
   };
@@ -22051,6 +22074,9 @@ function _admCouns() {
       '<td class="n" style="font-weight:800;color:' + (x.unPct >= 40 ? '#DC2626' : x.unPct >= 20 ? '#D97706' : 'var(--txm)') + '">' +
         _admN(x.unreached) + '<span style="font-weight:600;font-size:.82em;color:var(--txm)"> ' +
         x.unPct.toFixed(0) + '%</span></td>' +
+      '<td class="n" style="font-weight:800;color:' + (x.wk ? '#047857' : 'var(--txl)') + '">' +
+        (x.wk ? _admN(x.wk) + '<span style="font-weight:600;font-size:.82em;color:var(--txm)"> ' +
+          x.wkPct.toFixed(0) + '%</span>' : '·') + '</td>' +
       '<td class="n" style="font-weight:700;color:' + (x.fuOver ? '#DC2626' : 'var(--txm)') + '">' +
         (x.fu ? _admN(x.fuOver) : '–') + '</td>' +
       '<td class="n" style="color:var(--txm)">' +
@@ -22103,13 +22129,15 @@ function _admCouns() {
     '<tr><th rowspan="2" style="vertical-align:bottom">Branch · counsellor</th>' +
     '<th rowspan="2" class="n" style="vertical-align:bottom">Leads</th>' +
     '<th rowspan="2" class="n" style="vertical-align:bottom" title="Average age of the leads held">Age</th>' +
-    '<th colspan="3" style="text-align:center;border-bottom:1px solid var(--bor)">Effort · theirs</th>' +
+    '<th colspan="4" style="text-align:center;border-bottom:1px solid var(--bor)">Effort · theirs</th>' +
     '<th colspan="3" style="text-align:center;border-left:1px solid var(--bor);border-bottom:1px solid var(--bor)">' +
       'Walk-in leads</th>' +
     '<th colspan="3" style="text-align:center;border-left:1px solid var(--bor);border-bottom:1px solid var(--bor)">' +
       'Digital leads</th>' +
     '<th rowspan="2" class="n">&nbsp;</th></tr>' +
     '<tr><th class="n" title="Still at new or could not connect">Unreached</th>' +
+    '<th class="n" title="Leads this person wrote a note on, moved a stage on, or completed a ' +
+      'task against in the last seven days — read from the Comment and Follow-up columns">Worked · 7d</th>' +
     '<th class="n" title="Call and visit tasks past their due date and still open">Overdue</th>' +
     '<th class="n" title="Human follow-up tasks completed, of those raised">Tasks done</th>' +
     '<th class="n" style="border-left:1px solid var(--bor)">Leads</th>' +
@@ -22228,44 +22256,80 @@ function _admFmtDay(d) {
   var M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   return d.getDate() + ' ' + M[d.getMonth()];
 }
-/* ══ WHEN WAS A LEAD ACTUALLY WORKED ═══════════════════════════════════════
-   Corrected 6 November 2026, on the counsellors' own objection.
+/* ══ WHAT A COUNSELLOR ACTUALLY DID, AND WHEN ══════════════════════════════
+   Rebuilt 7 November 2026 out of the COMMENT and FOLLOW-UP logs, which is the
+   only place in the export that records a human action with its own date.
 
-   "Done today" used to count follow-up TASK SLOTS marked Done. It is the
-   wrong signal twice over. A counsellor moves a lead forward without always
-   ticking a task against it, so real work goes uncounted: over the last
-   seven days this file shows 67 task ticks against 287 leads that actually
-   moved stage — it under-reported by a factor of four. And the ticks that do
-   exist are mostly not a person's work at all, because the automatic
-   WhatsApp and silence nudges tick themselves the moment they fire.
+   Two earlier attempts at this both failed, in opposite directions:
 
-   What the ERP records reliably is the STAGE and the day it was reached. A
-   lead that has moved to 03 Followup, 04 Interested, 05 Visit Scheduled,
-   06 Visited, 07 Application Done, 08 Lost, 09 Not Interested or
-   10 Admission Completed has been worked by somebody, and Stage Entered says
-   when. That is the measure now.
+     UPDATED said 612 of the 970 leads were touched today. Checked against the
+     logs, 608 of those 612 carry no entry of any kind for today — no comment,
+     no stage change, not even an automated nudge. Something re-saved most of
+     the book this morning and stamped the column. Updated is the right date
+     for an admission, which is a row-level fact, and the wrong one for a
+     day's work.
 
-   NOT the Updated column, which is what prompted this. Updated moves for any
-   reason at all: 586 leads carry today's date in it and 367 of those are
-   still sitting at Untouched or Not Connected, so nothing was done to them.
-   Keyed off Updated the figure would have been inflated six-fold.
+     STAGE ENTERED said only the leads whose stage had moved. A counsellor who
+     rang nine parents and wrote nine notes without anybody changing stage did
+     nine pieces of work and showed as nothing.
 
-   01 Untouched and 02 Not Connected are deliberately excluded, as the
-   counsellors listed them. An unanswered call is effort, but the lead has
-   not moved, and this column is about movement. */
-var ADM_WORKED_ST = { contacted: 1, interested: 1, visit_scheduled: 1, visited: 1,
-                      admission_form_issued: 1, admitted: 1, lost: 1, not_interested: 1 };
-/* the day this lead reached the stage it is at now, if that stage counts as worked */
-function _admWorkedOn(r) {
-  if (!r || !ADM_WORKED_ST[r.st]) return '';
-  var d = r.sent || '';
-  return (d && String(d).length >= 10) ? String(d).slice(0, 10) : '';
+   So a touch is read from the logs themselves. Both are written the same way,
+   "07 Nov 2026, 10:29 am · <what> · <detail>", and each entry carries the
+   moment it happened:
+
+     COMMENT 1-10      a note, or a stage change, each with its timestamp.
+                       Entries the ERP writes for itself are marked [System]
+                       and are not somebody's work.
+     FOLLOW-UP 1-10    a task, with the day it was completed. The automated
+                       nudges are excluded here as they are everywhere else:
+                       1,077 of the export's 1,596 follow-ups are whatsapp or
+                       silence nudges, and 1,027 of those record "failed". A
+                       robot's failed message is not a counsellor's call.
+
+   One lead touched three times in a day counts once per day, because the
+   panel counts LEADS WORKED, not keystrokes. */
+var ADM_CM_RE = /^(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{4}),\s*(\d{1,2}):(\d{2})\s*([ap]m)\s*·\s*([^·]*?)\s*·\s*([\s\S]*)$/i;
+function _admCmParse(str) {
+  var m = ADM_CM_RE.exec(String(str || '').trim());
+  if (!m) return null;
+  var at = _admFuDate(m[1], m[2], m[3], m[4], m[5], m[6]);
+  if (!at) return null;
+  var body = String(m[8] || '');
+  return { at: at, kind: String(m[7] || '').trim().toLowerCase(), body: body,
+           sys: body.indexOf('[System]') >= 0 };
 }
-/* the leads in scope that moved on a given day, or across a window */
+/* every day on which a person did something to this lead */
+function _admTouchDays(r) {
+  if (!r) return [];
+  if (r.__td) return r.__td;
+  var seen = {}, out = [];
+  var add = function (d) {
+    var k = _admDay(d);
+    if (k && !seen[k]) { seen[k] = 1; out.push(k); }
+  };
+  (r.cm || []).forEach(function (raw) {
+    var c = _admCmParse(raw);
+    if (c && !c.sys) add(c.at);
+  });
+  (r.fu || []).forEach(function (raw) {
+    var f = _admFuParse(raw);
+    if (f && !f.auto && f.done) add(f.done);
+  });
+  out.sort();
+  try { r.__td = out; } catch (e) {}
+  return out;
+}
+function _admWorkedOn(r) {
+  var d = _admTouchDays(r);
+  return d.length ? d[d.length - 1] : '';
+}
+/* the leads in scope a person worked on a given day, or across a window */
 function _admMoved(rows, from, to) {
+  var hi = to || from;
   return rows.filter(function (r) {
-    var d = _admWorkedOn(r);
-    return d && d >= from && d <= (to || from);
+    var d = _admTouchDays(r);
+    for (var i = 0; i < d.length; i++) if (d[i] >= from && d[i] <= hi) return true;
+    return false;
   });
 }
 
@@ -22313,10 +22377,10 @@ function _admFollow() {
   var today = _admToday(), wkA = _admShiftDay(-7), wkB = _admShiftDay(-1);
   var MV = [
     { k: 'wtoday', lab: 'Worked today', col: '#047857',
-      note: 'leads whose stage moved today',
+      note: 'a note, a stage change or a task completed today',
       sel: function (rows) { return _admMoved(rows, today, today); } },
     { k: 'wweek', lab: 'Worked last 7 days', col: '#047857',
-      note: 'stage moved in the seven days to yesterday',
+      note: 'worked in the seven days to yesterday',
       sel: function (rows) { return _admMoved(rows, wkA, wkB); } }
   ];
 
@@ -22403,7 +22467,7 @@ function _admFollow() {
     '<thead><tr><th rowspan="2" style="vertical-align:bottom">Branch · counsellor</th>' +
     '<th rowspan="2" class="n" style="vertical-align:bottom">Leads</th>' +
     '<th colspan="2" style="text-align:center;border-left:1px solid var(--bor);' +
-      'border-bottom:1px solid var(--bor)">Leads moved · stage changed</th>' +
+      'border-bottom:1px solid var(--bor)">Leads worked · from the logs</th>' +
     '<th colspan="' + (W.length + 1) + '" style="text-align:center;border-left:1px solid var(--bor);' +
       'border-bottom:1px solid var(--bor)">Follow-up tasks</th></tr><tr>' +
     MV.map(function (w, i) { return '<th class="n"' +
@@ -22432,8 +22496,18 @@ function _admFollow() {
     return f.done && _admDay(f.done) >= wkA && _admDay(f.done) <= wkB; }).length;
   var updToday = S.rows.filter(function (r) {
     return String(r.upd || '').slice(0, 10) === today; }).length;
-  var updIdle = S.rows.filter(function (r) {
-    return String(r.upd || '').slice(0, 10) === today && (r.st === 'new' || r.st === 'not_connected'); }).length;
+  /* how many of today's Updated rows have nothing in either log for today —
+     the figure that settles what Updated is and is not good for */
+  var updQuiet = S.rows.filter(function (r) {
+    if (String(r.upd || '').slice(0, 10) !== today) return false;
+    var t = _admTouchDays(r);
+    if (t.indexOf(today) >= 0) return false;
+    var auto = false;
+    (r.fu || []).forEach(function (raw) {
+      var f = _admFuParse(raw);
+      if (f && f.auto && f.done && _admDay(f.done) === today) auto = true; });
+    return !auto;
+  }).length;
 
   h += '<div style="margin-top:13px;border-radius:12px;padding:13px 16px;font-size:14.5px;line-height:1.65;' +
     'background:' + (over.length ? '#FEF2F2' : 'var(--sur)') + ';border:1px solid ' +
@@ -22453,14 +22527,18 @@ function _admFollow() {
       'hide exactly the gap this panel exists to show.' : '') +
     '</div>' +
     '<div class="au-note" style="margin-top:9px"><b>Why this panel counts two different things.</b> ' +
-    '<b>Leads moved</b> is the real measure of work done: a lead that reached 03 Followup, 04 Interested, ' +
-    '05 Visit Scheduled, 06 Visited, 07 Application Done, 08 Lost, 09 Not Interested or ' +
-    '10 Admission Completed was worked by somebody, and the stage date says when. It replaced a count of ' +
-    'follow-up task ticks, which missed most of the work — in this file ' + _admN(movWk) +
-    ' leads moved over the last seven days against ' + _admN(tickWk) + ' task ticks. ' +
-    '<b>It is deliberately not the Updated column</b>, which changes for any reason at all: ' +
-    _admN(updToday) + ' leads carry today’s date there and ' + _admN(updIdle) +
-    ' of those are still sitting at Untouched or Not Connected, so nothing was done to them. ' +
+    '<b>Leads worked</b> is read from the <b>Comment</b> and <b>Follow-up</b> columns, which are the ' +
+    'only place a human action is recorded with its own date: a note written, a stage changed, or a ' +
+    'task completed. Entries the system writes for itself are left out, and so are the automatic ' +
+    'nudges. A lead worked three times in a day counts once, because this counts leads rather than ' +
+    'keystrokes. Counting task ticks alone would miss most of it — ' + _admN(movWk) +
+    ' leads were worked over the last seven days against ' + _admN(tickWk) + ' task ticks. ' +
+    '<b>It is deliberately not the Updated column.</b> ' + _admN(updToday) +
+    ' leads carry today’s date there' +
+    (updQuiet ? ', and ' + _admN(updQuiet) + ' of those have no entry in either log for today — ' +
+      'no note, no stage change, not even a nudge. Something re-saved them; nobody worked them. ' +
+      'Updated is the right date for an admission, which is a fact about the row, and the wrong one ' +
+      'for a day’s work. ' : '. ') +
     '<b>Follow-up tasks</b> is the other half — what is scheduled and what is late. The two are ' +
     'kept in separate column groups because they count different things.</div>';
   el.innerHTML = h;
@@ -22659,15 +22737,15 @@ function _admPace() {
      the Monthly Trends tab is filled in by hand at the end of a month: the
      season in progress is not in it yet and will not be for months. But the
      season IS in the tracker, lead by lead, and an admitted lead carries the
-     date it reached that stage. So the current season's row is built from
-     those dates instead of waiting for the tab. It is marked as the live
-     count on the page, because a month still running is not the same kind of
-     number as a closed one. */
+     date the admission was done in its Updated column. So the current season's
+     row is built from those dates instead of waiting for the tab. It is marked
+     as the live count on the page, because a month still running is not the
+     same kind of number as a closed one. */
   var liveN = 0;
   if (S.season) {
     S.rows.forEach(function (r) {
       if (!_admIsWon(r)) return;
-      var iso = r.sent || r.d;                 // when it reached "admitted"
+      var iso = _admWonDay(r);                 // the day the admission was done
       if (!iso || String(iso).length < 7) return;
       var mi = parseInt(String(iso).slice(5, 7), 10);
       if (!(mi >= 1 && mi <= 12)) return;
@@ -22737,8 +22815,8 @@ function _admPace() {
       : '') +
     (liveN
       ? '<b style="color:var(--tx)">' + S.season + ' is the live row</b>, built from the ' +
-        _admN(liveN) + ' admission' + (liveN === 1 ? '' : 's') + ' in the tracker and dated by the day ' +
-        'each one reached that stage — the Monthly Trends tab is written up at the end of a ' +
+        _admN(liveN) + ' admission' + (liveN === 1 ? '' : 's') + ' in the tracker, each dated by its ' +
+        'Updated day — the Monthly Trends tab is written up at the end of a ' +
         'month, so a season in progress is never in it. Its months are still filling. '
       : '') +
     'Read this for <b style="color:var(--tx)">when</b> a season is won rather than for how this one ' +
@@ -23721,14 +23799,15 @@ function admOpenCompare(br) {
    TARGET is the branch's own monthly admission target out of the consolidated
    plan. It is fixed and nothing here adjusts it.
 
-   ACHIEVED is counted off the tracker and dated by the day the lead REACHED
-   "admitted" — the stage-entered column — and not by the day its enquiry was
-   created. A lead that arrived last month and admitted this month belongs to
-   this month, because that is what a monthly admission target measures. The
-   two rules are not close: for November 2026 it is 20 admissions won against
-   10 enquiries-arrived, a factor of two. The plan table directly below counts
-   admissions the same way, for the same reason — two panels on one tab are
-   not allowed to disagree about the same month.
+   ACHIEVED is counted off the tracker and dated by the lead's UPDATED day,
+   not the day its enquiry was created. That is the tracker's own logic: a row
+   is created when the enquiry arrives and updated when the admission is
+   finally done. A lead that arrived last month and admitted this month
+   belongs to this month, because that is what a monthly admission target
+   measures, and the two rules are not close — for November 2026 it is 23
+   admissions done against 12 enquiries-arrived. The plan table directly below
+   counts admissions the same way, for the same reason: two panels on one tab
+   are not allowed to disagree about the same month.
 
    The percentage is deliberately NOT pro-rated for the days elapsed. The
    month's target is the month's target, and management reads this knowing
@@ -23763,12 +23842,23 @@ function _ambOrd(n) {
 function _ambBand(pct) {
   return pct == null ? 'amb-na' : pct >= 30 ? 'amb-ok' : pct >= 20 ? 'amb-warn' : 'amb-bad';
 }
-/* the month an admission belongs to: the day it reached the stage, not the day
-   the enquiry arrived. _admWorkedOn() applies the same rule to the follow-up
-   panel, which is why the two agree. */
+/* ══ THE DAY AN ADMISSION BELONGS TO — ONE RULE, USED EVERYWHERE ══
+   Corrected 7 November 2026 to the UPDATED column, on the tracker's own
+   logic: a row is CREATED when the enquiry arrives and UPDATED when the
+   admission is finally done, so Updated is the date the admission happened
+   and Created is the date the lead did. The tab had been dating admissions by
+   Stage Entered, which is close but not the column the office works from.
+
+   Leads are counted on Created, admissions on Updated, and nothing on this
+   tab counts an admission any other way — the card at the top, the monthly
+   plan table and the season chart all come through here. */
+function _admWonDay(r) {
+  var iso = (r && r.upd) || '';
+  return String(iso).length >= 10 ? String(iso).slice(0, 10) : '';
+}
 function _ambWonMonth(r) {
-  var iso = r.sent || r.d || '';
-  return String(iso).length >= 7 ? String(iso).slice(0, 7) : '';
+  var d = _admWonDay(r);
+  return d ? d.slice(0, 7) : '';
 }
 function _ambMonthRows(ym) {
   var S = _admSet(), R = _admRaw, PLAN = (R && R.plan) || {};
@@ -23889,8 +23979,8 @@ function _ambMonthStatus() {
         '<span class="amb-bad"><i></i>Below 20%</span>' +
       '</div>' +
       '<div class="amb-ft">Target is the branch’s own monthly plan for ' + _admEsc(full) +
-        ', not pro-rated for the days gone · an admission counts in the month it ' +
-        'reached that stage, not the month its enquiry arrived · click a branch for the students' +
+        ', not pro-rated for the days gone · an admission counts in the month it was ' +
+        'completed, not the month its enquiry arrived · click a branch for the students' +
       '</div>' +
     '</div>';
   show(true);
@@ -23909,19 +23999,18 @@ function _admPlanPanel() {
 
   /* WHICH MONTH A FIGURE BELONGS TO — corrected 7 Nov 2026.
 
-     A lead belongs to the month it ARRIVED: that is what a lead target is.
-     An admission belongs to the month it was WON, which is what an admission
-     target is, and until now this table could not tell the difference. It
-     counted admissions by arrival date too, with a note underneath admitting
-     the tracker carried no conversion date and asking for one.
+     A lead belongs to the month it ARRIVED — the Created column — because
+     that is what a lead target counts. An admission belongs to the month it
+     was DONE, which is the Updated column, because that is what an admission
+     target counts. This table used to date both by arrival, with a note
+     underneath admitting the tracker carried no conversion date and asking
+     for one; it carries one, and has all along.
 
-     That column now exists and is read — the stage-entered date, every one of
-     this season's admitted rows carries it — so the note was describing a gap
-     that had been closed. The difference is not cosmetic: for November 2026
-     the old rule showed 10 admissions and the correct one shows 20, because
-     ten leads that arrived in October were won in November. The Admission
-     Status card above counts them the same way, and two panels on one tab do
-     not get to disagree about the same month. */
+     The difference is not cosmetic: for November 2026 arrival-dating shows 12
+     admissions and the correct rule shows 23, because eleven leads that came
+     in during October were admitted in November. The Admission Status card
+     above counts them the same way, and two panels on one tab do not get to
+     disagree about the same month. */
   var got = {};
   S.rows.forEach(function (r) {
     if (!isL && !_admIsWon(r)) return;
@@ -23994,11 +24083,11 @@ function _admPlanPanel() {
     (dueT ? '(' + Math.round(100 * dueG / dueT) + '%) ' : '') + 'have come in' +
     (thisYm === MM[0] ? ', with ' + _admMonthLab(thisYm) + ' still running' : '') + '. ' +
     'These targets are fixed and nothing on this page adjusts them.' +
-    (isL ? ' A lead is counted in the month it <b style="color:var(--tx)">arrived</b>.'
-         : ' An admission is counted in the month it was <b style="color:var(--tx)">won</b> \u2014 the ' +
-           'day the lead reached that stage \u2014 and not the month its enquiry arrived. Those are the ' +
-           'same thing in the opening month and not afterwards: a lead that came in during October and ' +
-           'admitted in November is November\u2019s. The card at the top of the tab counts it the same way.') +
+    (isL ? ' A lead is counted in the month it <b style="color:var(--tx)">arrived</b> \u2014 its Created day.'
+         : ' An admission is counted in the month it was <b style="color:var(--tx)">completed</b> \u2014 ' +
+           'its Updated day \u2014 and not the month its enquiry arrived. Those are the same thing in the ' +
+           'opening month and not afterwards: a lead that came in during October and was admitted in ' +
+           'November is November\u2019s. The card at the top of the tab counts it the same way.') +
     '</div>';
   el.innerHTML = h;
 }
