@@ -22434,6 +22434,9 @@ function _admLeadTable(rows, hiTasks) {
     var today = _admToday();
     var nsCell = !ns
       ? '<span style="color:#DC2626;font-weight:700">none recorded</span>'
+      : ns.src === 'stale'
+        ? '<span style="color:#B45309;font-weight:700">nothing booked</span>' +
+          '<div style="font-size:11px;color:var(--txl)">' + e(ns.note) + '</div>'
       : ns.src === 'event'
         ? '<span style="color:var(--txm)">' + e(ns.note) + '</span><div style="font-size:11px;' +
           'color:var(--txl)">no date given</div>'
@@ -22676,14 +22679,60 @@ function _admRelDate(phrase, anchor) {
 function _admNextStep(r) {
   if (!r) return null;
   if (r.__ns !== undefined) return r.__ns;
-  var out = null, best = null;
-  /* a pending human task is the next action, with no interpretation needed */
+  var out = null, today = _admToday();
+
+  /* ══ WHICH PENDING TASK GOVERNS ══ (corrected 7 November 2026)
+
+     A lead carries more than one open task often enough to matter — 54 of the
+     612 open leads do — and the reader used to take the OLDEST of them, which
+     made a lead look abandoned while a call was booked for next week. Tanvik
+     Tejas at Bachupally had a task dated 3 November still open and another
+     dated the 11th, a note on the 6th saying the parent was not answering,
+     and a stage update the same day. Nobody had forgotten this lead. It read
+     as overdue because of the 3rd.
+
+     So:
+       SOMETHING BOOKED AHEAD wins. Among the open tasks, any dated today or
+         later is the next action, and the earliest of those is the one that
+         comes next. The older one was missed, not forgotten, and the lead is
+         not overdue. 15 leads come out of the overdue count on this alone.
+       EVERYTHING IN THE PAST falls back to the LATEST of them, because the
+         most recent date is the most current statement of what was meant to
+         happen — not the oldest, which is simply the staleset.
+       WORKED SINCE overrides even that. If the lead was written on, moved or
+         had a task completed ON OR AFTER that date, the counsellor has moved
+         past the open task and only forgot to tick it. That is not an overdue
+         follow-up, it is an unbooked next call, and it belongs with the leads
+         that have nothing scheduled rather than with the neglected ones.
+         Another 32 leads. */
+  var pend = [];
   (r.fu || []).forEach(function (raw) {
     var f = _admFuParse(raw);
-    if (!f || f.auto || !f.open || !f.due) return;
-    if (!best || f.due < best.due) best = f;
+    if (f && !f.auto && f.open && f.due) pend.push(f);
   });
-  if (best) out = { day: _admDay(best.due), src: 'task', note: best.kind || 'follow-up task' };
+  pend.sort(function (a, b) { return a.due - b.due; });
+  var ahead = null, latePast = null, i;
+  for (i = 0; i < pend.length; i++) {
+    var d = _admDay(pend[i].due);
+    if (d >= today) { if (!ahead) ahead = pend[i]; }
+    else latePast = pend[i];
+  }
+  var best = ahead || latePast;
+  if (best) {
+    var bday = _admDay(best.due);
+    if (bday >= today) {
+      out = { day: bday, src: 'task', note: best.kind || 'follow-up task' };
+    } else {
+      var tdays = _admTouchDays(r), last = tdays.length ? tdays[tdays.length - 1] : '';
+      if (last && last >= bday) {
+        /* the work has moved on past the open task */
+        out = { day: '', src: 'stale', note: 'last worked ' + last +
+                ', nothing booked since', worked: last };
+      } else {
+        out = { day: bday, src: 'task', note: best.kind || 'follow-up task' };
+      }
+    }
+  }
   if (!out) {
     /* otherwise the newest note that looks forward */
     var ents = [];
@@ -22820,8 +22869,10 @@ function _admFollow() {
       sel: function (rows) { return rows.filter(function (r) {
         var n = _admNextStep(r); return n && n.day && n.day < today; }); } },
     { k: 'nsnone', lab: 'No next step', col: '#B45309',
-      note: 'nothing scheduled and nothing in the notes that sets a date',
-      sel: function (rows) { return rows.filter(function (r) { return !_admNextStep(r); }); } }
+      note: 'nothing booked ahead \u2014 either nothing was ever scheduled, or the lead has been ' +
+            'worked past the last open task without a new one being set',
+      sel: function (rows) { return rows.filter(function (r) {
+        var n = _admNextStep(r); return !n || (!n.day && n.src !== 'event'); }); } }
   ];
 
   /* NO TILES (7 November 2026). The panel opened on twelve of them and every
