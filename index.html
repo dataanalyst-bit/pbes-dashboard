@@ -3596,7 +3596,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div class="au-sec">
         <h3>⏰ Follow-up report as on today</h3>
         <div class="sub">Where the follow-up stands this morning: what was worked today and yesterday, what
-          is due today, what is still open, and what has run past its date. Work is read from the
+          is due today, what is still open, and what has run past its date. Everything on the pending side
+          counts only the leads a counsellor still follows up — <b>01 Untouched, 02 Not Connected,
+          03 Followup, 04 Interested, 05 Visit Scheduled, 06 Visited</b> and <b>07 Application Done</b>.
+          A lead that is Lost, Not Interested or already Admitted is finished with and is owed nothing.
+          Work is read from the
           <b>Comment</b> and <b>Follow-up</b> columns — a note written, a stage changed or a task completed
           — because those are the only entries that carry their own date. Only what a person has to do is
           counted: calls, visit reminders, re-engagement and decision deadlines. The automatic WhatsApp and
@@ -22111,7 +22115,29 @@ function _admFuParse(str) {
   return { due: due, kind: kind, done: null, open: /^pending/i.test(tail),
            note: tail.replace(/^pending\s*·?\s*/i, '').trim(), auto: !!ADM_FU_AUTO[kind] };
 }
-/* every HUMAN follow-up in scope, each carrying its lead */
+/* ══ THE SEVEN STAGES A COUNSELLOR STILL FOLLOWS UP ══ (7 November 2026)
+   01 Untouched, 02 Not Connected, 03 Followup, 04 Interested,
+   05 Visit Scheduled, 06 Visited, 07 Application Done.
+
+   The other three are finished with, each for its own reason: 08 Lost and
+   09 Not Interested are closed, and 10 Admission Completed has already become
+   a student. Nobody owes any of them a call, so counting their tasks as
+   pending work inflates the queue with items that should never be actioned —
+   on the 7 November file, 42 of the 258 "overdue" tasks were chasing leads
+   that were already lost, declined or admitted. Those are gone from the
+   pending figures now.
+
+   This bounds what is OWED, not what was DONE. The worked columns still count
+   every lead a counsellor touched, including the ones they closed: ringing a
+   parent and establishing they are not interested is the job, and 140 of the
+   419 leads worked in the last seven days have since closed — 106 lost, 10
+   declined and 24 admitted. Dropping those would hide a third of the week's
+   work, which is the error this panel was rebuilt to stop making. */
+var ADM_FOLLOWABLE = { new: 1, not_connected: 1, contacted: 1, interested: 1,
+                       visit_scheduled: 1, visited: 1, admission_form_issued: 1 };
+function _admFollowable(r) { return !!(r && ADM_FOLLOWABLE[r.st]); }
+
+/* every HUMAN follow-up still owed, each carrying its lead */
 var _admFuCache = null;
 function _admFollowUps() {
   var S = _admSet();
@@ -22119,6 +22145,7 @@ function _admFollowUps() {
   if (_admFuCache && _admFuCache.sig === sig) return _admFuCache.list;
   var out = [];
   S.rows.forEach(function (r) {
+    if (!_admFollowable(r)) return;        // closed, declined or already admitted
     (r.fu || []).forEach(function (raw) {
       var f = _admFuParse(raw);
       if (!f || f.auto) return;            // automatic nudges are not somebody's work
@@ -22616,14 +22643,18 @@ function _admFollow() {
      was invisible in the old table, which is the same bug in another place. */
   var byBr = {}, brOrder = [];
   var slot = function (br, c) {
-    if (!byBr[br]) { byBr[br] = { n: br, all: [], rows: [], c: {}, order: [] }; brOrder.push(br); }
+    if (!byBr[br]) { byBr[br] = { n: br, all: [], rows: [], open: [], c: {}, order: [] }; brOrder.push(br); }
     var B = byBr[br];
     var k = _admCKey(c);
-    if (!B.c[k]) { B.c[k] = { n: c, all: [], rows: [] }; B.order.push(k); }
+    if (!B.c[k]) { B.c[k] = { n: c, all: [], rows: [], open: [] }; B.order.push(k); }
     return { B: B, C: B.c[k] };
   };
+  /* rows is every lead, which the worked columns read; open is the book still
+     owed a follow-up, which the Leads column and the task columns read */
   S.rows.forEach(function (r) {
-    var x = slot(r.b, _admCName(r)); x.B.rows.push(r); x.C.rows.push(r);
+    var x = slot(r.b, _admCName(r));
+    x.B.rows.push(r); x.C.rows.push(r);
+    if (_admFollowable(r)) { x.B.open.push(r); x.C.open.push(r); }
   });
   FU.forEach(function (f) {
     var x = slot(f.br, f.c); x.B.all.push(f); x.C.all.push(f);
@@ -22651,7 +22682,7 @@ function _admFollow() {
       body += '<tr><td><button class="na-secbtn" onclick="admTog(' +
         JSON.stringify(key).replace(/"/g, '&quot;') + ')" style="font-weight:700">' +
         (_admOpen[key] ? '▾ ' : '▸ ') + _admEsc(bn) + '</button></td>' +
-        '<td class="n" style="color:var(--txm)">' + _admN(B.rows.length) + '</td>' +
+        '<td class="n" style="color:var(--txm)">' + _admN(B.open.length) + '</td>' +
         MV.map(function (w, i) { return mcell(B.rows, w, bn, i === 0); }).join('') +
         '<td class="n" style="color:var(--txm);border-left:1px solid var(--bor)">' + _admN(B.all.length) + '</td>' +
         W.map(function (w) { return cell(B.all, w, bn); }).join('') + '</tr>';
@@ -22661,7 +22692,7 @@ function _admFollow() {
           var C = B.c[k];
           body += '<tr style="background:var(--pl)"><td style="padding-left:31px;color:var(--txm)">' +
             _admEsc(C.n) + '</td>' +
-            '<td class="n" style="color:var(--txm)">' + _admN(C.rows.length) + '</td>' +
+            '<td class="n" style="color:var(--txm)">' + _admN(C.open.length) + '</td>' +
             MV.map(function (w, i) { return mcell(C.rows, w, bn + ' · ' + C.n, i === 0); }).join('') +
             '<td class="n" style="color:var(--txm);border-left:1px solid var(--bor)">' + _admN(C.all.length) + '</td>' +
             W.map(function (w) { return cell(C.all, w, bn + ' · ' + C.n); }).join('') + '</tr>';
@@ -22669,11 +22700,14 @@ function _admFollow() {
     });
   h += '<div style="overflow-x:auto;margin-top:14px"><table class="au-tbl" style="min-width:1020px">' +
     '<thead><tr><th rowspan="2" style="vertical-align:bottom">Branch · counsellor</th>' +
-    '<th rowspan="2" class="n" style="vertical-align:bottom">Leads</th>' +
+    '<th rowspan="2" class="n" style="vertical-align:bottom" title="Leads still on one of the seven ' +
+      'stages a counsellor follows up — Lost, Not Interested and Admitted are left out">Open leads</th>' +
     '<th colspan="' + MV.length + '" style="text-align:center;border-left:1px solid var(--bor);' +
-      'border-bottom:1px solid var(--bor)">Leads worked · from the logs</th>' +
+      'border-bottom:1px solid var(--bor)">Leads worked · from the logs ' +
+      '<span style="font-weight:600;opacity:.8">(every lead, closed ones too)</span></th>' +
     '<th colspan="' + (W.length + 1) + '" style="text-align:center;border-left:1px solid var(--bor);' +
-      'border-bottom:1px solid var(--bor)">Follow-up tasks</th></tr><tr>' +
+      'border-bottom:1px solid var(--bor)">Follow-up tasks ' +
+      '<span style="font-weight:600;opacity:.8">(open leads only)</span></th></tr><tr>' +
     MV.map(function (w, i) { return '<th class="n"' +
       (i === 0 ? ' style="border-left:1px solid var(--bor)"' : '') +
       ' title="' + _admEsc(w.note) + '">' + _admEsc(w.lab.replace('Worked ', '')) + '</th>'; }).join('') +
@@ -22695,7 +22729,8 @@ function _admFollow() {
   oOrd.sort(function (a, b) { return oBy[b] - oBy[a]; });
   var oldest = over.slice().sort(function (a, b) { return a.due - b.due; })[0];
   /* the three comparisons the note makes, measured rather than asserted */
-  var movWk = _admMoved(S.rows, wkA, wkB).length;
+  var movWkRows = _admMoved(S.rows, wkA, wkB), movWk = movWkRows.length;
+  var wkShut = movWkRows.filter(function (r) { return !_admFollowable(r); }).length;
   var tickWk = FU.filter(function (f) {
     return f.done && _admDay(f.done) >= wkA && _admDay(f.done) <= wkB; }).length;
   var updToday = S.rows.filter(function (r) {
@@ -22737,14 +22772,19 @@ function _admFollow() {
     'nudges. A lead worked three times in a day counts once, because this counts leads rather than ' +
     'keystrokes. Counting task ticks alone would miss most of it — ' + _admN(movWk) +
     ' leads were worked over the last seven days against ' + _admN(tickWk) + ' task ticks. ' +
+    'These columns count <b>every</b> lead a person touched, including the ones they closed: ringing a ' +
+    'parent and establishing they are not interested is the job, and ' + _admN(wkShut) + ' of the ' +
+    _admN(movWk) + ' leads worked over the last seven days have since been closed or admitted. ' +
     '<b>It is deliberately not the Updated column.</b> ' + _admN(updToday) +
     ' leads carry today’s date there' +
     (updQuiet ? ', and ' + _admN(updQuiet) + ' of those have no entry in either log for today — ' +
       'no note, no stage change, not even a nudge. Something re-saved them; nobody worked them. ' +
       'Updated is the right date for an admission, which is a fact about the row, and the wrong one ' +
       'for a day’s work. ' : '. ') +
-    '<b>Follow-up tasks</b> is the other half — what is scheduled and what is late. The two are ' +
-    'kept in separate column groups because they count different things.</div>';
+    '<b>Follow-up tasks</b> is the other half — what is scheduled and what is late, and it is bounded ' +
+    'the other way: only the leads still owed something, so a task sitting against a lost lead is not in ' +
+    'it. The two are kept in separate column groups because they count different things, over different ' +
+    'leads.</div>';
   el.innerHTML = h;
 }
 
