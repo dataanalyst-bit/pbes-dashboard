@@ -3503,6 +3503,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
       <div class="au-ctl">
         <span class="scope-chip" id="adm-scope"><i></i>All branches</span>
+        <button class="amt-b" id="adm-notes-btn" onclick="admToggleNotes()"
+          title="Show or hide the explanatory text under each panel">Notes off</button>
         <span class="exm-status" id="adm-status"></span>
       </div>
     </div>
@@ -23527,9 +23529,69 @@ function _admPaint() {
   _admCouns(); _admFollow(); _admHist();
   _admModel(); _admMethod();
   _admClean();
+  _admLean();                      // the prose goes last, once everything is drawn
   var l = document.getElementById('adm-loader'), b = document.getElementById('adm-body');
   if (l) l.style.display = 'none';
   if (b) b.style.display = 'flex';
+}
+/* ══ THE TAB WITHOUT THE PROSE ═════════════════════════════════════════════
+   Added 7 November 2026. Every panel on this tab had grown an explanation
+   under it — how a figure is counted, which column it comes from, what not to
+   read into it — and together they buried the numbers they were there to
+   protect. The text is now off by default and one chip away.
+
+   It is hidden rather than deleted on purpose. Several of those notes are the
+   only place the page says that admissions are dated by Updated and leads by
+   Created, that automatic nudges are excluded from every task figure, or that
+   a counsellor must not be ranked on overall conversion because the walk-in
+   allocation decides it. Anybody who needs to check a number can turn them
+   back on; nobody has to read them to see the chart.
+
+   What counts as prose: the description under a section heading, anything
+   tagged as a note or a footnote, and any block of running text a panel wrote
+   under its own chart. A block is only taken as running text when it holds no
+   table, chart, control or figure of its own and runs past 120 characters, so
+   legends, switches and short captions stay where they are. */
+var ADM_PROSE_HOSTS = ['adm-notes', 'adm-compare', 'adm-plan', 'adm-yoy', 'adm-funnel',
+  'adm-source', 'adm-class', 'adm-pace', 'adm-couns', 'adm-follow', 'adm-hist',
+  'adm-model', 'adm-clean', 'adm-trend', 'adm-month'];
+var _admNotesOn = (function () {
+  try { return localStorage.getItem('pbes_adm_notes') === '1'; } catch (e) { return false; }
+})();
+function _admProseNodes() {
+  var out = [], pane = document.getElementById('pane-adm27');
+  if (!pane) return out;
+  /* the descriptions under each section heading, and anything already marked
+     as a note or a footnote */
+  pane.querySelectorAll('.au-sec > .sub, .au-note, .amb-ft, .amt-ft').forEach(function (n) {
+    if (n.id !== 'adm-method') out.push(n);
+  });
+  /* and the running text each panel writes under its own chart */
+  ADM_PROSE_HOSTS.forEach(function (id) {
+    var host = document.getElementById(id);
+    if (!host) return;
+    for (var i = 0; i < host.children.length; i++) {
+      var c = host.children[i];
+      if (c.tagName !== 'DIV') continue;
+      if (c.querySelector('table, svg, canvas, button, input, select, .au-kpi')) continue;
+      if ((c.textContent || '').trim().length <= 120) continue;
+      out.push(c);
+    }
+  });
+  return out;
+}
+function _admLean() {
+  var btn = document.getElementById('adm-notes-btn');
+  if (btn) {
+    btn.textContent = _admNotesOn ? 'Notes on' : 'Notes off';
+    btn.className = 'amt-b' + (_admNotesOn ? ' on' : '');
+  }
+  _admProseNodes().forEach(function (n) { n.style.display = _admNotesOn ? '' : 'none'; });
+}
+function admToggleNotes() {
+  _admNotesOn = !_admNotesOn;
+  try { localStorage.setItem('pbes_adm_notes', _admNotesOn ? '1' : '0'); } catch (e) {}
+  _admLean();
 }
 window._admRepaint = function () { if (_admLoaded) _admPaint(); };
 
@@ -24658,8 +24720,7 @@ function _ambMonthStatus() {
     '<div class="amb">' +
       '<div class="amb-hd">' +
         '<div class="amb-ttl">Admission Status – <span>' + _admEsc(span) + '</span></div>' +
-        '<div class="amb-sb">Target against achieved · ' + _admEsc(winLab) +
-          (months.length > 1 ? ' · the season so far, not this month alone' : '') + '</div>' +
+        '<div class="amb-sb">Target against achieved · ' + _admEsc(winLab) + '</div>' +
         '<div class="amb-kpis">' +
           '<div class="amb-k"><b>' + _admN(T) + '</b><span>' +
             (months.length > 1 ? 'TARGET TO DATE' : _ambMonthShort(ym).split(' ')[0].toUpperCase() +
