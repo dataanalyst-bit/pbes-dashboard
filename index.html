@@ -21800,6 +21800,27 @@ function _admKpis() {
   var tgt = 0;
   _admBranches(S).forEach(function (b) { tgt += _admTarget(b); });
 
+  /* ══ THE THREE ADMISSION FIGURES MUST RECONCILE ══ (10 November 2026)
+     This tile counts every admitted row and asks nothing about dates. The
+     Admission Status card and the monthly plan both count admissions that
+     fall inside a planned month. The three are the same number while the
+     dates are sound, and on 10 November they read 80, 49 and 51 because the
+     Updated column had come through with its day and month the wrong way
+     round and most of the admissions had landed outside the season.
+
+     The dates are repaired at source now, but a reader that cannot notice its
+     own figures disagreeing will let the next such break through just as
+     quietly. So the gap is measured here and printed on the tile. */
+  var PM = {}; ((_admRaw && _admRaw.planMonths) || []).forEach(function (m) { PM[m] = 1; });
+  var offPlan = 0;
+  if (Object.keys(PM).length) {
+    rows.forEach(function (r) {
+      if (!_admIsWon(r)) return;
+      var d = _admWonDay(r);
+      if (!d || !PM[d.slice(0, 7)]) offPlan++;
+    });
+  }
+
   function tile(id, ico, bg, fg, col, val, lab, note) {
     return '<button class="au-kpi na-kpi-b" onclick="admOpenKpi(\'' + id + '\')" ' +
       'title="Click for the branch-wise breakdown">' +
@@ -21813,7 +21834,9 @@ function _admKpis() {
     (S.season || '') + (S.all.length ? ' · ' + _admN(open) + ' still open' : '') +
     (S.tests ? ' · incl. ' + _admN(S.tests) + ' test row' + (S.tests === 1 ? '' : 's') : ''));
   h += tile('won', '🎓', '#ECFDF5', '#047857', '#059669', _admN(won), 'Admitted so far',
-    tgt ? _admPct1(won, tgt) + '% of a ' + _admN(tgt) + ' target' : 'no target set');
+    (tgt ? _admPct1(won, tgt) + '% of a ' + _admN(tgt) + ' target' : 'no target set') +
+    (offPlan ? ' · <b style="color:#DC2626">' + _admN(offPlan) + ' carry a date outside the plan' +
+      '</b>, so the card and the plan table below will read lower' : ''));
   h += tile('conv', '📈', '#F5F3FF', '#6D28D9', '#7C3AED', _admPct1(won, rows.length) + '%', 'Conversion rate',
     _admN(won) + ' admitted of ' + _admN(rows.length) + ' leads');
   h += tile('cold', '📵', '#FFFBEB', '#B45309', cold ? '#D97706' : '#059669', _admN(cold),
