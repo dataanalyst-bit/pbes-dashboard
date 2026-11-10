@@ -24672,9 +24672,22 @@ function _ambMonthRows(months) {
   return _admBranches(S).map(function (b) {
     var pb = (PLAN[b] || {}).adms || {}, tgt = 0;
     (months || []).forEach(function (m) { tgt += +(pb[m] || 0) || 0; });
-    var won = S.rows.filter(function (r) {
-      return r.b === b && _admIsWon(r) && inWin[_ambWonMonth(r)];
-    });
+    /* ══ THE STATUS DECIDES THE COUNT ══ (10 November 2026)
+       This card covers the season so far, and a lead whose Status reads
+       "10 - Admission Completed" is an admission of this season whatever its
+       Updated cell happens to say. It used to be dropped when that cell fell
+       outside the window, and on 10 November that cost 31 of 80 admissions:
+       the card read 49 while the tile above it read 80 and nothing on the page
+       explained the gap.
+
+       So every admitted row is counted. The date still decides which month a
+       row belongs to for the plan table below; here it decides nothing, and a
+       row whose date cannot place it is carried rather than lost. The number
+       carried is reported, because a date that cannot place an admission is
+       worth fixing at source even when it no longer costs anything. */
+    var all = S.rows.filter(function (r) { return r.b === b && _admIsWon(r); });
+    var won = all, off = 0;
+    all.forEach(function (r) { if (!inWin[_ambWonMonth(r)]) off++; });
     /* the curriculum split of what was actually taken, where it was recorded.
        The plan sets no per-strand target, so this is the achieved side alone —
        printing it as a fraction of something that does not exist would invent
@@ -24687,7 +24700,7 @@ function _ambMonthRows(months) {
     });
     order.sort(function (x, y) { return cur[y] - cur[x]; });
     var named = order.reduce(function (n, k) { return n + cur[k]; }, 0);
-    return { b: b, tgt: tgt, got: won.length, rows: won,
+    return { b: b, tgt: tgt, got: won.length, rows: won, off: off,
              pct: tgt ? won.length / tgt * 100 : null,
              split: order.map(function (k) { return k + ' ' + cur[k]; }).join(' · '),
              unrec: won.length - named };
@@ -24900,8 +24913,8 @@ function _ambMonthStatus() {
     return;
   }
 
-  var T = 0, G = 0, all = [];
-  rows.forEach(function (r) { T += r.tgt; G += r.got; all = all.concat(r.rows); });
+  var T = 0, G = 0, OFF = 0, all = [];
+  rows.forEach(function (r) { T += r.tgt; G += r.got; OFF += (r.off || 0); all = all.concat(r.rows); });
   var pct = T ? G / T * 100 : null;
   var today = new Date();
 
@@ -24963,7 +24976,9 @@ function _ambMonthStatus() {
       '<div class="amb-ft">Target is the branch’s own monthly plan added up across ' +
         _admN(months.length) + ' month' + (months.length === 1 ? '' : 's') +
         ', with the month still running counted in full rather than pro-rated \u00b7 ' +
-        'an admission counts on the day it was completed, not the day its enquiry arrived \u00b7 ' +
+        'every lead whose status reads 10 \u2013 Admission Completed is counted here \u00b7 ' +
+        (OFF ? _admN(OFF) + ' of them carry a date outside these months and are counted all the ' +
+               'same \u00b7 ' : '') +
         'click a branch for the students' +
       '</div>' +
     '</div>';
@@ -24979,7 +24994,8 @@ function _admPlanPanel() {
   var MM = R.planMonths || [], brs = _admBranches(S);
   if (!MM.length) { el.innerHTML = '<div class="au-empty">No monthly plan is loaded.</div>'; return; }
   var isL = _admPlanMetric === 'leads';
-  var today = _admIso(new Date()), thisYm = today.slice(0, 7);
+  var today = _admIso(new Date()), thisYm = today.slice(0, 7), offPlan = 0;
+  if (MM.indexOf(thisYm) < 0) thisYm = MM[MM.length - 1];
 
   /* WHICH MONTH A FIGURE BELONGS TO — corrected 7 Nov 2026.
 
@@ -24999,6 +25015,11 @@ function _admPlanPanel() {
   S.rows.forEach(function (r) {
     if (!isL && !_admIsWon(r)) return;
     var ym = isL ? String(r.d || '').slice(0, 7) : _ambWonMonth(r);
+    /* An admission whose date falls outside the plan altogether still happened.
+       It is placed in the month now running rather than dropped, so the row
+       totals keep matching the status count; the note under the table says how
+       many were placed that way. */
+    if (!isL && (!ym || MM.indexOf(ym) < 0)) { ym = thisYm; offPlan++; }
     if (!ym) return;
     got[r.b + '|' + ym] = (got[r.b + '|' + ym] || 0) + 1;
   });
@@ -25067,6 +25088,10 @@ function _admPlanPanel() {
     (dueT ? '(' + Math.round(100 * dueG / dueT) + '%) ' : '') + 'have come in' +
     (thisYm === MM[0] ? ', with ' + _admMonthLab(thisYm) + ' still running' : '') + '. ' +
     'These targets are fixed and nothing on this page adjusts them.' +
+    (!isL && offPlan ? ' <b style="color:#B45309">' + _admN(offPlan) + '</b> admission' +
+      (offPlan === 1 ? '' : 's') + ' carry a date outside these months and ' +
+      (offPlan === 1 ? 'is' : 'are') + ' shown under ' + _admMonthLab(thisYm) +
+      ' rather than dropped, so this table still adds up to the admitted count.' : '') +
     (isL ? ' A lead is counted in the month it <b style="color:var(--tx)">arrived</b> \u2014 its Created day.'
          : ' An admission is counted in the month it was <b style="color:var(--tx)">completed</b> \u2014 ' +
            'its Updated day \u2014 and not the month its enquiry arrived. Those are the same thing in the ' +
