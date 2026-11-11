@@ -37608,8 +37608,9 @@ window.T1 = (function () {
   /* which rows are open, and the switch on the problems panel */
   var _t1Open = {};
   window.t1Toggle = function (k) { _t1Open[k] = !_t1Open[k]; build(); };
-  var T1_PROB = 'raised';
-  window.t1ProbMode = function (m) { T1_PROB = m; build(); };
+  /* which branch the problems panel is held to; '' is all of them */
+  var T1_PROBBR = '';
+  window.t1ProbBranch = function (b) { T1_PROBBR = b || ''; build(); };
 
   function build() {
     if (!M) return;
@@ -38119,17 +38120,17 @@ window.T1 = (function () {
        homework problem and not a transport problem, which counting mentions
        could never tell apart.
 
-       Three orderings, because "the biggest problem" is three different
-       questions and they disagree:
+       The switch picks the BRANCH, because the list that matters to a
+       principal is their own and the list that matters to the group is all
+       five together. The order is fixed: most parents first, which is what
+       the panel is titled.
 
-         Most raised      — how many parents complained of it. Volume.
-         Most damaging    — how far those parents' overall rating sits below
-                            the rest. A problem raised by forty parents who
-                            still rate the school 4.5 is not the one costing
-                            us families.
-         Most urgent      — the urgency axis already on this tab: a child
-                            hurt, a matter raised repeatedly, an unanswered
-                            escalation, a family threatening to leave.
+       It carried three orderings when it was first built — by volume, by
+       damage, by urgency — which answered a question nobody on this tab was
+       asking. The three figures are still printed, one to a column, so a
+       problem raised by forty parents who still rate the school 4.5 can be
+       told apart from one raised by eleven who rate it 2.0 by reading across
+       instead of re-sorting.
 
        Lift is the honest version of "damaging": the theme's mean overall
        rating minus the mean of every other respondent, so a stage that rates
@@ -38138,18 +38139,40 @@ window.T1 = (function () {
        a pattern — but it is still counted and listed underneath. */
     (function () {
       var el = $('t1-problems'); if (!el) return;
-      var MODES = [
-        { k: 'raised',  lab: 'Most raised',   d: 'how many parents complained of it' },
-        { k: 'damage',  lab: 'Most damaging', d: 'how far below the rest those parents rate the school' },
-        { k: 'urgent',  lab: 'Most urgent',   d: 'hurt children, repeat complaints, families threatening to leave' }
-      ];
-      var sw = $('t1-prob-sw');
-      if (sw) sw.innerHTML = MODES.map(function (m) {
-        return '<button class="ex-sw' + (T1_PROB === m.k ? ' on' : '') + '" onclick="t1ProbMode(' +
-          JSON.stringify(m.k).replace(/"/g, '&quot;') + ')" title="' + esc(m.d) + '">' + esc(m.lab) + '</button>';
-      }).join('');
 
-      var said = R.filter(function (o) { return o.sub; });
+      /* ── BRANCH BY BRANCH ─────────────────────────────────────────────
+         The list that matters to a principal is their own, and the one that
+         matters to the group is all five together — so the switch picks the
+         campus rather than a way of sorting. The table keeps every figure it
+         had, so how damaging a problem is and how urgent it is are still read
+         off their own columns; it is the ordering that is now fixed, by how
+         many parents raised it, which is what this panel is titled.
+
+         When the filter at the top of the page is already held to one branch
+         this panel follows it and offers nothing to switch, because a button
+         promising another campus would hand back a list the rest of the tab
+         is not showing. */
+      var held = (BR && BR !== 'ALL') ? BR : '';
+      var pick = held || T1_PROBBR;
+      if (pick && branches.indexOf(pick) < 0) { pick = ''; T1_PROBBR = ''; }
+
+      var sw = $('t1-prob-sw');
+      if (sw) {
+        if (held) {
+          sw.innerHTML = '<span style="font-size:11.5px;color:var(--txm);align-self:center">' +
+            'Held to <b style="color:var(--tx)">' + esc(held) + '</b> by the filter at the top of the page.</span>';
+        } else {
+          var btn = function (v, lab) {
+            return '<button class="ex-sw' + (pick === v ? ' on' : '') + '" onclick="t1ProbBranch(' +
+              JSON.stringify(v).replace(/"/g, '&quot;') + ')">' + esc(lab) + '</button>';
+          };
+          sw.innerHTML = btn('', 'All branches') +
+            branches.map(function (b) { return btn(b, b); }).join('');
+        }
+      }
+
+      var base = pick ? inBranch(ALL.filter(function (o) { return o.branch === pick; })) : R;
+      var said = base.filter(function (o) { return o.sub; });
       if (!said.length) {
         el.innerHTML = '<div class="au-empty">No written comments in this view.</div>'; return;
       }
@@ -38190,9 +38213,9 @@ window.T1 = (function () {
       var ranked = items.filter(function (x) { return x.n >= MINP; });
       var thin = items.filter(function (x) { return x.n < MINP; })
                       .sort(function (a, b) { return b.n - a.n; });
+      /* most raised first, and where two are level the one whose parents rate
+         the school lowest goes above */
       ranked.sort(function (a, b) {
-        if (T1_PROB === 'damage') return (a.lift == null ? 99 : a.lift) - (b.lift == null ? 99 : b.lift);
-        if (T1_PROB === 'urgent') return b.urg - a.urg || b.n - a.n;
         return b.n - a.n || (a.lift == null ? 99 : a.lift) - (b.lift == null ? 99 : b.lift);
       });
       var top = ranked.slice(0, 10);
