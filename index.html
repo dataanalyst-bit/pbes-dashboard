@@ -1444,6 +1444,12 @@ async function idbGet(key){
     t.onsuccess=()=>res(t.result); t.onerror=()=>res(null);
   }); }catch(e){ return null; }
 }
+async function idbDel(key){
+  try{ const db=await _idbOpen(); return await new Promise((res)=>{
+    const t=db.transaction('kv','readwrite').objectStore('kv').delete(key);
+    t.onsuccess=()=>res(true); t.onerror=()=>res(false);
+  }); }catch(e){ return false; }
+}
 async function idbSet(key,val){
   try{ const db=await _idbOpen(); return await new Promise((res)=>{
     const t=db.transaction('kv','readwrite').objectStore('kv').put(val,key);
@@ -15395,7 +15401,7 @@ async function _examEnsureForScorecard(){
   window.__examRankLoading=true;
   try{
     let raw=null;
-    try{ const c=await idbGet('pbes_pt1_v2'); if(c&&c.data&&c.data.students) raw=c.data; }catch(e){}
+    try{ const c=await idbGet('pbes_pt1_v3'); if(c&&c.data&&c.data.students) raw=c.data; }catch(e){}
     if(!raw){
       const s=await sb.auth.getSession();
       const session=s&&s.data&&s.data.session;
@@ -15405,7 +15411,7 @@ async function _examEnsureForScorecard(){
       if(!res.ok) return;
       const d=await res.json();
       raw=(d&&d.PT1_RAW&&d.PT1_RAW.students)?d.PT1_RAW:null;
-      if(raw){ try{ idbSet('pbes_pt1_v2',{t:Date.now(),data:raw}); }catch(e){} }
+      if(raw){ try{ idbSet('pbes_pt1_v3',{t:Date.now(),data:raw}); }catch(e){} }
     }
     if(raw){ window._pt1Raw=raw; if(typeof renderRankings==='function') renderRankings(); }
   }catch(e){ /* leave the review row empty */ }
@@ -16163,12 +16169,12 @@ function exSyncSwitch(){
     b.classList.toggle('on', on);
     b.setAttribute('aria-selected', on?'true':'false');
     b.disabled = !ok && !on;
-    /* Greyed out has three possible causes and the reader cannot tell them
-       apart, so the tooltip names all three rather than asserting the one
-       that happens to be least likely. */
-    b.title = ok ? '' : 'Not available yet \u2014 either the workbook has no rows for this '+
-      'sitting, or Apps Script has not been re-deployed since this sitting was added. '+
-      'Press \u21bb Refresh to re-read it.';
+    /* WHY it is greyed out, from the payload rather than from a list of
+       possibilities. A tab the script could not find reports itself; a tab it
+       found but which holds no rows is a different problem with a different
+       fix; and a payload that has never heard of the sitting at all means the
+       script is older than the dashboard. */
+    b.title = ok ? '' : _exWhyUnavailable(pair[0]);
   });
   var tag=document.getElementById('exm-tag');
   if(tag){
@@ -16176,6 +16182,28 @@ function exSyncSwitch(){
     var t=_exPayload(); var n=(t&&t.students&&t.students.rows)?t.students.rows.length:0;
     tag.innerHTML='CBSE &amp; CAIE · '+S.label+(n?' · '+n.toLocaleString('en-IN')+' students':'');
   }
+}
+
+/* What to say about a sitting that cannot be opened. */
+function _exWhyUnavailable(which){
+  var R = _pt1Raw;
+  if (!R) return 'The review has not loaded yet.';
+  if (which === 'cmp') return 'Needs both PT-1 and the Half Yearly, and one of them has no rows yet.';
+  var S = EX_SITTINGS[which]; if (!S) return '';
+  var t = R[S.key];
+  if (t === undefined)
+    return 'This dashboard knows about the ' + S.label + ', but the Apps Script that sent the '
+         + 'data does not \u2014 so it was never read. Deploy the current Code.gs (Deploy \u2192 '
+         + 'Manage deployments \u2192 edit the existing deployment \u2192 New version), then press '
+         + '\u21bb Refresh.';
+  if (t && t.missing) {
+    var seen = (R.tabsSeen || []).join(', ');
+    return 'The workbook has no tab named "' + t.missing + '". '
+         + (seen ? 'The tabs it does have are: ' + seen + '. ' : '')
+         + 'Rename the tab to match, or tell me the name it should look for.';
+  }
+  return 'The "' + (S.tab || S.label) + '" tab was found but has no rows in it yet. '
+       + 'Press \u21bb Refresh once marks are entered.';
 }
 
 /* Run once per payload. The default sitting is only honoured if its rows are
@@ -17216,8 +17244,14 @@ async function loadPT1Review(force){
         /* Keyed to the payload SHAPE, not just the data. A snapshot written
            before the half-yearly sitting existed carries no students_hy, and
            restoring it would grey the switch out for a day with nothing to
-           show why. Bumping the key retires those silently. */
-        var c=await idbGet('pbes_pt1_v2');
+           show why. Bumping the key retires those silently.
+
+           v3 (11 Nov 2026): the Term 1 Report Card joined the payload. A v2
+           snapshot is up to 24 hours old, carries no students_t1, and is
+           restored BEFORE the network answers — so the new sitting arrived
+           greyed out even on a correctly re-deployed script, which is the same
+           trap the note above was written for. */
+        var c=await idbGet('pbes_pt1_v3');
         if(c && c.data && c.data.students && (Date.now()-c.t) < 24*3600*1000){
           _pt1Raw=c.data; window._pt1Raw=c.data; _pt1Loaded=true; _pt1Post();
           _pt1SetStatus('Cached · refreshing in background');
@@ -17247,7 +17281,8 @@ async function loadPT1Review(force){
 
     var _chg=_liveMark('pt1', raw.generatedAt, function(){ loadPT1Review(true); }, function(){ return _pt1Loading; }) || !_pt1Loaded;
     _pt1Raw=raw; window._pt1Raw=raw; _pt1Loaded=true;
-    try{ idbSet('pbes_pt1_v2',{ t:Date.now(), data:raw }); }catch(e){}
+    try{ idbSet('pbes_pt1_v3',{ t:Date.now(), data:raw }); }catch(e){}
+    try{ idbDel('pbes_pt1_v2'); }catch(e){}
     if(_chg){ _pt1Post(); if(typeof renderRankings==='function') renderRankings(); }
     /* Even when the rows are unchanged, the SHAPE may not be: the instant
        paint can come from a snapshot taken before a sitting was added, which
