@@ -37410,13 +37410,54 @@ window.T1 = (function () {
     }
     return r >= g.lo && r <= g.hi;
   }
-  /* rows split into the stages that actually hold somebody */
+  /* CBSE and CAIE, as the two strands they are.
+     The mark and form sheets write three values between them — CBSE, CAIE and
+     CAIE-EY — and CAIE-EY is the Cambridge early years, the same strand at a
+     younger stage rather than a third one. Folded here so Prep does not split
+     into two Cambridge rows. Anything unrecognised keeps its own name instead
+     of being forced into one of the two. */
+  function t1Curr(v) {
+    var t = String(v == null ? '' : v).toUpperCase().replace(/[^A-Z]/g, '');
+    if (!t) return '';
+    if (t.indexOf('CBSE') === 0) return 'CBSE';
+    if (t.indexOf('CAIE') === 0 || t.indexOf('CAMBRIDGE') === 0 || t.indexOf('IGCSE') >= 0) return 'CAIE';
+    return String(v).trim();
+  }
+  /* rows split into the stages that actually hold somebody, and each stage
+     split again by strand where it runs both.
+
+     The two strands sit different papers and are run by different teams, so a
+     stage holding both is two different questions averaged onto one row. A
+     stage with only one strand in it keeps the plain label, because
+     "Prep · CAIE" where there is no CBSE prep says nothing the row does not
+     already say. */
   function t1Stages(rows) {
     var useLevel = (rows || []).some(function (o) { return o.level; });
-    return T1_SEG.map(function (g) {
-      return { label: g.label, note: g.note,
-               rows: (rows || []).filter(function (o) { return t1InSeg(o, g, useLevel); }) };
-    }).filter(function (x) { return x.rows.length; });
+    /* Whether to name the strand is decided ONCE for the whole expansion, not
+       stage by stage. Deciding it per stage reads as though the label had been
+       forgotten on some rows: in a branch running both, "Prep" sitting above
+       "Grades 1 & 2 · CBSE" looks like an omission when it is really the fact
+       that Prep runs one strand only — which is worth saying out loud. So in a
+       view holding both strands every row names its own, and in a single-strand
+       view none of them do. */
+    var all = {}; (rows || []).forEach(function (o) { var c = t1Curr(o.curr); if (c) all[c] = 1; });
+    var split = Object.keys(all).length > 1;
+    var out = [];
+    T1_SEG.forEach(function (g) {
+      var mine = (rows || []).filter(function (o) { return t1InSeg(o, g, useLevel); });
+      if (!mine.length) return;
+      if (!split) { out.push({ label: g.label, note: g.note, rows: mine, cur: Object.keys(all)[0] || '' }); return; }
+      var by = {}, order = [];
+      mine.forEach(function (o) {
+        var c = t1Curr(o.curr) || '\u2014';
+        if (!by[c]) { by[c] = []; order.push(c); }
+        by[c].push(o);
+      });
+      order.sort().forEach(function (c) {
+        out.push({ label: g.label + ' · ' + c, note: g.note, rows: by[c], cur: c });
+      });
+    });
+    return out;
   }
 
   /* which rows are open, and the switch on the problems panel */
