@@ -3437,6 +3437,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div id="t1-stages"></div>
       </div>
 
+      <div class="au-sec">
+        <h3>The ten problems parents actually raised</h3>
+        <div class="sub">Read out of the written comments in <b>9. Your Feedback</b>, not out of the star ratings.
+          A subject counts here only where the sentence naming it was itself negative, so &ldquo;transport is
+          excellent&rdquo; is not a transport problem. Every row opens the parents behind it and their own words.</div>
+        <div id="t1-prob-sw" class="ex-switch" style="margin:0 0 13px"></div>
+        <div id="t1-problems"></div>
+      </div>
+
 
 
 
@@ -37363,6 +37372,59 @@ window.T1 = (function () {
   }
 
   /* ══ the page ══ */
+/* ══ THE FIVE STAGES OF THE SCHOOL ════════════════════════════════════════
+   The same bands the School Audit uses, so a weak stage here reads straight
+   against that stage's audit score. One definition, used by the rings, by the
+   recommendation table, by the seven questions and by the branch grid — four
+   panels disagreeing about where Grade 5 sits would be worse than not
+   splitting them at all.
+
+   The sheet's own Level column is used wherever it is filled: it already
+   places "PP 1" and "PP 2", which the grade ladder does not, and those two
+   alone were 129 responses falling off every ring. The ladder stays as the
+   fallback for an older sheet. */
+  var T1_SEG = [
+    { label: 'Prep', note: 'EY, PP, Nursery, Pre-Primary', lv: 'Prep',      lo: 0,  hi: 6  },
+    { label: 'Grades 1 & 2',   note: 'I\u2013II',    lv: 'Grade 1-2',   lo: 7,  hi: 8  },
+    { label: 'Grades 3 to 5',  note: 'III\u2013V',   lv: 'Grade 3-5',   lo: 9,  hi: 11 },
+    { label: 'Grades 6 to 8',  note: 'VI\u2013VIII', lv: 'Grade 6-8',   lo: 12, hi: 14 },
+    { label: 'Grades 9 & 10',  note: 'IX\u2013X',    lv: 'Grade 9-10',  lo: 15, hi: 16 },
+    { label: 'Grades 11 & 12', note: 'XI\u2013XII',  lv: 'Grade 11-12', lo: 17, hi: 18 }
+  ];
+  function t1InSeg(o, g, useLevel) {
+    var key = function (v) { return String(v || '').toLowerCase().replace(/[^a-z0-9]/g, ''); };
+    if (useLevel && o.level) return key(o.level) === key(g.lv);
+    var r = window.T1.gradeRank(o.grade);
+    if (r === 99) {
+      var t = String(o.grade || '').toUpperCase().replace(/\s+/g, '');
+      if (/^PP[12]$/.test(t) || /^EY/.test(t) || /^(LKG|UKG|NUR)/.test(t)) return g.lo === 0;
+      /* GRADE_ORDER is written in Roman numerals, so a branch that answers the
+         form with "Grade 1" or "Stage 4" instead of "I" or "IV" ranks 99 and
+         falls off every stage on this tab. The ladder puts "I" at index 7, so
+         an Arabic grade sits at 6 + n. */
+      var m = t.match(/(\d{1,2})/);
+      if (m) {
+        var n = parseInt(m[1], 10);
+        if (n >= 1 && n <= 12) r = 6 + n;
+      }
+    }
+    return r >= g.lo && r <= g.hi;
+  }
+  /* rows split into the stages that actually hold somebody */
+  function t1Stages(rows) {
+    var useLevel = (rows || []).some(function (o) { return o.level; });
+    return T1_SEG.map(function (g) {
+      return { label: g.label, note: g.note,
+               rows: (rows || []).filter(function (o) { return t1InSeg(o, g, useLevel); }) };
+    }).filter(function (x) { return x.rows.length; });
+  }
+
+  /* which rows are open, and the switch on the problems panel */
+  var _t1Open = {};
+  window.t1Toggle = function (k) { _t1Open[k] = !_t1Open[k]; build(); };
+  var T1_PROB = 'raised';
+  window.t1ProbMode = function (m) { T1_PROB = m; build(); };
+
   function build() {
     if (!M) return;
     var el = $('t1-body'); if (!el) return;
@@ -37504,7 +37566,14 @@ window.T1 = (function () {
         rowsH.map(function (x) {
           var w = x.g.filter(function (o) { return o.callOpen; });
           var d = x.g.filter(function (o) { return o.seg === 'detractor'; });
-          return '<tr><td><b>' + esc(x.b) + '</b>' +
+          /* the same branch, stage by stage — a campus at +12 can be carrying
+             a Prep at +40 and a 9 & 10 deep in the red, and the branch line
+             says neither */
+          var ok = 'nps|' + x.b, kids = t1Stages(x.g), isOpen = !!_t1Open[ok];
+          return '<tr><td>' + (kids.length > 1
+              ? '<button class="na-secbtn" onclick="t1Toggle(' + JSON.stringify(ok).replace(/"/g, '&quot;') +
+                ')" style="font-weight:700">' + (isOpen ? '\u25be ' : '\u25b8 ') + esc(x.b) + '</button>'
+              : '<b>' + esc(x.b) + '</b>') +
               (x.g.length < 30 ? ' <span style="font-size:10px;color:' + COL.warn + ';font-weight:700">too few to rank</span>' : '') + '</td>' +
             '<td class="n">' + K(x.g, x.b + ' — every response', 'all responses', x.g.length) + '</td>' +
             '<td class="n">' + (x.st ? pc(x.g.length / x.st * 100) : '–') + '</td>' +
@@ -37516,7 +37585,28 @@ window.T1 = (function () {
                 '<span style="color:' + ratCol(x.o5 && x.o5.avg) + ';font-weight:700">' + n1(x.o5 && x.o5.avg) + '</span>') + '</td>' +
             '<td class="n">' + K(d, x.b + ' — detractors', 'scored 6 or below',
                 d.length + ' <span style="color:var(--txm)">(' + pc(x.s ? x.s.detrPct : 0) + ')</span>') + '</td>' +
-            '<td class="n">' + K(w, x.b + ' — asked for a call', 'callback list', w.length) + '</td></tr>';
+            '<td class="n">' + K(w, x.b + ' — asked for a call', 'callback list', w.length) + '</td></tr>' +
+            (isOpen ? kids.map(function (z) {
+              var zs = window.T1.npsOf(z.rows.map(function (o) { return o.nps; })
+                        .filter(function (v) { return v != null; }));
+              var zo = window.T1.dimStats(z.rows, 'overall');
+              var zd = z.rows.filter(function (o) { return o.seg === 'detractor'; });
+              var zw = z.rows.filter(function (o) { return o.callOpen; });
+              var zl = x.b + ' · ' + z.label;
+              return '<tr style="background:var(--pl)">' +
+                '<td style="padding-left:31px;color:var(--txm)">' + esc(z.label) +
+                  ' <span style="font-size:10px;color:var(--txl)">' + esc(z.note) + '</span></td>' +
+                '<td class="n">' + K(z.rows, zl, 'every response', z.rows.length) + '</td>' +
+                '<td class="n" style="color:var(--txl)">\u2013</td>' +
+                '<td>' + npsBar(zs, z.rows, zl) + '</td>' +
+                '<td class="n">' + K(z.rows, zl + ' — recommend scores',
+                    'NPS ' + sgn(zs && zs.score), '<b style="color:' + npsCol(zs && zs.score) + '">' +
+                    sgn(zs && zs.score) + '</b>') + '</td>' +
+                '<td class="n"><span style="color:' + ratCol(zo && zo.avg) + ';font-weight:700">' +
+                    n1(zo && zo.avg) + '</span></td>' +
+                '<td class="n">' + K(zd, zl + ' — detractors', 'scored 6 or below', zd.length) + '</td>' +
+                '<td class="n">' + K(zw, zl + ' — asked for a call', 'callback list', zw.length) + '</td></tr>';
+            }).join('') : '');
         }).join('') + '</tbody></table>' +
         '<div class="au-legend"><span><i style="background:' + COL.pos + '"></i>promoter 9–10</span>' +
         '<span><i style="background:#CBD5E1"></i>passive 7–8</span>' +
@@ -37544,7 +37634,12 @@ window.T1 = (function () {
           var hi = R.filter(function (o) { return o[x.d.k] >= 4; });
           var lo = R.filter(function (o) { return o[x.d.k] != null && o[x.d.k] <= 2; });
           var any = R.filter(function (o) { return o[x.d.k] != null; });
-          return '<tr' + (x.d.k === 'overall' ? ' style="background:var(--bg)"' : '') + '><td><b>' + esc(x.d.label) + '</b>' +
+          var qk = 'dim|' + x.d.k, qKids = t1Stages(R), qOpen = !!_t1Open[qk];
+          return '<tr' + (x.d.k === 'overall' ? ' style="background:var(--bg)"' : '') + '><td>' +
+            (qKids.length > 1
+              ? '<button class="na-secbtn" onclick="t1Toggle(' + JSON.stringify(qk).replace(/"/g, '&quot;') +
+                ')" style="font-weight:700">' + (qOpen ? '\u25be ' : '\u25b8 ') + esc(x.d.label) + '</button>'
+              : '<b>' + esc(x.d.label) + '</b>') +
             (x.d.k === 'overall' ? '<div style="font-size:10.5px;color:var(--txm);font-weight:600">the summary question, not an area</div>' : '') + '</td>' +
             '<td>' + distBar(x.s.dist, R, x.d.k, x.d.label) + '</td>' +
             '<td class="n">' + K(any, x.d.label + ' — every rating', 'average ' + n1(x.s.avg),
@@ -37553,7 +37648,31 @@ window.T1 = (function () {
             '<td class="n">' + K(lo, x.d.label + ' — rated 1 or 2', 'the parents to answer',
               '<span style="color:' + (x.s.low / x.s.n > 0.1 ? COL.neg : 'inherit') + '">' + x.s.low +
               ' <span style="color:var(--txm)">(' + pc(x.s.low / x.s.n * 100) + ')</span></span>') + '</td>' +
-            '<td class="n" style="color:' + (gap < -0.3 ? COL.neg : 'var(--txm)') + '">' + (gap >= -0.001 ? '—' : gap.toFixed(2)) + '</td></tr>';
+            '<td class="n" style="color:' + (gap < -0.3 ? COL.neg : 'var(--txm)') + '">' + (gap >= -0.001 ? '—' : gap.toFixed(2)) + '</td></tr>' +
+            /* the same question, stage by stage: an average of 3.9 across the
+               school can be 4.4 in Prep and 3.2 in 9 & 10, and only one of
+               those is a conversation */
+            (qOpen ? qKids.map(function (z) {
+              var zs = window.T1.dimStats(z.rows, x.d.k);
+              if (!zs) return '';
+              var zl = x.d.label + ' · ' + z.label;
+              var zhi = z.rows.filter(function (o) { return o[x.d.k] >= 4; });
+              var zlo = z.rows.filter(function (o) { return o[x.d.k] != null && o[x.d.k] <= 2; });
+              var zany = z.rows.filter(function (o) { return o[x.d.k] != null; });
+              var zgap = zs.avg - best.s.avg;
+              return '<tr style="background:var(--pl)">' +
+                '<td style="padding-left:31px;color:var(--txm)">' + esc(z.label) +
+                  ' <span style="font-size:10px;color:var(--txl)">' + esc(z.note) + '</span></td>' +
+                '<td>' + distBar(zs.dist, z.rows, x.d.k, zl) + '</td>' +
+                '<td class="n">' + K(zany, zl + ' — every rating', 'average ' + n1(zs.avg),
+                    '<b style="color:' + ratCol(zs.avg) + '">' + n1(zs.avg) + '</b>') + '</td>' +
+                '<td class="n">' + K(zhi, zl + ' — rated 4 or 5', 'satisfied parents', pc(zs.sat)) + '</td>' +
+                '<td class="n">' + K(zlo, zl + ' — rated 1 or 2', 'the parents to answer',
+                    '<span style="color:' + (zs.low / zs.n > 0.1 ? COL.neg : 'inherit') + '">' + zs.low +
+                    ' <span style="color:var(--txm)">(' + pc(zs.low / zs.n * 100) + ')</span></span>') + '</td>' +
+                '<td class="n" style="color:' + (zgap < -0.3 ? COL.neg : 'var(--txm)') + '">' +
+                    (zgap >= -0.001 ? '—' : zgap.toFixed(2)) + '</td></tr>';
+            }).join('') : '');
         }).join('') + '</tbody></table>' +
         '<div class="au-flag' + (worst.s.avg < 3.8 ? ' bad' : '') + '"><b>' + esc(best.d.label) + '</b> is the strongest ' +
         'answer at ' + n1(best.s.avg) + ' and <b>' + esc(worst.d.label) + '</b> the weakest at ' + n1(worst.s.avg) +
@@ -37572,16 +37691,30 @@ window.T1 = (function () {
         window.T1.DIMS.map(function (d) { return '<th>' + esc(d.label.replace(/ &.*| \(.*/, '')) + '</th>'; }).join('') +
         '<th class="net">n</th></tr></thead><tbody>' +
         cells.map(function (c2) {
-          return '<tr><td class="cat">' + esc(c2.b) + '</td>' +
-            c2.v.map(function (v, i) {
-              var d = window.T1.DIMS[i];
-              var rs = c2.g.filter(function (o) { return o[d.k] != null; });
-              var sh = rateShade(v);
-              return '<td><button class="au-cell t1k" data-d="' + drillId(rs) + '" data-t="' +
-                esc(c2.b + ' — ' + d.label) + '" data-s="' + esc('average ' + n1(v) + '/5 · ' + sh.t) +
-                '" style="background:' + sh.bg + ';color:' + sh.fg + ';font-weight:700">' +
-                n1(v) + '</button></td>'; }).join('') +
-            '<td class="net">' + K(c2.g, c2.b + ' — every response', 'all responses', c2.n) + '</td></tr>';
+          var gk = 'grid|' + c2.b, gKids = t1Stages(c2.g), gOpen = !!_t1Open[gk];
+          var line = function (label, note, g, pad) {
+            return '<tr' + (pad ? ' style="background:var(--pl)"' : '') + '><td class="cat"' +
+              (pad ? ' style="padding-left:28px;font-weight:600;color:var(--txm)"' : '') + '>' + label +
+              (note ? ' <span style="font-size:10px;color:var(--txl)">' + esc(note) + '</span>' : '') + '</td>' +
+              window.T1.DIMS.map(function (d) {
+                var rs = g.filter(function (o) { return o[d.k] != null; });
+                var st = window.T1.dimStats(g, d.k);
+                var v = st ? st.avg : null, sh = rateShade(v);
+                return '<td><button class="au-cell t1k" data-d="' + drillId(rs) + '" data-t="' +
+                  esc((pad ? c2.b + ' · ' + label : c2.b) + ' — ' + d.label) + '" data-s="' +
+                  esc('average ' + n1(v) + '/5 · ' + sh.t) + '" style="background:' + sh.bg + ';color:' + sh.fg +
+                  ';font-weight:700">' + n1(v) + '</button></td>'; }).join('') +
+              '<td class="net">' + K(g, (pad ? c2.b + ' · ' + label : c2.b) + ' — every response',
+                  'all responses', g.length) + '</td></tr>';
+          };
+          /* a branch average hides which stage is carrying it, so the branch
+             opens into the same five stages the rings below use */
+          var head = gKids.length > 1
+            ? '<button class="na-secbtn" onclick="t1Toggle(' + JSON.stringify(gk).replace(/"/g, '&quot;') +
+              ')" style="font-weight:700">' + (gOpen ? '\u25be ' : '\u25b8 ') + esc(c2.b) + '</button>'
+            : '<b>' + esc(c2.b) + '</b>';
+          return line(head, '', c2.g, 0) +
+            (gOpen ? gKids.map(function (z) { return line(esc(z.label), z.note, z.rows, 1); }).join('') : '');
         }).join('') + '</tbody></table></div>' +
         rateLegend() +
         '<div class="au-note">Every cell is coloured by the same fixed scale above, so a 4.0 is the same ' +
@@ -37596,30 +37729,12 @@ window.T1 = (function () {
        rather than grades needs no separate rule. */
     (function () {
       var el = $('t1-stages'); if (!el) return;
-      var rank = window.T1.gradeRank;
-      var SEG = [
-        { label: 'Prep', note: 'EY, PP, Nursery, Pre-Primary', lv: 'Prep',      lo: 0,  hi: 6  },
-        { label: 'Grades 1 & 2',  note: 'I–II',    lv: 'Grade 1-2',   lo: 7,  hi: 8  },
-        { label: 'Grades 3 to 5', note: 'III–V',   lv: 'Grade 3-5',   lo: 9,  hi: 11 },
-        { label: 'Grades 6 to 8', note: 'VI–VIII', lv: 'Grade 6-8',   lo: 12, hi: 14 },
-        { label: 'Grades 9 & 10', note: 'IX–X',    lv: 'Grade 9-10',  lo: 15, hi: 16 },
-        { label: 'Grades 11 & 12', note: 'XI–XII', lv: 'Grade 11-12', lo: 17, hi: 18 }
-      ];
-      /* The sheet now carries its own Level column. Use it wherever it is
-         filled: it already places "PP 1" and "PP 2", which the grade ladder
-         does not, and those two alone were 129 responses falling off every
-         ring. The ladder stays as the fallback for an older sheet. */
+      /* The rings, the recommendation table, the seven questions and the
+         branch grid all read T1_SEG / t1InSeg above — four panels disagreeing
+         about where Grade 5 sits would be worse than not splitting them. */
+      var SEG = T1_SEG;
       var useLevel = R.some(function (o) { return o.level; });
-      var key = function (v) { return String(v || '').toLowerCase().replace(/[^a-z0-9]/g, ''); };
-      var inSeg = function (o, g) {
-        if (useLevel && o.level) return key(o.level) === key(g.lv);
-        var r = rank(o.grade);
-        if (r === 99) {
-          var t = String(o.grade || '').toUpperCase().replace(/\s+/g, '');
-          if (/^PP[12]$/.test(t) || /^EY/.test(t)) return g.lo === 0;
-        }
-        return r >= g.lo && r <= g.hi;
-      };
+      var inSeg = function (o, g) { return t1InSeg(o, g, useLevel); };
       var SC = { 1: '#DC2626', 2: '#EA580C', 3: '#F59E0B', 4: '#1E4FD8', 5: '#059669' };
       /* an SVG ring; slices is [{v,c,label}] */
       var ring = function (sl, cx, cy, rO, rI) {
@@ -37800,6 +37915,147 @@ window.T1 = (function () {
         var host = $('t1-stage-cards');
         if (host) host.innerHTML = buildCards(window.__t1StageDim);
       });
+    })();
+
+    /* ── 2c · THE TEN PROBLEMS PARENTS ACTUALLY RAISED ──────────────────
+       Asked for on 11 November 2026.
+
+       The star ratings say a question scored 3.6. They do not say what is
+       wrong, and the written box does — so this reads the comments.
+
+       It does NOT count mentions. The tab already carries a per-theme
+       sentiment: every comment is split into clauses, each clause scored on a
+       weighted lexicon with negation and intensifiers handled ("not at all
+       happy" is not happy), and the score of a clause is attributed to the
+       themes that clause names, split where it names two. So a theme counts
+       as a PROBLEM for a parent only where the sentences naming it came out
+       negative. "Transport is excellent but homework is too much" is a
+       homework problem and not a transport problem, which counting mentions
+       could never tell apart.
+
+       Three orderings, because "the biggest problem" is three different
+       questions and they disagree:
+
+         Most raised      — how many parents complained of it. Volume.
+         Most damaging    — how far those parents' overall rating sits below
+                            the rest. A problem raised by forty parents who
+                            still rate the school 4.5 is not the one costing
+                            us families.
+         Most urgent      — the urgency axis already on this tab: a child
+                            hurt, a matter raised repeatedly, an unanswered
+                            escalation, a family threatening to leave.
+
+       Lift is the honest version of "damaging": the theme's mean overall
+       rating minus the mean of every other respondent, so a stage that rates
+       everything low cannot climb the table on its own gloom. A theme raised
+       by fewer than three parents is not ranked — one unhappy family is not
+       a pattern — but it is still counted and listed underneath. */
+    (function () {
+      var el = $('t1-problems'); if (!el) return;
+      var MODES = [
+        { k: 'raised',  lab: 'Most raised',   d: 'how many parents complained of it' },
+        { k: 'damage',  lab: 'Most damaging', d: 'how far below the rest those parents rate the school' },
+        { k: 'urgent',  lab: 'Most urgent',   d: 'hurt children, repeat complaints, families threatening to leave' }
+      ];
+      var sw = $('t1-prob-sw');
+      if (sw) sw.innerHTML = MODES.map(function (m) {
+        return '<button class="ex-sw' + (T1_PROB === m.k ? ' on' : '') + '" onclick="t1ProbMode(' +
+          JSON.stringify(m.k).replace(/"/g, '&quot;') + ')" title="' + esc(m.d) + '">' + esc(m.lab) + '</button>';
+      }).join('');
+
+      var said = R.filter(function (o) { return o.sub; });
+      if (!said.length) {
+        el.innerHTML = '<div class="au-empty">No written comments in this view.</div>'; return;
+      }
+      /* a parent has a problem with a theme when the sentences naming it were
+         negative — or when the comment as a whole was, and named only that */
+      var NEGC = -0.25;
+      var rowsFor = function (k) {
+        return said.filter(function (o) {
+          if (!o.themes || o.themes.indexOf(k) < 0) return false;
+          var a = o.aspect && o.aspect[k];
+          if (a != null && a !== 0) return a < NEGC;
+          return o.sentScore < NEGC;        // named it, scored nothing of its own
+        });
+      };
+      var baseAll = said.filter(function (o) { return o.overall != null; });
+      var meanOf = function (list) {
+        var v = list.map(function (o) { return o.overall; }).filter(function (x) { return x != null; });
+        return v.length ? v.reduce(function (a, b) { return a + b; }, 0) / v.length : null;
+      };
+      var themeList = {};
+      said.forEach(function (o) { (o.themes || []).forEach(function (k) { themeList[k] = 1; }); });
+      var items = Object.keys(themeList).map(function (k) {
+        var rs = rowsFor(k);
+        var mine = meanOf(rs);
+        var others = meanOf(baseAll.filter(function (o) { return rs.indexOf(o) < 0; }));
+        var urg = rs.reduce(function (a, o) { return a + (o.urgency || 0); }, 0);
+        var flags = {};
+        rs.forEach(function (o) { (o.urgencyFlags || []).forEach(function (f) { flags[f] = (flags[f] || 0) + 1; }); });
+        var th = (window.T1.THEMES || []).filter(function (t) { return t.k === k; })[0] || {};
+        return { k: k, rows: rs, n: rs.length, mine: mine, others: others,
+                 lift: (mine != null && others != null) ? mine - others : null,
+                 urg: urg, urgN: rs.filter(function (o) { return (o.urgency || 0) > 0; }).length,
+                 flags: flags, owner: th.owner || '', col: th.c || '#64748B',
+                 calls: rs.filter(function (o) { return o.callOpen; }).length };
+      }).filter(function (x) { return x.n > 0; });
+
+      var MINP = 3;
+      var ranked = items.filter(function (x) { return x.n >= MINP; });
+      var thin = items.filter(function (x) { return x.n < MINP; })
+                      .sort(function (a, b) { return b.n - a.n; });
+      ranked.sort(function (a, b) {
+        if (T1_PROB === 'damage') return (a.lift == null ? 99 : a.lift) - (b.lift == null ? 99 : b.lift);
+        if (T1_PROB === 'urgent') return b.urg - a.urg || b.n - a.n;
+        return b.n - a.n || (a.lift == null ? 99 : a.lift) - (b.lift == null ? 99 : b.lift);
+      });
+      var top = ranked.slice(0, 10);
+      if (!top.length) {
+        el.innerHTML = '<div class="au-empty">No theme was raised negatively by ' + MINP +
+          ' parents or more in this view.</div>'; return;
+      }
+      var maxN = Math.max.apply(null, top.map(function (x) { return x.n; }));
+      var pcOf = function (x) { return x.n / said.length * 100; };
+
+      el.innerHTML =
+        '<table class="au-tbl"><thead><tr><th style="width:26px">#</th><th>Problem</th>' +
+        '<th style="min-width:130px">Parents raising it</th><th class="n">Parents</th>' +
+        '<th class="n">Their overall /5</th><th class="n">vs everyone else</th>' +
+        '<th class="n">Urgent</th><th class="n">Calls open</th><th>Whose</th></tr></thead><tbody>' +
+        top.map(function (x, i) {
+          var fl = Object.keys(x.flags).sort(function (a, b) { return x.flags[b] - x.flags[a]; });
+          return '<tr><td class="n" style="color:var(--txm);font-weight:700">' + (i + 1) + '</td>' +
+            '<td><b style="color:' + x.col + '">' + esc(x.k) + '</b>' +
+            (fl.length ? '<div style="font-size:10.5px;color:var(--txm);font-weight:600">' +
+              esc(fl[0]) + (fl.length > 1 ? ' \u00b7 +' + (fl.length - 1) + ' more' : '') + '</div>' : '') + '</td>' +
+            '<td><div class="au-bar" style="height:9px"><i style="width:' +
+              (x.n / maxN * 100).toFixed(1) + '%;background:' + x.col + '"></i></div>' +
+              '<div style="font-size:10.5px;color:var(--txm)">' + pc(pcOf(x)) + ' of the ' +
+              said.length + ' who wrote something</div></td>' +
+            '<td class="n">' + K(x.rows, x.k + ' \u2014 parents who raised it as a problem',
+                'their own words', '<b>' + x.n + '</b>') + '</td>' +
+            '<td class="n">' + (x.mine == null ? '\u2013' :
+                '<span style="color:' + ratCol(x.mine) + ';font-weight:700">' + n1(x.mine) + '</span>') + '</td>' +
+            '<td class="n" style="font-weight:700;color:' + (x.lift != null && x.lift < -0.3 ? COL.neg : 'var(--txm)') + '">' +
+                (x.lift == null ? '\u2013' : (x.lift > 0 ? '+' : '') + x.lift.toFixed(2)) + '</td>' +
+            '<td class="n">' + (x.urgN ? K(x.rows.filter(function (o) { return (o.urgency || 0) > 0; }),
+                x.k + ' \u2014 the urgent ones', 'hurt, repeated, escalated or leaving',
+                '<b style="color:' + COL.neg + '">' + x.urgN + '</b>') : '<span style="color:var(--txl)">0</span>') + '</td>' +
+            '<td class="n">' + (x.calls ? K(x.rows.filter(function (o) { return o.callOpen; }),
+                x.k + ' \u2014 asked for a call', 'callback list', x.calls) : '<span style="color:var(--txl)">0</span>') + '</td>' +
+            '<td style="font-size:11.5px;color:var(--txm)">' + esc(x.owner || '\u2013') + '</td></tr>';
+        }).join('') + '</tbody></table>' +
+        '<div class="au-note"><b>How a problem is counted.</b> Every comment is split into sentences and each ' +
+        'sentence scored on a weighted lexicon that handles negation and intensifiers, so \u201cnot at all happy\u201d ' +
+        'scores as unhappy. A sentence\u2019s score goes to the subjects that sentence names, split where it names ' +
+        'two \u2014 so a theme counts here only where the parent was negative <em>about that subject</em>. ' +
+        '<b>vs everyone else</b> is this theme\u2019s mean overall rating minus the mean of every other parent who ' +
+        'wrote in, so a stage that rates everything low cannot climb the table on its own gloom. Themes raised by ' +
+        'fewer than ' + MINP + ' parents are not ranked' +
+        (thin.length ? ': ' + thin.map(function (x) {
+            return K(x.rows, x.k + ' \u2014 parents who raised it', 'too few to rank',
+                     esc(x.k) + ' (' + x.n + ')'); }).join(', ') : '') + '.</div>';
+      wireDrills(el);
     })();
 
     /* ── 3 · drivers ── */
