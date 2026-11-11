@@ -16127,17 +16127,75 @@ function _exBranch(){
   if (window._BRANCH_LOCK) return window._BRANCH_LOCK;
   return (typeof fBranch !== 'undefined' && fBranch && fBranch !== 'ALL') ? fBranch : '';
 }
+/* ══ WHO IS THE CLASS TEACHER OF THIS ROOM ══ (11 November 2026)
+
+   Only the PT-1 Student Result sheet fills its "Class Teacher" column. The
+   half-yearly tab leaves it blank, and the Term 1 Report card leaves it blank
+   on all 7,574 rows — so the review named a class teacher for one sitting out
+   of three, and the comparison could name one only on its PT-1 side.
+
+   The name does not belong to the sitting, it belongs to the room. So the
+   PT-1 sheet is read once as the roster of record and its names are written
+   onto whichever sitting is being handed to the frame, which is why the
+   review page itself needed no change: it reads the same column it always
+   read, and now that column is filled.
+
+   Rooms are matched on a normalised branch, curriculum, grade and section, so
+   "Grade 5"/"V" and "5 A"/"A" pair up across sheets that spell them
+   differently. A room PT-1 has no name for stays blank rather than borrowing
+   a neighbour's. */
+function _exCtFromPT1() {
+  var t = _pt1Raw && _pt1Raw.students, m = {};
+  if (!t || !t.hdr || !t.rows) return m;
+  var H = {}; t.hdr.forEach(function (h, i) { H[String(h).trim()] = i; });
+  var iB = H['Branch'], iC = H['Curriculum'], iG = H['Grade'], iS = H['Section'], iT = H['Class Teacher'];
+  if (iT === undefined || iB === undefined || iG === undefined) return m;
+  var S = function (r, i) { return i === undefined ? '' : String(r[i] == null ? '' : r[i]).trim(); };
+  t.rows.forEach(function (r) {
+    var name = S(r, iT); if (!name) return;
+    m[_exRoomKey(S(r, iB), S(r, iC), S(r, iG), S(r, iS))] = name;
+  });
+  return m;
+}
+/* the one spelling of a room that every lookup on this tab goes through */
+function _exRoomKey(br, cur, grade, sec) {
+  return [String(br || '').trim(), _exCurr(cur), _exNGrade(grade),
+          _exNSec(String(grade || '') + ' ' + String(sec || ''))].join('␟');
+}
+
 function _exPayload(){
   if(!_pt1Raw) return null;
   var S=EX_SITTINGS[_exSitting]||EX_SITTINGS.pt1;
   var t=_pt1Raw[S.key];
-  if(S.key==='students'||!t||!t.rows||!t.rows.length) return _pt1Raw;
+  if(!t||!t.rows||!t.rows.length) return _pt1Raw;
   var out={}; for(var k in _pt1Raw){ if(Object.prototype.hasOwnProperty.call(_pt1Raw,k)) out[k]=_pt1Raw[k]; }
-  out.students=t;
+  out.students=_exFillCT(t);
+  if(S.key==='students') return out;
   /* The absentee list is built from the first sitting’s mark sheets, so it
      does not describe this one and is dropped rather than shown against it. */
   out.absentees={hdr:[],rows:[]};
   return out;
+}
+
+/* Return a copy of a sitting's table with Class Teacher filled from PT-1.
+   A copy, never the original: _pt1Raw is the cached payload and is handed to
+   the comparison and to every other sitting after this one. */
+function _exFillCT(t){
+  var map=_exCtFromPT1(); if(!map || !Object.keys(map).length) return t;
+  var hdr=t.hdr.slice(), H={}; hdr.forEach(function(h,i){ H[String(h).trim()]=i; });
+  var iT=H['Class Teacher'];
+  if(iT===undefined){ iT=hdr.length; hdr.push('Class Teacher'); }
+  var iB=H['Branch'], iC=H['Curriculum'], iG=H['Grade'], iS=H['Section'];
+  if(iB===undefined||iG===undefined) return t;
+  var S=function(r,i){ return i===undefined?'':String(r[i]==null?'':r[i]).trim(); };
+  var n=0;
+  var rows=t.rows.map(function(r){
+    var o=r.slice(); while(o.length<=iT) o.push(null);
+    var nm=map[_exRoomKey(S(r,iB),S(r,iC),S(r,iG),S(r,iS))];
+    if(nm && !String(o[iT]==null?'':o[iT]).trim()){ o[iT]=nm; n++; }
+    return o;
+  });
+  return { hdr:hdr, rows:rows, ctFilled:n };
 }
 
 function exHasSitting(which){
@@ -16379,7 +16437,8 @@ function _exTeachersFor(rows, sj) {
   var T = _exCmp && _exCmp.tix; if (!T || !rows || !rows.length) return [];
   var key = sj ? _exSubKey(sj) : '', seen = {}, out = [];
   rows.forEach(function (r) {
-    var names = key ? T.st[r.tk + '␟' + key] : (T.ct[r.tk] || (r.tch ? [r.tch] : null));
+    var names = key ? T.st[r.tk + '␟' + key]
+                    : (r.tch ? [r.tch] : T.ct[r.tk]);   /* PT-1 sheet first */
     (names || []).forEach(function (n) { if (!seen[n]) { seen[n] = 1; out.push(n); } });
   });
   return out.sort();
@@ -16491,9 +16550,15 @@ function _exBuildCompare() {
   /* the roster key for each child's room, and a class teacher from the roster
      wherever the mark sheet left the column empty */
   var TIX = _exBuildTeacherIndex();
+  /* The PT-1 Student Result sheet is the roster of record for class teachers
+     — it is the only sitting that fills the column — so it wins over both the
+     sitting's own cell and the staff tab, on BOTH sides of the comparison. */
+  var CTP = _exCtFromPT1();
   var stamp = function (o) {
-    o.tk = [o.br, o.cu, o.g, o.s].join('\u241f');
-    if (!o.tch) { var c = TIX.ct[o.tk]; if (c && c.length) o.tch = c.join(' & '); }
+    o.tk = _exRoomKey(o.br, o.cur, o.gr, o.sec0);
+    var p = CTP[o.tk];
+    if (p) o.tch = p;
+    else if (!o.tch) { var c = TIX.ct[o.tk]; if (c && c.length) o.tch = c.join(' & '); }
   };
   RA.forEach(stamp); RB.forEach(stamp);
 
@@ -16663,6 +16728,30 @@ function _exRollTable(rows, sj) {
 }
 
 /* the classes or sections behind a headline figure */
+/* The names for one row of the comparison: the class teachers of the rooms it
+   covers, or the teachers of one paper in them.
+
+   Both sittings sit under ONE set of names, because there is one roster. The
+   Class & Subject Teachers tab and the PT-1 mark sheet are current snapshots,
+   not a record of who taught in October and who taught in December, so an
+   October column beside a December one would invent a change the data cannot
+   see \u2014 and "A \u2192 B" printed next to a fall is how a teacher gets blamed for
+   a handover that never happened. A branch or a stage covers too many rooms to
+   name, so past four it says how many. */
+function _exWho(x, sj) {
+  var seen = {}, all = [];
+  _exTeachersFor(x.a, sj).concat(_exTeachersFor(x.b, sj)).forEach(function (n) {
+    if (!seen[n]) { seen[n] = 1; all.push(n); } });
+  if (!all.length) return '<span style="color:var(--txm)">\u2013</span>';
+  all.sort();
+  var esc = function (v) { return String(v).replace(/[&<>"]/g, function (m) {
+    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]; }); };
+  if (all.length <= 2) return esc(all.join(' & '));
+  if (all.length <= 4) return esc(all.slice(0, 2).join(', ')) +
+    ' <span style="color:var(--txm)">+' + (all.length - 2) + '</span>';
+  return '<span title="' + esc(all.join(', ')) + '">' + all.length + ' teachers</span>';
+}
+
 function _exUnitList(units) {
   var e = function (v) { return String(v == null ? '' : v).replace(/[&<>"]/g, function (m) {
     return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]; }); };
@@ -16678,24 +16767,17 @@ function _exUnitList(units) {
      exactly the sort of thing that gets a teacher blamed for a handover that
      never happened. A class-level row can still cover more rooms in one
      sitting than the other, so the names are the union across both. */
-  var who = function (x) {
-    var seen = {}, all = [];
-    _exTeachersFor(x.a, x.sj).concat(_exTeachersFor(x.b, x.sj)).forEach(function (n) {
-      if (!seen[n]) { seen[n] = 1; all.push(n); } });
-    if (!all.length) return '<span style="color:var(--txm)">\u2013</span>';
-    all.sort();
-    return e(all.length <= 2 ? all.join(' & ')
-           : all.slice(0, 2).join(', ') + ' +' + (all.length - 2) + ' more');
-  };
+  var who = _exWho;
   var anySj = units.some(function (x) { return x.sj; });
   return '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:760px"><thead><tr>' +
-    '<th>Where</th><th>' + (anySj ? 'Subject teacher' : 'Class teacher') + '</th>' +
-    '<th class="n">Children Oct \u2192 Dec</th><th class="n">PT-1 %</th>' +
+    '<th>Where</th><th>Class teacher</th>' +
+    (anySj ? '<th>Subject teacher</th>' : '') +
+    '<th class="n">PT-1 %</th>' +
     '<th class="n">Half yearly %</th><th class="n">Change</th></tr></thead><tbody>' +
     units.map(function (x) {
       return '<tr><td style="font-weight:700">' + e(x.full || x.k) + '</td>' +
-        '<td style="color:var(--txm)">' + who(x) + '</td>' +
-        '<td class="n" style="color:var(--txm)">' + x.na + ' \u2192 ' + x.nb + '</td>' +
+        '<td style="color:var(--txm)">' + who(x, '') + '</td>' +
+        (anySj ? '<td style="color:var(--txm)">' + who(x, x.sj) + '</td>' : '') +
         '<td class="n" style="color:var(--txm)">' + x.pa.toFixed(1) + '</td>' +
         '<td class="n" style="color:var(--txm)">' + x.pb.toFixed(1) + '</td>' +
         '<td class="n" style="font-weight:800;color:' + (x.ch >= 0 ? '#047857' : '#DC2626') + '">' +
@@ -16849,14 +16931,35 @@ function _exRenderCompare() {
      A stage with nothing on one side of the comparison is left out rather
      than drawn as an empty row. */
   var bandsOf = function (x) {
-    var ba = {}, bb = {};
-    x.a.forEach(function (r) { var k = _exBand(r.gr); if (k) (ba[k] = ba[k] || []).push(r); });
-    x.b.forEach(function (r) { var k = _exBand(r.gr); if (k) (bb[k] = bb[k] || []).push(r); });
-    return EX_BANDS.filter(function (bd) { return ba[bd.k] && bb[bd.k]; })
-      .map(function (bd) {
-        return unit(bd.lab, (x.key || 'b') + '|' + bd.k, ba[bd.k], bb[bd.k], x.sj, classesOf,
-                    (x.full || x.k) + ' · ' + bd.lab); })
-      .filter(function (y) { return y.ch != null; });
+    /* CBSE and CAIE sit different papers out of different totals, so a stage
+       that holds both is two different questions averaged onto one row. They
+       are split here: the strand is part of what a stage IS at a branch that
+       runs two. A stage with only one strand in it keeps the plain label,
+       because "Prep · CAIE" where there is no CBSE prep says nothing the row
+       does not already say. */
+    var ba = {}, bb = {}, curs = {};
+    var put = function (m, r) {
+      var k = _exBand(r.gr); if (!k) return;
+      var c = r.cu || '—';
+      (curs[k] = curs[k] || {})[c] = 1;
+      ((m[k] = m[k] || {})[c] = m[k][c] || []).push(r);
+    };
+    x.a.forEach(function (r) { put(ba, r); });
+    x.b.forEach(function (r) { put(bb, r); });
+    var out = [];
+    EX_BANDS.forEach(function (bd) {
+      var A1 = ba[bd.k], B1 = bb[bd.k];
+      if (!A1 || !B1) return;
+      var list = Object.keys(curs[bd.k]).sort();
+      var many = list.filter(function (c) { return A1[c] && B1[c]; }).length > 1;
+      list.forEach(function (c) {
+        if (!A1[c] || !B1[c]) return;
+        var lab = many ? bd.lab + ' · ' + c : bd.lab;
+        out.push(unit(lab, (x.key || 'b') + '|' + bd.k + '|' + c, A1[c], B1[c], x.sj, classesOf,
+                      (x.full || x.k) + ' · ' + lab));
+      });
+    });
+    return out.filter(function (y) { return y.ch != null; });
   };
   var branchesOf = function (x) {
     var ga = grp(x.a, function (r) { return r.br; }), gb = grp(x.b, function (r) { return r.br; });
@@ -16973,7 +17076,12 @@ function _exRenderCompare() {
       var vid = pick(x, opt.what || nameCol);
       body += '<tr' + (depth ? ' style="background:var(--pl)"' : '') + '>' +
         '<td style="padding-left:' + (9 + pad) + 'px' + (depth ? ';color:var(--txm)' : '') + '">' + head + '</td>' +
-        '<td class="n" style="color:var(--txm);white-space:nowrap">' + x.na + ' → ' + x.nb + '</td>' +
+        '<td style="color:var(--txm)">' + _exWho(x, '') + '</td>' +
+        /* only a row that IS a subject has a subject teacher; on a branch or a
+           class row the same names would otherwise repeat the column beside it
+           and read as though they taught every paper */
+        '<td style="color:var(--txm)">' +
+          (x.sj ? _exWho(x, x.sj) : '<span style="color:var(--txm)">\u2013</span>') + '</td>' +
         '<td class="n" style="color:var(--txm)">' + x.pa.toFixed(1) + '</td>' +
         '<td class="n" style="font-weight:700">' + x.pb.toFixed(1) + '</td>' +
         '<td class="n" style="font-weight:800;color:' + (x.ch >= 0 ? up : dn) + '">' + sg(x.ch) + '</td>' +
@@ -16982,7 +17090,7 @@ function _exRenderCompare() {
           'style="color:var(--p);font-weight:700;white-space:nowrap">view ›</button></td></tr>';
       if (open) kids.forEach(function (y) { emit(y, depth + 1); });
       if (open && !kids.length)
-        body += '<tr style="background:var(--pl)"><td colspan="7" style="padding-left:' + (31 + pad) +
+        body += '<tr style="background:var(--pl)"><td colspan="8" style="padding-left:' + (31 + pad) +
           'px;color:var(--txm)">Nothing inside this group sat both papers.</td></tr>';
     };
     data.forEach(function (x) { emit(x, 0); });
@@ -16990,7 +17098,7 @@ function _exRenderCompare() {
     return '<div class="au-sec"><h3>' + e(title) + '</h3>' +
       (note ? '<div class="sub">' + note + '</div>' : '') +
       '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:860px"><thead><tr>' +
-      '<th>' + e(nameCol) + '</th><th class="n">Children Oct → Dec</th>' +
+      '<th>' + e(nameCol) + '</th><th>Class teacher</th><th>Subject teacher</th>' +
       '<th class="n">PT-1 %</th><th class="n">Half yearly %</th>' +
       '<th class="n">Change</th><th>Up or down</th><th class="n">&nbsp;</th>' +
       '</tr></thead><tbody>' + body + '</tbody></table></div></div>';
