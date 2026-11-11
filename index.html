@@ -36605,21 +36605,67 @@ window.renderCivilTab = function (raw) {
       var cs = getComputedStyle(el);
       if (cs.position !== 'sticky' && cs.position !== 'fixed') return;
       if (el.offsetParent === null) return;                  // hidden on this tab
-      n += el.getBoundingClientRect().height;
+      /* Where this bar COMES TO REST: its own top offset plus its height, not
+         its height alone. The two bars overlap by design — the filter bar is
+         pinned at 72px while the header above it is taller than that — so
+         adding their heights put every table heading lower than the chrome
+         actually reaches, and left a strip of rows showing through above it. */
+      var top = parseFloat(cs.top);
+      if (!isFinite(top)) top = 0;
+      n = Math.max(n, top + el.getBoundingClientRect().height);
     });
     n = Math.round(n);
     var cur = document.documentElement.style.getPropertyValue('--fzTop');
     if (cur !== n + 'px') document.documentElement.style.setProperty('--fzTop', n + 'px');
   }
-  /* the nearest ancestor that scrolls vertically on its own */
+  /* ── WHAT A STICKY HEADING IS ACTUALLY STICKY TO ─────────────────────────
+     Not the page: the nearest ancestor that is a SCROLL CONTAINER, whether or
+     not it currently has anything to scroll. CSS makes an element a scroll
+     container as soon as either axis is non-visible, and it forces the other
+     axis to auto when only one is set — so a plain `overflow-x:auto` wrapper,
+     which most wide tables on this dashboard sit in, is a vertical scroll
+     container too.
+
+     That is what broke the headings. The first version of this looked for an
+     ancestor that was actually scrolling vertically, found none, treated the
+     table as page-flow and gave its heading `top:123px` — but the heading was
+     resolving that against the WRAPPER, not the viewport. So instead of
+     sitting under the filter bar it sat 123px down inside its own table, on
+     top of the third or fourth row, on every tab at once. */
   function scrollBoxOf(t){
     var el = t.parentElement;
     while (el && el !== document.body){
       var cs = getComputedStyle(el);
-      if (/(auto|scroll)/.test(cs.overflowY) && el.clientHeight && el.scrollHeight > el.clientHeight + 2) return el;
+      if (cs.overflowX !== 'visible' || cs.overflowY !== 'visible') return el;
       el = el.parentElement;
     }
     return null;
+  }
+  /* A wrapper only needs its horizontal scrollbar while the table is actually
+     too wide for it. Many are written with `overflow-x:auto` regardless, and
+     on a normal window most of those tables fit — so the wrapper is a scroll
+     container for no reason, and its table's heading can only pin to the
+     wrapper instead of to the page. Where the table fits, the scrollbar is
+     turned off and the heading pins properly; where it does not, the wrapper
+     keeps it and the heading pins to the wrapper's top edge, which is the
+     honest answer for a table you scroll sideways.
+
+     A box with a real height limit is never touched: that is a deliberate
+     scrolling panel, not a stray overflow. */
+  function relaxWrap(t){
+    var p = t.parentElement;
+    if (!p || p === document.body) return;
+    var cs = getComputedStyle(p);
+    /* max-height is the honest marker of a deliberate scrolling panel. Height
+       is not: getComputedStyle resolves it to a pixel value on anything that
+       is rendered, never 'auto', so testing it here made this function bail
+       out every time and the fix never reached the tables it was written for. */
+    if (cs.maxHeight !== 'none') return;                               // a real panel
+    if (p.scrollHeight > p.clientHeight + 2) return;                   // genuinely scrolls
+    if (!/(auto|scroll)/.test(cs.overflowX) && p.style.overflowX !== 'visible') return;
+    var fits = t.scrollWidth <= p.clientWidth + 2;
+    var want = fits ? 'visible' : 'auto';
+    if (p.style.overflowX !== want) p.style.overflowX = want;
   }
   /* a pinned heading needs a solid background of its own, exactly like a
      pinned first column — without one the rows scroll through it */
@@ -36653,6 +36699,7 @@ window.renderCivilTab = function (raw) {
       /* and the heading row, for any table long enough to lose it */
       if (t.tHead && t.tHead.rows.length && t.rows.length >= MINROWS){
         if (!t.classList.contains('hdfz')) t.classList.add('hdfz');
+        relaxWrap(t);                       // before asking what it is sticky to
         var box = scrollBoxOf(t);
         if (box) t.classList.add('hdfz-box'); else t.classList.remove('hdfz-box');
         paintHead(t);
