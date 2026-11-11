@@ -36534,6 +36534,34 @@ window.renderCivilTab = function (raw) {
     position: sticky; left: 0; z-index: 2; box-shadow: 1px 0 0 var(--bor, #E2E8F0);
   }
   table.brfz > thead > tr > *:first-child{ z-index: 3; }
+
+  /* ── HEADINGS STAY ON SCREEN ─────────────────────────────────────────────
+     A long table scrolled past its own heading row is a column of numbers
+     with nothing saying what they are. Every table with enough rows to lose
+     its heading gets that row pinned, by the script below.
+
+     WHERE IT PINS TO depends on what is scrolling. A table inside a box with
+     its own scrollbar pins to the top of that box. A table in the page flow
+     pins under the site header and the filter bar, whose combined height is
+     measured into --fzTop — pinning such a table at 0 is what the audit
+     tables already did, and it slid them underneath the green bar instead of
+     holding them below it.
+
+     The z-index sits above the body cells and below the page chrome (the
+     header is 200, the filter bar 190), so a pinned heading can never cover
+     the controls that filter it. */
+  table.hdfz > thead > tr > th,
+  table.hdfz > thead > tr > td{
+    position: sticky; top: var(--fzTop, 0px); z-index: 20;
+  }
+  table.hdfz.hdfz-box > thead > tr > th,
+  table.hdfz.hdfz-box > thead > tr > td{ top: 0; }
+  /* the corner cell is pinned both ways, so it must outrank both */
+  table.hdfz.brfz > thead > tr > *:first-child{ z-index: 21; }
+  table.hdfz > thead > tr > th::after{
+    content: ''; position: absolute; left: 0; right: 0; bottom: -1px;
+    border-bottom: 1px solid var(--bor, #E2E8F0); pointer-events: none;
+  }
 </style>
 <script>
 (function(){
@@ -36565,7 +36593,50 @@ window.renderCivilTab = function (raw) {
       if (!c.style.backgroundColor) c.style.backgroundColor = bgOf(c);
     }
   }
+  /* How far down the page a pinned heading has to sit: the site header plus
+     the filter bar, both of which are themselves sticky. Measured rather than
+     assumed, because the bar is taller when its controls wrap and absent on
+     tabs that do not show it. */
+  function fzTop(){
+    var n = 0;
+    ['.hdr', '.fb'].forEach(function (sel){
+      var el = document.querySelector(sel);
+      if (!el) return;
+      var cs = getComputedStyle(el);
+      if (cs.position !== 'sticky' && cs.position !== 'fixed') return;
+      if (el.offsetParent === null) return;                  // hidden on this tab
+      n += el.getBoundingClientRect().height;
+    });
+    n = Math.round(n);
+    var cur = document.documentElement.style.getPropertyValue('--fzTop');
+    if (cur !== n + 'px') document.documentElement.style.setProperty('--fzTop', n + 'px');
+  }
+  /* the nearest ancestor that scrolls vertically on its own */
+  function scrollBoxOf(t){
+    var el = t.parentElement;
+    while (el && el !== document.body){
+      var cs = getComputedStyle(el);
+      if (/(auto|scroll)/.test(cs.overflowY) && el.clientHeight && el.scrollHeight > el.clientHeight + 2) return el;
+      el = el.parentElement;
+    }
+    return null;
+  }
+  /* a pinned heading needs a solid background of its own, exactly like a
+     pinned first column — without one the rows scroll through it */
+  function paintHead(t){
+    var hr = t.tHead ? t.tHead.rows : [];
+    for (var r = 0; r < hr.length; r++){
+      for (var c = 0; c < hr[r].cells.length; c++){
+        var cell = hr[r].cells[c];
+        if (cell.__hz) continue;
+        cell.__hz = 1;
+        if (!cell.style.backgroundColor) cell.style.backgroundColor = bgOf(cell);
+      }
+    }
+  }
+  var MINROWS = 8;                 // below this a heading cannot scroll away
   function scan(){
+    fzTop();
     var ts = document.querySelectorAll('table');
     for (var i = 0; i < ts.length; i++){
       var t = ts[i];
@@ -36579,6 +36650,13 @@ window.renderCivilTab = function (raw) {
         var p = t.parentElement;
         if (p && t.scrollWidth > p.clientWidth + 2 && getComputedStyle(p).overflowX === 'visible') p.style.overflowX = 'auto';
       }
+      /* and the heading row, for any table long enough to lose it */
+      if (t.tHead && t.tHead.rows.length && t.rows.length >= MINROWS){
+        if (!t.classList.contains('hdfz')) t.classList.add('hdfz');
+        var box = scrollBoxOf(t);
+        if (box) t.classList.add('hdfz-box'); else t.classList.remove('hdfz-box');
+        paintHead(t);
+      }
     }
   }
   /* The colour above is sampled once and written into the cell, and __fz stops
@@ -36591,6 +36669,10 @@ window.renderCivilTab = function (raw) {
   function reseat(){
     var cs = document.querySelectorAll('table.brfz > * > tr > *:first-child, table.brfz > tr > *:first-child');
     for (var i = 0; i < cs.length; i++){ cs[i].__fz = 0; cs[i].style.backgroundColor = ''; }
+    /* the pinned headings carry a baked colour for the same reason and go
+       stale on a theme switch in exactly the same way */
+    var hs = document.querySelectorAll('table.hdfz > thead > tr > th, table.hdfz > thead > tr > td');
+    for (var j = 0; j < hs.length; j++){ hs[j].__hz = 0; hs[j].style.backgroundColor = ''; }
     try { scan(); } catch(e){}
   }
   var timer = null;
@@ -36600,6 +36682,9 @@ window.renderCivilTab = function (raw) {
   new MutationObserver(function(){ setTimeout(reseat, 0); })
     .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   window.addEventListener('resize', soon);
+  /* the filter bar changes height when its controls wrap, and the header can
+     be scrolled away on a short viewport — both move where a heading pins */
+  window.addEventListener('scroll', function(){ try { fzTop(); } catch(e){} }, { passive: true });
 })();
 </script>
 <script>
