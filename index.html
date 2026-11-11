@@ -16191,11 +16191,20 @@ function _exWhyUnavailable(which){
   if (which === 'cmp') return 'Needs both PT-1 and the Half Yearly, and one of them has no rows yet.';
   var S = EX_SITTINGS[which]; if (!S) return '';
   var t = R[S.key];
-  if (t === undefined)
-    return 'This dashboard knows about the ' + S.label + ', but the Apps Script that sent the '
-         + 'data does not \u2014 so it was never read. Deploy the current Code.gs (Deploy \u2192 '
-         + 'Manage deployments \u2192 edit the existing deployment \u2192 New version), then press '
-         + '\u21bb Refresh.';
+  if (t === undefined) {
+    /* The build stamp separates the two causes. A payload carrying no stamp at
+       all was built by a Code.gs older than 11 November, which is the one that
+       knows nothing about this sitting. */
+    if (!R.build)
+      return 'The script that answered is older than this page \u2014 it sent no build stamp, so it '
+           + 'predates the ' + S.label + '. This is almost always a SECOND deployment: '
+           + '"Deploy \u2192 New deployment" mints a new /exec URL and leaves the old one serving the '
+           + 'old code forever. Open Deploy \u2192 Manage deployments, edit the deployment the '
+           + 'dashboard already uses (the pencil), set Version to the newest, and Deploy. Running '
+           + 'testPT1Coverage() in the editor will confirm the script itself can see the tab.';
+    return 'The script reports build ' + R.build + ', which has no ' + S.label + ' in it. '
+         + 'Deploy the current Code.gs to the deployment the dashboard uses, then press \u21bb Refresh.';
+  }
   if (t && t.missing) {
     var seen = (R.tabsSeen || []).join(', ');
     return 'The workbook has no tab named "' + t.missing + '". '
@@ -17278,6 +17287,29 @@ async function loadPT1Review(force){
     if(!raw || !raw.students || !raw.students.rows || !raw.students.rows.length)
       throw new Error('No marks returned. Check that the Student Result, Class & Subject Teachers '+
                       'and Period Structure tabs exist and that /api/data forwards ?section=pt1');
+
+    /* ══ A PAYLOAD THAT IS OLDER THAN THIS PAGE ══ (11 November 2026)
+
+       The Term 1 sitting arrived greyed out on a correctly re-deployed script,
+       and the reason was not the sheet: something between here and Apps Script
+       was still answering with a copy built before the sitting existed. A
+       normal load does not send nocache=1, so an edge copy can outlive a
+       deployment by its full lifetime.
+
+       So the shape is checked rather than assumed. If a key this page needs is
+       absent, the request is made once more with nocache=1 — which rebuilds the
+       edge copy and the Apps Script copy both — before anything is reported.
+       One retry, guarded by a flag, so a genuinely old deployment cannot put
+       this into a loop. */
+    if (raw && raw.students_t1 === undefined && !force && !window.__pt1Retried) {
+      window.__pt1Retried = true;
+      _pt1SetStatus('Re-reading past the cache\u2026');
+      /* queued, not called here: this function clears _pt1Loading in a
+         finally{}, which would fire a tick after a nested call had set it and
+         leave the retry running with the flag down */
+      setTimeout(function(){ loadPT1Review(true); }, 0);
+      return;
+    }
 
     var _chg=_liveMark('pt1', raw.generatedAt, function(){ loadPT1Review(true); }, function(){ return _pt1Loading; }) || !_pt1Loaded;
     _pt1Raw=raw; window._pt1Raw=raw; _pt1Loaded=true;
