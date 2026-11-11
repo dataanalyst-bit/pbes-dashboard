@@ -1317,8 +1317,21 @@ function _liveMark(id, gen, reread, busy){
   var changed = o.gen !== gen;
   o.netAt=Date.now(); o.gen=gen;
   var t=Date.parse(String(gen||''));
-  if(reread && !o.reread && !isNaN(t) && (Date.now()-t) > 15*60000){
-    o.reread=true;                                     // once per visit per section
+  /* ── THE SAFETY NET, WHICH USED TO FIRE ONLY ONCE ──────────────────────
+     When the server's copy is more than fifteen minutes old this asks for it
+     to be rebuilt. That used to be allowed once per visit, on a flag that was
+     never cleared — and once-per-visit is exactly the case that fails for
+     somebody who edits a sheet and waits at the dashboard: the one re-read
+     had already been spent earlier in the session, so the edit sat behind a
+     stale server copy with nothing left to dislodge it.
+
+     It is now gated on TIME rather than on a one-shot flag: at most one forced
+     re-read every ten minutes per section, which is the server's own rebuild
+     cycle, so it can never become a loop and can always fire again. */
+  var RE_GAP = 10*60000;
+  if(reread && !isNaN(t) && (Date.now()-t) > 15*60000 &&
+     (!o.reread || (Date.now()-o.reread) > RE_GAP)){
+    o.reread=Date.now();
     (function wait(){ if(busy && busy()) return setTimeout(wait,400); try{ reread(); }catch(e){} })();
   }
   return changed;
@@ -38780,10 +38793,29 @@ window.T1 = (function () {
       var chg = (typeof _liveMark === 'function'
         ? _liveMark('term1', raw.generatedAt, function () { loadTerm1(true); }, function () { return loading; })
         : true) || !loaded;
-      if (chg) { _raw = raw; loaded = true; paint(); }
+      /* The fetched copy is ALWAYS the one held from here on. This used to be
+         inside the `if`, so a payload judged unchanged was written to the
+         local store while the screen kept an older one — and the next visit
+         then painted from a saved copy this session never had. Only the
+         redraw is conditional, because redrawing an unchanged report for no
+         reason throws away the reader's scroll position. */
+      _raw = raw;
+      if (chg) paint();
       loaded = true;
       try { idbSet('pbes_term1', { t: Date.now(), data: raw }); } catch (e) {}
-      status(typeof _liveLabel === 'function' ? _liveLabel(raw.generatedAt) : '');
+      /* HOW OLD THE SHEET READ IS, in words when it matters.
+
+         "Live \u00b7 updated 09:40" is easy to read as the time now rather than
+         the time the server last opened the sheet, so an edit made at 15:00
+         and a dashboard still showing 09:40 looks like a broken dashboard
+         instead of a cached one. When the copy is old enough that a rebuild is
+         due, the tab says so and says a re-read is on its way \u2014 which it is:
+         _liveMark asks for one whenever the copy passes fifteen minutes. */
+      var _age = Date.parse(String(raw.generatedAt || ''));
+      var _mins = isFinite(_age) ? Math.round((Date.now() - _age) / 60000) : null;
+      status(_mins != null && _mins >= 12
+        ? 'Sheet last read ' + _mins + ' min ago \u00b7 re-reading'
+        : (typeof _liveLabel === 'function' ? _liveLabel(raw.generatedAt) : ''));
     } catch (err) {
       if (!loaded) {
         show(false);
