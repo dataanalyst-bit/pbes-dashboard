@@ -30175,8 +30175,15 @@ function _sylPost(){
   var f=document.getElementById('syl-frame');
   if(!f||!f.contentWindow||!_sylRaw) return;
   var sig=_sylSig(_sylRaw);
-  /* already on screen — reopening the tab must not redraw it */
-  if(_sylReady && sig===_sylPostedSig){ _sylShow(true); return; }
+  /* already on screen — reopening the tab must not redraw it.
+
+     THE SCOPE STILL GOES ACROSS. This used to return here without sending
+     it, so the one sequence a reader actually performs — open the tab, go
+     somewhere else, change the month at the top, come back — left the frame
+     on whatever month it had when it was last drawn, while the chip above it
+     named the new one. The rows are unchanged, so there is nothing to redraw;
+     the scope is not, so it is pushed before returning. */
+  if(_sylReady && sig===_sylPostedSig){ _sylShow(true); _sylPushBranch(); return; }
   var rows;
   try{ rows = sylRowsFromSheet(_sylRaw.syl); }
   catch(err){ _sylFail(String(err&&err.message||err)); return; }
