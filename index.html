@@ -15423,7 +15423,7 @@ async function _examEnsureForScorecard(){
   window.__examRankLoading=true;
   try{
     let raw=null;
-    try{ const c=await idbGet('pbes_pt1_v3'); if(c&&c.data&&c.data.students) raw=c.data; }catch(e){}
+    try{ const c=await idbGet('pbes_pt1_v4'); if(c&&c.data&&c.data.students) raw=c.data; }catch(e){}
     if(!raw){
       const s=await sb.auth.getSession();
       const session=s&&s.data&&s.data.session;
@@ -15433,7 +15433,7 @@ async function _examEnsureForScorecard(){
       if(!res.ok) return;
       const d=await res.json();
       raw=(d&&d.PT1_RAW&&d.PT1_RAW.students)?d.PT1_RAW:null;
-      if(raw){ try{ idbSet('pbes_pt1_v3',{t:Date.now(),data:raw}); }catch(e){} }
+      if(raw){ try{ idbSet('pbes_pt1_v4',{t:Date.now(),data:raw}); }catch(e){} }
     }
     if(raw){ window._pt1Raw=raw; if(typeof renderRankings==='function') renderRankings(); }
   }catch(e){ /* leave the review row empty */ }
@@ -16901,6 +16901,18 @@ function _exWhyNoCompare(C) {
   }
   var nA = C.nA || 0, nB = C.nB || 0;
   var list = function (a) { return a && a.length ? a.map(e).join(', ') : ''; };
+  /* where each table came from, when the script is new enough to say */
+  var src = function (t, lab) {
+    if (!t || !t.from) return '';
+    var w = t.book ? ' of <b>' + e(t.book) + '</b>' : '';
+    return '<div style="margin-top:7px;font-size:11.5px;color:var(--txm)">The ' + lab +
+      ' figures were read from the tab <b>' + e(t.from) + '</b>' + w +
+      (t.asked && t.asked !== t.from
+        ? ' \u2014 but the script asked for <b>' + e(t.asked) + '</b>, so it matched a different ' +
+          'tab. That is the fault: rename the tab, or tell me the name it should look for.'
+        : '.') + '</div>';
+  };
+  var prov = src((_pt1Raw || {}).students, 'PT-1') + src((_pt1Raw || {}).students_hy, 'half-yearly');
   var pct = function (h) { return (h || []).filter(function (x) {
     return / %$/.test(String(x)) && x !== 'Overall %' && x !== 'Target %'; }); };
   var pa = pct(C.hdrA), pb = pct(C.hdrB);
@@ -16917,14 +16929,14 @@ function _exWhyNoCompare(C) {
       '</b> rows but not one subject percentage column \u2014 nothing on it is headed ' +
       '\u201c&lt;subject&gt; %\u201d. The comparison works on percentages, because the two ' +
       'sittings are marked out of different totals. The columns it does have are: <b>' +
-      list(got.slice(0, 24)) + (got.length > 24 ? ', \u2026' : '') + '</b>.';
+      list(got.slice(0, 24)) + (got.length > 24 ? ', \u2026' : '') + '</b>.' + prov;
   }
   /* both sides have subject columns, but none of them pair */
   return 'The two tabs have <b>' + nA + '</b> and <b>' + nB + '</b> rows, and both carry subject ' +
     'marks \u2014 but they do not share a single subject, so there is nothing to put side by side. ' +
     'PT-1 has <b>' + list(pa.map(function (x) { return x.replace(/ %$/, ''); })) + '</b>; the ' +
     'half-yearly has <b>' + list(pb.map(function (x) { return x.replace(/ %$/, ''); })) + '</b>. ' +
-    'Spelling one subject the same way on both tabs is enough to bring this back.';
+    'Spelling one subject the same way on both tabs is enough to bring this back.' + prov;
 }
 
 function _exRenderCompare() {
@@ -17579,7 +17591,11 @@ async function loadPT1Review(force){
            restored BEFORE the network answers — so the new sitting arrived
            greyed out even on a correctly re-deployed script, which is the same
            trap the note above was written for. */
-        var c=await idbGet('pbes_pt1_v3');
+        /* v4 (13 Nov 2026): a snapshot is kept for 24 hours and painted
+           BEFORE the network answers, so a copy taken while a tab held the
+           wrong data goes on being shown for a day after the sheet is put
+           right. Moving the key retires every one of them at once. */
+        var c=await idbGet('pbes_pt1_v4');
         if(c && c.data && c.data.students && (Date.now()-c.t) < 24*3600*1000){
           _pt1Raw=c.data; window._pt1Raw=c.data; _pt1Loaded=true; _pt1Post();
           _pt1SetStatus('Cached · refreshing in background');
@@ -17632,8 +17648,8 @@ async function loadPT1Review(force){
 
     var _chg=_liveMark('pt1', raw.generatedAt, function(){ loadPT1Review(true); }, function(){ return _pt1Loading; }) || !_pt1Loaded;
     _pt1Raw=raw; window._pt1Raw=raw; _pt1Loaded=true;
-    try{ idbSet('pbes_pt1_v3',{ t:Date.now(), data:raw }); }catch(e){}
-    try{ idbDel('pbes_pt1_v2'); }catch(e){}
+    try{ idbSet('pbes_pt1_v4',{ t:Date.now(), data:raw }); }catch(e){}
+    try{ idbDel('pbes_pt1_v2'); idbDel('pbes_pt1_v3'); }catch(e){}
     if(_chg){ _pt1Post(); if(typeof renderRankings==='function') renderRankings(); }
     /* Even when the rows are unchanged, the SHAPE may not be: the instant
        paint can come from a snapshot taken before a sitting was added, which
