@@ -16585,6 +16585,8 @@ function _exBuildCompare() {
   RA.forEach(stamp); RB.forEach(stamp);
 
   return { A: RA, B: RB, subjects: SUBJ, mean: mean, subOnly: subOnly, tix: TIX,
+           /* kept so an empty comparison can say WHICH columns it was given */
+           hdrA: (tA.hdr || []).slice(), hdrB: (tB.hdr || []).slice(),
            nA: A.length, nB: B.length, placedA: RA.length, placedB: RB.length };
 }
 
@@ -16865,14 +16867,72 @@ function _exCurBar(list) {
           'Pick a strand to compare like with like.') +
     '</span></div>';
 }
+/* ══ WHY THERE IS NOTHING TO COMPARE ═════════════════════════════════════
+   Rewritten 13 November 2026.
+
+   This used to say "Both sittings need marks before they can be compared"
+   and print the row counts — which was wrong whenever the row counts were
+   not zero, and that is exactly the case it kept being read in: 7,019 PT-1
+   rows and 1,216 half-yearly rows on screen, under a sentence saying there
+   were no marks.
+
+   The marks were there. What was missing was a subject the two sheets SPELL
+   THE SAME WAY. A row survives only if it carries at least one of the
+   subjects the two sheets have in common, so when that list is empty every
+   row on both sides is dropped and the panel empties out — for a reason
+   the old sentence could not express and the reader could not guess.
+
+   So it now reports what it was actually given: the rows, the subject
+   columns each tab carries, and which of the three faults this is. */
+function _exWhyNoCompare(C) {
+  var e = function (v) { return String(v == null ? '' : v).replace(/[&<>"]/g, function (m) {
+    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]; }); };
+  /* _exBuildCompare returns null before either tab has a single row, so the
+     counts have to come from the payload itself there rather than from C */
+  if (!C) {
+    var R = _pt1Raw || {};
+    var ra = (R.students && R.students.rows ? R.students.rows.length : 0);
+    var rb = (R.students_hy && R.students_hy.rows ? R.students_hy.rows.length : 0);
+    if (!R.students && !R.students_hy)
+      return 'The two sittings have not loaded yet. If this stays, press \u21bb Refresh.';
+    if (!ra && !rb) return 'Neither sitting has any rows yet.';
+    return 'Only one sitting has rows: <b>' + ra + '</b> PT-1 and <b>' + rb +
+      '</b> half-yearly. Both tabs need marks before they can be compared.';
+  }
+  var nA = C.nA || 0, nB = C.nB || 0;
+  var list = function (a) { return a && a.length ? a.map(e).join(', ') : ''; };
+  var pct = function (h) { return (h || []).filter(function (x) {
+    return / %$/.test(String(x)) && x !== 'Overall %' && x !== 'Target %'; }); };
+  var pa = pct(C.hdrA), pb = pct(C.hdrB);
+
+  if (!nA || !nB) {
+    return 'Only one sitting has rows: <b>' + nA + '</b> PT-1 and <b>' + nB +
+      '</b> half-yearly. Both tabs need marks before they can be compared.';
+  }
+  if (!pa.length || !pb.length) {
+    var side = !pb.length ? 'half-yearly' : 'PT-1';
+    /* \u201c<subject> %\u201d is written as an entity so the angle brackets survive */
+    var got  = !pb.length ? C.hdrB : C.hdrA;
+    return 'The <b>' + side + '</b> tab carries <b>' + (!pb.length ? nB : nA) +
+      '</b> rows but not one subject percentage column \u2014 nothing on it is headed ' +
+      '\u201c&lt;subject&gt; %\u201d. The comparison works on percentages, because the two ' +
+      'sittings are marked out of different totals. The columns it does have are: <b>' +
+      list(got.slice(0, 24)) + (got.length > 24 ? ', \u2026' : '') + '</b>.';
+  }
+  /* both sides have subject columns, but none of them pair */
+  return 'The two tabs have <b>' + nA + '</b> and <b>' + nB + '</b> rows, and both carry subject ' +
+    'marks \u2014 but they do not share a single subject, so there is nothing to put side by side. ' +
+    'PT-1 has <b>' + list(pa.map(function (x) { return x.replace(/ %$/, ''); })) + '</b>; the ' +
+    'half-yearly has <b>' + list(pb.map(function (x) { return x.replace(/ %$/, ''); })) + '</b>. ' +
+    'Spelling one subject the same way on both tabs is enough to bring this back.';
+}
+
 function _exRenderCompare() {
   var el = document.getElementById('exm-compare'); if (!el) return;
   if (!_exCmp) _exCmp = _exBuildCompare();
   var C = _exCmp;
   if (!C || !C.A.length || !C.B.length) {
-    el.innerHTML = '<div class="au-empty">Both sittings need marks before they can be compared. ' +
-      'The workbook currently has ' + (C ? C.nA : 0) + ' PT-1 rows and ' + (C ? C.nB : 0) +
-      ' half-yearly rows.</div>';
+    el.innerHTML = '<div class="au-empty">' + _exWhyNoCompare(C) + '</div>';
     return;
   }
   var scope = _exBranch();
