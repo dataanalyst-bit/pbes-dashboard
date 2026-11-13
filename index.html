@@ -23102,6 +23102,57 @@ var ADM_REL = new RegExp('\\b(day after tomorrow|tomorrow|next week|this week|th
   'mon|tue|wed|thu|fri|sat|sun)|in\\s+\\d{1,2}\\s+days?|after\\s+\\d{1,2}\\s+days?)\\b', 'i');
 var ADM_EVENT = new RegExp('\\b(after diwali|post diwali|after the diwali|after festival|' +
   'after holidays|after dussera|asap)\\b', 'i');
+/* ══ A DATE WRITTEN OUT IN THE NOTE ══════════════════════════════════════
+   Added 13 November 2026.
+
+   The notes carry dates in plain text and the reader could only see relative
+   phrases, so "Will visit campus on Next Saturday 14th of November" was read
+   as nothing at all and the lead fell into "no next step". These read the
+   date itself: 14/11/2026, 14-11-26, 14th November, Nov 14, 2026-11-14.
+   Day first, because that is how this office writes them.
+
+   THE TRAP, and why most of these must be thrown away. A date in one of
+   these notes is usually NOT a commitment. On the 10 November file 244 notes
+   carried a date and only 36 of them pointed forward: 190 were the writer
+   stamping the note with the day they wrote it ("not lifting -07/11/2026"),
+   and 18 were reporting something that had already happened. Treating any of
+   those as the next follow-up would invent a date for hundreds of leads and
+   fill the report with work nobody had promised.
+
+   So a date counts only when it is STRICTLY AFTER the note that carries it,
+   and no more than 120 days after. The second rule matters as much as the
+   first: a bare "Oct 5th" written in November has no year in it, and rolling
+   it forward to the next October produces a date eleven months out that
+   nobody meant. Past the horizon it is read as a reference to the past and
+   dropped. */
+var ADM_MON = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8,
+                sep:9, sept:9, oct:10, nov:11, dec:12 };
+var ADM_TXT_HORIZON = 120;
+function _admTextDate(txt, anchor) {
+  var t = String(txt || ''); if (!t) return '';
+  var a = _admDay(anchor); if (!a) return '';
+  var ay = +a.slice(0, 4), am = +a.slice(5, 7), ad = +a.slice(8, 10);
+  var best = '';
+  var take = function (y, mo, d) {
+    if (!(mo >= 1 && mo <= 12 && d >= 1 && d <= 31)) return;
+    if (y == null) y = (mo > am || (mo === am && d >= ad)) ? ay : ay + 1;   /* no year written */
+    else if (y < 100) y += 2000;
+    var iso = y + '-' + (mo < 10 ? '0' : '') + mo + '-' + (d < 10 ? '0' : '') + d;
+    if (iso <= a) return;                                   /* a stamp, or the past */
+    if (_admDayNum(iso) - _admDayNum(a) > ADM_TXT_HORIZON) return;   /* a year-rollover artefact */
+    if (!best || iso < best) best = iso;                    /* the soonest promise wins */
+  };
+  var m, re1 = /\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/g;
+  while ((m = re1.exec(t))) take(+m[1], +m[2], +m[3]);
+  var re2 = /\b(\d{1,2})[-\/.](\d{1,2})(?:[-\/.](\d{2,4}))?\b/g;
+  while ((m = re2.exec(t))) take(m[3] ? +m[3] : null, +m[2], +m[1]);     /* day first */
+  var re3 = /\b(\d{1,2})\s*(?:st|nd|rd|th)?\s*(?:of\s+)?(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?(?:\s*,?\s*(\d{4}))?/gi;
+  while ((m = re3.exec(t))) take(m[3] ? +m[3] : null, ADM_MON[m[2].toLowerCase()], +m[1]);
+  var re4 = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s*(\d{1,2})\s*(?:st|nd|rd|th)?(?:\s*,?\s*(\d{4}))?/gi;
+  while ((m = re4.exec(t))) take(m[3] ? +m[3] : null, ADM_MON[m[1].toLowerCase()], +m[2]);
+  return best;
+}
+
 function _admRelDate(phrase, anchor) {
   var p = String(phrase).toLowerCase().trim(), d = new Date(anchor.getTime()), m;
   var add = function (n) { d.setDate(d.getDate() + n); return _admDay(d); };
@@ -23183,6 +23234,10 @@ function _admNextStep(r) {
       var f = _admFuParse(raw); if (f && !f.auto && f.note) ents.push({ at: f.done || f.due, t: f.note }); });
     ents.sort(function (a, b) { return b.at - a.at; });
     for (var i = 0; i < ents.length && !out; i++) {
+      /* a date written out beats a phrase: "next Saturday 14th of November"
+         carries both, and the one with the day in it is the one to trust */
+      var wd = _admTextDate(ents[i].t, ents[i].at);
+      if (wd) { out = { day: wd, src: 'text', note: 'written in the note' }; break; }
       var m = ADM_REL.exec(ents[i].t);
       if (m) {
         var day = _admRelDate(m[0], ents[i].at);
@@ -23392,9 +23447,43 @@ function _admFWindows() {
     { k: 'next',  lab: 'Due next 7 days',   col: '#6366F1',
       note: 'scheduled from tomorrow to seven days out',
       f: function (f) { var d = _admDay(f.due); return d > today && d <= next; } },
+    /* ══ OVERDUE MEANS NOBODY HAS BEEN BACK TO IT ══ (13 November 2026)
+
+       A task goes Pending in the ERP and stays Pending until somebody ticks
+       it. Counsellors here do not tick it: they ring the parent, write the
+       call up as a comment, and move on. The task sits open for ever.
+
+       Counted raw, that put 294 tasks in this column on the 10 November file
+       — and 95 of them, almost a third, belonged to leads that were
+       demonstrably worked ON OR AFTER the day the task fell due. The work had
+       been done. Only the tick was missing, and the column was reporting the
+       tick rather than the work. Worse, the panel contradicted itself: the
+       lead-level reading beside it already knew those leads had been worked
+       past their open task and said so, while this column still called them
+       overdue.
+
+       So a task is overdue only when the lead has NOT been touched since the
+       day it fell due — no comment, no stage change, no completed task on or
+       after that date. The rest are not forgotten parents, they are unticked
+       boxes, and they get a column of their own so the gap stays visible
+       instead of being buried in the red one. */
     { k: 'over',  lab: 'Overdue',           col: '#DC2626',
-      note: 'past their due date and still open',
-      f: function (f) { return f.open && _admDay(f.due) < today; } }
+      note: 'past their due date, still open, and nobody has been back to the lead since',
+      f: function (f) {
+        if (!f.open) return false;
+        var d = _admDay(f.due); if (d >= today) return false;
+        var t = _admTouchDays(f.r), last = t.length ? t[t.length - 1] : '';
+        return !(last && last >= d);
+      } },
+    { k: 'untick', lab: 'Worked, not ticked', col: '#B45309',
+      note: 'the task is still open, but the lead was written on or moved on or after the day ' +
+            'it fell due \u2014 the call was made and the box was never ticked',
+      f: function (f) {
+        if (!f.open) return false;
+        var d = _admDay(f.due); if (d >= today) return false;
+        var t = _admTouchDays(f.r), last = t.length ? t[t.length - 1] : '';
+        return !!(last && last >= d);
+      } }
   ];
 }
 function _admFollow() {
