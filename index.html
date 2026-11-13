@@ -1226,6 +1226,15 @@ table.vckt tr.vck-c td.nm{font-weight:600;color:var(--tx)}
 #pane-adm27 .amt-10 .dow{font-size:8px;letter-spacing:.04em;font-weight:500;opacity:.75}
 #pane-adm27 .amt-10 .a{font-weight:800}
 #pane-adm27 .amt-10 .l{color:var(--txm);font-weight:500}
+#pane-adm27 .amt-brn{background:none;border:0;padding:0;font:inherit;font-size:14px;font-weight:800;
+  color:var(--tx);cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px;
+  letter-spacing:-.01em}
+#pane-adm27 .amt-brn:hover{color:var(--p)}
+#pane-adm27 .amt-brn>i.ar{font-style:normal;display:inline-block;width:11px;color:var(--txm);
+  font-size:9px}
+#pane-adm27 .amt-brn:hover>i.ar{color:var(--p)}
+#pane-adm27 .amt-10 tr.cnsr td{background:var(--pl)}
+#pane-adm27 .amt-10 td.cns{padding-left:26px;font-size:11px;color:var(--txm);font-weight:600}
 @media(max-width:1300px){
   #pane-adm27 .amb-row>#adm-trend,#pane-adm27 .amb-row>#adm-month{max-width:none}
 }
@@ -25079,18 +25088,41 @@ function _admCompare() {
       '. Correct the created date in the tracker and they join on the next refresh.</div>';
   }
 
+  /* ══ TWO DATES, TWO ROW SETS ══ (13 November 2026)
+
+     This table used to pick ONE set of rows — those CREATED inside the window
+     — and then count how many of them had been admitted. For "Whole season"
+     that is the same thing. For "Yesterday" it is not: it answered "of the
+     leads that arrived yesterday, how many have since been admitted", which
+     for a single day is almost always zero, while the ten-day table beside it
+     answered "how many admissions were completed yesterday". Two panels, two
+     different questions, one date column apart — which is what made 12/11
+     disagree.
+
+     A lead now belongs to the window by the day it ARRIVED (Created) and an
+     admission by the day it was DONE, and they are counted over separate row
+     sets. The conversion column is therefore admissions completed in the
+     window over leads that arrived in it. Over a season those are the same
+     children and the figure means what it always did; over a single day it is
+     a throughput rate, not a cohort rate, and it is the one the office is
+     actually asking for. */
+  var inWin  = function (d) { return d && d >= a && d <= b; };
+  var wonIn  = function (r) { return _admIsWon(r) && inWin(_admWonDay(r)); };
   var data = brs.map(function (br) {
-    var rs  = S.rows.filter(function (r) { return r.b === br && r.d >= a && r.d <= b; });
+    var mine = S.rows.filter(function (r) { return r.b === br; });
+    var rs  = mine.filter(function (r) { return inWin(r.d); });        // leads
+    var aw  = mine.filter(wonIn);                                      // admissions
     var dig = rs.filter(_admIsDigital), wlk = rs.filter(_admIsWalk);
-    var dA  = dig.filter(_admIsWon).length, wA = wlk.filter(_admIsWon).length;
+    var dA  = aw.filter(_admIsDigital).length, wA = aw.filter(_admIsWalk).length;
     /* The season figure never moves with the period switch: the year\'s target
        is a year\'s target, and measuring a Tuesday against it would be noise
        dressed up as a percentage. */
-    var seasonWon = S.rows.filter(function (r) { return r.b === br && _admIsWon(r); }).length;
+    var seasonWon = mine.filter(_admIsWon).length;
     return { b: br, n: rs.length, won: dA + wA,
              dL: dig.length, dA: dA, dC: dig.length ? 100 * dA / dig.length : null,
              wL: wlk.length, wA: wA, wC: wlk.length ? 100 * wA / wlk.length : null,
              conv: rs.length ? 100 * (dA + wA) / rs.length : 0,
+             rowsL: rs, rowsA: aw,
              seasonWon: seasonWon,
              tgt: _admTarget(br), tgtL: (_admRaw.leadTargets || {})[br] || 0 };
   }).sort(function (x, y) { return y.n - x.n; });
@@ -25172,6 +25204,10 @@ function _admCompare() {
     '<b style="color:var(--tx)">Walk-in</b> is ' + wn.join(', ') + '. <b style="color:var(--tx)">' +
     'Digital</b> is everything else \u2014 the website, Facebook, Instagram, Google Ads and any source ' +
     'added later \u2014 so the two columns always add up to Total Leads with nothing left over.' +
+    '<br><br><b style="color:var(--tx)">Leads</b> are counted on the day the enquiry arrived ' +
+    '(the Created column) and <b style="color:var(--tx)">admissions</b> on the day the admission was ' +
+    'completed (the Updated column), so over a short window the two are different children and the ' +
+    'conversion figure is a throughput rate rather than a cohort one.' +
     '<br><br><b style="color:var(--tx)">Target</b> is the whole academic year and does not move with ' +
     'the buttons above; neither does the last column, which is the season\'s admissions so far against ' +
     'that target. Only the lead and admission counts follow the window, because measuring a Tuesday ' +
@@ -25181,9 +25217,20 @@ function _admCompare() {
 }
 function admOpenCompare(br) {
   var S = _admSet(), rg = _admRange(_admPeriod);
-  var rows = S.rows.filter(function (r) { return r.b === br && r.d >= rg[0] && r.d <= rg[1]; });
+  var inW = function (d) { return d && d >= rg[0] && d <= rg[1]; };
+  /* the leads that arrived in the window and the admissions completed in it:
+     two different sets, shown together, each row once */
+  var seen = {}, rows = [];
+  S.rows.forEach(function (r) {
+    if (r.b !== br) return;
+    if (!inW(r.d) && !(_admIsWon(r) && inW(_admWonDay(r)))) return;
+    if (seen[r.id]) return; seen[r.id] = 1; rows.push(r);
+  });
+  var nL = rows.filter(function (r) { return inW(r.d); }).length;
+  var nA = rows.filter(function (r) { return _admIsWon(r) && inW(_admWonDay(r)); }).length;
   _admModal(br + ' · ' + _admPeriodLab(_admPeriod),
-    _admN(rows.length) + ' leads · ' + _admN(rows.filter(_admIsWon).length) + ' admitted',
+    _admN(nL) + ' lead' + (nL === 1 ? '' : 's') + ' arrived · ' +
+    _admN(nA) + ' admission' + (nA === 1 ? '' : 's') + ' completed',
     _admEnqTable(rows, false));
 }
 
@@ -25445,8 +25492,10 @@ function ambOpenMonth(id) {
    Referral and manual rows are neither walk-in nor digital, so they appear in
    Admissions and in neither split; the line under the table says how many
    that is rather than letting the two columns quietly fail to add up. */
-var ADM_DIGITAL_SRC = { facebook:1, website:1, google_ads:1, chatbot:1, instagram:1, qr:1 };
-var ADM_WALKIN_SRC  = { walk_in:1 };
+/* Walk-in and digital are _admIsWalk and _admIsDigital, the definition that
+   comes from Code.gs and that Branch comparison uses. This panel briefly kept
+   its own narrower list, which put referral and hand-entered rows in neither
+   column and left walk-in plus digital adding to less than the total. */
 var _admDayMetric = 'all';
 /* One term per button, and each cell carries the pair: admissions over the
    leads of the same kind. Two counts in one cell is the whole point — a day
@@ -25454,11 +25503,18 @@ var _admDayMetric = 'all';
    admissions on its own cannot. */
 var ADM_DAY_METRICS = [
   { k:'all',  lab:'Total',    f:function(r){ return true; } },
-  { k:'walk', lab:'Walk-in',  f:function(r){ return !!ADM_WALKIN_SRC[r.src]; } },
-  { k:'dig',  lab:'Digital',  f:function(r){ return !!ADM_DIGITAL_SRC[r.src]; } }
+  { k:'walk', lab:'Walk-in',  f:_admIsWalk },
+  { k:'dig',  lab:'Digital',  f:_admIsDigital }
 ];
 function admSetDayMetric(m) { _admDayMetric = m; _admTrend(); }
 
+/* which branches are open. A counsellor works one branch, so the key is the
+   branch alone and the sub-rows are that branch's owners. */
+var _admDayOpen = {};
+function admDayToggle(b) {
+  if (_admDayOpen[b]) delete _admDayOpen[b]; else _admDayOpen[b] = 1;
+  _admTrend();
+}
 /* the ten dates the table shows, newest first */
 function _admLastDays(n) {
   var out = [], d = new Date();
@@ -25486,18 +25542,26 @@ function _admTrend() {
      Created column — and an admission on the day it was completed, which the
      stage-change log records and the Updated column is meant to. */
   var A = {}, L = {}, aTot = {}, lTot = {}, aCol = {}, lCol = {}, aAll = 0, lAll = 0;
-  var bump = function (m, tot, col, b, day, n) {
+  var who = {};                               // branch -> { counsellor: 1 }
+  var bump = function (m, tot, col, b, c, day) {
     m[b + '|' + day] = (m[b + '|' + day] || 0) + 1;
+    m[b + '\u241f' + c + '|' + day] = (m[b + '\u241f' + c + '|' + day] || 0) + 1;
     tot[b] = (tot[b] || 0) + 1;
+    tot[b + '\u241f' + c] = (tot[b + '\u241f' + c] || 0) + 1;
     col[day] = (col[day] || 0) + 1;
   };
   S.rows.forEach(function (r) {
     if (!M.f(r)) return;
+    var c = String(r.owner || '').trim() || '(not assigned)';
     var cre = String(r.d || '').slice(0, 10);
-    if (cre && pos[cre] !== undefined) { bump(L, lTot, lCol, r.b, cre); lAll++; }
-    if (!_admIsWon(r)) return;
-    var won = _admWonDay(r);
-    if (won && pos[won] !== undefined) { bump(A, aTot, aCol, r.b, won); aAll++; }
+    var won = _admIsWon(r) ? _admWonDay(r) : '';
+    /* every counsellor the branch has, whether or not they show in the
+       window: a counsellor with a row of dots is the thing a branch head is
+       looking for, and dropping them for having nothing would hide it */
+    (who[r.b] || (who[r.b] = {}))[c] = 1;
+    var inC = cre && pos[cre] !== undefined, inW = won && pos[won] !== undefined;
+    if (inC) { bump(L, lTot, lCol, r.b, c, cre); lAll++; }
+    if (inW) { bump(A, aTot, aCol, r.b, c, won); aAll++; }
   });
 
   var btn = ADM_DAY_METRICS.map(function (m) {
@@ -25534,11 +25598,26 @@ function _admTrend() {
     }).join('') +
     '<th class="n" style="white-space:nowrap">Tot</th></tr></thead><tbody>';
 
+  var line = function (key, label, depth, open, onBr) {
+    var lead = depth
+      ? '<td class="cns" style="white-space:nowrap">' + _admEsc(label) + '</td>'
+      : '<td style="white-space:nowrap"><button class="amt-brn" onclick="admDayToggle(' +
+          JSON.stringify(onBr).replace(/"/g, '&quot;') + ')" title="' +
+          (open ? 'Close' : 'Open this branch by counsellor') + '"><i class="ar">' +
+          (open ? '\u25be' : '\u25b8') + '</i>' + _admDot(onBr) + ' ' + _admEsc(label) + '</button></td>';
+    return '<tr' + (depth ? ' class="cnsr"' : '') + '>' + lead +
+      DAYS.map(function (d) { return cell(A[key + '|' + d] || 0, L[key + '|' + d] || 0); }).join('') +
+      '<td class="n"><span class="a" style="color:' + (aTot[key] ? '#0D9488' : 'var(--txm)') + '">' +
+      (aTot[key] || 0) + '</span><span class="l">/' + (lTot[key] || 0) + '</span></td></tr>';
+  };
   brs.forEach(function (b) {
-    h += '<tr><td style="white-space:nowrap">' + _admDot(b) + ' ' + _admEsc(b) + '</td>' +
-      DAYS.map(function (d) { return cell(A[b + '|' + d] || 0, L[b + '|' + d] || 0); }).join('') +
-      '<td class="n"><span class="a" style="color:' + (aTot[b] ? '#0D9488' : 'var(--txm)') + '">' +
-      (aTot[b] || 0) + '</span><span class="l">/' + (lTot[b] || 0) + '</span></td></tr>';
+    var open = !!_admDayOpen[b];
+    h += line(b, b, 0, open, b);
+    if (!open) return;
+    Object.keys(who[b] || {}).sort(function (x, y) {
+      return (lTot[b + '\u241f' + y] || 0) - (lTot[b + '\u241f' + x] || 0) ||
+             String(x).localeCompare(String(y));
+    }).forEach(function (c) { h += line(b + '\u241f' + c, c, 1, false, b); });
   });
 
   h += '</tbody>' + (brs.length < 2 ? '' :
