@@ -1195,8 +1195,12 @@ table.vckt tr.vck-c td.nm{font-weight:600;color:var(--tx)}
 :root[data-theme="dark"] #pane-adm27{--amb-ok:#34D399; --amb-warn:#FBBF24;
   --amb-bad:#F87171; --amb-na:#7F8DA4}
 #pane-adm27 .amb-row{display:flex;justify-content:flex-end;gap:16px;align-items:flex-start;flex-wrap:wrap}
-#pane-adm27 .amb-row>#adm-trend{flex:1 1 440px;min-width:0;display:flex}
-#pane-adm27 .amb-row>#adm-month{flex:0 1 580px;min-width:0}
+/* The ten-day table needs the full width of the tab: eleven columns squeezed
+   into half of it put the oldest days and the total behind a sideways scroll,
+   which is exactly where the eye does not go. It takes its own line, and the
+   month card sits under it. */
+#pane-adm27 .amb-row>#adm-trend{flex:1 1 100%;min-width:0;display:flex}
+#pane-adm27 .amb-row>#adm-month{flex:1 1 100%;min-width:0}
 @media(max-width:1100px){
   #pane-adm27 .amb-row>#adm-trend,#pane-adm27 .amb-row>#adm-month{flex:1 1 100%;max-width:none}
 }
@@ -25214,18 +25218,85 @@ function _ambBand(pct) {
   return pct == null ? 'amb-na' : pct >= 30 ? 'amb-ok' : pct >= 20 ? 'amb-warn' : 'amb-bad';
 }
 /* ══ THE DAY AN ADMISSION BELONGS TO — ONE RULE, USED EVERYWHERE ══
-   Corrected 7 November 2026 to the UPDATED column, on the tracker's own
-   logic: a row is CREATED when the enquiry arrives and UPDATED when the
-   admission is finally done, so Updated is the date the admission happened
-   and Created is the date the lead did. The tab had been dating admissions by
-   Stage Entered, which is close but not the column the office works from.
+   Corrected 13 November 2026. Admissions were dated by the UPDATED column on
+   the tracker's own logic — created when the enquiry arrives, updated when
+   the admission is done. That logic is right about what Updated is FOR and
+   wrong about what it HOLDS.
 
-   Leads are counted on Created, admissions on Updated, and nothing on this
-   tab counts an admission any other way — the card at the top, the monthly
-   plan table and the season chart all come through here. */
+   Updated is a last-touched stamp for the whole row, and the tracker rewrites
+   it in bulk: in the file read on 6 November, 586 of 929 rows carried 6
+   November; on the 7th, 612 of 970 carried the 7th; on the 10th, 786 of 1,172
+   carried the 10th. Roughly two rows in three are re-stamped every time the
+   sheet is touched, so an October admission silently becomes a November one,
+   and by this morning every admission in the book had moved into November —
+   which is why the plan table read 0 against an October target of 115.
+
+   The stage-change log in the Comments column is the record that cannot move.
+   Each entry is written once, when the row actually changes stage:
+
+       07 Nov 2026, 04:14 pm · Stage change · [10 - Admission Completed > ...]
+       03 Nov 2026, 09:42 am · Stage change · → admitted
+
+   so the date an enquiry became an admission is read from there. In the 10
+   November file that log dates 79 of the 80 admissions — 52 in October, 27 in
+   November — and 22 of those already carried an Updated stamp LATER than the
+   day they were admitted. Updated is still used, as a fallback, for a row
+   whose log records no stage change, and Created after that: a real admission
+   is never dropped for want of a date.
+
+   Leads are counted on Created, admissions on the stage-change log, and
+   nothing on this tab counts an admission any other way — the card at the
+   top, the monthly plan table, the day-by-day table and the season chart all
+   come through here. */
+var _ADM_MONTHS3 = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+var _ADM_WON_RE  = /(admission\s*(done|completed)|\badmitted\b|\bjoined\b|\benrolled\b)/i;
+var _ADM_LOGDATE = /^\s*(\d{1,2})\s+([A-Za-z]{3})[a-z]*\s+(\d{4})/;
+
+/* the leading timestamp of a log line, as YYYY-MM-DD */
+function _admLogDay(line) {
+  var t = String(line || '');
+  var m = _ADM_LOGDATE.exec(t);
+  if (m) {
+    var mi = _ADM_MONTHS3.indexOf(m[2].toLowerCase());
+    if (mi >= 0) return m[3] + '-' + ('0' + (mi + 1)).slice(-2) + '-' + ('0' + m[1]).slice(-2);
+    return '';
+  }
+  m = /^\s*(\d{4}-\d{2}-\d{2})/.exec(t);
+  return m ? m[1] : '';
+}
+/* the last time this row was moved INTO the admitted stage */
+function _admStageWonDay(r) {
+  var cm = (r && r.cm) || [];
+  if (!cm.length || !cm.forEach) return '';
+  var best = '';
+  cm.forEach(function (c) {
+    var t = String(c || '');
+    if (!/stage\s*change/i.test(t)) return;
+    /* what the row moved TO: after the arrow in "[A > B]" or after "→" */
+    var tail = t.replace(/^[^·]*·[^·]*·/, '');
+    var to = tail.indexOf('>') >= 0 ? tail.slice(tail.lastIndexOf('>') + 1)
+           : tail.indexOf('→') >= 0 ? tail.slice(tail.lastIndexOf('→') + 1)
+           : tail;
+    if (!_ADM_WON_RE.test(to)) return;
+    var d = _admLogDay(t);
+    if (d && d > best) best = d;
+  });
+  return best;
+}
 function _admWonDay(r) {
+  var d = _admStageWonDay(r);
+  if (d) return d;
   var iso = (r && r.upd) || '';
-  return String(iso).length >= 10 ? String(iso).slice(0, 10) : '';
+  if (String(iso).length >= 10) return String(iso).slice(0, 10);
+  var c = (r && r.d) || '';
+  return String(c).length >= 10 ? String(c).slice(0, 10) : '';
+}
+/* how many admissions could only be dated by the re-stamped column, for the
+   note under the plan table */
+function _admWonDaySrc(r) {
+  if (_admStageWonDay(r)) return 'log';
+  if (String((r && r.upd) || '').length >= 10) return 'upd';
+  return String((r && r.d) || '').length >= 10 ? 'created' : 'none';
 }
 function _ambWonMonth(r) {
   var d = _admWonDay(r);
@@ -25330,144 +25401,132 @@ function ambOpenMonth(id) {
    THE MONTH IN PROGRESS STOPS AT TODAY. Plotting the rest of November at zero
    would draw a cliff that reads as a collapse rather than as a month that has
    not happened yet. */
-var _admTrBr = '', _admTrYm = '';
-function admTrBr(v) { _admTrBr = v; _admTrend(); }
-function admTrYm(v) { _admTrYm = v; _admTrend(); }
+/* ══ THE LAST TEN DAYS, IN THE FORM THE GROUP CIRCULATES ══ (13 November 2026)
 
-/* every month this season has a lead or an admission in, oldest first */
-function _admTrMonths(S) {
-  var m = {}, out = [];
-  S.rows.forEach(function (r) {
-    if (r.d && String(r.d).length >= 7) m[String(r.d).slice(0, 7)] = 1;
-    var w = _admWonDay(r); if (w) m[w.slice(0, 7)] = 1;
-  });
-  for (var k in m) if (m.hasOwnProperty(k)) out.push(k);
-  return out.sort();
+   This panel was two lines on a shared scale — leads and admissions across a
+   whole month. It read well and answered the wrong question: what gets asked
+   in the morning is how many came in yesterday, and the day before, branch by
+   branch, which a line chart can only be squinted at to answer.
+
+   So it is the table the director already writes by hand: ten columns of
+   dates, newest first, a row per branch, a total down the right. The switch
+   picks which of four counts fills it.
+
+   Walk-in and digital are read from the source the tracker records, not from
+   the free-text channel column — that column holds 23 different spellings
+   including "Sibling-6337" and "PARENT REFERAL", and cannot be counted on.
+   Referral and manual rows are neither walk-in nor digital, so they appear in
+   Admissions and in neither split; the line under the table says how many
+   that is rather than letting the two columns quietly fail to add up. */
+var ADM_DIGITAL_SRC = { facebook:1, website:1, google_ads:1, chatbot:1, instagram:1, qr:1 };
+var ADM_WALKIN_SRC  = { walk_in:1 };
+var _admDayMetric = 'adms';
+var ADM_DAY_METRICS = [
+  { k:'adms',  lab:'Admissions',         on:'won',
+    f:function(r){ return _admIsWon(r); } },
+  { k:'wadm',  lab:'Walk-in admissions', on:'won',
+    f:function(r){ return _admIsWon(r) && ADM_WALKIN_SRC[r.src]; } },
+  { k:'dadm',  lab:'Digital admissions', on:'won',
+    f:function(r){ return _admIsWon(r) && ADM_DIGITAL_SRC[r.src]; } },
+  { k:'dlead', lab:'Digital leads',      on:'created',
+    f:function(r){ return !!ADM_DIGITAL_SRC[r.src]; } }
+];
+function admSetDayMetric(m) { _admDayMetric = m; _admTrend(); }
+
+/* the ten dates the table shows, newest first */
+function _admLastDays(n) {
+  var out = [], d = new Date();
+  for (var i = 0; i < n; i++) { out.push(_admIso(d)); d.setDate(d.getDate() - 1); }
+  return out;
 }
+var _ADM_DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+function _admDayHead(iso) {
+  var p = String(iso).split('-');
+  var dt = new Date(+p[0], +p[1] - 1, +p[2]);
+  return { d: +p[2] + '/' + (+p[1]), w: _ADM_DOW[dt.getDay()], sun: dt.getDay() === 0 };
+}
+
 function _admTrend() {
   var el = document.getElementById('adm-trend'); if (!el) return;
   var S = _admSet(), R = _admRaw;
   if (!R) { el.innerHTML = ''; return; }
 
-  var months = _admTrMonths(S);
-  if (!months.length) {
-    el.innerHTML = '<div class="amt"><div class="amt-h">Leads and admissions, day by day</div>' +
-      '<div class="au-empty">No lead in this scope carries a date yet.</div></div>';
-    return;
-  }
-  var nowYm = _ambMonthKey();
-  if (months.indexOf(_admTrYm) < 0)
-    _admTrYm = months.indexOf(nowYm) >= 0 ? nowYm : months[months.length - 1];
-  var ym = _admTrYm;
+  var M = ADM_DAY_METRICS.filter(function (m) { return m.k === _admDayMetric; })[0]
+       || ADM_DAY_METRICS[0];
+  var DAYS = _admLastDays(10), brs = _admBranches(S);
 
-  /* the global branch filter wins: its own buttons only offer what is in scope */
-  var brs = _admBranches(S);
-  if (S.scope) _admTrBr = '';
-  if (_admTrBr && brs.indexOf(_admTrBr) < 0) _admTrBr = '';
-  var pick = _admTrBr ? [_admTrBr] : brs;
-  var inBr = function (r) { return !_admTrBr || r.b === _admTrBr; };
-
-  var days = _admDaysIn(ym);
-  var last = days;
-  if (ym === nowYm) last = Math.min(days, new Date().getDate());   // no future days
-
-  var L = [], A = [], i;
-  for (i = 0; i <= days; i++) { L[i] = 0; A[i] = 0; }
+  /* one pass: which day each qualifying row lands on */
+  var cnt = {}, tot = {}, colT = {}, grand = 0, other = 0;
   S.rows.forEach(function (r) {
-    if (!inBr(r)) return;
-    var d = String(r.d || '');
-    if (d.slice(0, 7) === ym) { var dd = +d.slice(8, 10); if (dd >= 1 && dd <= days) L[dd]++; }
-    if (_admIsWon(r)) {
-      var w = _admWonDay(r);
-      if (w && w.slice(0, 7) === ym) { var ad = +w.slice(8, 10); if (ad >= 1 && ad <= days) A[ad]++; }
-    }
+    if (!M.f(r)) return;
+    var day = M.on === 'won' ? _admWonDay(r) : String(r.d || '').slice(0, 10);
+    if (!day) return;
+    if (DAYS.indexOf(day) < 0) return;
+    var k = r.b + '|' + day;
+    cnt[k] = (cnt[k] || 0) + 1;
+    tot[r.b] = (tot[r.b] || 0) + 1;
+    colT[day] = (colT[day] || 0) + 1;
+    grand++;
   });
-  var sumL = 0, sumA = 0;
-  for (i = 1; i <= last; i++) { sumL += L[i]; sumA += A[i]; }
-
-  /* ── the drawing ── */
-  var W = 760, H = 250, padL = 42, padR = 12, padT = 14, padB = 30;
-  var pw = W - padL - padR, ph = H - padT - padB;
-  var peak = 1;
-  for (i = 1; i <= last; i++) { if (L[i] > peak) peak = L[i]; if (A[i] > peak) peak = A[i]; }
-  var step = Math.max(1, Math.ceil(peak / 4));
-  var top = step * 4;
-  var X = function (d) { return padL + (last < 2 ? pw / 2 : pw * (d - 1) / (last - 1)); };
-  var Y = function (v) { return padT + ph - ph * v / top; };
-  var path = function (arr) {
-    var p = '';
-    for (var d = 1; d <= last; d++) p += (d === 1 ? 'M' : 'L') + X(d).toFixed(1) + ' ' + Y(arr[d]).toFixed(1);
-    return p;
-  };
-  var dots = function (arr, col, lab) {
-    var o = '';
-    for (var d = 1; d <= last; d++) {
-      o += '<circle cx="' + X(d).toFixed(1) + '" cy="' + Y(arr[d]).toFixed(1) + '" r="' +
-        (last > 20 ? 2.2 : 3) + '" fill="' + col + '"><title>' + d + ' ' +
-        _ambMonthShort(ym) + ' · ' + arr[d] + ' ' + lab + '</title></circle>';
-    }
-    return o;
-  };
-  var grid = '', g;
-  for (g = 0; g <= 4; g++) {
-    var gy = (padT + ph - ph * g / 4).toFixed(1);
-    grid += '<line x1="' + padL + '" y1="' + gy + '" x2="' + (W - padR) + '" y2="' + gy +
-      '" stroke="var(--bor)" stroke-width="1"/>' +
-      '<text x="' + (padL - 7) + '" y="' + (+gy + 3.5) + '" text-anchor="end" font-size="10" ' +
-      'fill="var(--txl)">' + (step * g) + '</text>';
-  }
-  /* every day gets a tick; the label is thinned only when they would collide */
-  var every = last > 24 ? 2 : 1;
-  var xlab = '';
-  for (var d = 1; d <= last; d++) {
-    if (d !== 1 && d !== last && (d % every)) continue;
-    xlab += '<text x="' + X(d).toFixed(1) + '" y="' + (H - padB + 15) + '" text-anchor="middle" ' +
-      'font-size="10" fill="var(--txm)">' + d + '</text>';
+  if (M.k === 'adms') {
+    S.rows.forEach(function (r) {
+      if (!_admIsWon(r) || ADM_WALKIN_SRC[r.src] || ADM_DIGITAL_SRC[r.src]) return;
+      var day = _admWonDay(r);
+      if (day && DAYS.indexOf(day) >= 0) other++;
+    });
   }
 
-  var CL = 'var(--amt-l)', CA = 'var(--amt-a)';
-  var svg = '<svg class="amt-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" ' +
-    'aria-label="Leads and admissions by day of ' + _ambMonthFull(ym) + '">' + grid +
-    '<path d="' + path(L) + '" fill="none" stroke="' + CL + '" stroke-width="2.2" ' +
-      'stroke-linejoin="round" stroke-linecap="round"/>' +
-    '<path d="' + path(A) + '" fill="none" stroke="' + CA + '" stroke-width="2.2" ' +
-      'stroke-linejoin="round" stroke-linecap="round"/>' +
-    dots(L, CL, 'leads') + dots(A, CA, 'admissions') + xlab + '</svg>';
-
-  /* ── the switches ── */
-  var btn = function (on, call, inner) {
-    return '<button class="amt-b' + (on ? ' on' : '') + '" onclick="' + call + '">' + inner + '</button>';
-  };
-  var brBar = '';
-  if (!S.scope && brs.length > 1) {
-    brBar = btn(!_admTrBr, "admTrBr('')", 'All branches') +
-      brs.map(function (b) {
-        return btn(_admTrBr === b, "admTrBr('" + b.replace(/'/g, "\\'") + "')",
-          _admDot(b) + _admEsc(b));
-      }).join('');
-  }
-  var moBar = months.map(function (m) {
-    return btn(m === ym, "admTrYm('" + m + "')", _ambMonthShort(m));
+  var btn = ADM_DAY_METRICS.map(function (m) {
+    return '<button class="amt-b' + (m.k === M.k ? ' on' : '') +
+      '" onclick="admSetDayMetric(\'' + m.k + '\')">' + m.lab + '</button>';
   }).join('');
 
-  el.innerHTML = '<div class="amt">' +
-    '<div class="amt-h">Leads and admissions, day by day</div>' +
-    '<div class="amt-s">' + _admEsc(_ambMonthFull(ym)) + ' · ' +
-      _admEsc(_admTrBr || (S.scope || 'all five branches')) + ' · ' +
-      '<b style="color:var(--tx)">' + _admN(sumL) + '</b> lead' + (sumL === 1 ? '' : 's') + ' and ' +
-      '<b style="color:var(--tx)">' + _admN(sumA) + '</b> admission' + (sumA === 1 ? '' : 's') +
-      (ym === nowYm ? ' to the ' + _ambOrd(last) : '') + '</div>' +
-    '<div class="amt-bar">' + brBar + (brBar && moBar ? '<span class="sep"></span>' : '') + moBar + '</div>' +
-    svg +
-    '<div class="amt-leg">' +
-      '<span><i style="background:' + CL + '"></i>Leads · by the day the enquiry arrived</span>' +
-      '<span><i style="background:' + CA + '"></i>Admissions · by the day it was completed</span>' +
+  /* a count is easier to find when its weight shows; the scale is the busiest
+     single cell in the table, so a quiet metric is not painted as a failure */
+  var peak = 0;
+  for (var k2 in cnt) if (cnt.hasOwnProperty(k2) && cnt[k2] > peak) peak = cnt[k2];
+  var cell = function (v) {
+    if (!v) return '<td class="n" style="color:var(--txm)">·</td>';
+    var a = peak ? 0.07 + 0.3 * (v / peak) : 0.15;
+    return '<td class="n" style="font-weight:700;background:rgba(13,148,136,' + a.toFixed(3) + ')">' + v + '</td>';
+  };
+
+  var h = '<div class="amt"><div class="amt-h">' + M.lab + ' — the last ten days</div>' +
+    '<div class="amt-s">' + _admEsc(S.scope || 'all five branches') + ' · ' +
+      '<b style="color:var(--tx)">' + _admN(grand) + '</b> in the window · ' +
+      (M.on === 'won' ? 'by the day the admission was completed' : 'by the day the enquiry arrived') +
     '</div>' +
-    '<div class="amt-ft">Both lines share one scale, so the distance between them is real. They are not ' +
-      'the same leads: an admission on any day usually belongs to an enquiry from weeks before, so this ' +
-      'is two rhythms side by side rather than a conversion rate.' +
-      (ym === nowYm ? ' The line stops at today; the rest of the month has not happened.' : '') +
-    '</div></div>';
+    '<div class="amt-bar">' + btn + '</div>' +
+    '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:640px"><thead><tr>' +
+    '<th style="white-space:nowrap">Branch</th>' +
+    DAYS.map(function (d, i) {
+      var H = _admDayHead(d);
+      return '<th class="n" style="white-space:nowrap;font-size:11px' +
+        (i === 0 ? ';color:#0D9488' : '') + (H.sun ? ';opacity:.6' : '') + '">' + H.d +
+        '<div style="font-size:8.5px;letter-spacing:.06em;font-weight:500">' + H.w + '</div></th>';
+    }).join('') +
+    '<th class="n" style="white-space:nowrap">Tot</th></tr></thead><tbody>';
+
+  brs.forEach(function (b) {
+    h += '<tr><td style="white-space:nowrap">' + _admDot(b) + ' ' + _admEsc(b) + '</td>' +
+      DAYS.map(function (d) { return cell(cnt[b + '|' + d] || 0); }).join('') +
+      '<td class="n" style="font-weight:800;color:' + (tot[b] ? '#0D9488' : 'var(--txm)') + '">' +
+      (tot[b] || 0) + '</td></tr>';
+  });
+
+  h += '</tbody>' + (brs.length < 2 ? '' :
+    '<tfoot><tr style="font-weight:800;border-top:2px solid var(--bor)"><td>All branches</td>' +
+    DAYS.map(function (d) {
+      return '<td class="n">' + (colT[d] ? colT[d] : '<span style="color:var(--txm)">·</span>') + '</td>';
+    }).join('') +
+    '<td class="n" style="color:#0D9488">' + _admN(grand) + '</td></tr></tfoot>') +
+    '</table></div>';
+
+  if (M.k === 'adms' && other) {
+    h += '<div class="amt-ft">' + _admN(other) + ' of these came by referral or were entered by hand, so ' +
+      'they are counted here but in neither the walk-in nor the digital view.</div>';
+  }
+  el.innerHTML = h + '</div>';
 }
 
 function _ambMonthStatus() {
