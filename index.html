@@ -957,6 +957,18 @@ table.vckt tr.vck-c td.nm{font-weight:600;color:var(--tx)}
   .ph-nav.prev{left:6px}.ph-nav.next{right:6px}}
 
 /* ═══ MEETING ACTIONS ═══ */
+/* ══ ONE MENU ENTRY, SEVERAL DASHBOARDS ══ (13 November 2026)
+   Three feedback tabs and two admission years were five lines in the menu for
+   what a reader thinks of as two subjects. They are now one entry each, and
+   this strip is how you move between them — so the menu is shorter and
+   nothing has been taken away. The strip hides any dashboard the signed-in
+   role may not open, and hides itself when that leaves only one. */
+.grpsw{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 16px}
+.grpsw button{border:1px solid var(--bor);background:var(--sur);color:var(--txm);
+  border-radius:99px;padding:7px 16px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;
+  line-height:1.3}
+.grpsw button:hover{border-color:var(--p);color:var(--p)}
+.grpsw button.on{background:var(--p);border-color:var(--p);color:#fff;font-weight:800}
 .mt-drop{border:2px dashed var(--bor);border-radius:14px;padding:26px 22px;text-align:center;background:var(--sur)}
 .mt-drop.on{border-color:var(--p);background:var(--pl)}
 .mt-drop h4{font-size:14px;font-weight:800;color:var(--tx);margin:0 0 6px}
@@ -1904,6 +1916,20 @@ const ROLE_TABS = {
 // pinned to it, and the payload is filtered to that branch server-side.
 const ROLE_ALL_BRANCH = { management:1, auditor:1, admin_manager:1, vigilance_officer:1 };
 function _tabIdOf(btn){ const m=(btn.getAttribute('onclick')||'').match(/showTab\('([^']+)'/); return m?m[1]:''; }
+/* A menu entry that opens a group of tabs — Parentz Feedback, Admissions —
+   lists them in data-tabs. It is shown when the role may open ANY of them,
+   and the switch inside the pane drops the ones it may not, so a role with
+   2026-27 but not 2027-28 still reaches its own tab. */
+function _tabIdsOf(btn){
+  var d=(btn.getAttribute('data-tabs')||'').split(',').map(function(x){return x.trim();}).filter(Boolean);
+  if(d.length) return d;
+  var one=_tabIdOf(btn); return one?[one]:[];
+}
+window._ALLOWED_TABS = null;              // null = every tab
+function tabAllowed(id){
+  var A = window._ALLOWED_TABS;
+  return !A || A.indexOf(id) !== -1;
+}
 function applyRoleAccess(){
   const role=(window._ROLE||'').toLowerCase().trim();
   const branch=window._USER_BRANCH||null;
@@ -1932,20 +1958,27 @@ function applyRoleAccess(){
   } else if(sel){ sel.disabled=false; sel.style.opacity=''; sel.style.cursor=''; sel.title=''; }
 
   // Tab visibility
+  window._ALLOWED_TABS = allowed || null;
   const btns=[...document.querySelectorAll('nav .tb, .tabs .tb, .tb')];
   const seen={};
   btns.forEach(btn=>{
-    const id=_tabIdOf(btn); if(!id||seen[id])return; seen[id]=1;
-    btn.style.display=(allowed && allowed.indexOf(id)===-1)?'none':'';
+    const ids=_tabIdsOf(btn); if(!ids.length)return;
+    const key=ids.join('|'); if(seen[key])return; seen[key]=1;
+    const ok = !allowed || ids.some(function(i){ return allowed.indexOf(i)!==-1; });
+    btn.style.display = ok ? '' : 'none';
   });
+  try{ syncGroupSwitch(); }catch(e){}
 
   // If the currently-open tab is not allowed, jump to the first allowed one.
   if(allowed && allowed.length){
     const activePane=document.querySelector('.pane.active');
     const activeId=activePane?activePane.id.replace('pane-',''):'';
     if(allowed.indexOf(activeId)===-1){
-      const firstBtn=btns.find(b=>allowed.indexOf(_tabIdOf(b))!==-1);
-      if(firstBtn) firstBtn.click();
+      const firstBtn=btns.find(b=>_tabIdsOf(b).some(function(i){return allowed.indexOf(i)!==-1;}));
+      if(firstBtn){
+        const want=_tabIdsOf(firstBtn).filter(function(i){return allowed.indexOf(i)!==-1;})[0];
+        if(want) showTab(want, firstBtn); else firstBtn.click();
+      }
     } else if(lockBranch){ renderAll(); }
   } else if(lockBranch){ renderAll(); }
 
@@ -2093,20 +2126,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     <button class="tb active" onclick="showTab('overview',this)" title="Executive Overview"><span class="ic">📊</span><span class="lb">Executive Overview</span></button>
     <button class="tb" onclick="showTab('admp',this)" title="Admission Process"><span class="ic">🧾</span><span class="lb">Admission Process</span></button>
     <button class="tb" onclick="showTab('glance',this)" title="Consolidated Glance"><span class="ic">🗂️</span><span class="lb">Consolidated Glance</span></button>
-    <button class="tb" onclick="showTab('meet',this)" title="Meeting Actions"><span class="ic">🎙️</span><span class="lb">Meeting Actions</span></button>
     <div class="sn-grp">Academics</div>
     <button class="tb" onclick="showTab('pt1',this)" title="Examination Result"><span class="ic">📝</span><span class="lb">Examination Result</span></button>
     <button class="tb" onclick="showTab('observations',this)" title="Teacher Observations"><span class="ic">👁️</span><span class="lb">Teacher Observations</span></button>
     <button class="tb" onclick="showTab('audit',this)" title="School Audit"><span class="ic">🏫</span><span class="lb">School Audit</span></button>
     <button class="tb" onclick="showTab('syl',this)" title="Syllabus &amp; Notebook"><span class="ic">📓</span><span class="lb">Syllabus &amp; Notebook</span></button>
     <div class="sn-grp">Parents & Students</div>
-    <button class="tb" onclick="showTab('ptm',this)" title="PTM Feedback"><span class="ic">💬</span><span class="lb">PTM Feedback</span></button>
-    <button class="tb" onclick="showTab('kptm',this)" title="K-Innovative PTM Feedback"><span class="ic">⭐</span><span class="lb">K-Innovative PTM</span></button>
-    <button class="tb" onclick="showTab('term1',this)" title="Term 1 Feedback Report"><span class="ic">📝</span><span class="lb">Term 1 Feedback</span></button>
+    <button class="tb" data-tabs="term1,ptm,kptm" onclick="showTab('term1',this)" title="Parentz Feedback · Term 1, PTM and K-Innovative"><span class="ic">💬</span><span class="lb">Parentz Feedback</span></button>
     <button class="tb" onclick="showTab('care',this)" title="Care Calls"><span class="ic">📞</span><span class="lb">Care Calls</span></button>
     <button class="tb" onclick="showTab('grievance',this)" title="Grievance"><span class="ic">📣</span><span class="lb">Grievance</span></button>
-    <button class="tb" onclick="showTab('admissions',this)" title="Admissions 2026-27"><span class="ic">🎓</span><span class="lb">Admissions 2026-27</span></button>
-    <button class="tb" onclick="showTab('adm27',this)" title="Admissions 2027-28 · enquiry tracker, targets and history"><span class="ic">🗳️</span><span class="lb">Admissions 2027-28</span></button>
+    <button class="tb" data-tabs="adm27,admissions" onclick="showTab('adm27',this)" title="Admissions · 2027-28 enquiry tracker, with 2026-27 beside it"><span class="ic">🗳️</span><span class="lb">Admissions 2027-28</span></button>
     <button class="tb" onclick="showTab('dm',this)" title="Digital Marketing"><span class="ic">📣</span><span class="lb">Digital Marketing</span></button>
     <div class="sn-grp">Operations</div>
     <button class="tb" onclick="showTab('naa',this)" title="Non Academic Audit"><span class="ic">🧯</span><span class="lb">Non Academic Audit</span></button>
@@ -2408,6 +2437,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 <!-- ═══ ADMISSIONS 2026-27 ═══ -->
 <div id="pane-admissions" class="pane">
+  <div class="grpsw"><button data-tab="adm27" onclick="showTab('adm27')">🗳️ Admissions 2027-28</button><button data-tab="admissions" onclick="showTab('admissions')">🎓 Admissions 2026-27</button></div>
   <div class="sh">
     <div class="sh-l"><span class="sh-ico">🎓</span><div><h2>2026-2027 Admission Analysis</h2><p id="adm-tag" class="sh-sub">Lead-to-Admission Pipeline · Confirmed Enrollments</p></div></div>
     <span class="fnote" id="adm-fn">All Branches</span>
@@ -3180,6 +3210,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 <!-- ═══ PTM PARENT FEEDBACK ═══ -->
 <div id="pane-ptm" class="pane">
   <div class="au-wrap">
+    <div class="grpsw"><button data-tab="term1" onclick="showTab('term1')">📝 Term 1 Feedback</button><button data-tab="ptm" onclick="showTab('ptm')">💬 PTM Feedback</button><button data-tab="kptm" onclick="showTab('kptm')">⭐ K-Innovative PTM</button></div>
 
     <div class="au-head">
       <div>
@@ -3433,6 +3464,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 <!-- ═══ TERM 1 PARENT FEEDBACK & NPS ═══ -->
 <div id="pane-term1" class="pane">
   <div class="au-wrap">
+    <div class="grpsw"><button data-tab="term1" onclick="showTab('term1')">📝 Term 1 Feedback</button><button data-tab="ptm" onclick="showTab('ptm')">💬 PTM Feedback</button><button data-tab="kptm" onclick="showTab('kptm')">⭐ K-Innovative PTM</button></div>
 
     <div class="au-head">
       <div>
@@ -3533,6 +3565,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 <!-- ═══ K-INNOVATIVE PTM FEEDBACK ═══ -->
 <div id="pane-kptm" class="pane">
   <div class="au-wrap">
+    <div class="grpsw"><button data-tab="term1" onclick="showTab('term1')">📝 Term 1 Feedback</button><button data-tab="ptm" onclick="showTab('ptm')">💬 PTM Feedback</button><button data-tab="kptm" onclick="showTab('kptm')">⭐ K-Innovative PTM</button></div>
     <div class="au-head">
       <div><h2 style="margin:0;font-size:20px;font-weight:800">⭐ K-Innovative PTM Feedback</h2>
         <div style="font-size:12.5px;color:var(--txm);margin-top:3px" id="kp-meta">Loading…</div></div>
@@ -3635,6 +3668,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 <div id="pane-adm27" class="pane">
   <div class="au-wrap">
+    <div class="grpsw"><button data-tab="adm27" onclick="showTab('adm27')">🗳️ Admissions 2027-28</button><button data-tab="admissions" onclick="showTab('admissions')">🎓 Admissions 2026-27</button></div>
 
     <div class="au-head">
       <div>
@@ -8905,11 +8939,55 @@ function viewCombinedAdmissions(filter){
 // ════════════════════════════════════════════
 // TAB + INIT
 // ════════════════════════════════════════════
+/* The switch strips at the top of the grouped panes: mark the open one, and
+   leave out any tab this role may not open. */
+function syncGroupSwitch(){
+  var open=document.querySelector('.pane.active');
+  var now=open?open.id.replace('pane-',''):'';
+  document.querySelectorAll('.grpsw button').forEach(function(b){
+    var id=b.getAttribute('data-tab');
+    b.style.display = tabAllowed(id) ? '' : 'none';
+    b.classList.toggle('on', id===now);
+    b.setAttribute('aria-pressed', String(id===now));
+  });
+  /* a strip left with one visible button is not a choice */
+  document.querySelectorAll('.grpsw').forEach(function(w){
+    var n=0; w.querySelectorAll('button').forEach(function(b){ if(b.style.display!=='none') n++; });
+    w.style.display = n>1 ? '' : 'none';
+  });
+  /* and a menu entry that can now open only one of its tabs says which one,
+     rather than naming a dashboard this role never reaches */
+  document.querySelectorAll('.tb[data-tabs]').forEach(function(tb){
+    var ids=_tabIdsOf(tb).filter(tabAllowed);
+    var lb=tb.querySelector('.lb'); if(!lb) return;
+    if(!lb.dataset.full) lb.dataset.full=lb.textContent;
+    if(ids.length===1){
+      var one=document.querySelector('.grpsw button[data-tab="'+ids[0]+'"]');
+      lb.textContent = one ? one.textContent.replace(/^[^\w]+/,'').trim() : lb.dataset.full;
+    } else lb.textContent = lb.dataset.full;
+  });
+}
 function showTab(id,btn){
+  /* A grouped menu entry names its usual tab, which a restricted role may not
+     be allowed to open — a principal has 2026-27 but not 2027-28. Land on the
+     first tab of the group they CAN open rather than on an empty pane. */
+  if(!tabAllowed(id)){
+    var alt = btn ? _tabIdsOf(btn).filter(tabAllowed) : [];
+    if(!alt.length){
+      var own = document.querySelector('.tb[data-tabs~="'+id+'"], .tb[data-tabs*="'+id+'"]');
+      if(own) alt = _tabIdsOf(own).filter(tabAllowed);
+    }
+    if(!alt.length) return;
+    id = alt[0];
+  }
   document.querySelectorAll('.pane').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tb').forEach(b=>b.classList.remove('active'));
   document.getElementById('pane-'+id).classList.add('active');
   if(btn)btn.classList.add('active');
+  else document.querySelectorAll('.tb').forEach(function(b){
+    if(_tabIdsOf(b).indexOf(id)!==-1) b.classList.add('active');
+  });
+  try{ syncGroupSwitch(); }catch(e){}
   /* Switching a tab used to call renderAll(), which redrew all fourteen panels
      — so opening Care Calls cost five seconds, and opening it again cost five
      more. Only the panel being opened is drawn, and only if a filter change has
@@ -8925,8 +9003,9 @@ function switchTab(id){
   pane.classList.add('active');
   // find the matching tab button
   document.querySelectorAll('.tb').forEach(function(b){
-    if(b.getAttribute('onclick')&&b.getAttribute('onclick').indexOf("'"+id+"'")!==-1) b.classList.add('active');
+    if(_tabIdsOf(b).indexOf(id)!==-1) b.classList.add('active');
   });
+  try{ syncGroupSwitch(); }catch(e){}
   window.scrollTo(0,0);
   if(typeof renderTabIfStale==='function') renderTabIfStale(id); else renderAll();
 }
