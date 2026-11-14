@@ -1029,6 +1029,13 @@ table.vckt tr.vck-c td.nm{font-weight:600;color:var(--tx)}
 .na-num:hover{border-bottom-color:currentColor}
 .na-barbtn{background:none;border:0;padding:0;width:100%;cursor:pointer;display:block}
 .na-barbtn .au-bar{display:block}
+.na-cellbtn{background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;
+  font-variant-numeric:tabular-nums}
+.na-cellbtn:hover{color:#2563EB;text-decoration:underline}
+.bio-gt i.ar{font-style:normal;display:inline-block;width:13px;color:var(--txm);font-size:10px}
+.bio-gt tbody tr:hover{background:var(--pl)}
+.bio-leg{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:9px;font-size:11.5px;
+  color:var(--txm)}
 .na-secbtn{background:none;border:0;padding:0;font:inherit;font-weight:600;color:inherit;cursor:pointer;
   text-align:left;display:inline-flex;gap:6px;align-items:center}
 .na-secbtn:hover{color:#2563EB}
@@ -3842,88 +3849,45 @@ document.addEventListener('DOMContentLoaded', async () => {
     </div>
 
     <div id="bio-loader" class="exm-loader"><div class="exm-spin"></div>
-      <div>Reading the biometric punches…<br><span>Working out each shift's real start time from the clocking pattern</span></div></div>
+      <div>Reading the biometric punches…</div></div>
 
     <div id="bio-body" style="display:none;flex-direction:column;gap:16px">
-
-      <div id="bio-notes"></div>
 
       <div class="au-kpis" id="bio-kpis"></div>
 
       <div class="au-sec">
-        <h3>🚨 What the system reported, and what the punches show</h3>
-        <div class="sub">This comes first because it decides whether any attendance report can be trusted
-          for a group of staff. Every arrival past the grace period is counted here, and set beside the
-          number the biometric system <b>itself</b> flagged as late. It is grouped by <b>designation</b>,
-          because a role is who gets spoken to — with the shift code those staff sit on named underneath,
-          since the late-marking rule is a setting on the code. Where a role flagged none, that rule is
-          simply not switched on for its code — so the absence of late-coming complaints about those
-          staff is not evidence that they arrive on time. Click any designation for the people behind it.</div>
+        <h3>👥 Staff groups</h3>
+        <div id="bio-dept"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>🚨 Reported by the system, against the punches</h3>
         <div id="bio-codes"></div>
       </div>
 
       <div class="au-sec">
         <h3>🏫 Branch comparison</h3>
-        <div class="sub">Branch sizes differ a great deal, so the <b>rate</b> is the comparable figure and the
-          count is not. The last column splits each branch's late days by how late they were: a branch whose
-          bar is mostly green and amber has a start-of-day habit to fix, one with a red tail has individuals
-          to speak to. Click a branch — or its bar — for every member of staff, then a name for their
-          day-by-day record.</div>
         <div id="bio-branch"></div>
       </div>
 
       <div class="au-sec">
         <h3>📊 How late, when they are late</h3>
-        <div class="sub">The shape of the problem, which decides what to do about it. A large marginal band is
-          gate traffic, assembly timing and the queue at the punch machine — a process to change. A large
-          severe band is a roster that is wrong or a person who is not turning up for their shift. Click any
-          band for the branches and the staff inside it.</div>
         <div id="bio-sev"></div>
       </div>
 
       <div class="au-sec">
         <h3>📅 Day by day</h3>
-        <div class="sub">Late-coming is rarely flat across a month — it climbs before long weekends and
-          festivals, and that pattern is worth putting to the branch heads because it will come back.</div>
         <div id="bio-daily"></div>
       </div>
 
       <div class="au-sec">
-        <h3>👥 By staff group</h3>
-        <div class="sub">Teaching, admin and support staff compared on the same measure. Worth reading beside
-          the panel at the top: the group the system was already watching is usually the only one anybody has
-          been able to act on.</div>
-        <div id="bio-dept"></div>
-      </div>
-
-      <div class="au-sec">
         <h3>🚩 Late marks against the monthly allowance</h3>
-        <div class="sub">The school rule, applied: a late mark is an arrival more than <b>15 minutes</b> past
-          the shift start, and <b>three are allowed in a calendar month</b>. The fourth flags the employee.
-          The allowance resets each month, so two clean-ish months do not add up to a flag. Grouped by branch
-          so each principal sees their own list; tap a name for the months that broke the allowance and every
-          late mark behind them.</div>
         <div id="bio-people"></div>
       </div>
 
       <div class="au-sec">
         <h3>🧭 Staff carried on the wrong shift</h3>
-        <div class="sub">The school runs a small number of shifts and the sheet says which. Where somebody's
-          typical punch sits far from the shift they are carried on and lands squarely on another, they are
-          moved to it — a roster cell nobody updated otherwise manufactures an hour of lateness every day.
-          Someone merely <i>late</i> is never moved: arriving at 08:32 on an 08:00 shift is closer to 08:15
-          but not convincingly, so the roster stands and the lateness shows. Every change is listed here
-          rather than applied quietly.</div>
         <div id="bio-roster"></div>
-      </div>
-
-      <div class="au-sec">
-        <h3>📐 How these numbers are made</h3>
-        <div class="sub" id="bio-method"></div>
-        <div class="sub" style="margin-top:10px">Only the first punch of the day is read, so early departures
-          and mid-day absence are not covered here. Approved late arrivals, outdoor duty and official leave
-          are not told apart from unexcused lateness — which is the main reason the individual list above is
-          worth checking with each branch before it is acted on.</div>
       </div>
 
     </div>
@@ -21464,9 +21428,7 @@ function _bioBranchAcc(br, rows, note) {
       (note || (_bioLate(rows).length + ' of ' + rows.length + ' days · ' + deep + ' past ' +
                 _bioRaw.bands[1] + 'm · ' + nStaff + ' staff')) + '</span>';
   var body = people.length
-    ? '<div style="font-size:11.5px;color:var(--txm);margin:2px 0 8px">Worst first. Tap a name for every ' +
-        'attended day, with the punch time and the start it was judged against.</div>' +
-      people.map(function (p) { return _bioPersonAcc(p, false); }).join('')
+    ? people.map(function (p) { return _bioPersonAcc(p, false); }).join('')
     : '<div class="au-empty">No attended days.</div>';
   return _naAcc(head, body);
 }
@@ -21508,7 +21470,7 @@ var BIO_KPI = {
       var P = _bioRaw.policy || {}, all = _bioPolicy(rows);
       var n = all.filter(function (p) { return p.flagged; }).length;
       return { n: n, txt: _bioN(n),
-               note: n + ' of ' + all.length + ' staff past the ' + P.allow + '-a-month allowance' };
+               note: n + ' of ' + all.length + ' staff' };
     },
     pick: function (rows) {
       var keep = {};
@@ -21540,9 +21502,9 @@ function bioOpenKpi(kind) {
     return { b: b, v: K.val(rows), rows: rows };
   }).sort(function (x, y) { return (y.v.n || 0) - (x.v.n || 0); });
 
-  var h = '<div style="font-size:12.5px;color:var(--txm);line-height:1.6;margin-bottom:12px">' + K.sub() +
-    '. Group figure: <b style="color:var(--tx)">' + g.txt + '</b>' + (g.note ? ' (' + g.note + ')' : '') +
-    '. Tap a branch for its staff, then a name for their day-by-day record.</div>';
+  var h = '<div class="bio-leg" style="margin:0 0 12px">' +
+    '<span style="color:var(--tx);font-weight:800;font-size:15px">' + g.txt + '</span>' +
+    (g.note ? '<span>' + g.note + '</span>' : '') + '</div>';
 
   data.forEach(function (d) {
     h += _bioBranchAcc(d.b, d.rows, d.v.txt + (d.v.note ? ' · ' + d.v.note : ''));
@@ -21589,22 +21551,46 @@ function _bioKpis() {
     '<div class="na-kh"><span class="na-ico" style="background:#FEF2F2;color:#B91C1C">🚨</span>' +
     '<span class="v" style="color:#DC2626">' + (missPct === null ? '–' : missPct + '%') + '</span></div>' +
     '<div class="k">Never flagged by the system</div>' +
-    '<div class="d">' + _bioN(tl - tf) + ' of ' + _bioN(tl) + ' late arrivals carried no late flag</div>' +
+    '<div class="d">' + _bioN(tl - tf) + ' of ' + _bioN(tl) + ' late arrivals</div>' +
     '<div class="na-click">Click to view ›</div></button>');
   tiles.push('<button class="au-kpi na-kpi-b" onclick="bioOpenDays()" ' +
     'title="Click for every day">' +
     '<div class="na-kh"><span class="na-ico" style="background:#F8FAFC;color:#475569">📅</span>' +
     '<span class="v" style="color:var(--tx)">' + S.days + '</span></div>' +
     '<div class="k">Working days read</div>' +
-    '<div class="d">Out of ' + (R.dates || []).filter(function (d) {
-        return !_bioMonth || d.d.slice(0, 7) === _bioMonth; }).length +
-      ' dates — holidays and Sundays drop out on attendance, not on a calendar</div>' +
+    '<div class="d">of ' + (R.dates || []).filter(function (d) {
+        return !_bioMonth || d.d.slice(0, 7) === _bioMonth; }).length + ' dates</div>' +
     '<div class="na-click">Click to view ›</div></button>');
 
   el.innerHTML = tiles.join('');
 }
 
 /* ── what the machine reported ──────────────────────────────────────────────
+   The finding that comes first on the page, because it decides whether a
+   monthly attendance report can be used for a group of staff at all. */
+var BIO_GRP_ORDER = ['Teachers', 'HOD', 'Sports', 'Admin', 'Other'];
+var BIO_GRP_COL = { Teachers: '#1E4FD8', HOD: '#7C3AED', Sports: '#0D9488',
+                    Admin: '#D97706', Other: '#94A3B8' };
+var BIO_GRP_RE = [
+  ['Admin',    /maint(en|ain)|housekeep|plumb|electric|carpent|sweep|clean|garden|securit|guard|driver|conduct|attendant|peon|helper|cook|canteen|ayah|caretak|nurse|lift\s*man|water\s*man/i],
+  ['Sports',   /\bsports?\b|\bpet\b|\bpti\b|physical\s*(education|training|director)|coach|yoga|karate|skating|swim|\bgames\b|\bgym/i],
+  ['HOD',      /\bhod\b|head\s*of\s*(the\s*)?dep|co-?ordinator|coordinaotr|\bdean\b|subject\s*head|\bhead\s*of\b/i],
+  ['Teachers', /teacher|faculty|lecturer|tutor|\btgt\b|\bpgt\b|\bprt\b|educator|montessori|teaching/i],
+  ['Admin',    /principal|\badmin|transport|office|reception|account|\bhr\b|clerk|cashier|\bstore|purchase|librar|\bit\b|system|\berp\b|\bdtp\b|\bseo\b|\bpro\b|counsel|manager|supervis|in-?charge|incharge|\bhm\b|head\s*m(istress|aster)|warden|\blab\b|\bpa\b|vigilance|grievance|marketing|\bmis\b/i]
+];
+function _bioGrp(desig) {
+  var t = String(desig == null ? '' : desig);
+  if (!t || /not recorded/i.test(t)) return 'Other';
+  for (var i = 0; i < BIO_GRP_RE.length; i++) if (BIO_GRP_RE[i][1].test(t)) return BIO_GRP_RE[i][0];
+  return 'Other';
+}
+function _bioGrpChip(g) {
+  var c = BIO_GRP_COL[g] || '#94A3B8';
+  return '<span style="display:inline-block;width:9px;height:9px;border-radius:3px;background:' + c +
+    ';margin-right:7px;vertical-align:1px"></span>';
+}
+
+/* ── what the machine reported ─────────────────────────────────
    The finding that comes first on the page, because it decides whether a
    monthly attendance report can be used for a group of staff at all. */
 function _bioRoles() {
@@ -21638,74 +21624,96 @@ function _bioRoleBr(o) {
          ' <span style="color:var(--txm)">' + o.brs.length + ' branches</span>';
 }
 
+/* The same four groups, measured on whether the machine reported the lateness
+   at all. A group row opens into the designations inside it; the bar is the
+   late arrivals it found, the grey part the share the system itself flagged.
+   Counted over every date in the file, not working days only \u2014 whether the
+   rule fires has nothing to do with which day somebody was late. */
+var _bioCodeOpen = {};
+function bioCodeToggle(btn) {
+  var k = btn.getAttribute('data-k');
+  _bioCodeOpen[k] = !_bioCodeOpen[k];
+  _bioCodes();
+}
+function _bioCodeTree() {
+  var roles = _bioRoles(), m = {};
+  roles.forEach(function (c) {
+    var g = _bioGrp(c.dg);
+    var o = m[g] || (m[g] = { g: g, staff: 0, late: 0, flagged: 0, brs: [], scs: [], roles: [] });
+    o.staff += c.staff; o.late += c.late; o.flagged += c.flagged;
+    o.roles.push(c);
+    c.brs.forEach(function (x) { if (o.brs.indexOf(x) < 0) o.brs.push(x); });
+    c.scs.forEach(function (x) { if (o.scs.indexOf(x) < 0) o.scs.push(x); });
+  });
+  return BIO_GRP_ORDER.filter(function (g) { return m[g]; }).map(function (g) { return m[g]; })
+    .sort(function (x, y) { return y.late - x.late || y.staff - x.staff; });
+}
 function _bioCodes() {
   var el = document.getElementById('bio-codes'); if (!el) return;
-  var S = _bioSet(), R = _bioRaw, roles = _bioRoles();
-  if (!roles.length) { el.innerHTML = '<div class="au-empty">No late arrivals in this scope.</div>'; return; }
-  var max = Math.max.apply(null, roles.map(function (c) { return c.late; })) || 1;
-  var tl = roles.reduce(function (t, c) { return t + c.late; }, 0);
-  var tf = roles.reduce(function (t, c) { return t + c.flagged; }, 0);
-  var silent = roles.filter(function (c) { return !c.flagged; });
-
-  var h = '';
-  if (silent.length) {
-    /* The rule lives on the shift code, so a code that flagged nothing AT ALL
-       has the rule switched off. A code that flags other staff but never these
-       is a different fault and must not be reported as the same one: the
-       exemption is then on the employee, not on the code. */
-    var scF = {};
-    (R.codes || []).forEach(function (c) {
-      if (S.scope && c.branch !== S.scope) return;
-      var k = c.sc || '(no code)'; scF[k] = (scF[k] || 0) + c.flagged;
-    });
-    var off = [], mixed = [];
-    silent.forEach(function (c) {
-      c.scs.forEach(function (x) {
-        var t = scF[x] ? mixed : off;
-        if (t.indexOf(x) < 0) t.push(x);
-      });
-    });
-    h += '<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;padding:13px 15px;' +
-      'margin-bottom:14px;font-size:12.5px;line-height:1.65;color:#7F1D1D">' +
-      '<b>' + silent.length + ' role' + (silent.length === 1 ? '' : 's') + ' never raised a single late ' +
-      'arrival</b> — ' + silent.map(function (c) {
-        return _bioEsc(c.dg) + ' (' + c.staff + ' staff, ' + _bioN(c.late) + ' late)';
-      }).join(', ') + '. The late-marking rule is a setting on the <b>shift code</b>, not on the person' +
-      (off.length ? ', and on ' + off.map(_bioEsc).join(' / ') + ' it has never fired for anybody — one ' +
-        'setting in the biometric software rather than a new process' : '') +
-      (mixed.length ? '. ' + mixed.map(_bioEsc).join(' / ') + (mixed.length === 1 ? ' does' : ' do') +
-        ' fire for other staff on the same ' +
-        'code, so for the roles above it is the <b>employee record</b> that is carrying the exemption, ' +
-        'not the code — that one is checked person by person' : '') +
-      '. Until it is corrected, no attendance report from this system can be used for these staff.</div>';
-  }
-  h += '<table class="au-tbl"><thead><tr><th>Designation</th><th>Branch</th><th class="n">Staff</th>' +
-    '<th style="min-width:170px">Late arrivals · flagged vs never flagged</th>' +
-    '<th class="n">Late</th><th class="n">Flagged</th><th class="n">Share flagged</th></tr></thead><tbody>';
-  roles.forEach(function (c) {
-    var w = 100 * c.late / max, fw = c.late ? 100 * c.flagged / c.late : 0;
-    h += '<tr><td><button class="na-secbtn" onclick="bioOpenDesig(' +
-        JSON.stringify(c.dg).replace(/"/g, '&quot;') + ')">' + _bioEsc(c.dg) + ' ›</button>' +
-      '<div style="font-size:10.5px;color:var(--txm);margin-top:2px">on ' +
-        _bioRoleSc(c) + '</div></td>' +
-      '<td style="white-space:nowrap">' + _bioRoleBr(c) + '</td>' +
-      '<td class="n" style="color:var(--txm)">' + c.staff + '</td>' +
-      '<td><div style="height:11px;width:' + w + '%;min-width:3px;border-radius:99px;overflow:hidden;' +
-        'background:#DC2626;display:flex"><i style="width:' + fw + '%;background:#94A3B8;display:block"></i></div></td>' +
-      '<td class="n" style="font-weight:800">' + _bioN(c.late) + '</td>' +
-      '<td class="n" style="color:var(--txm)">' + _bioN(c.flagged) + '</td>' +
-      '<td class="n" style="font-weight:800;color:' + (c.flagged ? '#D97706' : '#DC2626') + '">' +
-        (c.late ? Math.round(100 * c.flagged / c.late) + '%' : '–') + '</td></tr>';
+  var tree = _bioCodeTree();
+  if (!tree.length) { el.innerHTML = '<div class="au-empty">No late arrivals in this scope.</div>'; return; }
+  var max = Math.max.apply(null, tree.map(function (o) { return o.late; })) || 1;
+  var tl = tree.reduce(function (t, o) { return t + o.late; }, 0);
+  var tf = tree.reduce(function (t, o) { return t + o.flagged; }, 0);
+  var silent = 0;
+  tree.forEach(function (o) {
+    o.roles.forEach(function (c) { if (!c.flagged) silent++; });
   });
-  h += '</tbody></table>' +
-    '<div style="font-size:11.5px;color:var(--txm);margin-top:10px;line-height:1.6">' +
-    'Grey is the part the system flagged, red the part it did not. Across every role here the system ' +
-    'reported <b style="color:var(--tx)">' + _bioN(tf) + ' of ' + _bioN(tl) + '</b> late arrivals (' +
-    (tl ? Math.round(100 * tf / tl) : 0) + '%). The small line under each designation is the shift ' +
-    'code its staff are carried on, because that is where the late-marking rule is turned on or off. ' +
-    'Counted over every date in the file, because this is about the machine rather than about which ' +
-    'day somebody was late.</div>';
-  el.innerHTML = h;
+
+  var row = function (o, label, chip, depth, kids, key, click) {
+    var w = 100 * o.late / max, fw = o.late ? 100 * o.flagged / o.late : 0;
+    var open = !!_bioCodeOpen[key];
+    var kq = String(key).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    var head = kids
+      ? '<button class="na-secbtn" data-k="' + kq + '" onclick="bioCodeToggle(this)" ' +
+        'style="font-weight:800;font-size:14px"><i class="ar">' + (open ? '\u25be' : '\u25b8') + '</i>' +
+        chip + _bioEsc(label) + '</button>'
+      : '<button class="na-secbtn" onclick="bioOpenDesig(' + click + ')">' + _bioEsc(label) + ' \u203a</button>';
+    var share = o.late ? Math.round(100 * o.flagged / o.late) : null;
+    return '<tr' + (depth ? ' style="background:var(--pl)"' : '') + '>' +
+      '<td style="padding-left:' + (9 + depth * 20) + 'px">' + head +
+        (depth ? '<div style="font-size:10.5px;color:var(--txm);margin-top:2px">' + _bioRoleSc(o) +
+                 '</div>' : '') + '</td>' +
+      '<td style="white-space:nowrap">' + _bioRoleBr(o) + '</td>' +
+      '<td class="n" style="color:var(--txm)">' + o.staff + '</td>' +
+      '<td><div style="height:11px;width:' + w + '%;min-width:3px;border-radius:99px;overflow:hidden;' +
+        'background:#DC2626;display:flex"><i style="width:' + fw +
+        '%;background:#94A3B8;display:block"></i></div></td>' +
+      '<td class="n" style="font-weight:800">' + _bioN(o.late) + '</td>' +
+      '<td class="n" style="color:var(--txm)">' + _bioN(o.flagged) + '</td>' +
+      '<td class="n" style="font-weight:800;color:' + (o.flagged ? '#D97706' : '#DC2626') + '">' +
+        (share === null ? '\u2013' : share + '%') + '</td></tr>';
+  };
+
+  var h = '<table class="au-tbl bio-gt"><thead><tr><th>Designation group</th><th>Branch</th>' +
+    '<th class="n">Staff</th><th style="min-width:170px">Late \u00b7 flagged vs never flagged</th>' +
+    '<th class="n">Late</th><th class="n">Flagged</th><th class="n">Share flagged</th>' +
+    '</tr></thead><tbody>';
+  tree.forEach(function (o) {
+    h += row(o, o.g, _bioGrpChip(o.g), 0, true, o.g, '');
+    if (!_bioCodeOpen[o.g]) return;
+    o.roles.slice().sort(function (a, b) { return b.late - a.late || b.staff - a.staff; })
+      .forEach(function (c) {
+        h += row(c, c.dg, '', 1, false, o.g + BIO_GSEP + c.dg,
+                 JSON.stringify(c.dg).replace(/"/g, '&quot;'));
+      });
+  });
+
+  el.innerHTML = h + '</tbody></table>' +
+    '<div class="bio-leg">' +
+    '<span><span style="display:inline-block;width:18px;height:9px;border-radius:99px;' +
+      'background:#94A3B8;vertical-align:1px;margin-right:6px"></span>Flagged by the system</span>' +
+    '<span style="color:var(--bor)">|</span>' +
+    '<span><span style="display:inline-block;width:18px;height:9px;border-radius:99px;' +
+      'background:#DC2626;vertical-align:1px;margin-right:6px"></span>Never flagged</span>' +
+    '<span style="color:var(--bor)">|</span>' +
+    '<span style="color:var(--tx);font-weight:700">' + _bioN(tf) + ' / ' + _bioN(tl) + '</span>' +
+    '<span>' + (tl ? Math.round(100 * tf / tl) : 0) + '% reported</span>' +
+    (silent ? '<span style="color:var(--bor)">|</span>' +
+      '<span style="background:#FEF2F2;color:#B91C1C;font-weight:700;border-radius:99px;' +
+      'padding:2px 9px">\u26a0 ' + silent + ' designation' + (silent === 1 ? '' : 's') +
+      ' \u00b7 0% flagged</span>' : '') +
+    '</div>';
 }
 function bioOpenDesig(dg) {
   if (!_bioRaw) return;
@@ -21720,33 +21728,26 @@ function bioOpenDesig(dg) {
      days only, because it is about people. Both counts are shown rather than
      quietly differing by a handful. */
   var every = _bioRoles().filter(function (c) { return c.dg === dg; })[0];
-  var h = '<div style="font-size:12.5px;color:var(--txm);line-height:1.6;margin-bottom:12px">' +
-    'Every late arrival by staff carrying this designation on the <b style="color:var(--tx)">working ' +
-    'days</b> of ' + (_bioMonth ? _bioMonthLabel(_bioMonth) : 'the file') +
-    (every && every.late !== rows.length
-      ? ' — ' + _bioN(every.late) + ' across every date in the file, ' + _bioN(rows.length) +
-        ' once holidays and Sundays are set aside'
-      : '') +
-    (every && every.scs.length ? '. Carried on shift code ' + every.scs.map(_bioEsc).join(' / ') : '') +
-    '. Tap a name for their day-by-day record.</div>' +
-    (people.length ? people.map(function (p) { return _bioPersonAcc(p, true); }).join('')
-                   : '<div class="au-empty">No late arrivals on working days.</div>');
+  var h = people.length ? people.map(function (p) { return _bioPersonAcc(p, true); }).join('')
+                        : '<div class="au-empty">No late arrivals on working days.</div>';
   if (typeof openHTMLModal === 'function')
-    openHTMLModal(dg + (S.scope ? ' — ' + S.scope : ''),
-      _bioN(rows.length) + ' late arrivals on working days · ' + people.length + ' staff', h);
+    openHTMLModal(dg + (S.scope ? ' · ' + S.scope : ''),
+      _bioGrp(dg) + ' · ' + _bioN(rows.length) + ' late · ' + people.length + ' staff' +
+      (every && every.scs.length ? ' · ' + every.scs.map(_bioEsc).join(' / ') : ''), h);
 }
 function bioOpenCodes() {
   if (!_bioRaw) return;
-  var roles = _bioRoles();
-  var h = '<div style="font-size:12.5px;color:var(--txm);line-height:1.6;margin-bottom:12px">' +
-    'Every designation with at least one late arrival, worst first. A role flagging none sits on a ' +
-    'shift code whose late-marking rule is off — the code is named beside it. Tap a role for the ' +
-    'staff behind it.</div>' +
-    '<table class="au-tbl"><thead><tr><th>Designation</th><th>Branch</th><th>Shift code</th>' +
+  var roles = _bioRoles().slice().sort(function (a, b) {
+    var ga = BIO_GRP_ORDER.indexOf(_bioGrp(a.dg)), gb = BIO_GRP_ORDER.indexOf(_bioGrp(b.dg));
+    return ga - gb || b.late - a.late;
+  });
+  var h = '<table class="au-tbl"><thead><tr><th>Group</th><th>Designation</th><th>Branch</th><th>Shift code</th>' +
     '<th class="n">Staff</th><th class="n">Late arrivals</th><th class="n">Flagged</th>' +
     '<th class="n">Never flagged</th></tr></thead><tbody>' +
     roles.map(function (c) {
-      return '<tr><td><button class="na-secbtn" onclick="bioOpenDesig(' +
+      return '<tr><td style="white-space:nowrap">' + _bioGrpChip(_bioGrp(c.dg)) +
+          _bioEsc(_bioGrp(c.dg)) + '</td>' +
+        '<td><button class="na-secbtn" onclick="bioOpenDesig(' +
           JSON.stringify(c.dg).replace(/"/g, '&quot;') + ')">' + _bioEsc(c.dg) + ' ›</button></td>' +
         '<td style="white-space:nowrap">' + _bioRoleBr(c) + '</td>' +
         '<td style="font-size:11.5px;color:var(--txm)">' + _bioRoleSc(c) + '</td>' +
@@ -21758,7 +21759,8 @@ function bioOpenCodes() {
     }).join('') + '</tbody></table>';
   if (typeof openHTMLModal === 'function')
     openHTMLModal('What the biometric system reported',
-      roles.length + ' designations · every date in the file', h)
+      roles.length + ' designations · ' + BIO_GRP_ORDER.filter(function (g) {
+        return roles.some(function (c) { return _bioGrp(c.dg) === g; }); }).length + ' groups', h)
 }
 
 /* ── branch comparison ─────────────────────────────────────────────────────── */
@@ -21805,12 +21807,8 @@ function _bioBranch() {
       '<td><div style="height:11px;border-radius:99px;overflow:hidden;display:flex;background:#EEF2FF">' +
         seg + '</div></td></tr>';
   });
-  h += '</tbody></table>' +
-    '<div style="font-size:11.5px;color:var(--txm);margin-top:10px;line-height:1.6">' +
-    'Group rate <b style="color:var(--tx)">' + (gPct === null ? '–' : gPct.toFixed(1) + '%') + '</b>. ' +
-    'Branch sizes differ a great deal, so the rate is the comparable figure and the count is not. ' +
-    'The last column splits each branch’s late days by how late they were — a branch whose bar is ' +
-    'mostly green-yellow has a start-of-day habit, one with a red tail has individuals.</div>';
+  h += '</tbody></table><div class="bio-leg"><span style="color:var(--tx);font-weight:700">' +
+    (gPct === null ? '–' : gPct.toFixed(1) + '%') + '</span><span>group rate</span></div>';
   el.innerHTML = h;
 }
 function bioOpenBranch(br) {
@@ -21820,11 +21818,7 @@ function bioOpenBranch(br) {
   var people = _bioByStaff(rows).sort(function (a, b) {
     return (b.deepDays - a.deepDays) || (b.pct - a.pct) || (b.avg - a.avg);
   });
-  var h = '<div style="font-size:12.5px;color:var(--txm);line-height:1.6;margin-bottom:12px">' +
-    'Every member of staff who attended at ' + _bioEsc(br) + ' in ' + _bioMonthTxt() +
-    ', worst first — days past ' + _bioRaw.bands[1] + ' minutes, then late rate. Tap a name for their ' +
-    'day-by-day record with the punch time and the start it was judged against.</div>' +
-    (people.length ? people.map(function (p) { return _bioPersonAcc(p, false); }).join('')
+  var h = (people.length ? people.map(function (p) { return _bioPersonAcc(p, false); }).join('')
                    : '<div class="au-empty">No attended days.</div>');
   if (typeof openHTMLModal === 'function')
     openHTMLModal(br + ' — every member of staff',
@@ -21864,9 +21858,7 @@ function bioOpenBand(band, branch) {
   var title = deep ? 'More than ' + _bioRaw.bands[1] + ' minutes late' : BD[band].n + ' — ' + BD[band].d;
   if (branch) title += ' · ' + branch;
   var brs = _bioRaw.branches.filter(function (b) { return rows.some(function (r) { return r.br === b; }); });
-  var h = '<div style="font-size:12.5px;color:var(--txm);line-height:1.6;margin-bottom:12px">' +
-    _bioN(rows.length) + ' attended day' + (rows.length === 1 ? '' : 's') + ' in ' +
-    _bioMonthTxt() + '. Tap a branch for its staff, then a name for the days behind it.</div>';
+  var h = '';
   if (!rows.length) h += '<div class="au-empty">Nothing in this band.</div>';
   brs.forEach(function (b) {
     var rs = rows.filter(function (r) { return r.br === b; });
@@ -21902,13 +21894,12 @@ function _bioDaily() {
       '<div style="font-size:9px;color:var(--txl)">' + BIO_DOW[new Date(d + 'T00:00:00Z').getUTCDay()] +
         '</div></button>';
   });
-  h += '</div><div style="font-size:11.5px;color:var(--txm);margin-top:8px;line-height:1.6">' +
-    'Each bar is the share of staff present that day who arrived late; the number above it is that ' +
-    'percentage. Grey bars are below the month average of <b style="color:var(--tx)">' + gPct.toFixed(1) +
-    '%</b>. Click any day for the branches and the staff behind it. Days where fewer than ' +
-    Math.round(R.workdayShare * 100) + '% of staff on roll punched at all are treated as non-working and ' +
-    'are not shown — that is how Sundays, holidays and festival weeks drop out without anybody ' +
-    'maintaining a calendar.</div>';
+  h += '</div><div class="bio-leg">' +
+    '<span><span style="display:inline-block;width:18px;height:9px;border-radius:3px;background:#CBD5E1;' +
+      'vertical-align:1px;margin-right:6px"></span>below average</span>' +
+    '<span style="color:var(--bor)">|</span>' +
+    '<span style="color:var(--tx);font-weight:700">' + gPct.toFixed(1) + '%</span><span>month average</span>' +
+    '</div>';
   el.innerHTML = h;
 }
 function bioOpenDay(d) {
@@ -21916,9 +21907,7 @@ function bioOpenDay(d) {
   var S = _bioSet();
   var rows = S.rows.filter(function (r) { return r.d === d; });
   var brs = _bioRaw.branches.filter(function (b) { return rows.some(function (r) { return r.br === b; }); });
-  var h = '<div style="font-size:12.5px;color:var(--txm);line-height:1.6;margin-bottom:12px">' +
-    _bioN(rows.length) + ' staff present, ' + _bioN(_bioLate(rows).length) + ' arrived late (' +
-    (_bioPct(rows) || 0).toFixed(1) + '%). Tap a branch for its staff, then a name for their record.</div>';
+  var h = '';
   brs.forEach(function (b) {
     var rs = rows.filter(function (r) { return r.br === b; });
     h += _bioBranchAcc(b, rs, _bioN(_bioLate(rs).length) + ' of ' + rs.length + ' present late');
@@ -21931,11 +21920,7 @@ function bioOpenDays() {
   if (!_bioRaw) return;
   var S = _bioSet(), R = _bioRaw;
   var inMonth = R.dates.filter(function (x) { return !_bioMonth || x.d.slice(0, 7) === _bioMonth; });
-  var h = '<div style="font-size:12.5px;color:var(--txm);line-height:1.6;margin-bottom:12px">' +
-    'Every date in the file and what it was treated as. A date counts as a working day when at least ' +
-    Math.round(R.workdayShare * 100) + '% of the ' + _bioN(R.staffOnRoll) + ' staff on roll punched — so ' +
-    'Sundays, holidays and festival weeks drop out of the late-coming figures on their own, in any ' +
-    'month.</div><table class="au-tbl"><thead><tr><th>Date</th><th>Day</th><th class="n">Punched</th>' +
+  var h = '<table class="au-tbl"><thead><tr><th>Date</th><th>Day</th><th class="n">Punched</th>' +
     '<th class="n">Share of roll</th><th>Treated as</th><th class="n">Late rate</th></tr></thead><tbody>';
   var byDate = {};
   S.rows.forEach(function (r) { (byDate[r.d] || (byDate[r.d] = [])).push(r); });
@@ -21960,51 +21945,120 @@ function bioOpenDays() {
 }
 
 /* ── staff groups ──────────────────────────────────────────────────────────── */
+/* The staff-group panel. Three levels in one table: the four designation
+   groups, the designations inside a group, and the individual staff inside a
+   designation — each one a tap, each one keeping the same seven measures so a
+   row never changes meaning as it opens. Every value is also a click, which
+   opens the day-by-day punches behind that exact row. */
+var _bioGrpOpen = {};
+var BIO_GSEP = '\u241f';
+function bioGrpToggle(btn) {
+  var k = btn.getAttribute('data-k');
+  _bioGrpOpen[k] = !_bioGrpOpen[k];
+  _bioDept();
+}
+function _bioGrpTree() {
+  var S = _bioSet(), m = {};
+  S.rows.forEach(function (r) {
+    var g = _bioGrp(r.s.g), dg = r.s.g || '(not recorded)';
+    var o = m[g] || (m[g] = { g: g, rows: [], dsg: {}, order: [] });
+    o.rows.push(r);
+    if (!o.dsg[dg]) { o.dsg[dg] = []; o.order.push(dg); }
+    o.dsg[dg].push(r);
+  });
+  return BIO_GRP_ORDER.filter(function (g) { return m[g]; }).map(function (g) { return m[g]; });
+}
 function _bioDept() {
   var el = document.getElementById('bio-dept'); if (!el) return;
-  var S = _bioSet(), R = _bioRaw;
-  var by = {}, order = [];
-  S.rows.forEach(function (r) {
-    var k = r.s.dp || '(not stated)';
-    if (!by[k]) { by[k] = []; order.push(k); }
-    by[k].push(r);
-  });
-  if (!order.length) { el.innerHTML = '<div class="au-empty">No attendance in this scope.</div>'; return; }
-  order.sort(function (a, b) { return (_bioPct(by[b]) || 0) - (_bioPct(by[a]) || 0); });
-  var h = '<table class="au-tbl"><thead><tr><th>Staff group</th><th class="n">Staff</th>' +
-    '<th class="n">Attended days</th><th style="min-width:160px">Late arrival rate</th>' +
+  var R = _bioRaw, tree = _bioGrpTree();
+  if (!tree.length) { el.innerHTML = '<div class="au-empty">No attendance in this scope.</div>'; return; }
+  window._BIO_GBAG = {};
+
+  /* one row, at any of the three depths */
+  var row = function (key, label, chip, rows, depth, kids) {
+    window._BIO_GBAG[key] = rows;
+    var p = _bioPct(rows), deep = _bioDeep(rows).length;
+    var open = !!_bioGrpOpen[key];
+    var pad = 9 + depth * 20;
+    var kq = String(key).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    var head = kids
+      ? '<button class="na-secbtn" data-k="' + kq + '" onclick="bioGrpToggle(this)" ' +
+        'style="font-weight:' + (depth ? 600 : 800) + ';font-size:' + (depth ? 12.5 : 14) + 'px">' +
+        '<i class="ar">' + (open ? '▾' : '▸') + '</i>' + chip + _bioEsc(label) + '</button>'
+      : '<button class="na-secbtn" style="font-weight:500;font-size:12.5px" onclick="bioOpenGBag(\'' +
+        kq + '\')"><i class="ar"></i>' + chip + _bioEsc(label) + ' \u203a</button>';
+    var cell = function (inner, style) {
+      return '<td class="n" style="' + (style || '') + '"><button class="na-cellbtn" onclick="bioOpenGBag(\'' +
+        kq + '\')">' + inner + '</button></td>';
+    };
+    var h = '<tr' + (depth ? ' style="background:var(--pl)"' : '') + '>' +
+      '<td style="padding-left:' + pad + 'px">' + head + '</td>' +
+      cell(_bioByStaff(rows).length, 'color:var(--txm)') +
+      cell(_bioN(rows.length), 'color:var(--txm)') +
+      '<td><button class="na-barbtn" onclick="bioOpenGBag(\'' + kq + '\')">' +
+        '<span class="au-bar"><i style="width:' + Math.min(100, p || 0) + '%;background:' +
+        _bioLateCol(p) + '"></i></span></button></td>' +
+      cell((p === null ? '–' : p.toFixed(1) + '%'),
+           'font-weight:800;color:' + _bioLateCol(p)) +
+      cell(_bioN(deep), 'color:' + (deep ? '#EA580C' : '#059669')) +
+      cell(_bioMM(_bioAvg(rows)), 'color:#D97706;font-weight:700') + '</tr>';
+    return h;
+  };
+
+  var h = '<table class="au-tbl bio-gt"><thead><tr><th>Designation group</th><th class="n">Staff</th>' +
+    '<th class="n">Attended days</th><th style="min-width:150px">Late arrival rate</th>' +
     '<th class="n">Late rate</th><th class="n">Past ' + R.bands[1] + 'm</th>' +
     '<th class="n">Avg when late</th></tr></thead><tbody>';
-  order.forEach(function (k) {
-    var rows = by[k], p = _bioPct(rows);
-    h += '<tr><td><button class="na-secbtn" onclick="bioOpenDept(' +
-        JSON.stringify(k).replace(/"/g, '&quot;') + ')"><b>' + _bioEsc(k) + '</b> ›</button></td>' +
-      '<td class="n" style="color:var(--txm)">' + _bioByStaff(rows).length + '</td>' +
-      '<td class="n" style="color:var(--txm)">' + _bioN(rows.length) + '</td>' +
-      '<td><button class="na-barbtn" onclick="bioOpenDept(' + JSON.stringify(k).replace(/"/g, '&quot;') +
-        ')"><span class="au-bar"><i style="width:' + (p || 0) + '%;background:' + _bioLateCol(p) +
-        '"></i></span></button></td>' +
-      '<td class="n" style="font-weight:800;color:' + _bioLateCol(p) + '">' + p.toFixed(1) + '%</td>' +
-      '<td class="n" style="color:' + (_bioDeep(rows).length ? '#EA580C' : '#059669') + '">' +
-        _bioN(_bioDeep(rows).length) + '</td>' +
-      '<td class="n" style="color:#D97706;font-weight:700">' + _bioMM(_bioAvg(rows)) + '</td></tr>';
+
+  tree.sort(function (a, b) { return (_bioPct(b.rows) || 0) - (_bioPct(a.rows) || 0); });
+  tree.forEach(function (o) {
+    h += row(o.g, o.g, _bioGrpChip(o.g), o.rows, 0, true);
+    if (!_bioGrpOpen[o.g]) return;
+    o.order.slice().sort(function (a, b) {
+      return (_bioPct(o.dsg[b]) || 0) - (_bioPct(o.dsg[a]) || 0);
+    }).forEach(function (dg) {
+      var dk = o.g + BIO_GSEP + dg;
+      h += row(dk, dg, '', o.dsg[dg], 1, true);
+      if (!_bioGrpOpen[dk]) return;
+      _bioByStaff(o.dsg[dg]).sort(function (a, b) {
+        return (b.pct - a.pct) || (b.avg - a.avg);
+      }).forEach(function (pp) {
+        h += row(dk + BIO_GSEP + pp.si, pp.s.n + ' · ' + pp.br, '', pp.rows, 2, false);
+      });
+    });
   });
-  el.innerHTML = h + '</tbody></table>';
+
+  /* the four groups as a legend, so the colour on each row has a key */
+  var leg = BIO_GRP_ORDER.filter(function (g) {
+    return tree.some(function (o) { return o.g === g; });
+  }).map(function (g) {
+    return '<span style="white-space:nowrap">' + _bioGrpChip(g) + _bioEsc(g) + '</span>';
+  }).join('<span style="color:var(--bor)">|</span>');
+
+  el.innerHTML = h + '</tbody></table>' +
+    '<div class="bio-leg">' + leg + '</div>';
 }
-function bioOpenDept(dept) {
-  if (!_bioRaw) return;
-  var S = _bioSet();
-  var rows = S.rows.filter(function (r) { return (r.s.dp || '(not stated)') === dept; });
-  var brs = _bioRaw.branches.filter(function (b) { return rows.some(function (r) { return r.br === b; }); });
-  var h = '<div style="font-size:12.5px;color:var(--txm);line-height:1.6;margin-bottom:12px">' +
-    _bioEsc(dept) + ' across ' + brs.length + ' branch' + (brs.length === 1 ? '' : 'es') + ' — ' +
-    (_bioPct(rows) || 0).toFixed(1) + '% of ' + _bioN(rows.length) + ' attended days started late. ' +
-    'Tap a branch for its staff.</div>';
-  brs.forEach(function (b) {
-    h += _bioBranchAcc(b, rows.filter(function (r) { return r.br === b; }));
-  });
-  if (typeof openHTMLModal === 'function')
-    openHTMLModal(dept, _bioByStaff(rows).length + ' staff · ' + _bioMonthTxt(), h);
+/* every value in that table opens the punches behind its own row */
+function bioOpenGBag(key) {
+  var rows = (window._BIO_GBAG || {})[key];
+  if (!rows || !rows.length || typeof openHTMLModal !== 'function') return;
+  var parts = String(key).split(BIO_GSEP);
+  var depth = parts.length - 1;
+  var ttl = depth === 2 ? rows[0].s.n : parts[parts.length - 1];
+  var sub = _bioN(_bioLate(rows).length) + ' late of ' + _bioN(rows.length) + ' attended days · ' +
+    _bioByStaff(rows).length + ' staff · ' + _bioMonthTxt();
+  var h;
+  if (depth === 2) {
+    h = _bioRecTable(rows, false);
+  } else {
+    var brs = _bioRaw.branches.filter(function (b) {
+      return rows.some(function (r) { return r.br === b; });
+    });
+    h = brs.map(function (b) {
+      return _bioBranchAcc(b, rows.filter(function (r) { return r.br === b; }));
+    }).join('');
+  }
+  openHTMLModal(ttl + (depth ? ' · ' + parts[0] : ''), sub, h);
 }
 
 /* ── the individual list ───────────────────────────────────────────────────── */
@@ -22017,8 +22071,8 @@ function _bioPeople() {
 
   if (!all.length) { el.innerHTML = '<div class="au-empty">No attendance in this scope.</div>'; return; }
   if (!flagged.length) {
-    el.innerHTML = '<div class="au-empty">Nobody exceeded ' + P.allow + ' late marks in a calendar ' +
-      'month in this scope \u2014 which is the good outcome for this panel.</div>';
+    el.innerHTML = '<div class="au-empty">No staff over the ' + P.allow +
+      '-mark allowance in this scope.</div>';
     return;
   }
 
@@ -22031,12 +22085,11 @@ function _bioPeople() {
   var labs = ['No late marks', 'Within the allowance', 'Just over', 'Well over'];
   var cols = ['#059669', '#65A30D', '#D97706', '#DC2626'];
 
-  var h = '<div style="font-size:12.5px;color:var(--txm);line-height:1.65;margin-bottom:12px">' +
-    'A <b style="color:var(--tx)">late mark</b> is an arrival more than ' + P.lateMin +
-    ' minutes past the shift start. <b style="color:var(--tx)">' + P.allow + ' are allowed in a ' +
-    'calendar month</b>; the next one flags the employee. The allowance resets each month, so ' +
-    'somebody with three marks in each of two months is not flagged. Marks are counted against the ' +
-    'corrected shift, not the roster cell \u2014 see the panel below for whose shift was corrected.</div>';
+  var h = '<div class="bio-leg" style="margin:0 0 12px">' +
+    '<span style="background:var(--pl);border-radius:99px;padding:3px 11px">' +
+      '<b style="color:var(--tx)">&gt; ' + P.lateMin + 'm</b> = one late mark</span>' +
+    '<span style="background:var(--pl);border-radius:99px;padding:3px 11px">' +
+      '<b style="color:var(--tx)">' + P.allow + '</b> allowed per calendar month</span></div>';
 
   h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">' +
     buckets.map(function (n, i) {
@@ -22100,8 +22153,7 @@ function _bioRoster() {
   var coh = (R.cohorts || []).filter(function (c) { return !S.scope || c.branch === S.scope; });
   var ind = (R.overrides || []).filter(function (o) { return !S.scope || o.branch === S.scope; });
   if (!coh.length && !ind.length) {
-    el.innerHTML = '<div class="au-empty">Every roster in this scope matched the punches closely enough ' +
-      'to be used as written.</div>';
+    el.innerHTML = '<div class="au-empty">No roster corrections in this scope.</div>';
     return;
   }
   var h = '<table class="au-tbl"><thead><tr><th>Who</th><th>Scope</th><th>Branch</th>' +
@@ -22137,16 +22189,14 @@ function _bioRoster() {
           : '#DC26261A;color:#DC2626') + '">' + (o.applied ? _bioHM(o.slot) + ' \u2713'
           : 'Roster kept') + '</span></td></tr>';
   });
-  el.innerHTML = h + '</tbody></table>' +
-    '<div style="font-size:11.5px;color:var(--txm);margin-top:10px;line-height:1.65">' +
-    '<b style="color:var(--tx)">The shifts this school runs</b>, taken from the sheet itself: ' +
-    (R.slots || []).map(_bioHM).join(', ') + '. Somebody is moved to a different one only when their ' +
-    'typical punch sits at least <b>' + ((R.policy && R.policy.gap) || 30) + ' minutes</b> from the ' +
-    'shift they are carried on <i>and</i> at least <b>' + ((R.policy && R.policy.ratio) || 2) +
-    '\u00d7 closer</b> to another one. That ratio is what keeps it honest: somebody rostered 08:00 who ' +
-    'arrives at 08:32 is nearer 08:15, but not convincingly, so they stay on 08:00 and read as late \u2014 ' +
-    'moving them would quietly erase it. Rows marked <b>Roster kept</b> are staff whose punches sit late ' +
-    'but scattered; scatter is what lateness looks like, so they were deliberately not excused.</div>';
+  el.innerHTML = h + '</tbody></table><div class="bio-leg">' +
+    '<span>Shifts</span><span style="color:var(--tx);font-weight:700">' +
+      (R.slots || []).map(_bioHM).join(' \u00b7 ') + '</span>' +
+    '<span style="color:var(--bor)">|</span>' +
+    '<span>Moved at</span><span style="color:var(--tx);font-weight:700">&ge; ' +
+      ((R.policy && R.policy.gap) || 30) + 'm away</span>' +
+    '<span>and</span><span style="color:var(--tx);font-weight:700">' +
+      ((R.policy && R.policy.ratio) || 2) + '\u00d7 closer</span></div>';
 }
 
 /* ── month switch and paint ────────────────────────────────────────────────── */
@@ -22193,22 +22243,10 @@ function _bioPaint() {
   if (sc) sc.innerHTML = '<i></i>' + (S.scope || 'All branches') + ' · ' +
     (_bioMonth ? _bioMonthLabel(_bioMonth) : 'every month');
 
-  var mth = document.getElementById('bio-method');
-  if (mth) mth.textContent = R.method || '';
-
-  var note = document.getElementById('bio-notes');
-  if (note) {
-    var miss = R.branches && window._ALL_BRANCHES
-      ? window._ALL_BRANCHES.filter(function (b) { return R.branches.indexOf(b) < 0; }) : [];
-    var bits = [];
-    if ((R.notes || []).length) bits.push('Tabs skipped: ' + R.notes.join('; ') + '.');
-    if (miss.length) bits.push('No biometric sheet in this workbook for ' + miss.join(', ') + '.');
-    note.innerHTML = bits.length
-      ? '<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:10px 13px;' +
-        'font-size:12px;color:#92400E;line-height:1.6">' + _bioEsc(bits.join(' ')) + '</div>'
-      : '';
-  }
-
+  /* The method note and the skipped-tab banner are gone from the page; a
+     branch with no sheet in the workbook still shows in the scope chip by its
+     absence from the month bar, and R.notes stays in the payload for anyone
+     reading it in the console. */
   _bioMonthBar();
   _bioKpis();
   _bioCodes();
