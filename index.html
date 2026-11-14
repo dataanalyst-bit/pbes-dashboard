@@ -461,6 +461,27 @@ body.nav-min .sn-foot{display:none}
 
 /* TABLE */
 .dt{width:100%;border-collapse:collapse}
+.hrm-wrap{overflow-x:auto}
+table.hrm{min-width:620px}
+table.hrm th,table.hrm td{padding:8px 11px;white-space:nowrap}
+table.hrm th.n,table.hrm td.n{text-align:center}
+table.hrm .hrm-b{position:sticky;left:0;z-index:2;background:var(--sur);
+  box-shadow:1px 0 0 var(--bor);min-width:132px;text-align:left}
+table.hrm thead .hrm-b{background:var(--pl);z-index:3}
+table.hrm tfoot td{background:var(--pl);border-top:2px solid var(--bor);border-bottom:0;
+  font-weight:800}
+table.hrm tfoot .hrm-b{background:var(--pl)}
+table.hrm .hrm-t{border-left:2px solid var(--bor);font-weight:800}
+table.hrm tr.hrm-on .hrm-b{box-shadow:1px 0 0 var(--bor),inset 3px 0 0 var(--p)}
+.hrm-c{background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;
+  font-variant-numeric:tabular-nums;min-width:18px}
+.hrm-c:hover{text-decoration:underline}
+.hrm-leg{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:9px 13px 2px;
+  font-size:11.5px;color:var(--txm)}
+.hrm-sw{display:inline-block;width:14px;height:10px;border-radius:2px;margin-right:3px;
+  vertical-align:-1px}
+.hrm-warn .hrm-c{background:#FEF2F2;color:#B91C1C;font-weight:700;border-radius:99px;
+  padding:2px 10px}
 .dt th{background:var(--pl);color:var(--p);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:9px 13px;text-align:left;border-bottom:2px solid var(--bor)}
 .dt td{padding:9px 13px;font-size:12.5px;border-bottom:1px solid var(--bor);vertical-align:middle}
 .dt tr:last-child td{border-bottom:none}
@@ -2425,6 +2446,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         <th>Score</th></tr></thead>
       <tbody id="hr-rank-tbody"></tbody>
     </table></div>
+  </div>
+
+<!-- Monthly closed positions, every branch -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="ch"><h3>📅 Monthly closed positions · all branches</h3>
+      <span class="fnote" id="hr-mcp-fn">Dated by Closed Date · click any figure for the positions behind it</span></div>
+    <div class="cb-0" id="hr-monthly"></div>
   </div>
 
 <!-- Forecast built from the closed-role history -->
@@ -8012,7 +8040,171 @@ function renderHRForecast(){
   if(fn) fn.textContent='Fitted on '+fi(D.length)+' closed roles \u00b7 '+fi(open.length)+' open';
 }
 
+/* ── monthly closed positions, branch by branch ──────────────────────
+   One row per branch, one column per month, every cell the number of positions
+   that CLOSED in it — dated by Closed Date, not by when the role was posted, so
+   a position opened in April and filled in July lands in July.
+
+   Every branch is shown whatever the branch filter is set to, the same way the
+   recruiter ranking does, because the point of this table is the comparison;
+   the selected branch is picked out rather than left alone on screen.
+
+   A closed position with no Closed Date cannot be placed in a month. Those are
+   counted and named under the table instead of being dropped silently or
+   pushed into whichever month happens to be first. */
+var HR_MCP_MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+/* the dashboard's branch colours, so a branch is the same colour here as on
+   every other tab; "All Branches" is a real value in the HR sheet for a role
+   posted group-wide, and gets the neutral dot rather than being dropped */
+var HR_MCP_DOT = { Boduppal:'#1E4FD8', Keesara:'#059669', Pocharam:'#D97706',
+                   Bachupally:'#7C3AED', Gowdavalli:'#0D9488' };
+function _hrMcpDot(b) {
+  return '<span class="bd" style="background:' + (HR_MCP_DOT[b] || '#94A3B8') +
+    ';margin-right:7px;vertical-align:-1px"></span>';
+}
+function _hrMcpMonth(iso) {
+  var m = String(iso || '').match(/^(\d{4})-(\d{2})/);
+  return m ? m[1] + '-' + m[2] : '';
+}
+function _hrMcpLabel(k) {
+  var p = String(k).split('-');
+  return HR_MCP_MON[+p[1] - 1] + '<div style="font-size:9px;color:var(--txm);font-weight:600">' +
+    p[0].slice(2) + '</div>';
+}
+function _hrMcpSet() {
+  var all = (typeof HR_RECORDS !== 'undefined' && Array.isArray(HR_RECORDS)) ? HR_RECORDS : [];
+  var closed = all.filter(function (r) { return /closed|filled/i.test(String(r.Status || '')); });
+  var dated = [], undated = [];
+  closed.forEach(function (r) {
+    (_hrMcpMonth(r.ClosedDate) ? dated : undated).push(r);
+  });
+  var months = {}, branches = {};
+  dated.forEach(function (r) {
+    months[_hrMcpMonth(r.ClosedDate)] = 1;
+    branches[r.Branch || '–'] = 1;
+  });
+  /* "All Branches" is the HR sheet's own value for a role posted group-wide.
+     It is a real row and is kept, but it is not a campus, so it sits under the
+     five rather than sorting to the top of them. */
+  var bl = Object.keys(branches).sort(function (a, b) {
+    var ga = /^all/i.test(a) ? 1 : 0, gb = /^all/i.test(b) ? 1 : 0;
+    return ga - gb || (a < b ? -1 : a > b ? 1 : 0);
+  });
+  return { dated: dated, undated: undated,
+           months: Object.keys(months).sort(), branches: bl };
+}
+function renderHRMonthly() {
+  var el = document.getElementById('hr-monthly'); if (!el) return;
+  var S = _hrMcpSet();
+  if (!S.months.length) {
+    el.innerHTML = '<div style="padding:18px;color:var(--txm);font-size:12.5px">' +
+      'No closed position carries a Closed Date yet.</div>';
+    return;
+  }
+  var sel = (typeof fBranch !== 'undefined' && fBranch !== 'ALL') ? fBranch : '';
+
+  /* the grid, plus the two sets of totals */
+  var cell = {}, rowT = {}, colT = {}, peak = 0, grand = 0;
+  S.dated.forEach(function (r) {
+    var b = r.Branch || '–', m = _hrMcpMonth(r.ClosedDate), k = b + '|' + m;
+    cell[k] = (cell[k] || 0) + 1;
+    rowT[b] = (rowT[b] || 0) + 1;
+    colT[m] = (colT[m] || 0) + 1;
+    grand++;
+    if (cell[k] > peak) peak = cell[k];
+  });
+  window._HR_MCP = S;
+
+  /* a count shades from the palest tint at 1 to full at the busiest cell, so
+     the hiring peaks read off the table without anybody reading the numbers */
+  var shade = function (n) {
+    if (!n) return '';
+    var t = peak > 1 ? (n - 1) / (peak - 1) : 1;
+    /* one hue, palest at 1 and deepest at the busiest cell, and the number
+       stays in ink at every step — a tint dark enough to need white text is
+       a tint the figure stops being readable on. */
+    return 'background:rgba(30,79,216,' + (0.07 + t * 0.27).toFixed(3) + ');font-weight:700;';
+  };
+  var q = function (v) { return JSON.stringify(String(v)).replace(/"/g, '&quot;'); };
+  var btn = function (txt, fn, style) {
+    return '<button class="hrm-c" style="' + (style || '') + '" onclick="' + fn + '">' + txt + '</button>';
+  };
+
+  var h = '<div class="hrm-wrap"><table class="dt hrm"><thead><tr>' +
+    '<th class="hrm-b">Branch</th>' +
+    S.months.map(function (m) { return '<th class="n">' + _hrMcpLabel(m) + '</th>'; }).join('') +
+    '<th class="n hrm-t">Total</th></tr></thead><tbody>';
+
+  S.branches.forEach(function (b) {
+    var on = sel && b === sel;
+    h += '<tr' + (on ? ' class="hrm-on"' : '') + '><td class="hrm-b">' +
+      _hrMcpDot(b) + '<b>' + String(b).replace(/</g, '&lt;') + '</b></td>' +
+      S.months.map(function (m) {
+        var n = cell[b + '|' + m] || 0;
+        return '<td class="n" style="' + shade(n) + '">' +
+          (n ? btn(n, 'hrMcpOpen(' + q(b) + ',' + q(m) + ')') :
+               '<span style="color:var(--txl)">–</span>') + '</td>';
+      }).join('') +
+      '<td class="n hrm-t">' + btn('<b>' + (rowT[b] || 0) + '</b>',
+        'hrMcpOpen(' + q(b) + ',\'\')') + '</td></tr>';
+  });
+
+  /* "Total", not "All branches": the sheet already has an All Branches row of
+     its own just above, and two rows reading the same thing is how a footer
+     gets mistaken for data. */
+  h += '</tbody><tfoot><tr><td class="hrm-b"><b>Total</b></td>' +
+    S.months.map(function (m) {
+      return '<td class="n"><b>' + btn(colT[m] || 0, 'hrMcpOpen(\'\',' + q(m) + ')') + '</b></td>';
+    }).join('') +
+    '<td class="n hrm-t">' + btn('<b>' + grand + '</b>', 'hrMcpOpen(\'\',\'\')') +
+    '</td></tr></tfoot></table></div>';
+
+  h += '<div class="hrm-leg"><span>Closed positions by the month they were filled</span>' +
+    '<span style="color:var(--bor)">|</span>' +
+    '<span><i class="hrm-sw" style="background:rgba(30,79,216,.08)"></i>' +
+    '<i class="hrm-sw" style="background:rgba(30,79,216,.20)"></i>' +
+    '<i class="hrm-sw" style="background:rgba(30,79,216,.36)"></i>' +
+    'quiet → busiest (' + peak + ')</span>' +
+    (S.undated.length ? '<span style="color:var(--bor)">|</span>' +
+      '<span class="hrm-warn">' + btn('⚠ ' + S.undated.length + ' closed without a Closed Date',
+        'hrMcpUndated()') + '</span>' : '') + '</div>';
+
+  el.innerHTML = h;
+}
+/* any figure in the table opens the positions behind it; an empty branch or an
+   empty month means "every one of them", so the totals open too */
+function hrMcpOpen(branch, month) {
+  var S = window._HR_MCP; if (!S) return;
+  var rows = S.dated.filter(function (r) {
+    return (!branch || (r.Branch || '–') === branch) &&
+           (!month || _hrMcpMonth(r.ClosedDate) === month);
+  }).sort(function (a, b) { return String(a.ClosedDate).localeCompare(String(b.ClosedDate)); });
+  var lab = [branch || 'All branches',
+             month ? HR_MCP_MON[+month.split('-')[1] - 1] + ' ' + month.split('-')[0] : 'every month'];
+  _hrMcpModal('📅 ' + lab.join(' · '), rows.length + ' closed position' +
+    (rows.length === 1 ? '' : 's'), rows);
+}
+function hrMcpUndated() {
+  var S = window._HR_MCP; if (!S) return;
+  _hrMcpModal('⚠ Closed, but not dated', S.undated.length +
+    ' position' + (S.undated.length === 1 ? '' : 's') + ' with no Closed Date', S.undated);
+}
+function _hrMcpModal(title, sub, rows) {
+  if (typeof openModal !== 'function') return;
+  openModal(title, sub, rows, [
+    { key: 'ClosedDate', label: 'Closed', date: true },
+    { key: 'Branch', label: 'Branch' },
+    { key: 'Position', label: 'Position', maxW: '200px' },
+    { key: 'HR', label: 'Recruiter' },
+    { key: 'Priority', label: 'Priority', pill: true },
+    { key: 'PostDate', label: 'Posted', date: true },
+    { key: 'DaysToClose', label: 'Days' },
+    { key: 'CandidateName', label: 'Candidate', maxW: '170px' }
+  ]);
+}
+
 function renderHRRanking(){
+  try{ renderHRMonthly(); }catch(e){ console.error('HR monthly:',e&&e.message); }
   try{ renderHRForecast(); }catch(e){ console.error('HR forecast:',e&&e.message); }
   const tbody=document.getElementById('hr-rank-tbody');
   if(!tbody)return;
