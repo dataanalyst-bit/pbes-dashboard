@@ -14579,17 +14579,85 @@ function openBranchAccordion(title, sub, groups, cols, unit){
 
 
 // Export the currently open modal's records to CSV (respects the active search filter).
+/* ══ EXPORT WHAT IS ON SCREEN ══ (14 November 2026)
+
+   Export CSV only ever knew one kind of modal: the one built from a row array
+   and a column list. The other kind — openHTMLModal, which renders a table
+   this page has already laid out — deliberately clears both of those, because
+   it has neither. So every HTML drill-down on the dashboard, all thirty-six of
+   them, answered "No records to export" however much was on the screen.
+
+   Rather than teach thirty-six call sites to hand over their rows as data, the
+   export reads the table it is looking at. The modal is already showing the
+   finished table, so what is exported is exactly what is read — including the
+   accordions that carry one table per branch, which get a first column naming
+   the section they came from. */
+function _csvFromModalDom(){
+  var box=document.getElementById('modal-html');
+  if(!box || box.style.display==='none') return null;
+  var tables=[].slice.call(box.querySelectorAll('table'));
+  if(!tables.length) return null;
+  var txt=function(el){ return String(el?el.innerText:'').replace(/\s+/g,' ').trim(); };
+  /* the heading a table sits under, so a multi-table export says which is which */
+  var sectionOf=function(t){
+    var n=t;
+    while(n && n!==box){
+      var prev=n.previousElementSibling;
+      while(prev){
+        if(/^(H2|H3|H4|H5)$/.test(prev.tagName)) return txt(prev);
+        var h=prev.querySelector && prev.querySelector('h2,h3,h4,h5,b,strong');
+        if(h && txt(h)) return txt(h);
+        if(prev.classList && (prev.classList.contains('na-acc-h')||prev.classList.contains('acc-h')))
+          return txt(prev);
+        prev=prev.previousElementSibling;
+      }
+      n=n.parentElement;
+    }
+    return '';
+  };
+  var many=tables.length>1, out=[], widest=0;
+  tables.forEach(function(t){
+    var sec=many?sectionOf(t):'';
+    var heads=[].slice.call(t.querySelectorAll('thead tr'));
+    var hr=heads.length?heads[heads.length-1]:null;
+    var head=hr?[].slice.call(hr.children).map(txt):[];
+    var body=[].slice.call(t.querySelectorAll('tbody tr')).concat(
+             [].slice.call(t.querySelectorAll('tfoot tr')));
+    if(!body.length) return;
+    if(head.length){ var h=many?[ 'Section' ].concat(head):head;
+      widest=Math.max(widest,h.length); out.push({cells:h,head:true}); }
+    body.forEach(function(tr){
+      var cells=[].slice.call(tr.children).map(txt);
+      if(!cells.join('')) return;
+      var row=many?[sec].concat(cells):cells;
+      widest=Math.max(widest,row.length);
+      out.push({cells:row});
+    });
+  });
+  if(!out.length) return null;
+  return { rows:out, width:widest };
+}
 function exportModalCSV(){
   const cols=(window._modalColumns||[]).filter(c=>c && c.key);
   let rows=(typeof modalAllRows!=='undefined'&&Array.isArray(modalAllRows))?modalAllRows:[];
   const sv=(typeof modalSearchVal!=='undefined'&&modalSearchVal)?modalSearchVal:'';
   if(sv) rows=rows.filter(r=>cols.some(c=>String(r[c.key]||'').toLowerCase().includes(sv)));
-  if(!rows.length){ alert('No records to export.'); return; }
   const strip=v=>String(v==null?'':v).replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/\s+/g,' ').trim();
   const esc=v=>{ const s=strip(v); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
-  const header=cols.map(c=>esc(c.label||c.key)).join(',');
-  const body=rows.map(r=>cols.map(c=>esc(r[c.key])).join(',')).join('\n');
-  const csv='\ufeff'+header+'\n'+body;   // BOM for Excel
+  let csv;
+  if(rows.length && cols.length){
+    const header=cols.map(c=>esc(c.label||c.key)).join(',');
+    const body=rows.map(r=>cols.map(c=>esc(r[c.key])).join(',')).join('\n');
+    csv='﻿'+header+'\n'+body;
+  } else {
+    const dom=_csvFromModalDom();
+    if(!dom){ alert('No records to export.'); return; }
+    csv='﻿'+dom.rows.map(function(r){
+      var c=r.cells.slice();
+      while(c.length<dom.width) c.push('');
+      return c.map(esc).join(',');
+    }).join('\n');
+  }
   const titleEl=document.getElementById('modal-title');
   const base=(titleEl?titleEl.textContent:'export').replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'_').slice(0,60)||'export';
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
