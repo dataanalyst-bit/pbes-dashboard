@@ -24202,9 +24202,16 @@ function _admPace() {
     MON.forEach(function (m) {
       var v = cell[ay + '|' + m] || 0;
       var sh = v / max;
-      h += '<td class="n" style="font-size:13.5px;' +
+      /* Only this season's cells can be opened. The closed seasons come from
+         the Monthly Trends tab, which holds a count per month and not the
+         enquiries behind it — there is nothing to show, and a cell that looks
+         clickable and does nothing is worse than one that does not. */
+      var live = cur && v > 0;
+      h += '<td class="n" style="font-size:13.5px;' + (live ? 'cursor:pointer;' : '') +
         (v ? 'background:rgba(99,102,241,' + (0.08 + 0.55 * sh).toFixed(2) + ');font-weight:' +
-             (sh > 0.45 ? '800' : '600') : 'color:var(--txm)') + '">' + (v || '·') + '</td>';
+             (sh > 0.45 ? '800' : '600') : 'color:var(--txm)') + '"' +
+        (live ? ' title="Click to view these admissions" onclick="admOpenPaceMonth(\'' + m + '\')"' : '') +
+        '>' + (v || '·') + '</td>';
     });
     h += '<td class="n" style="font-weight:800">' + _admN(tot[ay] || 0) + '</td></tr>';
   });
@@ -24370,13 +24377,30 @@ function admOpenHist(ay, branch) {
 }
 
 // ── the drill-down shared by every panel ───────────────────────────────────
+/* ══ BOTH DATES, ON EVERY LEAD ══ (14 November 2026)
+
+   The table carried one date, "Added", and the question asked of it is nearly
+   always about the other one. Created and Updated now sit side by side, so a
+   lead can be checked against the tracker without opening the sheet.
+
+   The Updated cell also says when it disagrees with the day the row actually
+   became an admission. That day is read from the stage-change log in the
+   comments, which is written once; Updated is a last-touched stamp the tracker
+   rewrites in bulk — two rows in three carried the export date in every file
+   read this month. Where the two differ the cell is marked and its tooltip
+   gives the admission date, so the drift is visible on the row rather than
+   argued about later. */
 function _admEnqTable(rows, showBranch) {
   if (!rows.length) return '<div class="au-empty">Nothing here.</div>';
   var h = '<table class="au-tbl"><thead><tr><th>Child</th><th>Parent</th><th class="n">Phone</th>' +
     (showBranch ? '<th>Branch</th>' : '') + '<th>Class</th><th>Curriculum</th><th>Source</th>' +
-    '<th>Stage</th><th>Last note</th><th class="n">Added</th></tr></thead><tbody>';
+    '<th>Stage</th><th>Last note</th><th class="n">Created</th><th class="n">Updated</th>' +
+    '</tr></thead><tbody>';
   rows.slice().sort(function (a, b) { return (b.d || '').localeCompare(a.d || ''); })
     .forEach(function (r) {
+      var upd = String(r.upd || '').slice(0, 10);
+      var won = _admIsWon(r) ? _admWonDay(r) : '';
+      var drift = won && upd && won !== upd;
       h += '<tr><td style="font-weight:600">' + (_admEsc(r.name) || '–') +
           (r.dup ? ' <span class="na-pill" style="background:#D9770618;color:#D97706">repeat</span>' : '') +
           (r.xbr ? ' <span class="na-pill" style="background:#7C3AED18;color:#7C3AED">also elsewhere</span>' : '') +
@@ -24390,7 +24414,11 @@ function _admEnqTable(rows, showBranch) {
         '<td><span class="na-pill" style="background:' + _admStageCol(r.st) + '1A;color:' +
           _admStageCol(r.st) + '">' + _admEsc(_admStageLab(r.st)) + '</span></td>' +
         '<td style="max-width:36ch;color:var(--txm)">' + (_admEsc(r.sub) || '–') + '</td>' +
-        '<td class="n" style="white-space:nowrap">' + _admDate(r.d) + '</td></tr>';
+        '<td class="n" style="white-space:nowrap">' + _admDate(r.d) + '</td>' +
+        '<td class="n" style="white-space:nowrap' + (drift ? ';color:#D97706;font-weight:700' : '') + '"' +
+          (drift ? ' title="Updated says ' + _admEsc(_admDate(upd)) + ', but the stage-change log puts the admission on ' +
+                   _admEsc(_admDate(won)) + '. The dashboard counts the admission on the log date."' : '') + '>' +
+          (upd ? _admDate(upd) : '–') + (drift ? ' ·' : '') + '</td></tr>';
     });
   return h + '</tbody></table>';
 }
@@ -24941,7 +24969,56 @@ function _admTargetFor(branch, a, b, metric) {
 }
 
 // ── 1. branch comparison ───────────────────────────────────────────────────
+/* the two rows of the source comparison open the leads behind them: a rate
+   quoted with a confidence interval still has to be checkable against names */
+/* one month of the season in progress, by the day each admission was done */
+function admOpenPaceMonth(mon) {
+  var S = _admSet();
+  var MI = { JAN:1, FEB:2, MAR:3, APR:4, MAY:5, JUN:6, JUL:7, AUG:8, SEP:9, OCT:10, NOV:11, DEC:12 };
+  var want = MI[mon]; if (!want) return;
+  var sel = S.rows.filter(function (r) {
+    if (!_admIsWon(r)) return false;
+    var iso = _admWonDay(r);
+    return iso && parseInt(String(iso).slice(5, 7), 10) === want;
+  });
+  if (!sel.length) return;
+  _admModal(mon + ' \u00b7 ' + (S.season || 'this season'),
+    _admN(sel.length) + ' admission' + (sel.length === 1 ? '' : 's') +
+    ' completed in this month \u00b7 by the day the admission was done',
+    _admEnqTable(sel, true));
+}
+function admOpenSrcSplit(which, what) {
+  var S = _admSet();
+  var sel = S.rows.filter(which === 'w' ? _admIsWalk : _admIsDigital);
+  if (what === 'won') sel = sel.filter(_admIsWon);
+  if (!sel.length) return;
+  _admModal((which === 'w' ? 'Walk-in' : 'Digital') + ' \u00b7 ' +
+    (what === 'won' ? 'admitted' : 'every lead') + ' \u00b7 whole season',
+    _admN(sel.length) + ' row' + (sel.length === 1 ? '' : 's'),
+    _admEnqTable(sel, true));
+}
+var _admCmpOpen = {};
 function admSetPeriod(p) { _admPeriod = p; _admCompare(); }
+function admCmpToggle(br) {
+  if (_admCmpOpen[br]) delete _admCmpOpen[br]; else _admCmpOpen[br] = 1;
+  _admCompare();
+}
+var ADM_CMP_LAB = { wL:'walk-in leads', wA:'walk-in admissions', dL:'digital leads',
+                    dA:'digital admissions', n:'leads', won:'admissions' };
+function admOpenCmpCell(br, key, counsellor) {
+  var d = (window._CMP_BAG || {})[br]; if (!d) return;
+  var rows;
+  if (counsellor) {
+    var o = d.who.filter(function (x) { return x.c === counsellor; })[0];
+    rows = o ? o[key] : [];
+  } else rows = d.sets[key] || [];
+  if (!rows || !rows.length) return;
+  var onWon = (key === 'wA' || key === 'dA' || key === 'won');
+  _admModal(br + (counsellor ? ' \u00b7 ' + counsellor : '') + ' \u00b7 ' + _admPeriodLab(_admPeriod),
+    _admN(rows.length) + ' ' + ADM_CMP_LAB[key] + ' \u00b7 ' +
+    (onWon ? 'by the day the admission was completed' : 'by the day the enquiry arrived'),
+    _admEnqTable(rows, false));
+}
 
 /* ═════ LAST YEAR, SIDE BY SIDE ═════
    Asked for on 5 November 2026: a button that sets this season against
@@ -25202,6 +25279,18 @@ function _admCompare() {
              wL: wlk.length, wA: wA, wC: wlk.length ? 100 * wA / wlk.length : null,
              conv: rs.length ? 100 * (dA + wA) / rs.length : 0,
              rowsL: rs, rowsA: aw,
+             sets: { wL: wlk, wA: aw.filter(_admIsWalk), dL: dig,
+                     dA: aw.filter(_admIsDigital), n: rs, won: aw },
+             who: (function () {
+               var m = {};
+               mine.forEach(function (r) {
+                 var c = String(r.owner || '').trim() || '(not assigned)';
+                 var o = m[c] || (m[c] = { c: c, wL: [], wA: [], dL: [], dA: [], n: [], won: [] });
+                 if (inWin(r.d)) { o.n.push(r); (_admIsWalk(r) ? o.wL : o.dL).push(r); }
+                 if (wonIn(r)) { o.won.push(r); (_admIsWalk(r) ? o.wA : o.dA).push(r); }
+               });
+               return Object.keys(m).sort().map(function (k) { return m[k]; });
+             })(),
              seasonWon: seasonWon,
              tgt: _admTarget(br), tgtL: (_admRaw.leadTargets || {})[br] || 0 };
   }).sort(function (x, y) { return y.n - x.n; });
@@ -25237,28 +25326,60 @@ function _admCompare() {
     return '<span style="font-weight:800;color:' + (v >= 20 ? '#059669' : v >= 5 ? '#D97706' : '#DC2626') +
       '">' + v.toFixed(1) + '%</span>';
   };
+  /* ══ EVERY VALUE IS A DOOR ══ (14 November 2026)
+     The branch name opened the whole window; the nine figures beside it did
+     not open anything, so "Boduppal, 3 walk-in admissions" could be read but
+     not checked. Each count now opens exactly the rows it counts, and the
+     branch opens into the counsellors who own them. The percentages are
+     derived from the two counts either side of them and stay plain. */
+  window._CMP_BAG = {};
   data.forEach(function (d) {
     var sp = d.tgt ? 100 * d.seasonWon / d.tgt : null;
-    h += '<tr><td><button class="na-secbtn" onclick="admOpenCompare(' +
-        JSON.stringify(d.b).replace(/"/g, '&quot;') + ')">' + _admDot(d.b) + ' ' +
-        _admEsc(d.b) + ' \u203a</button></td>' +
-      '<td class="n">' + _admN(d.wL) + '</td>' +
-      '<td class="n" style="font-weight:700;color:' + (d.wA ? '#059669' : 'var(--txm)') + '">' +
-        _admN(d.wA) + '</td>' +
+    var open = !!_admCmpOpen[d.b];
+    window._CMP_BAG[d.b] = d;
+    var num = function (key, v, style) {
+      if (!v) return '<td class="n" style="' + (style || '') + 'color:var(--txm)">' + _admN(v) + '</td>';
+      return '<td class="n" style="cursor:pointer;' + (style || '') + '" title="Click to view"' +
+        ' onclick="admOpenCmpCell(' + JSON.stringify(d.b).replace(/"/g, '&quot;') + ',\'' + key + '\')">' +
+        _admN(v) + '</td>';
+    };
+    h += '<tr><td><button class="amt-brn" onclick="admCmpToggle(' +
+        JSON.stringify(d.b).replace(/"/g, '&quot;') + ')" title="' +
+        (open ? 'Close' : 'Open this branch by counsellor') + '"><i class="ar">' +
+        (open ? '\u25be' : '\u25b8') + '</i>' + _admDot(d.b) + ' ' + _admEsc(d.b) + '</button></td>' +
+      num('wL', d.wL) +
+      num('wA', d.wA, 'font-weight:700;color:' + (d.wA ? '#059669' : 'var(--txm)') + ';') +
       '<td class="n">' + pc(d.wC) + '</td>' +
-      '<td class="n" style="border-left:1px solid var(--bor)">' + _admN(d.dL) + '</td>' +
-      '<td class="n" style="font-weight:700;color:' + (d.dA ? '#059669' : 'var(--txm)') + '">' +
-        _admN(d.dA) + '</td>' +
+      num('dL', d.dL, 'border-left:1px solid var(--bor);') +
+      num('dA', d.dA, 'font-weight:700;color:' + (d.dA ? '#059669' : 'var(--txm)') + ';') +
       '<td class="n">' + pc(d.dC) + '</td>' +
-      '<td class="n" style="border-left:1px solid var(--bor);font-weight:800">' + _admN(d.n) + '</td>' +
-      '<td class="n" style="font-weight:800;color:' + (d.won ? '#059669' : 'var(--txm)') + '">' +
-        _admN(d.won) + '</td>' +
+      num('n', d.n, 'border-left:1px solid var(--bor);font-weight:800;') +
+      num('won', d.won, 'font-weight:800;color:' + (d.won ? '#059669' : 'var(--txm)') + ';') +
       '<td class="n">' + pc(d.n ? d.conv : null) + '</td>' +
       '<td class="n" style="border-left:1px solid var(--bor);color:var(--txm)">' +
         (d.tgt ? _admN(d.tgt) : '\u2013') + '</td>' +
       '<td class="n" style="font-weight:800;color:' + (sp === null ? 'var(--txm)'
         : sp >= 100 ? '#059669' : sp >= 50 ? '#D97706' : '#DC2626') + '">' +
         (sp === null ? '\u2013' : _admN(d.seasonWon) + ' \u00b7 ' + sp.toFixed(1) + '%') + '</td></tr>';
+    if (!open) return;
+    d.who.forEach(function (o) {
+      var cn = function (key) {
+        var v = o[key].length;
+        if (!v) return '<td class="n" style="color:var(--txm)">\u00b7</td>';
+        return '<td class="n" style="cursor:pointer;font-weight:600" title="Click to view"' +
+          ' onclick="admOpenCmpCell(' + JSON.stringify(d.b).replace(/"/g, '&quot;') +
+          ',\'' + key + '\',' + JSON.stringify(o.c).replace(/"/g, '&quot;') + ')">' + v + '</td>';
+      };
+      var rate = function (a, l) { return '<td class="n" style="color:var(--txm);font-size:13px">' +
+        (l ? (100 * a / l).toFixed(1) + '%' : '\u2013') + '</td>'; };
+      h += '<tr style="background:var(--pl)"><td style="padding-left:30px;font-size:13px;' +
+        'color:var(--txm);font-weight:600">' + _admEsc(o.c) + '</td>' +
+        cn('wL') + cn('wA') + rate(o.wA.length, o.wL.length) +
+        cn('dL') + cn('dA') + rate(o.dA.length, o.dL.length) +
+        cn('n') + cn('won') + rate(o.won.length, o.n.length) +
+        '<td class="n" style="color:var(--txm)">\u2013</td>' +
+        '<td class="n" style="color:var(--txm)">\u2013</td></tr>';
+    });
   });
   var spT = T.tgt ? 100 * T.seasonWon / T.tgt : null;
   h += '</tbody>' + (data.length < 2 ? '' :
@@ -25586,6 +25707,23 @@ var ADM_DAY_METRICS = [
   { k:'dig',  lab:'Digital',  f:_admIsDigital }
 ];
 function admSetDayMetric(m) { _admDayMetric = m; _admTrend(); }
+/* key is "<branch>[\u241f<counsellor>]|<YYYY-MM-DD or *>" */
+function admOpenDayCell(key) {
+  var B = window._DAY_BAG; if (!B) return;
+  var ad = B.a[key] || [], ld = B.l[key] || [];
+  if (!ad.length && !ld.length) return;
+  /* one row per child, with the admissions first: a lead admitted on the day
+     appears once, not twice */
+  var seen = {}, rows = [];
+  ad.concat(ld).forEach(function (r) { if (seen[r.id]) return; seen[r.id] = 1; rows.push(r); });
+  var p = key.split('|'), whoP = p[0].split('\u241f'), day = p[1];
+  var lab = (whoP[0] === '*' ? 'All branches' : whoP[0]) + (whoP[1] ? ' \u00b7 ' + whoP[1] : '');
+  _admModal(lab + ' \u00b7 ' + (day === '*' ? 'the last ten days' : _admDate(day)) +
+      (B.lab === 'Total' ? '' : ' \u00b7 ' + B.lab),
+    _admN(ad.length) + ' admission' + (ad.length === 1 ? '' : 's') + ' completed \u00b7 ' +
+    _admN(ld.length) + ' lead' + (ld.length === 1 ? '' : 's') + ' arrived',
+    _admEnqTable(rows, whoP[0] === '*'));
+}
 
 /* which branches are open. A counsellor works one branch, so the key is the
    branch alone and the sub-rows are that branch's owners. */
@@ -25622,12 +25760,21 @@ function _admTrend() {
      stage-change log records and the Updated column is meant to. */
   var A = {}, L = {}, aTot = {}, lTot = {}, aCol = {}, lCol = {}, aAll = 0, lAll = 0;
   var who = {};                               // branch -> { counsellor: 1 }
-  var bump = function (m, tot, col, b, c, day) {
+  /* the rows behind every figure, so a cell can open what it counts */
+  var bagA = {}, bagL = {};
+  var put = function (bag, k, r) { (bag[k] || (bag[k] = [])).push(r); };
+  var bump = function (m, tot, col, b, c, day, bag, r) {
     m[b + '|' + day] = (m[b + '|' + day] || 0) + 1;
     m[b + '\u241f' + c + '|' + day] = (m[b + '\u241f' + c + '|' + day] || 0) + 1;
     tot[b] = (tot[b] || 0) + 1;
     tot[b + '\u241f' + c] = (tot[b + '\u241f' + c] || 0) + 1;
     col[day] = (col[day] || 0) + 1;
+    put(bag, b + '|' + day, r);
+    put(bag, b + '\u241f' + c + '|' + day, r);
+    put(bag, b + '|*', r);
+    put(bag, b + '\u241f' + c + '|*', r);
+    put(bag, '*|' + day, r);
+    put(bag, '*|*', r);
   };
   S.rows.forEach(function (r) {
     if (!M.f(r)) return;
@@ -25639,8 +25786,8 @@ function _admTrend() {
        looking for, and dropping them for having nothing would hide it */
     (who[r.b] || (who[r.b] = {}))[c] = 1;
     var inC = cre && pos[cre] !== undefined, inW = won && pos[won] !== undefined;
-    if (inC) { bump(L, lTot, lCol, r.b, c, cre); lAll++; }
-    if (inW) { bump(A, aTot, aCol, r.b, c, won); aAll++; }
+    if (inC) { bump(L, lTot, lCol, r.b, c, cre, bagL, r); lAll++; }
+    if (inW) { bump(A, aTot, aCol, r.b, c, won, bagA, r); aAll++; }
   });
 
   var btn = ADM_DAY_METRICS.map(function (m) {
@@ -25650,12 +25797,19 @@ function _admTrend() {
 
   /* the shading follows the leads, which is the figure that varies day to day;
      an admission is called out by weight instead */
+  window._DAY_BAG = { a: bagA, l: bagL, lab: M.lab };
   var peak = 0;
   for (var k2 in L) if (L.hasOwnProperty(k2) && L[k2] > peak) peak = L[k2];
-  var cell = function (a, l) {
+  /* every cell opens its own two sets — the admissions it counts and the
+     leads behind them — keyed the same way they were counted */
+  var cell = function (a, l, key) {
     if (!a && !l) return '<td class="n" style="color:var(--txm)">·</td>';
     var sh = peak && l ? 0.05 + 0.26 * (l / peak) : 0;
-    return '<td class="n"' + (sh ? ' style="background:rgba(13,148,136,' + sh.toFixed(3) + ')"' : '') + '>' +
+    return '<td class="n" style="cursor:pointer' +
+      (sh ? ';background:rgba(13,148,136,' + sh.toFixed(3) + ')' : '') + '"' +
+      ' title="Click to view these ' + a + ' admission' + (a === 1 ? '' : 's') +
+      ' and ' + l + ' lead' + (l === 1 ? '' : 's') + '"' +
+      ' onclick="admOpenDayCell(' + JSON.stringify(key).replace(/"/g, '&quot;') + ')">' +
       '<span class="a" style="color:' + (a ? '#0D9488' : 'var(--txm)') + '">' + a + '</span>' +
       '<span class="l">/' + l + '</span></td>';
   };
@@ -25685,9 +25839,8 @@ function _admTrend() {
           (open ? 'Close' : 'Open this branch by counsellor') + '"><i class="ar">' +
           (open ? '\u25be' : '\u25b8') + '</i>' + _admDot(onBr) + ' ' + _admEsc(label) + '</button></td>';
     return '<tr' + (depth ? ' class="cnsr"' : '') + '>' + lead +
-      DAYS.map(function (d) { return cell(A[key + '|' + d] || 0, L[key + '|' + d] || 0); }).join('') +
-      '<td class="n"><span class="a" style="color:' + (aTot[key] ? '#0D9488' : 'var(--txm)') + '">' +
-      (aTot[key] || 0) + '</span><span class="l">/' + (lTot[key] || 0) + '</span></td></tr>';
+      DAYS.map(function (d) { return cell(A[key + '|' + d] || 0, L[key + '|' + d] || 0, key + '|' + d); }).join('') +
+      cell(aTot[key] || 0, lTot[key] || 0, key + '|*') + '</tr>';
   };
   brs.forEach(function (b) {
     var open = !!_admDayOpen[b];
@@ -25701,13 +25854,8 @@ function _admTrend() {
 
   h += '</tbody>' + (brs.length < 2 ? '' :
     '<tfoot><tr style="border-top:2px solid var(--bor)"><td style="font-weight:800">All</td>' +
-    DAYS.map(function (d) {
-      var a = aCol[d] || 0, l = lCol[d] || 0;
-      if (!a && !l) return '<td class="n" style="color:var(--txm)">·</td>';
-      return '<td class="n"><span class="a">' + a + '</span><span class="l">/' + l + '</span></td>';
-    }).join('') +
-    '<td class="n"><span class="a" style="color:#0D9488">' + _admN(aAll) + '</span>' +
-    '<span class="l">/' + _admN(lAll) + '</span></td></tr></tfoot>') +
+    DAYS.map(function (d) { return cell(aCol[d] || 0, lCol[d] || 0, '*|' + d); }).join('') +
+    cell(aAll, lAll, '*|*') + '</tr></tfoot>') +
     '</table></div></div>';
 
   el.innerHTML = h;
@@ -25818,7 +25966,26 @@ function _ambMonthStatus() {
 }
 
 // ── 2. the fixed monthly plan, against what has come in ────────────────────
+var SEPC = '\u241f';
+var _admPlanOpen = {};
 function admSetPlanMetric(m) { _admPlanMetric = m; _admPlanPanel(); }
+function admPlanToggle(br) {
+  if (_admPlanOpen[br]) delete _admPlanOpen[br]; else _admPlanOpen[br] = 1;
+  _admPlanPanel();
+}
+/* key is "<branch>[\u241f<counsellor>]|<YYYY-MM>", or "*|<YYYY-MM>" for the row of totals */
+function admOpenPlanCell(key) {
+  var rows = (window._PLAN_BAG || {})[key] || [];
+  if (!rows.length) return;
+  var p = key.split('|'), ym = p[1], whoP = p[0].split(SEPC);
+  var isL = _admPlanMetric === 'leads';
+  var lab = whoP[0] === '*' ? 'All branches'
+          : whoP[0] + (whoP[1] ? ' \u00b7 ' + whoP[1] : '');
+  _admModal(lab + ' \u00b7 ' + _admMonthLab(ym),
+    _admN(rows.length) + ' ' + (isL ? 'lead' + (rows.length === 1 ? '' : 's') + ' created in this month'
+                                    : 'admission' + (rows.length === 1 ? '' : 's') + ' completed in this month'),
+    _admEnqTable(rows, whoP[0] === '*'));
+}
 
 function _admPlanPanel() {
   var el = document.getElementById('adm-plan'); if (!el) return;
@@ -25843,7 +26010,8 @@ function _admPlanPanel() {
      in during October were admitted in November. The Admission Status card
      above counts them the same way, and two panels on one tab do not get to
      disagree about the same month. */
-  var got = {};
+  var got = {}, bag = {}, who = {};
+  var keep = function (k, r) { (bag[k] || (bag[k] = [])).push(r); };
   S.rows.forEach(function (r) {
     if (!isL && !_admIsWon(r)) return;
     var ym = isL ? String(r.d || '').slice(0, 7) : _ambWonMonth(r);
@@ -25853,8 +26021,20 @@ function _admPlanPanel() {
        many were placed that way. */
     if (!isL && (!ym || MM.indexOf(ym) < 0)) { ym = thisYm; offPlan++; }
     if (!ym) return;
+    var c = String(r.owner || '').trim() || '(not assigned)';
+    (who[r.b] || (who[r.b] = {}))[c] = 1;
     got[r.b + '|' + ym] = (got[r.b + '|' + ym] || 0) + 1;
+    got[r.b + SEPC + c + '|' + ym] = (got[r.b + SEPC + c + '|' + ym] || 0) + 1;
+    keep(r.b + '|' + ym, r);
+    keep(r.b + SEPC + c + '|' + ym, r);
+    keep('*|' + ym, r);
   });
+  /* a counsellor with nothing this season still gets a row of dashes */
+  S.rows.forEach(function (r) {
+    var c = String(r.owner || '').trim() || '(not assigned)';
+    (who[r.b] || (who[r.b] = {}))[c] = 1;
+  });
+  window._PLAN_BAG = bag;
 
   var h = '<div style="display:flex;gap:6px;margin-bottom:12px">' +
     [['adms', 'Admissions'], ['leads', 'Leads']].map(function (m) {
@@ -25871,41 +26051,79 @@ function _admPlanPanel() {
         _admMonthLab(m) + (m === thisYm ? ' ●' : '') + '</th>'; }).join('') +
     '<th class="n">Plan total</th><th class="n">So far</th></tr></thead><tbody>';
 
+  /* ══ EVERY CELL OPENS WHAT IS BEHIND IT ══ (14 November 2026)
+
+     This table printed sixty figures and not one of them could be opened. A
+     branch two short of its November target is a question about five named
+     children, and the only way to reach them was to go back to the sheet. A
+     cell now opens the leads or admissions it counts, and a branch opens into
+     the counsellors who own them, so the row explains itself. Cells for months
+     still ahead carry a target and nothing to show, so they stay plain. */
   var colT = {}, colG = {}, grandT = 0, grandG = 0;
+  var cell = function (key, m, tgt, past) {
+    var ach = got[key + '|' + m] || 0;
+    var pct = tgt ? 100 * ach / tgt : null;
+    var bg = '';
+    if (past && pct !== null) {
+      bg = pct >= 100 ? 'background:#05966922' : pct >= 50 ? 'background:#D9770622'
+         : ach ? 'background:#DC262618' : 'background:#DC262610';
+    }
+    if (!past) return '<td class="n" style="font-size:13.5px;line-height:1.35">' +
+      '<span style="color:var(--txm)">' + tgt + '</span></td>';
+    var open = ach ? ' onclick="admOpenPlanCell(' + JSON.stringify(key + '|' + m).replace(/"/g, '&quot;') +
+      ')" style="cursor:pointer;' : ' style="';
+    return '<td class="n"' + open + 'font-size:13.5px;line-height:1.35;' + bg + '"' +
+      (ach ? ' title="Click to view these ' + (isL ? 'leads' : 'admissions') + '"' : '') + '>' +
+      '<b style="color:' + (pct === null ? 'var(--tx)' : pct >= 100 ? '#059669'
+        : pct >= 50 ? '#D97706' : '#DC2626') + '">' + ach + '</b>' +
+      '<span style="color:var(--txm)">/' + tgt + '</span></td>';
+  };
   brs.forEach(function (br) {
     var pb = (R.plan || {})[br];
-    var rowT = 0, rowG = 0;
-    h += '<tr><td style="white-space:nowrap">' + _admDot(br) + ' ' + _admEsc(br) + '</td>';
+    var rowT = 0, rowG = 0, open = !!_admPlanOpen[br];
+    h += '<tr><td style="white-space:nowrap"><button class="amt-brn" onclick="admPlanToggle(' +
+      JSON.stringify(br).replace(/"/g, '&quot;') + ')" title="' +
+      (open ? 'Close' : 'Open this branch by counsellor') + '"><i class="ar">' +
+      (open ? '\u25be' : '\u25b8') + '</i>' + _admDot(br) + ' ' + _admEsc(br) + '</button></td>';
     MM.forEach(function (m) {
       var tgt = pb ? (isL ? pb.leads[m] : pb.adms[m]) || 0 : 0;
-      var ach = got[br + '|' + m] || 0;
-      rowT += tgt; rowG += ach;
-      colT[m] = (colT[m] || 0) + tgt; colG[m] = (colG[m] || 0) + ach;
-      var past = m < thisYm, now = m === thisYm;
-      var pct = tgt ? 100 * ach / tgt : null;
-      var bg = '';
-      if ((past || now) && pct !== null) {
-        bg = pct >= 100 ? 'background:#05966922' : pct >= 50 ? 'background:#D9770622'
-           : ach ? 'background:#DC262618' : 'background:#DC262610';
-      }
-      h += '<td class="n" style="font-size:13.5px;line-height:1.35;' + bg + '">' +
-        ((past || now)
-          ? '<b style="color:' + (pct === null ? 'var(--tx)' : pct >= 100 ? '#059669'
-              : pct >= 50 ? '#D97706' : '#DC2626') + '">' + ach + '</b>' +
-            '<span style="color:var(--txm)">/' + tgt + '</span>'
-          : '<span style="color:var(--txm)">' + tgt + '</span>') + '</td>';
+      rowT += tgt; rowG += got[br + '|' + m] || 0;
+      colT[m] = (colT[m] || 0) + tgt; colG[m] = (colG[m] || 0) + (got[br + '|' + m] || 0);
+      h += cell(br, m, tgt, m <= thisYm);
     });
     grandT += rowT; grandG += rowG;
     h += '<td class="n" style="font-weight:800">' + _admN(rowT) + '</td>' +
       '<td class="n" style="font-weight:800;color:' + (rowG ? '#059669' : 'var(--txm)') + '">' +
       _admN(rowG) + '</td></tr>';
+    if (!open) return;
+    /* the counsellors of that branch. There is no per-counsellor target, so
+       their rows carry the count alone rather than an invented share. */
+    Object.keys(who[br] || {}).sort().forEach(function (c) {
+      var key = br + SEPC + c, sum = 0;
+      var cells = MM.map(function (m) {
+        var ach = got[key + '|' + m] || 0; sum += ach;
+        if (m > thisYm) return '<td class="n"></td>';
+        if (!ach) return '<td class="n" style="color:var(--txm)">\u00b7</td>';
+        return '<td class="n" style="cursor:pointer;font-weight:700" title="Click to view" onclick="admOpenPlanCell(' +
+          JSON.stringify(key + '|' + m).replace(/"/g, '&quot;') + ')">' + ach + '</td>';
+      }).join('');
+      h += '<tr style="background:var(--pl)"><td style="padding-left:30px;font-size:13px;color:var(--txm);' +
+        'font-weight:600">' + _admEsc(c) + '</td>' + cells +
+        '<td class="n" style="color:var(--txm)">\u2013</td>' +
+        '<td class="n" style="font-weight:700;color:' + (sum ? '#059669' : 'var(--txm)') + '">' +
+        _admN(sum) + '</td></tr>';
+    });
   });
   h += '</tbody>' + (brs.length < 2 ? '' : '<tfoot><tr style="font-weight:800;border-top:2px solid var(--bor)">' +
     '<td>All branches</td>' + MM.map(function (m) {
       var past = m <= thisYm;
-      return '<td class="n" style="font-size:13.5px">' +
-        (past ? colG[m] + '<span style="color:var(--txm)">/' + colT[m] + '</span>'
-              : '<span style="color:var(--txm)">' + colT[m] + '</span>') + '</td>'; }).join('') +
+      if (!past) return '<td class="n" style="font-size:13.5px">' +
+        '<span style="color:var(--txm)">' + colT[m] + '</span></td>';
+      var ach = colG[m] || 0;
+      return '<td class="n" style="font-size:13.5px' + (ach ? ';cursor:pointer' : '') + '"' +
+        (ach ? ' title="Click to view" onclick="admOpenPlanCell(' +
+               JSON.stringify('*|' + m).replace(/"/g, '&quot;') + ')"' : '') + '>' +
+        ach + '<span style="color:var(--txm)">/' + colT[m] + '</span></td>'; }).join('') +
     '<td class="n">' + _admN(grandT) + '</td><td class="n">' + _admN(grandG) + '</td>' +
     '</tr></tfoot>') + '</table></div>';
 
@@ -26326,11 +26544,15 @@ function _admModel() {
       '<table class="au-tbl"><thead><tr><th>Source</th><th class="n">Leads</th>' +
       '<th class="n">Admitted</th><th class="n">Rate</th><th>True rate lies between</th>' +
       '</tr></thead><tbody>' +
-      [['Walk-in', wlk.length, wW, wi], ['Digital', dig.length, dW, di]].map(function (x) {
+      [['Walk-in', wlk.length, wW, wi, 'w'], ['Digital', dig.length, dW, di, 'd']].map(function (x) {
+        var open = function (what, v, style) {
+          if (!v) return '<td class="n" style="' + (style || '') + 'color:var(--txm)">' + _admN(v) + '</td>';
+          return '<td class="n" style="cursor:pointer;' + (style || '') + '" title="Click to view"' +
+            ' onclick="admOpenSrcSplit(\'' + x[4] + '\',\'' + what + '\')">' + _admN(v) + '</td>';
+        };
         return '<tr><td style="font-weight:700">' + x[0] + '</td>' +
-          '<td class="n">' + _admN(x[1]) + '</td>' +
-          '<td class="n" style="font-weight:800;color:' + (x[2] ? '#059669' : '#DC2626') + '">' +
-            _admN(x[2]) + '</td>' +
+          open('leads', x[1]) +
+          open('won', x[2], 'font-weight:800;color:' + (x[2] ? '#059669' : '#DC2626') + ';') +
           '<td class="n" style="font-weight:800">' + (x[1] ? (100 * x[2] / x[1]).toFixed(1) : '0.0') + '%</td>' +
           '<td style="color:var(--txm)">' + x[3][0].toFixed(1) + '% to ' + x[3][1].toFixed(1) +
           '% <span style="font-size:13px">(95% confidence)</span></td></tr>';
