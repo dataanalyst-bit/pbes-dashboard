@@ -21291,13 +21291,29 @@ function _bioSet() {
     var s = R.staff[r[0]], br = R.branches[s.b];
     if (scope && br !== scope) return;
     out.push({ si: r[0], di: r[1], pin: r[2], late: r[3], flag: r[4], pout: r[5],
+               hd: r[6] ? 1 : 0,
                s: s, br: br, d: R.dates[r[1]].d, dow: R.dates[r[1]].dow });
   });
   return { rows: out, days: nd, scope: scope };
 }
-function _bioLate(rows) { return rows.filter(function (r) { return r.late > _bioRaw.grace; }); }
-function _bioDeep(rows) { return rows.filter(function (r) { return r.late > _bioRaw.bands[1]; }); }
-function _bioPct(rows) { return rows.length ? 100 * _bioLate(rows).length / rows.length : null; }
+/* A day whose first half the sheet marks absent is a half-day, not a late
+   arrival: the biometric system's own late flag never fires on one, however
+   long after the shift the punch sits. Such a day is still an attended day,
+   so it stays in the record tables and in the day counts — but it is out of
+   both halves of the rate, because a day that can never be in the numerator
+   has no business in the denominator either. */
+function _bioJudged(rows) { return rows.filter(function (r) { return !r.hd; }); }
+function _bioHalf(rows)   { return rows.filter(function (r) { return r.hd; }); }
+function _bioLate(rows) {
+  return rows.filter(function (r) { return !r.hd && r.late > _bioRaw.grace; });
+}
+function _bioDeep(rows) {
+  return rows.filter(function (r) { return !r.hd && r.late > _bioRaw.bands[1]; });
+}
+function _bioPct(rows) {
+  var j = _bioJudged(rows).length;
+  return j ? 100 * _bioLate(rows).length / j : null;
+}
 function _bioAvg(rows) {
   var l = _bioLate(rows); if (!l.length) return 0;
   return l.reduce(function (t, r) { return t + r.late; }, 0) / l.length;
@@ -21322,7 +21338,7 @@ function _bioPolicy(rows) {
     var o = by[r.si];
     if (!o) { o = by[r.si] = { si: r.si, s: r.s, br: r.br, rows: [], marks: [], months: {} }; order.push(r.si); }
     o.rows.push(r);
-    if (r.late > P.lateMin) {
+    if (!r.hd && r.late > P.lateMin) {
       o.marks.push(r);
       var m = r.d.slice(0, 7);
       (o.months[m] = o.months[m] || []).push(r);
@@ -21357,9 +21373,11 @@ function _bioByStaff(rows) {
   return order.map(function (si) {
     var o = m[si];
     o.days = o.rows.length;
+    o.halfDays = _bioHalf(o.rows).length;
+    o.judged = o.days - o.halfDays;
     o.lateDays = _bioLate(o.rows).length;
     o.deepDays = _bioDeep(o.rows).length;
-    o.pct = 100 * o.lateDays / Math.max(1, o.days);
+    o.pct = 100 * o.lateDays / Math.max(1, o.judged);
     o.avg = _bioAvg(o.rows);
     return o;
   });
@@ -21376,18 +21394,24 @@ function _bioRecTable(rows, showWho) {
   rows.slice().sort(function (a, b) { return a.d < b.d ? -1 : a.d > b.d ? 1 : b.late - a.late; })
     .forEach(function (r) {
       var bi = _bioBandOf(r.late), bd = BD[bi];
+      if (r.hd) bd = { n: 'Half day', c: '#64748B' };
       h += '<tr><td style="white-space:nowrap">' + _bioDispDate(r.d) +
         ' <span style="color:var(--txm);font-size:11px">' + BIO_DOW[r.dow] + '</span></td>' +
         (showWho ? '<td>' + _bioEsc(r.s.n) + '<div style="font-size:10.5px;color:var(--txm)">' +
             _bioEsc(r.s.g) + '</div></td><td style="white-space:nowrap">' + _bioDot(r.br) + ' ' +
             _bioEsc(r.br) + '</td>' : '') +
         '<td class="n" style="font-variant-numeric:tabular-nums">' + _bioHM(r.pin) + '</td>' +
-        '<td class="n" style="font-variant-numeric:tabular-nums;color:var(--txm)">' + _bioHM(r.s.ef) + '</td>' +
-        '<td class="n" style="font-weight:800;font-variant-numeric:tabular-nums;color:' + bd.c + '">' +
-          (r.late > _bioRaw.grace ? '+' + _bioMM(r.late) : '–') + '</td>' +
+        '<td class="n" style="font-variant-numeric:tabular-nums;color:var(--txm)">' +
+          _bioHM(r.pin - r.late) +
+          (_bioRosterDay(r.d) ? '' : ' <span title="start read from the punches" ' +
+            'style="color:#D97706;font-weight:700">\u00b7</span>') + '</td>' +
+        '<td class="n" style="font-weight:800;font-variant-numeric:tabular-nums;color:' +
+          (r.hd ? 'var(--txm)' : bd.c) + '">' +
+          (r.hd ? '–' : r.late > _bioRaw.grace ? '+' + _bioMM(r.late) : '–') + '</td>' +
         '<td><span class="na-pill" style="background:' + bd.c + '1A;color:' + bd.c + '">' + bd.n + '</span></td>' +
         '<td style="font-size:11px;color:' + (r.flag ? 'var(--txm)' : '#B91C1C') + '">' +
-          (r.late > _bioRaw.grace ? (r.flag ? 'flagged' : 'never flagged') : '') + '</td></tr>';
+          (!r.hd && r.late > _bioRaw.grace ? (r.flag ? 'flagged' : 'never flagged') : '') +
+          '</td></tr>';
     });
   return h + '</tbody></table>';
 }
@@ -21571,6 +21595,15 @@ function _bioKpis() {
 var BIO_GRP_ORDER = ['Teachers', 'HOD', 'Sports', 'Admin', 'Other'];
 var BIO_GRP_COL = { Teachers: '#1E4FD8', HOD: '#7C3AED', Sports: '#0D9488',
                     Admin: '#D97706', Other: '#94A3B8' };
+/* The sheet's own Department column is a clean three-way split — Teaching,
+   Non-Teaching, Admin Staff — so it decides the group wherever it is filled,
+   and the designation is only read to carve Sports and HOD out of whichever
+   department they sit in. "Non-Teaching" has to be tested before "Teaching",
+   because it contains it. */
+var BIO_DEPT_RE = [
+  ['Admin', /non[\s-]*teach|admin|support|house\s*keep|mainten|transport|security/i],
+  ['Teachers', /teach|academ|faculty/i]
+];
 var BIO_GRP_RE = [
   ['Admin',    /maint(en|ain)|housekeep|plumb|electric|carpent|sweep|clean|garden|securit|guard|driver|conduct|attendant|peon|helper|cook|canteen|ayah|caretak|nurse|lift\s*man|water\s*man/i],
   ['Sports',   /\bsports?\b|\bpet\b|\bpti\b|physical\s*(education|training|director)|coach|yoga|karate|skating|swim|\bgames\b|\bgym/i],
@@ -21578,11 +21611,30 @@ var BIO_GRP_RE = [
   ['Teachers', /teacher|faculty|lecturer|tutor|\btgt\b|\bpgt\b|\bprt\b|educator|montessori|teaching/i],
   ['Admin',    /principal|\badmin|transport|office|reception|account|\bhr\b|clerk|cashier|\bstore|purchase|librar|\bit\b|system|\berp\b|\bdtp\b|\bseo\b|\bpro\b|counsel|manager|supervis|in-?charge|incharge|\bhm\b|head\s*m(istress|aster)|warden|\blab\b|\bpa\b|vigilance|grievance|marketing|\bmis\b/i]
 ];
-function _bioGrp(desig) {
+function _bioGrp(desig, dept) {
   var t = String(desig == null ? '' : desig);
+  var d = String(dept == null ? '' : dept);
+  var i;
+  /* Support and operations first, so "Swimming Pool Maintenance" is maintenance
+     rather than sport and a bus attendant is transport rather than a teacher. */
+  if (BIO_GRP_RE[0][1].test(t)) return 'Admin';
+  /* Then the two groups that are carved out of any department: a PET is sport
+     and an Academic Coordinator is a head, whichever column they are filed in. */
+  if (BIO_GRP_RE[1][1].test(t)) return 'Sports';
+  if (BIO_GRP_RE[2][1].test(t)) return 'HOD';
+  /* Then the Department column, which is the school's own answer. */
+  for (i = 0; i < BIO_DEPT_RE.length; i++) if (BIO_DEPT_RE[i][1].test(d)) return BIO_DEPT_RE[i][0];
+  /* Only where Department is blank does the designation decide on its own. */
+  for (i = 0; i < BIO_GRP_RE.length; i++) if (BIO_GRP_RE[i][1].test(t)) return BIO_GRP_RE[i][0];
   if (!t || /not recorded/i.test(t)) return 'Other';
-  for (var i = 0; i < BIO_GRP_RE.length; i++) if (BIO_GRP_RE[i][1].test(t)) return BIO_GRP_RE[i][0];
   return 'Other';
+}
+/* A date is judged by the sheet's own shift start once the roster was
+   corrected; before that the start is read from the punches. The payload says
+   from when, so the page never hard-codes the date. */
+function _bioRosterDay(d) {
+  var f = (_bioRaw && _bioRaw.quality && _bioRaw.quality.rosterOkFrom) || '';
+  return !!f && String(d) >= f;
 }
 function _bioGrpChip(g) {
   var c = BIO_GRP_COL[g] || '#94A3B8';
@@ -21602,7 +21654,9 @@ function _bioRoles() {
        cached before this panel was re-grouped rendering rather than blank. */
     var dg = c.dg || c.sc || '(not recorded)';
     var o = m[dg];
-    if (!o) { o = m[dg] = { dg: dg, staff: 0, late: 0, flagged: 0, brs: [], scs: [] }; order.push(dg); }
+    if (!o) { o = m[dg] = { dg: dg, dp: c.dp || '', staff: 0, late: 0, flagged: 0,
+                            brs: [], scs: [] }; order.push(dg); }
+    if (!o.dp && c.dp) o.dp = c.dp;
     o.staff += c.staff; o.late += c.late; o.flagged += c.flagged;
     if (c.branch && o.brs.indexOf(c.branch) < 0) o.brs.push(c.branch);
     if (c.sc && o.scs.indexOf(c.sc) < 0) o.scs.push(c.sc);
@@ -21638,7 +21692,7 @@ function bioCodeToggle(btn) {
 function _bioCodeTree() {
   var roles = _bioRoles(), m = {};
   roles.forEach(function (c) {
-    var g = _bioGrp(c.dg);
+    var g = _bioGrp(c.dg, c.dp);
     var o = m[g] || (m[g] = { g: g, staff: 0, late: 0, flagged: 0, brs: [], scs: [], roles: [] });
     o.staff += c.staff; o.late += c.late; o.flagged += c.flagged;
     o.roles.push(c);
@@ -21732,21 +21786,22 @@ function bioOpenDesig(dg) {
                         : '<div class="au-empty">No late arrivals on working days.</div>';
   if (typeof openHTMLModal === 'function')
     openHTMLModal(dg + (S.scope ? ' · ' + S.scope : ''),
-      _bioGrp(dg) + ' · ' + _bioN(rows.length) + ' late · ' + people.length + ' staff' +
+      _bioGrp(dg, (rows[0] && rows[0].s && rows[0].s.dp) || '') + ' · ' +
+      _bioN(rows.length) + ' late · ' + people.length + ' staff' +
       (every && every.scs.length ? ' · ' + every.scs.map(_bioEsc).join(' / ') : ''), h);
 }
 function bioOpenCodes() {
   if (!_bioRaw) return;
   var roles = _bioRoles().slice().sort(function (a, b) {
-    var ga = BIO_GRP_ORDER.indexOf(_bioGrp(a.dg)), gb = BIO_GRP_ORDER.indexOf(_bioGrp(b.dg));
+    var ga = BIO_GRP_ORDER.indexOf(_bioGrp(a.dg, a.dp)), gb = BIO_GRP_ORDER.indexOf(_bioGrp(b.dg, b.dp));
     return ga - gb || b.late - a.late;
   });
   var h = '<table class="au-tbl"><thead><tr><th>Group</th><th>Designation</th><th>Branch</th><th>Shift code</th>' +
     '<th class="n">Staff</th><th class="n">Late arrivals</th><th class="n">Flagged</th>' +
     '<th class="n">Never flagged</th></tr></thead><tbody>' +
     roles.map(function (c) {
-      return '<tr><td style="white-space:nowrap">' + _bioGrpChip(_bioGrp(c.dg)) +
-          _bioEsc(_bioGrp(c.dg)) + '</td>' +
+      return '<tr><td style="white-space:nowrap">' + _bioGrpChip(_bioGrp(c.dg, c.dp)) +
+          _bioEsc(_bioGrp(c.dg, c.dp)) + '</td>' +
         '<td><button class="na-secbtn" onclick="bioOpenDesig(' +
           JSON.stringify(c.dg).replace(/"/g, '&quot;') + ')">' + _bioEsc(c.dg) + ' ›</button></td>' +
         '<td style="white-space:nowrap">' + _bioRoleBr(c) + '</td>' +
@@ -21760,7 +21815,8 @@ function bioOpenCodes() {
   if (typeof openHTMLModal === 'function')
     openHTMLModal('What the biometric system reported',
       roles.length + ' designations · ' + BIO_GRP_ORDER.filter(function (g) {
-        return roles.some(function (c) { return _bioGrp(c.dg) === g; }); }).length + ' groups', h)
+        return roles.some(function (c) { return _bioGrp(c.dg, c.dp) === g; }); }).length +
+        ' groups', h)
 }
 
 /* ── branch comparison ─────────────────────────────────────────────────────── */
@@ -21960,7 +22016,7 @@ function bioGrpToggle(btn) {
 function _bioGrpTree() {
   var S = _bioSet(), m = {};
   S.rows.forEach(function (r) {
-    var g = _bioGrp(r.s.g), dg = r.s.g || '(not recorded)';
+    var g = _bioGrp(r.s.g, r.s.dp), dg = r.s.g || '(not recorded)';
     var o = m[g] || (m[g] = { g: g, rows: [], dsg: {}, order: [] });
     o.rows.push(r);
     if (!o.dsg[dg]) { o.dsg[dg] = []; o.order.push(dg); }
@@ -21977,7 +22033,7 @@ function _bioDept() {
   /* one row, at any of the three depths */
   var row = function (key, label, chip, rows, depth, kids) {
     window._BIO_GBAG[key] = rows;
-    var p = _bioPct(rows), deep = _bioDeep(rows).length;
+    var p = _bioPct(rows), deep = _bioDeep(rows).length, hd = _bioHalf(rows).length;
     var open = !!_bioGrpOpen[key];
     var pad = 9 + depth * 20;
     var kq = String(key).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
@@ -21994,7 +22050,8 @@ function _bioDept() {
     var h = '<tr' + (depth ? ' style="background:var(--pl)"' : '') + '>' +
       '<td style="padding-left:' + pad + 'px">' + head + '</td>' +
       cell(_bioByStaff(rows).length, 'color:var(--txm)') +
-      cell(_bioN(rows.length), 'color:var(--txm)') +
+      cell(_bioN(_bioJudged(rows).length), 'color:var(--txm)') +
+      cell(hd ? _bioN(hd) : '–', 'color:' + (hd ? '#64748B' : 'var(--txl)')) +
       '<td><button class="na-barbtn" onclick="bioOpenGBag(\'' + kq + '\')">' +
         '<span class="au-bar"><i style="width:' + Math.min(100, p || 0) + '%;background:' +
         _bioLateCol(p) + '"></i></span></button></td>' +
@@ -22006,7 +22063,8 @@ function _bioDept() {
   };
 
   var h = '<table class="au-tbl bio-gt"><thead><tr><th>Designation group</th><th class="n">Staff</th>' +
-    '<th class="n">Attended days</th><th style="min-width:150px">Late arrival rate</th>' +
+    '<th class="n">Days judged</th><th class="n">Half days</th>' +
+    '<th style="min-width:150px">Late arrival rate</th>' +
     '<th class="n">Late rate</th><th class="n">Past ' + R.bands[1] + 'm</th>' +
     '<th class="n">Avg when late</th></tr></thead><tbody>';
 
@@ -22189,7 +22247,11 @@ function _bioRoster() {
           : '#DC26261A;color:#DC2626') + '">' + (o.applied ? _bioHM(o.slot) + ' \u2713'
           : 'Roster kept') + '</span></td></tr>';
   });
+  var okFrom = (R.quality && R.quality.rosterOkFrom) || '';
   el.innerHTML = h + '</tbody></table><div class="bio-leg">' +
+    (okFrom ? '<span style="background:#ECFDF5;color:#047857;font-weight:700;border-radius:99px;' +
+      'padding:2px 9px">Sheet roster used from ' + _bioDispDate(okFrom) + '</span>' +
+      '<span style="color:var(--bor)">|</span>' : '') +
     '<span>Shifts</span><span style="color:var(--tx);font-weight:700">' +
       (R.slots || []).map(_bioHM).join(' \u00b7 ') + '</span>' +
     '<span style="color:var(--bor)">|</span>' +
