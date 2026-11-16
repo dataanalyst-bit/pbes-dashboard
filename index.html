@@ -24377,36 +24377,53 @@ function _admFollow() {
      in their own group headed "Of which", which is the honest shape rather
      than a footnote nobody reads. */
   var NS = [
-    { k: 'nsdue', lab: 'Next step today', col: '#1E4FD8',
-      note: 'the next follow-up falls today',
-      sel: function (rows) { return rows.filter(function (r) {
-        var n = _admNextStep(r); return n && n.day === today; }); } },
+    { k: 'nsuntouched', lab: 'Untouched', col: '#B91C1C',
+      note: 'nobody has acted on this lead at all — still at stage 01, nothing written in either ' +
+            'log, and no follow-up task booked. Tested first, so a lead counted here is counted ' +
+            'nowhere else in this group',
+      sel: function (rows) { return rows.filter(_admUntouched); } },
     { k: 'nslate', lab: 'Next step overdue', col: '#DC2626',
       note: 'the day it was meant to happen has passed',
       sel: function (rows) { return rows.filter(function (r) {
+        if (_admUntouched(r)) return false;
         var n = _admNextStep(r); return n && n.day && n.day < today; }); } },
+    { k: 'nsdue', lab: 'Next step today', col: '#1E4FD8',
+      note: 'the next follow-up falls today',
+      sel: function (rows) { return rows.filter(function (r) {
+        if (_admUntouched(r)) return false;
+        var n = _admNextStep(r); return n && n.day === today; }); } },
     { k: 'nslater', lab: 'Later', col: '#0D9488',
       note: 'booked for a day after today — nothing is owed on it yet',
       sel: function (rows) { return rows.filter(function (r) {
+        if (_admUntouched(r)) return false;
         var n = _admNextStep(r); return n && n.day && n.day > today; }); } },
     { k: 'nsnone', lab: 'No next step', col: '#B45309',
-      note: 'nothing booked for a day anybody can act on — either nothing was ever scheduled, ' +
-            'or what is there carries no readable date',
+      note: 'worked at least once, but nothing is booked for a day anybody can act on — either ' +
+            'nothing was ever scheduled, or what is there carries no readable date. Untouched ' +
+            'leads are counted in their own column, not here',
       sel: function (rows) { return rows.filter(function (r) {
+        if (_admUntouched(r)) return false;
         var n = _admNextStep(r); return !(n && n.day); }); } }
   ];
-  /* subsets, not slices: these overlap the four columns above */
+  /* subsets, not slices: these cut across the five columns above */
   var NSX = [
-    { k: 'nsuntouched', lab: 'Untouched', col: '#B91C1C',
-      note: 'nobody has acted on this lead at all — still at stage 01, nothing written in either ' +
-            'log, and no follow-up task booked. Every one of these also sits under "No next step", ' +
-            'so it is a subset of the group to the left, not an extra slice',
-      sel: function (rows) { return rows.filter(_admUntouched); } },
+    { k: 'nswork', lab: 'Worked today', col: '#059669',
+      note: 'a person wrote a comment or ticked a follow-up against this lead TODAY. Open leads ' +
+            'only, unlike the "Leads worked" group on the left, which counts closed ones too. ' +
+            'It overlaps every column to the left: a lead can be overdue and still have been ' +
+            'picked up this morning',
+      sel: function (rows) { return rows.filter(function (r) {
+        if (_admTouchDays(r).indexOf(today) >= 0) return true;
+        var hit = false;
+        (r.fu || []).forEach(function (raw) {
+          var f = _admFuParse(raw);
+          if (f && !f.auto && f.done && _admDay(f.done) === today) hit = true; });
+        return hit; }); } },
     /* measured rather than ruled on — see _admFitFollow */
     { k: 'nsrisk', lab: 'At risk of being dropped', col: '#7C3AED', why: 1,
       note: 'fitted chance a person touches this lead in the next three days is under ' +
             Math.round(ADM_RISK_CUT * 100) + '% — click any figure for the reason, lead by lead. ' +
-            'A lead at risk can sit in any of the four columns to the left',
+            'A lead at risk can sit in any of the five columns to the left',
       sel: function (rows) { return rows.filter(function (r) {
         var p = _admDropRisk(r, FIT); return p !== null && p < ADM_RISK_CUT; }); } }
   ];
@@ -24513,10 +24530,10 @@ function _admFollow() {
       '<span style="font-weight:600;opacity:.8">(every lead, closed ones too)</span></th>' +
     '<th colspan="' + NS.length + '" style="text-align:center;border-left:1px solid var(--bor);' +
       'border-bottom:1px solid var(--bor)">Next follow-up · owed ' +
-      '<span style="font-weight:600;opacity:.8">(these four add up to Open leads)</span></th>' +
+      '<span style="font-weight:600;opacity:.8">(these five add up to Open leads)</span></th>' +
     '<th colspan="' + NSX.length + '" style="text-align:center;border-left:1px solid var(--bor);' +
       'border-bottom:1px solid var(--bor)">Of which ' +
-      '<span style="font-weight:600;opacity:.8">(subsets — they overlap the four at left)</span></th>' +
+      '<span style="font-weight:600;opacity:.8">(subsets — they overlap the five at left)</span></th>' +
     '<th colspan="' + (W.length + 1) + '" style="text-align:center;border-left:1px solid var(--bor);' +
       'border-bottom:1px solid var(--bor)">Follow-up tasks ' +
       '<span style="font-weight:600;opacity:.8">(open leads only)</span></th></tr><tr>' +
