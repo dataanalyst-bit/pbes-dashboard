@@ -24376,36 +24376,73 @@ function _admFollow() {
      in any of the four. Adding them to the others double-counts, so they sit
      in their own group headed "Of which", which is the honest shape rather
      than a footnote nobody reads. */
+  /* ── SIX STATES, AND EVERY OPEN LEAD IS IN EXACTLY ONE (16 November 2026) ──
+     Open leads = Untouched + Overdue + Today pending + Today done + Later +
+                  Not scheduled
+
+     The chain is tested in that order and the first match wins, so no lead is
+     counted twice and none is left out. Order is by how bad the state is, not
+     by the calendar:
+
+       Untouched      nobody has acted at all — the worst state there is, so it
+                      is taken out first and never appears in another column.
+       Overdue        a follow-up date has passed with the task still open. A
+                      lead that is overdue AND also has something due today is
+                      counted here, because the older miss is the real problem;
+                      the Worked today column beside this group shows whether
+                      somebody has since picked it up.
+       Today pending  a task falls due today and is not ticked.
+       Today done     a task fell due today and has been ticked.
+       Later          the next follow-up is booked for a day after today.
+       Not scheduled  worked at least once, but no follow-up date exists at
+                      all. Nothing has lapsed, because nothing was ever set
+                      — which is why it cannot be read as overdue, and why it
+                      gets a column of its own rather than being folded away. */
+  var _fuDay = function (r, wantDone) {
+    var hit = false;
+    (r.fu || []).forEach(function (raw) {
+      var f = _admFuParse(raw);
+      if (!f || f.auto) return;
+      if (_admDay(f.due) !== today) return;
+      if (wantDone ? !!f.done : !f.done) hit = true;
+    });
+    return hit;
+  };
+  var _nsState = function (r) {
+    if (_admUntouched(r)) return 'untouched';
+    var n = _admNextStep(r);
+    if (n && n.day && n.day < today) return 'overdue';
+    if (_fuDay(r, false)) return 'todo';
+    if (_fuDay(r, true)) return 'done';
+    if (n && n.day && n.day === today) return 'todo';
+    if (n && n.day && n.day > today) return 'later';
+    return 'unsched';
+  };
+  var _nsIs = function (k) { return function (rows) {
+    return rows.filter(function (r) { return _nsState(r) === k; }); }; };
   var NS = [
     { k: 'nsuntouched', lab: 'Untouched', col: '#B91C1C',
       note: 'nobody has acted on this lead at all — still at stage 01, nothing written in either ' +
-            'log, and no follow-up task booked. Tested first, so a lead counted here is counted ' +
-            'nowhere else in this group',
-      sel: function (rows) { return rows.filter(_admUntouched); } },
-    { k: 'nslate', lab: 'Next step overdue', col: '#DC2626',
-      note: 'the day it was meant to happen has passed',
-      sel: function (rows) { return rows.filter(function (r) {
-        if (_admUntouched(r)) return false;
-        var n = _admNextStep(r); return n && n.day && n.day < today; }); } },
-    { k: 'nsdue', lab: 'Next step today', col: '#1E4FD8',
-      note: 'the next follow-up falls today',
-      sel: function (rows) { return rows.filter(function (r) {
-        if (_admUntouched(r)) return false;
-        var n = _admNextStep(r); return n && n.day === today; }); } },
+            'log, and no follow-up task booked',
+      sel: _nsIs('untouched') },
+    { k: 'nslate', lab: 'Overdue', col: '#DC2626',
+      note: 'a follow-up date has passed with the task still open',
+      sel: _nsIs('overdue') },
+    { k: 'nsdue', lab: 'Today pending', col: '#1E4FD8',
+      note: 'a follow-up falls due today and has not been ticked',
+      sel: _nsIs('todo') },
+    { k: 'nsdone', lab: 'Today done', col: '#059669',
+      note: 'a follow-up fell due today and has been ticked',
+      sel: _nsIs('done') },
     { k: 'nslater', lab: 'Later', col: '#0D9488',
       note: 'booked for a day after today — nothing is owed on it yet',
-      sel: function (rows) { return rows.filter(function (r) {
-        if (_admUntouched(r)) return false;
-        var n = _admNextStep(r); return n && n.day && n.day > today; }); } },
-    { k: 'nsnone', lab: 'No next step', col: '#B45309',
-      note: 'worked at least once, but nothing is booked for a day anybody can act on — either ' +
-            'nothing was ever scheduled, or what is there carries no readable date. Untouched ' +
-            'leads are counted in their own column, not here',
-      sel: function (rows) { return rows.filter(function (r) {
-        if (_admUntouched(r)) return false;
-        var n = _admNextStep(r); return !(n && n.day); }); } }
+      sel: _nsIs('later') },
+    { k: 'nsnone', lab: 'Not scheduled', col: '#B45309',
+      note: 'worked at least once, but no follow-up date exists at all. Nothing has lapsed ' +
+            'because nothing was ever set, which is why it is not counted as overdue',
+      sel: _nsIs('unsched') }
   ];
-  /* subsets, not slices: these cut across the five columns above */
+  /* subsets, not slices: these cut across the six columns above */
   var NSX = [
     { k: 'nswork', lab: 'Worked today', col: '#059669',
       note: 'a person wrote a comment or ticked a follow-up against this lead TODAY. Open leads ' +
@@ -24423,7 +24460,7 @@ function _admFollow() {
     { k: 'nsrisk', lab: 'At risk of being dropped', col: '#7C3AED', why: 1,
       note: 'fitted chance a person touches this lead in the next three days is under ' +
             Math.round(ADM_RISK_CUT * 100) + '% — click any figure for the reason, lead by lead. ' +
-            'A lead at risk can sit in any of the five columns to the left',
+            'A lead at risk can sit in any of the six columns to the left',
       sel: function (rows) { return rows.filter(function (r) {
         var p = _admDropRisk(r, FIT); return p !== null && p < ADM_RISK_CUT; }); } }
   ];
@@ -24530,10 +24567,10 @@ function _admFollow() {
       '<span style="font-weight:600;opacity:.8">(every lead, closed ones too)</span></th>' +
     '<th colspan="' + NS.length + '" style="text-align:center;border-left:1px solid var(--bor);' +
       'border-bottom:1px solid var(--bor)">Next follow-up · owed ' +
-      '<span style="font-weight:600;opacity:.8">(these five add up to Open leads)</span></th>' +
+      '<span style="font-weight:600;opacity:.8">(these six add up to Open leads)</span></th>' +
     '<th colspan="' + NSX.length + '" style="text-align:center;border-left:1px solid var(--bor);' +
       'border-bottom:1px solid var(--bor)">Of which ' +
-      '<span style="font-weight:600;opacity:.8">(subsets — they overlap the five at left)</span></th>' +
+      '<span style="font-weight:600;opacity:.8">(subsets — they overlap the six at left)</span></th>' +
     '<th colspan="' + (W.length + 1) + '" style="text-align:center;border-left:1px solid var(--bor);' +
       'border-bottom:1px solid var(--bor)">Follow-up tasks ' +
       '<span style="font-weight:600;opacity:.8">(open leads only)</span></th></tr><tr>' +
