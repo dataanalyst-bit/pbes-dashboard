@@ -24359,11 +24359,24 @@ function _admFollow() {
      one. These count LEADS, across all of them, on the next date
      _admNextStep can recover from either log. Two different units, so they
      keep their own column group. */
+  /* ── A COLUMN GROUP THAT ADDS UP (16 November 2026) ──
+     Management asked whether these columns should sum to Open leads. They
+     should, and two things stopped them.
+
+     A lead whose next step is booked for a day AFTER today was in none of the
+     columns: not today, not overdue, and not "no next step" either. On the 16
+     November export that was 8 leads, plus 5 more carrying an event with no
+     readable date, so 13 of 786 simply vanished from the group. "Later" now
+     holds the future ones and "No next step" holds anything with no usable
+     day at all. The four together are an exact partition of the open book:
+     every open lead sits in one of them and in only one.
+
+     Untouched and At risk are NOT slices of that partition — they cut across
+     it. Every untouched lead also has no next step, and a lead at risk can be
+     in any of the four. Adding them to the others double-counts, so they sit
+     in their own group headed "Of which", which is the honest shape rather
+     than a footnote nobody reads. */
   var NS = [
-    { k: 'nsuntouched', lab: 'Untouched', col: '#B91C1C',
-      note: 'nobody has acted on this lead at all — still at stage 01, nothing written in ' +
-            'either log, and no follow-up task booked',
-      sel: function (rows) { return rows.filter(_admUntouched); } },
     { k: 'nsdue', lab: 'Next step today', col: '#1E4FD8',
       note: 'the next follow-up falls today',
       sel: function (rows) { return rows.filter(function (r) {
@@ -24372,15 +24385,28 @@ function _admFollow() {
       note: 'the day it was meant to happen has passed',
       sel: function (rows) { return rows.filter(function (r) {
         var n = _admNextStep(r); return n && n.day && n.day < today; }); } },
-    { k: 'nsnone', lab: 'No next step', col: '#B45309',
-      note: 'nothing booked ahead \u2014 either nothing was ever scheduled, or the lead has been ' +
-            'worked past the last open task without a new one being set',
+    { k: 'nslater', lab: 'Later', col: '#0D9488',
+      note: 'booked for a day after today — nothing is owed on it yet',
       sel: function (rows) { return rows.filter(function (r) {
-        var n = _admNextStep(r); return !n || (!n.day && n.src !== 'event'); }); } },
-    /* measured rather than ruled on \u2014 see _admFitFollow */
+        var n = _admNextStep(r); return n && n.day && n.day > today; }); } },
+    { k: 'nsnone', lab: 'No next step', col: '#B45309',
+      note: 'nothing booked for a day anybody can act on — either nothing was ever scheduled, ' +
+            'or what is there carries no readable date',
+      sel: function (rows) { return rows.filter(function (r) {
+        var n = _admNextStep(r); return !(n && n.day); }); } }
+  ];
+  /* subsets, not slices: these overlap the four columns above */
+  var NSX = [
+    { k: 'nsuntouched', lab: 'Untouched', col: '#B91C1C',
+      note: 'nobody has acted on this lead at all — still at stage 01, nothing written in either ' +
+            'log, and no follow-up task booked. Every one of these also sits under "No next step", ' +
+            'so it is a subset of the group to the left, not an extra slice',
+      sel: function (rows) { return rows.filter(_admUntouched); } },
+    /* measured rather than ruled on — see _admFitFollow */
     { k: 'nsrisk', lab: 'At risk of being dropped', col: '#7C3AED', why: 1,
       note: 'fitted chance a person touches this lead in the next three days is under ' +
-            Math.round(ADM_RISK_CUT * 100) + '% — click any figure for the reason, lead by lead',
+            Math.round(ADM_RISK_CUT * 100) + '% — click any figure for the reason, lead by lead. ' +
+            'A lead at risk can sit in any of the four columns to the left',
       sel: function (rows) { return rows.filter(function (r) {
         var p = _admDropRisk(r, FIT); return p !== null && p < ADM_RISK_CUT; }); } }
   ];
@@ -24461,6 +24487,7 @@ function _admFollow() {
         lcell(B.open, bn + ' · open leads', 'still on one of the seven stages') +
         MV.map(function (w, i) { return mcell(B.rows, w, bn, i === 0); }).join('') +
         NS.map(function (w, i) { return mcell(B.open, w, bn, i === 0); }).join('') +
+        NSX.map(function (w, i) { return mcell(B.open, w, bn, i === 0); }).join('') +
         tcell(B.all, bn + ' · tasks raised', 'every human follow-up task on an open lead') +
         W.map(function (w) { return cell(B.all, w, bn); }).join('') + '</tr>';
       if (!_admOpen[key]) return;
@@ -24472,6 +24499,7 @@ function _admFollow() {
             lcell(C.open, bn + ' · ' + C.n + ' · open leads', 'still on one of the seven stages') +
             MV.map(function (w, i) { return mcell(C.rows, w, bn + ' · ' + C.n, i === 0); }).join('') +
             NS.map(function (w, i) { return mcell(C.open, w, bn + ' · ' + C.n, i === 0); }).join('') +
+            NSX.map(function (w, i) { return mcell(C.open, w, bn + ' · ' + C.n, i === 0); }).join('') +
             tcell(C.all, bn + ' · ' + C.n + ' · tasks raised', 'every human follow-up task') +
             W.map(function (w) { return cell(C.all, w, bn + ' · ' + C.n); }).join('') + '</tr>';
         });
@@ -24485,15 +24513,18 @@ function _admFollow() {
       '<span style="font-weight:600;opacity:.8">(every lead, closed ones too)</span></th>' +
     '<th colspan="' + NS.length + '" style="text-align:center;border-left:1px solid var(--bor);' +
       'border-bottom:1px solid var(--bor)">Next follow-up · owed ' +
-      '<span style="font-weight:600;opacity:.8">(leads)</span></th>' +
+      '<span style="font-weight:600;opacity:.8">(these four add up to Open leads)</span></th>' +
+    '<th colspan="' + NSX.length + '" style="text-align:center;border-left:1px solid var(--bor);' +
+      'border-bottom:1px solid var(--bor)">Of which ' +
+      '<span style="font-weight:600;opacity:.8">(subsets — they overlap the four at left)</span></th>' +
     '<th colspan="' + (W.length + 1) + '" style="text-align:center;border-left:1px solid var(--bor);' +
       'border-bottom:1px solid var(--bor)">Follow-up tasks ' +
       '<span style="font-weight:600;opacity:.8">(open leads only)</span></th></tr><tr>' +
     MV.map(function (w, i) { return '<th class="n"' +
       (i === 0 ? ' style="border-left:1px solid var(--bor)"' : '') +
       ' title="' + _admEsc(w.note) + '">' + _admEsc(w.lab.replace('Worked ', '')) + '</th>'; }).join('') +
-    NS.map(function (w, i) { return '<th class="n"' +
-      (i === 0 ? ' style="border-left:1px solid var(--bor)"' : '') +
+    NS.concat(NSX).map(function (w, i) { return '<th class="n"' +
+      (i === 0 || i === NS.length ? ' style="border-left:1px solid var(--bor)"' : '') +
       ' title="' + _admEsc(w.note) + '">' +
       _admEsc(w.lab.replace('Next step ', '').replace(' of being dropped', '')) + '</th>'; }).join('') +
     '<th class="n" style="border-left:1px solid var(--bor)">Raised</th>' +
@@ -24506,6 +24537,7 @@ function _admFollow() {
       lcell(openRows, 'All branches \u00b7 open leads', 'still on one of the seven stages') +
       MV.map(function (w, i) { return mcell(S.rows, w, 'All branches', i === 0); }).join('') +
       NS.map(function (w, i) { return mcell(openRows, w, 'All branches', i === 0); }).join('') +
+      NSX.map(function (w, i) { return mcell(openRows, w, 'All branches', i === 0); }).join('') +
       tcell(FU, 'All branches \u00b7 tasks raised', 'every human follow-up task on an open lead') +
       W.map(function (w) { return cell(FU, w, 'All branches'); }).join('') +
       '</tr></tfoot>') + '</table></div>';
