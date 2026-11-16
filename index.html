@@ -23846,6 +23846,31 @@ function _admCmParse(str) {
            sys: body.indexOf('[System]') >= 0 };
 }
 /* every day on which a person did something to this lead */
+/* ── UNTOUCHED (16 November 2026) ──────────────────────────────────────────
+   A lead nobody has acted on at all. Three things have to be true together,
+   because any one of them alone is a different animal:
+
+     the stage is still 01 - Untouched   — a lead moved to Not Connected was
+                                           acted on, the call simply failed;
+     nothing is written in either log     — no human comment, no completed
+                                           follow-up task;
+     not even a task is booked            — scheduling one is itself an action,
+                                           so a lead with a pending task is
+                                           waiting, not ignored.
+
+   System-written comments and the tracker's own automatic follow-ups are
+   excluded by _admTouchDays and the auto flag, so a lead the SHEET touched
+   does not count as a lead a PERSON touched. */
+function _admUntouched(r) {
+  if (!r || r.st !== 'new') return false;
+  if (_admTouchDays(r).length) return false;
+  var human = false;
+  (r.fu || []).forEach(function (raw) {
+    var f = _admFuParse(raw);
+    if (f && !f.auto) human = true;
+  });
+  return !human;
+}
 function _admTouchDays(r) {
   if (!r) return [];
   if (r.__td) return r.__td;
@@ -24335,6 +24360,10 @@ function _admFollow() {
      _admNextStep can recover from either log. Two different units, so they
      keep their own column group. */
   var NS = [
+    { k: 'nsuntouched', lab: 'Untouched', col: '#B91C1C',
+      note: 'nobody has acted on this lead at all — still at stage 01, nothing written in ' +
+            'either log, and no follow-up task booked',
+      sel: function (rows) { return rows.filter(_admUntouched); } },
     { k: 'nsdue', lab: 'Next step today', col: '#1E4FD8',
       note: 'the next follow-up falls today',
       sel: function (rows) { return rows.filter(function (r) {
