@@ -25454,8 +25454,14 @@ function _admWalkinSet() {
   L.forEach(function (k) { m[k] = 1; });
   return m;
 }
-function _admIsWalk(r) { return !!_admWalkinSet()[r.src]; }
-function _admIsDigital(r) { return !_admWalkinSet()[r.src]; }
+/* The source is matched in lower case, the same way _admIsWalkSrc does it.
+   Code.gs already lower-cases the column on read, so nothing moves today —
+   but the two tests used to differ on case, and a single "Walk_In" typed at
+   source would have put the row in the walk-in column of the counsellor
+   ranking and the digital column of the branch comparison at the same time. */
+function _admWalkKey(r) { return String((r && r.src) || '').toLowerCase(); }
+function _admIsWalk(r) { return !!_admWalkinSet()[_admWalkKey(r)]; }
+function _admIsDigital(r) { return !_admWalkinSet()[_admWalkKey(r)]; }
 
 var ADM_PERIODS = [
   ['season',    'Whole season'],
@@ -25801,6 +25807,28 @@ function _admCompareYear(el, hdr) {
   el.innerHTML = h;
 }
 
+/* ── THE PLAN, IN WHOLE MONTHS (16 November 2026) ──────────────────────────
+   "Due by today" shared each month's number across its days: on the 16th,
+   November's 105 counted as 56, and the column read 46%. The arithmetic was
+   right and nobody could see it. Management asked for the plain version
+   instead — everything the plan asks for up to and INCLUDING this month,
+   against everything admitted so far. Bachupally: 35 for October plus 105 for
+   November is 140 asked, 42 done, 30%. No fractions of a month anywhere.
+
+   The denominator therefore runs to the END of the current month, so a branch
+   reads short for most of the month and squares up on the last day. That is
+   the point: it is the month's job, not the month's elapsed share. */
+function _admPlanToMonthEnd(branch, metric) {
+  var R = _admRaw, P = (R && R.plan) || {};
+  var pb = P[branch]; if (!pb) return 0;
+  var src = pb[metric === 'leads' ? 'leads' : 'adms'] || {};
+  var cur = _admIso(new Date()).slice(0, 7), t = 0;
+  Object.keys(src).forEach(function (ym) { if (ym <= cur) t += Number(src[ym]) || 0; });
+  return t;
+}
+var _ADM_MON3 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function _admPlanMonthLab() { return _ADM_MON3[new Date().getMonth()]; }
+
 /* The day the season's plan opens — the same window the "Whole season" button
    uses, so "due by today" and the season's admissions are measured over
    exactly the same stretch of calendar. */
@@ -25815,10 +25843,11 @@ function _admPlanFrom() {
 function admOpenSeasonWon(br) {
   var S = _admSet();
   var rows = S.rows.filter(function (r) { return r.b === br && _admIsWon(r); });
-  var due = _admTargetFor(br, _admPlanFrom(), _admIso(new Date()), 'adms');
+  var due = _admPlanToMonthEnd(br, 'adms');
   var tgt = _admTarget(br);
   _admModal(br + ' \u00b7 admissions this season',
-    _admN(rows.length) + ' admitted \u00b7 ' + _admN(Math.round(due)) + ' due by today \u00b7 ' +
+    _admN(rows.length) + ' admitted \u00b7 ' + _admN(Math.round(due)) +
+    ' due by the end of ' + _admPlanMonthLab() + ' \u00b7 ' +
     (tgt ? _admN(tgt) + ' for the full year' : 'no full-year target set'),
     _admEnqTable(rows, false));
 }
@@ -25946,8 +25975,8 @@ function _admCompare() {
       'Target<span class="pl-sub">full year</span></th>' +
     '<th class="n" title="Admissions completed since the season opened. It does not move with the buttons above.">' +
       'Admitted<span class="pl-sub">season so far</span></th>' +
-    '<th class="n" title="The monthly plan added up day by day to today, and what has actually been admitted against it.">' +
-      'Against plan<span class="pl-sub">due by today</span></th>' +
+    '<th class="n" title="Every month of the plan up to and including this one, added up in full, and what has actually been admitted against it.">' +
+      'Against plan<span class="pl-sub">by end of ' + _admPlanMonthLab() + '</span></th>' +
     '</tr></thead><tbody>';
   var pc = function (v) {
     if (v === null) return '<span style="color:var(--txm)">\u2013</span>';
@@ -25982,11 +26011,16 @@ function _admCompare() {
        nothing about whether the branch is ahead or behind, because it does not
        know how much of the year has gone.
 
-       The plan is already in the payload month by month, so it is added up day
-       by day to today and the season's admissions are set against THAT. 70
-       against 48 due is 146% and reads as ahead; 70 against 96 due would be
-       behind, and the old column would have shown the same 95.9% either way. */
-    var due = _admTargetFor(d.b, _admPlanFrom(), _admIso(new Date()), 'adms');
+       The plan is already in the payload month by month, so it is added up and
+       the season's admissions are set against THAT. 70 against 48 due is 146%
+       and reads as ahead; 70 against 96 due would be behind, and the old
+       column would have shown the same 95.9% either way.
+
+       ── 16 November 2026 ──
+       It was first added up day by day to today, which made the denominator a
+       fraction of a month nobody could reproduce by hand. It is now added up
+       in WHOLE MONTHS to the end of the current one — see _admPlanToMonthEnd. */
+    var due = _admPlanToMonthEnd(d.b, 'adms');
     var vsPlan = due > 0 ? 100 * d.seasonWon / due : null;
     h += '<tr><td><button class="amt-brn" onclick="admCmpToggle(' +
         JSON.stringify(d.b).replace(/"/g, '&quot;') + ')" title="' +
@@ -26036,7 +26070,7 @@ function _admCompare() {
   });
   var spT = T.tgt ? 100 * T.seasonWon / T.tgt : null;
   var dueT = data.reduce(function (t, d) {
-    return t + _admTargetFor(d.b, _admPlanFrom(), _admIso(new Date()), 'adms'); }, 0);
+    return t + _admPlanToMonthEnd(d.b, 'adms'); }, 0);
   h += '</tbody>' + (data.length < 2 ? '' :
     '<tfoot><tr style="font-weight:800;border-top:2px solid var(--bor)">' +
     '<td>' + (S.scope ? _admEsc(S.scope) : 'All five branches') + '</td>' +
@@ -26068,10 +26102,12 @@ function _admCompare() {
     '<br><br>The three columns on the right do <b style="color:var(--tx)">not</b> move with the buttons ' +
     'above. <b style="color:var(--tx)">Target</b> is the whole academic year. ' +
     '<b style="color:var(--tx)">Admitted</b> is every admission completed since the season opened. ' +
-    '<b style="color:var(--tx)">Against plan</b> is that figure over the monthly plan added up day by ' +
-    'day to today \u2014 so 100% is exactly on schedule, and the sub-line says how many were due. ' +
-    'A share of the full year cannot say the same thing, because it does not know how much of the ' +
-    'year has gone.' +
+    '<b style="color:var(--tx)">Against plan</b> is that figure over every month of the plan up to ' +
+    'and including this one, each month counted in full \u2014 so the sub-line says how many the plan ' +
+    'asks for by the end of ' + _admPlanMonthLab() + ', and 100% means the whole of this month\'s job ' +
+    'is already done. Because the denominator runs to month-end, a branch reads short for most of the ' +
+    'month and squares up on the last day. A share of the full year cannot say the same thing, because ' +
+    'it does not know how much of the year has gone.' +
     '</div>';
   el.innerHTML = h;
 }
