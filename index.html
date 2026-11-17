@@ -27142,8 +27142,7 @@ function _admYoY() {
   var CRM_HIST = 'Touched Leads', TRK = '27-28 tabs';
   var crmWon = function (a, b) {
     return LD.filter(function (r) {
-      return r && r.Stage === '08-Admission Completed' && r.Branch && (!scope || r.Branch === scope) &&
-             (!a || (r.Date && r.Date >= a && r.Date <= b));
+      return (!scope || r.Branch === scope) && _admCrmIn(r, a, b);
     }).length;
   };
   var trkWon = function () { return S.rows.filter(_admIsWon).length; };
@@ -27254,6 +27253,36 @@ function _admYoY() {
    The monthly grid's closed seasons are counted from the trend tab, which
    holds no rows at all; those cells open only where the history tab happens
    to carry that year, which is why some open and some do not. */
+/* ── THE DAY AN ADMISSION WAS COMPLETED, IN THE CRM (17 November 2026) ─────
+   Every LEAD_DATES row carries two dates. Date is Created On, the day the
+   lead opened. Updated is Updated On, the day the row last moved — and on a
+   row sitting at stage 08 that is the day it was marked admitted.
+
+   The year-on-year comparison was counting last year's admissions on Created
+   On, so a child who enquired in July and joined in October landed in July.
+   Against this season, which counts on the day the admission was completed,
+   the two columns were measuring different things and the percentage between
+   them was not a comparison at all.
+
+   One definition, used by every place that counts a CRM admission into a
+   window. Updated On is preferred; Created On is the fallback, so a payload
+   cached before this change degrades to the old behaviour instead of
+   reporting zero. */
+function _admCrmWon(r) {
+  return !!(r && r.Stage === '08-Admission Completed' && r.Branch);
+}
+function _admCrmDay(r) {
+  if (!r) return '';
+  var u = r.Updated;
+  if (u && u !== '–' && String(u).length >= 10) return String(u).slice(0, 10);
+  return r.Date && r.Date !== '–' ? String(r.Date).slice(0, 10) : '';
+}
+function _admCrmIn(r, a, b) {
+  if (!_admCrmWon(r)) return false;
+  if (!a) return true;
+  var d = _admCrmDay(r);
+  return !!d && d >= a && d <= b;
+}
 function _admYoYRows(ay, branch, a, b) {
   var S = _admSet(), R = _admRaw || {};
   if (ay === (R.season || '')) {
@@ -27267,9 +27296,7 @@ function _admYoYRows(ay, branch, a, b) {
   var LD = (typeof LEAD_DATES !== 'undefined' && LEAD_DATES) ? LEAD_DATES : [];
   if (ay === _admLastSeason(R.season || '') && LD.length) {
     return { kind: 'crm', rows: LD.filter(function (r) {
-      return r && r.Stage === '08-Admission Completed' && r.Branch &&
-        (!branch || r.Branch === branch) &&
-        (!a || (r.Date && r.Date >= a && r.Date <= b)); }) };
+      return (!branch || r.Branch === branch) && _admCrmIn(r, a, b); }) };
   }
   return { kind: 'hist', rows: (S.hist || []).filter(function (r) {
     return r.ay === ay && (!branch || r.b === branch) &&
@@ -27279,8 +27306,9 @@ function _admYoYHas(ay, branch, a, b) { return _admYoYRows(ay, branch, a, b).row
 function _admYoYTable(o) {
   var cols, get;
   if (o.kind === 'crm') {
-    cols = ['Branch', 'Student', 'Owner', 'Channel', 'Date'];
-    get = function (r) { return [r.Branch, r.Student, r.Owner, r.Channel, _admDate(r.Date)]; };
+    cols = ['Branch', 'Student', 'Owner', 'Channel', 'Admitted on', 'Lead created'];
+    get = function (r) { return [r.Branch, r.Student, r.Owner, r.Channel,
+      _admDate(_admCrmDay(r)), _admDate(r.Date)]; };
   } else {
     cols = ['Branch', 'Student', 'Class', 'Section', 'Admission no.', 'Date'];
     get = function (r) { return [r.b, r.n, r.cls, r.sec, r.adn, _admDate(r.d)]; };
@@ -27338,8 +27366,7 @@ function _admYoYBranches(S, R, season, lastAy, scope, day) {
     var lw = win(lastAy);
     cols.push({ ay: lastAy, w: lw, by: function (b) {
       return LD.filter(function (r) {
-        return r.Branch === b && r.Stage === '08-Admission Completed' &&
-               r.Date && r.Date >= lw[0] && r.Date <= lw[1]; }).length; } });
+        return r.Branch === b && _admCrmIn(r, lw[0], lw[1]); }).length; } });
   }
   hist.slice(-3).reverse().forEach(function (ay) {
     var w = win(ay);
@@ -27415,10 +27442,12 @@ function _admYoYBranches(S, R, season, lastAy, scope, day) {
     'counting from 1 September, so the years meet at the same point. Per cent is the change on the ' +
     'year before; ' + _admEsc(cols[cols.length - 1].ay) + ' is the baseline and carries none.' +
     (lastAy && cols.length > 2 ? '<br><b>Read ' + _admEsc(lastAy) + ' against ' + _admEsc(season) +
-      '</b> — both are lead registers counted the same way. The step from ' +
-      _admEsc(cols[2].ay) + ' to ' + _admEsc(lastAy) + ' crosses from the admissions sheet, which ' +
-      'dates a row by the day the admission was taken, to the CRM, which dates it by the day the ' +
-      'lead was opened; that change of register moves the number on its own.' : '') +
+      '</b> — both are lead registers and both are now dated the same way. ' +
+      _admEsc(lastAy) + ' counts a Touched Leads row at <b>stage 08 – Admission Completed</b> on its ' +
+      '<b>Updated On</b> date, which is the day it was marked admitted; ' + _admEsc(season) +
+      ' counts the day the stage log shows the admission completed. The step back to ' +
+      _admEsc(cols[2].ay) + ' crosses to the admissions sheet, which dates a row by the day the ' +
+      'admission was taken — the same event, recorded in a different book.' : '') +
     '</div>';
   return h;
 }
