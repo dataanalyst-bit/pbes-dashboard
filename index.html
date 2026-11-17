@@ -26473,10 +26473,28 @@ function _admLogDay(line) {
   m = /^\s*(\d{4}-\d{2}-\d{2})/.exec(t);
   return m ? m[1] : '';
 }
+/* ── EVERY LOG LINE THE ROW CARRIES, INCLUDING THE OVERFLOW (17 Nov 2026) ──
+   The export has ten numbered Comment columns. An eleventh entry does not get
+   a column of its own: it is written into "Additional Comments", several to a
+   cell. Only the ten slots were being read, so a lead worked hard enough to
+   fill them lost its newest lines — and the newest line on an admitted lead
+   is the one that says it was admitted. Five of the 130 admissions in the 17
+   November file were in that position and fell through to the re-stamped
+   Updated column; four of the five were dated on the wrong day because of it.
+   The overflow cell is cut back into its entries on the timestamp each one
+   starts with. */
+var _ADM_LOGSPLIT = /(?=\b\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4},\s*\d{1,2}:\d{2}\s*[ap]m\s*\u00b7)/i;
+function _admLogLines(r) {
+  var cm = (r && r.cm) || [], out = [];
+  if (cm.forEach) cm.forEach(function (c) { if (c) out.push(String(c)); });
+  var over = String((r && r.addl) || '');
+  if (over) over.split(_ADM_LOGSPLIT).forEach(function (c) { c = c.trim(); if (c) out.push(c); });
+  return out;
+}
 /* the last time this row was moved INTO the admitted stage */
 function _admStageWonDay(r) {
-  var cm = (r && r.cm) || [];
-  if (!cm.length || !cm.forEach) return '';
+  var cm = _admLogLines(r);
+  if (!cm.length) return '';
   var best = '';
   cm.forEach(function (c) {
     var t = String(c || '');
@@ -26495,6 +26513,13 @@ function _admStageWonDay(r) {
 function _admWonDay(r) {
   var d = _admStageWonDay(r);
   if (d) return d;
+  /* Stage Entered is when the row reached the stage it is at now, so on an
+     admitted row it is the day of the admission. It agrees with the log on
+     every one of the 125 admissions that carry both, and unlike Updated it is
+     not re-stamped when the sheet is bulk-edited — 88 of the 130 admitted rows
+     show an Updated of 10 November. It goes ahead of Updated for that reason. */
+  var se = (r && r.sent) || '';
+  if (String(se).length >= 10) return String(se).slice(0, 10);
   var iso = (r && r.upd) || '';
   if (String(iso).length >= 10) return String(iso).slice(0, 10);
   var c = (r && r.d) || '';
@@ -26504,6 +26529,7 @@ function _admWonDay(r) {
    note under the plan table */
 function _admWonDaySrc(r) {
   if (_admStageWonDay(r)) return 'log';
+  if (String((r && r.sent) || '').length >= 10) return 'sent';
   if (String((r && r.upd) || '').length >= 10) return 'upd';
   return String((r && r.d) || '').length >= 10 ? 'created' : 'none';
 }
