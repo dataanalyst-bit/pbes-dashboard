@@ -1224,6 +1224,54 @@ table.vckt tr.vck-c td.nm{font-weight:600;color:var(--tx)}
 #pane-adm27 .au-yoy td,#pane-adm27 .au-yoy th{white-space:nowrap}
 #pane-adm27 .au-bar{height:12px}
 
+/* ══ WALK-IN AND DIGITAL LEADS, SEASON AGAINST SEASON (18 Nov 2026) ══
+   One card a branch; a row a year, newest first; two bars a row.
+
+   EACH CARD HAS ITS OWN SCALE, and that is deliberate. The question the panel
+   answers is asked inside a branch — is this season ahead of that branch's
+   earlier ones — and the branches differ five- to tenfold, so on one shared
+   scale Gowdavalli's and Keesara's years were five hairlines of equal length
+   and the comparison they were drawn for could not be seen. Walk-in and
+   digital share the card's scale, so the two are comparable within a branch.
+   Across branches the bars are NOT comparable, which is why every bar carries
+   its figure beside it: the number is what is read across cards.
+
+   The two series colours are the first two slots of the same validated order
+   the branch dots come from — the widest-apart pair in it (colour-vision
+   separation 24.7 light / 26.8 dark, against a floor of 8; ordinary vision
+   33.6 / 31.8, floor 15). Because those two hues are also Boduppal's and
+   Pocharam's dots, this panel prints branch names without dots, and every
+   column is headed with its swatch AND its name, so neither colour is asked
+   to say two things at once. They are set on :root, not on the pane, because
+   the list behind a figure opens in the modal, which lives outside it. */
+:root{--ly-w:#2A78D6;--ly-d:#EB6834}
+:root[data-theme="dark"]{--ly-w:#3987E5;--ly-d:#D95926}
+#pane-adm27 .ly-top{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 14px}
+#pane-adm27 .ly-top .amt-b{font-size:13.5px;padding:7px 15px}
+#pane-adm27 .ly-top .cap{font-size:13px;color:var(--txm);margin-left:8px}
+#pane-adm27 .ly-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:14px}
+#pane-adm27 .ly-grid.one{grid-template-columns:minmax(0,620px)}
+#pane-adm27 .ly-card{border:1px solid var(--bor);border-radius:14px;background:var(--sur);
+  padding:15px 12px 10px;min-width:0}
+#pane-adm27 .ly-card h4{margin:0 6px 10px;font-size:17px;font-weight:800;letter-spacing:-.01em;color:var(--tx)}
+#pane-adm27 .ly-row{display:grid;grid-template-columns:80px minmax(0,1fr) minmax(0,1fr);gap:12px;
+  align-items:center;padding:5px 6px;border-radius:9px;min-height:36px}
+#pane-adm27 .ly-row.hd{min-height:0;padding-bottom:7px;font-size:11.5px;font-weight:800;
+  letter-spacing:.07em;text-transform:uppercase;color:var(--txm)}
+#pane-adm27 .ly-row.now{background:var(--pl)}
+#pane-adm27 .ly-sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
+#pane-adm27 .ly-yr{font-size:14px;font-weight:700;white-space:nowrap;color:var(--tx);line-height:1.2}
+#pane-adm27 .ly-yr small{display:block;font-size:10px;font-weight:800;color:var(--p);
+  letter-spacing:.06em;text-transform:uppercase}
+#pane-adm27 .ly-c{display:flex;align-items:center;gap:7px;min-width:0;width:100%;border:0;
+  background:transparent;padding:4px 0;min-height:26px;font:inherit;color:var(--tx);text-align:left;
+  cursor:pointer;border-radius:6px}
+#pane-adm27 button.ly-c:hover{background:rgba(42,120,214,.09)}
+#pane-adm27 button.ly-c:focus-visible{outline:2px solid var(--p);outline-offset:1px}
+#pane-adm27 .ly-c i{display:block;flex:0 0 auto;height:14px;min-width:2px;border-radius:0 4px 4px 0}
+#pane-adm27 .ly-c b{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+#pane-adm27 .ly-c.none{cursor:default;color:var(--txm);font-weight:700;padding-left:1px}
+
 /* ══ ADMISSION STATUS — this month, target against achieved ══
    Added 7 Nov 2026, to the layout the group circulates for its other schools
    so the five branches can be read beside them without anybody translating
@@ -3858,6 +3906,16 @@ document.addEventListener('DOMContentLoaded', async () => {
           where a waiting list will form. Cells naming a range of grades are counted as leads but left
           out of this chart, because placing them on one grade would invent demand that was never stated.</div>
         <div id="adm-class"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>🚶 Walk-in and digital leads, year against year</h3>
+        <div class="sub">Every branch, each academic year on record, walk-in beside digital. <b>As on
+          today</b> cuts every year at the same day of its own season, counting from 1 September;
+          <b>Overall</b> is every lead recorded for the year; <b>Average per month</b> is the leads
+          dated inside the season divided by the months that carry any. A dash is a register that
+          was never kept, not a zero. Click a figure for the sources behind it.</div>
+        <div id="adm-leadyrs"></div>
       </div>
 
       <div class="au-sec">
@@ -24856,6 +24914,311 @@ function admOpenClass(k) {
     _admN(rows.filter(_admIsWon).length) + ' admitted', head + _admByBranchAcc(rows));
 }
 
+/* ══ WALK-IN AND DIGITAL LEADS, SEASON AGAINST SEASON (18 November 2026) ════
+   Asked for by the analyst: every branch, every academic year on record, the
+   two kinds of lead side by side, with three ways of cutting it —
+
+     As on today        each year cut at the same day of its own season,
+                        counting from 1 September — the window the admissions
+                        comparison above already uses, so the two panels can
+                        be read against each other;
+     Overall            every lead recorded for that year;
+     Average per month  the leads dated inside the season, divided by the
+                        months of it in which that register recorded any.
+
+   THREE REGISTERS, ONE SHAPE. This season comes from the live tracker, last
+   season from the CRM lead export, and the years before from the
+   "All Enquiries" tab, which the server sends grouped (see _adReadLeadHist in
+   Code.gs). All three are folded into the same cells here — one per year,
+   branch and category, holding the day of the season each lead arrived and
+   the source it named — so one function counts all of them and the three
+   switches cannot drift apart.
+
+   A DASH IS NOT A ZERO. The older registers are not complete: Bachupally has
+   no digital register for 2024-25, Boduppal none before 2025-26, Pocharam
+   nothing at all for 2023-24. A year with no leads of a category in the
+   register is printed as a dash, because "0 digital leads" would be read as a
+   finding and it is only a missing book. A register that exists but had not
+   started by today's day of its season prints 0, which is true.
+
+   For the same reason there is no all-branches total: a group figure for
+   2024-25 would be one branch's digital register set against four branches'
+   this year.
+
+   THE MONTH AVERAGE divides by the months that carry leads rather than by
+   twelve, so a register that ran September and October only — Keesara's
+   2025-26 walk-ins — is read as twenty a month, not three. For the season in
+   progress the current month counts for the part of it that has passed.
+
+   Every figure opens the sources behind it. For the "All Enquiries" years
+   that is the Sub-source column, each line opening onto the "How They Heard"
+   wording under it; for the tracker and the CRM it is their own source
+   field, which is the nearest thing either holds. */
+var _admLyMode = 'today';
+var ADM_LY_MODES = [['today', 'As on today'], ['all', 'Overall'], ['avg', 'Average per month']];
+var ADM_LY_CAT = ['Walk-in', 'Digital'];
+var ADM_LY_COL = ['var(--ly-w,#2A78D6)', 'var(--ly-d,#EB6834)'];
+function admLyMode(m) { _admLyMode = m; _admLeadYears(); }
+
+function _admLyUtc(iso) { return Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)); }
+function _admLyDays(a, b) { return Math.round((_admLyUtc(b) - _admLyUtc(a)) / 86400000); }
+function _admLyIsIso(d) { return !!d && /^\d{4}-\d{2}-\d{2}/.test(String(d)); }
+
+function _admLyModel() {
+  var R = _admRaw; if (!R) return null;
+  var S = _admSet(), season = R.season || '';
+  if (!season) return null;
+  var today = _admIso(new Date());
+  var day = _admLyDays(_admYoyStart(season), today);
+  var LD = (typeof LEAD_DATES !== 'undefined' && LEAD_DATES) ? LEAD_DATES : [];
+  var H = R.leadHist || null, lastAy = _admLastSeason(season);
+
+  var years = [{ ay: season, kind: 'enq', now: 1 }];              // newest first
+  if (lastAy && LD.length) years.push({ ay: lastAy, kind: 'crm' });
+  if (H && H.ays) H.ays.slice().sort().reverse().forEach(function (ay) {
+    if (ay >= season || (ay === lastAy && LD.length)) return;
+    years.push({ ay: ay, kind: 'hist' });
+  });
+  years = years.slice(0, 5);
+  years.forEach(function (y) {
+    y.a = _admYoyStart(y.ay);
+    y.end = _admLyDays(y.a, parseInt(y.ay.slice(0, 4), 10) + '-08-31');
+    y.b = _admAddDays(y.a, day);
+  });
+
+  var cells = {};
+  var put = function (ay, b, c, s, h, dy) {
+    var k = ay + '|' + b + '|' + c, cell = cells[k] || (cells[k] = { n: 0, idx: {}, items: [] });
+    var ik = s + '\u0000' + h, it = cell.idx[ik];
+    if (!it) { it = cell.idx[ik] = { s: s, h: h, d: [] }; cell.items.push(it); }
+    it.d.push(dy); cell.n++;
+  };
+  var scope = S.scope;
+  /* this season — the tracker, exactly the rows every other panel counts */
+  S.rows.forEach(function (r) {
+    put(season, r.b, _admIsWalk(r) ? 0 : 1, _admSrcLab(r.src || '') || '(not recorded)', '',
+        _admLyIsIso(r.d) ? _admLyDays(years[0].a, String(r.d).slice(0, 10)) : null);
+  });
+  /* last season — the CRM export, dated on the day the lead was created */
+  if (years[1] && years[1].kind === 'crm') {
+    LD.forEach(function (r) {
+      if (!r || !r.Branch || (scope && r.Branch !== scope)) return;
+      put(lastAy, r.Branch, r.Channel === 'Walk-In' ? 0 : 1,
+          (r.PrimarySource && r.PrimarySource !== '–') ? r.PrimarySource : '(not recorded)', '',
+          _admLyIsIso(r.Date) ? _admLyDays(years[1].a, String(r.Date).slice(0, 10)) : null);
+    });
+  }
+  /* the years before — "All Enquiries", already grouped by the server */
+  if (H && H.g) {
+    var want = {};
+    years.forEach(function (y) { if (y.kind === 'hist') want[y.ay] = 1; });
+    H.g.forEach(function (x) {
+      var ay = H.ays[x[1]], b = H.branches[x[0]];
+      if (!want[ay] || (scope && b !== scope)) return;
+      var k = ay + '|' + b + '|' + x[2], cell = cells[k] || (cells[k] = { n: 0, idx: {}, items: [] });
+      cell.items.push({ s: H.subs[x[3]], h: H.heard[x[4]], d: x[5] });
+      cell.n += x[5].length;
+    });
+  }
+  var brs = scope ? [scope] : (R.branches || []).slice();
+  return { years: years, cells: cells, day: day, today: today, season: season, branches: brs,
+           histTab: (H && H.tab) || '' };
+}
+
+/* Is this lead inside what the switch is showing? One test, used by the
+   figure on the card and by the list behind it. */
+function _admLyIn(M, y, mode, dy) {
+  if (mode === 'all') return true;
+  if (mode === 'today') return y.now ? true : (dy !== null && dy >= 0 && dy <= M.day);
+  return dy !== null && dy >= 0 && dy <= y.end;                      // avg: dated inside the season
+}
+function _admLyMonthKey(y, dy) {
+  var dt = new Date(_admLyUtc(y.a) + dy * 86400000);
+  return dt.getUTCFullYear() * 12 + dt.getUTCMonth();
+}
+/* → { none, n, v, months } : n is the leads counted, v the figure printed */
+function _admLyVal(M, y, cell, mode) {
+  if (!cell || !cell.n) return { none: 1, n: 0, v: null, months: 0 };
+  var n = 0, mon = {}, first = null;
+  cell.items.forEach(function (it) {
+    for (var i = 0; i < it.d.length; i++) {
+      /* the first day of the season this register holds a lead for */
+      if (it.d[i] !== null && it.d[i] >= 0 && (first === null || it.d[i] < first)) first = it.d[i];
+      if (!_admLyIn(M, y, mode, it.d[i])) continue;
+      n++;
+      if (mode === 'avg') { var k = _admLyMonthKey(y, it.d[i]); mon[k] = (mon[k] || 0) + 1; }
+    }
+  });
+  if (mode !== 'avg') return { none: 0, n: n, v: n, months: 0, first: first };
+  var months = 0, cur = +M.today.slice(0, 4) * 12 + (+M.today.slice(5, 7) - 1);
+  Object.keys(mon).forEach(function (k) {
+    months += (y.now && +k === cur)
+      ? Math.min(1, +M.today.slice(8, 10) / _admDaysIn(M.today.slice(0, 7))) : 1;
+  });
+  return { none: 0, n: n, v: months ? n / months : 0, months: months, mon: mon };
+}
+function _admLyFmt(v, mode) {
+  if (v === null) return '–';
+  if (mode !== 'avg') return _admN(v);
+  return v < 10 && v > 0 ? v.toFixed(1) : _admN(Math.round(v));
+}
+function _admLyMonths(m) { return (Math.round(m * 10) / 10) + (m === 1 ? ' month' : ' months'); }
+
+function _admLeadYears() {
+  var el = document.getElementById('adm-leadyrs'); if (!el) return;
+  var M = _admLyModel();
+  if (!M || M.years.length < 2) {
+    el.innerHTML = '<div class="au-empty">No earlier season carries dated leads to compare with. ' +
+      'This panel reads the "All Enquiries" tab of the admissions workbook.</div>';
+    return;
+  }
+  var mode = _admLyMode;
+  var grid = {}, maxOf = {};
+  M.branches.forEach(function (b) {
+    maxOf[b] = 1;                                   // one scale a card — see the stylesheet
+    M.years.forEach(function (y) {
+      [0, 1].forEach(function (c) {
+        var v = _admLyVal(M, y, M.cells[y.ay + '|' + b + '|' + c], mode);
+        grid[y.ay + '|' + b + '|' + c] = v;
+        if (!v.none && v.v > maxOf[b]) maxOf[b] = v.v;
+      });
+    });
+  });
+
+  var cap = mode === 'today'
+    ? 'Day ' + M.day + ' of each season · 1 Sep to ' + _admDate(M.today).slice(0, 6)
+    : mode === 'all' ? 'Every lead recorded for the year'
+    : 'Leads a month, over the months that carry leads';
+  var h = '<div class="ly-top">' + ADM_LY_MODES.map(function (m) {
+      return '<button class="amt-b' + (m[0] === mode ? ' on' : '') + '" onclick="admLyMode(\'' + m[0] +
+        '\')" aria-pressed="' + (m[0] === mode) + '">' + m[1] + '</button>'; }).join('') +
+    '<span class="cap">' + _admEsc(cap) + '</span></div>';
+
+  h += '<div class="ly-grid' + (M.branches.length === 1 ? ' one' : '') + '">';
+  M.branches.forEach(function (b) {
+    h += '<div class="ly-card"><h4>' + _admEsc(b) + '</h4>' +
+      '<div class="ly-row hd"><span>Year</span>' +
+      [0, 1].map(function (c) {
+        return '<span><i class="ly-sw" style="background:' + ADM_LY_COL[c] + '"></i>' + ADM_LY_CAT[c] + '</span>';
+      }).join('') + '</div>';
+    M.years.forEach(function (y) {
+      h += '<div class="ly-row' + (y.now ? ' now' : '') + '"><span class="ly-yr">' + _admEsc(y.ay) +
+        (y.now ? '<small>this season</small>' : '') + '</span>';
+      [0, 1].forEach(function (c) {
+        var v = grid[y.ay + '|' + b + '|' + c];
+        if (v.none) {
+          h += '<span class="ly-c none" title="' + _admEsc('No ' + ADM_LY_CAT[c].toLowerCase() +
+            ' leads on record for ' + b + ' in ' + y.ay) + '">–</span>';
+          return;
+        }
+        var tip = b + ' · ' + y.ay + ' · ' + ADM_LY_CAT[c] + ' — ' +
+          (mode === 'avg'
+            ? _admN(v.n) + ' leads ÷ ' + _admLyMonths(v.months)
+            : _admN(v.n) + ' leads' + (mode === 'today' && !y.now
+                ? ', ' + _admDate(y.a) + ' to ' + _admDate(y.b) +
+                  (v.first > 14 ? ' (first lead on record ' + _admDate(_admAddDays(y.a, v.first)) + ')' : '')
+                : '')) +
+          ' · click for the sources';
+        h += '<button class="ly-c" title="' + _admEsc(tip) + '" onclick="admOpenLy(' +
+          JSON.stringify(y.ay).replace(/"/g, '&quot;') + ',' +
+          JSON.stringify(b).replace(/"/g, '&quot;') + ',' + c + ')">' +
+          '<i style="width:calc((100% - 54px) * ' + (v.v / maxOf[b]).toFixed(4) + ');background:' +
+            ADM_LY_COL[c] + '"></i><b>' + _admLyFmt(v.v, mode) + '</b></button>';
+      });
+      h += '</div>';
+    });
+    h += '</div>';
+  });
+  el.innerHTML = h + '</div>';
+}
+
+/* the sources behind one figure */
+function admOpenLy(ay, b, c) {
+  var M = _admLyModel(); if (!M) return;
+  var y = null; M.years.forEach(function (x) { if (x.ay === ay) y = x; });
+  var cell = M.cells[ay + '|' + b + '|' + c];
+  if (!y || !cell) return;
+  var mode = _admLyMode, v = _admLyVal(M, y, cell, mode);
+  var subs = {}, order = [];
+  cell.items.forEach(function (it) {
+    var n = 0;
+    for (var i = 0; i < it.d.length; i++) if (_admLyIn(M, y, mode, it.d[i])) n++;
+    if (!n) return;
+    var s = subs[it.s];
+    if (!s) { s = subs[it.s] = { k: it.s, n: 0, h: {} }; order.push(it.s); }
+    s.n += n;
+    if (it.h) s.h[it.h] = (s.h[it.h] || 0) + n;
+  });
+  var list = order.map(function (k) { return subs[k]; }).sort(function (p, q) { return q.n - p.n || (p.k < q.k ? -1 : 1); });
+  var tot = v.n, top = list.length ? list[0].n : 1, col = c ? 'var(--ly-d,#EB6834)' : 'var(--ly-w,#2A78D6)';
+  var two = y.kind === 'hist';
+
+  var sub = _admN(tot) + ' lead' + (tot === 1 ? '' : 's') +
+    (mode === 'today' ? (y.now ? ' so far this season' : ' · ' + _admDate(y.a) + ' to ' + _admDate(y.b))
+     : mode === 'all' ? ' · whole year'
+     : ' in ' + _admLyMonths(v.months) + ' · ' + _admLyFmt(v.v, 'avg') + ' a month');
+
+  var bar = function (n) {
+    return '<span style="flex:0 0 150px;height:10px;border-radius:99px;background:var(--bor);overflow:hidden">' +
+      '<i style="display:block;height:100%;width:' + Math.max(2, 100 * n / top).toFixed(1) + '%;background:' + col +
+      ';border-radius:99px"></i></span>'; };
+  var fig = function (n) {
+    return '<b style="flex:0 0 58px;text-align:right;font-variant-numeric:tabular-nums">' + _admN(n) + '</b>' +
+      '<span style="flex:0 0 46px;text-align:right;color:var(--txm);font-size:13px;font-variant-numeric:tabular-nums">' +
+      (tot ? Math.round(100 * n / tot) : 0) + '%</span>'; };
+
+  var html = '';
+  if (mode === 'avg' && v.mon) {
+    var keys = Object.keys(v.mon).map(Number).sort(function (p, q) { return p - q; });
+    var MN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    html += '<div style="overflow-x:auto;margin-bottom:14px"><table class="au-tbl" style="font-size:13.5px"><thead><tr>' +
+      keys.map(function (k) { return '<th class="n">' + MN[k % 12] + ' ' + String(Math.floor(k / 12)).slice(2) + '</th>'; }).join('') +
+      '</tr></thead><tbody><tr>' +
+      keys.map(function (k) { return '<td class="n" style="font-weight:800">' + _admN(v.mon[k]) + '</td>'; }).join('') +
+      '</tr></tbody></table></div>';
+  }
+  html += '<div style="display:flex;gap:12px;align-items:center;padding:0 12px 8px;font-size:11.5px;font-weight:800;' +
+    'letter-spacing:.07em;text-transform:uppercase;color:var(--txm)">' +
+    '<span style="flex:1">' + (two ? 'Sub-source (detail only)' : 'Source') + '</span>' +
+    '<span style="flex:0 0 150px"></span><span style="flex:0 0 58px;text-align:right">Leads</span>' +
+    '<span style="flex:0 0 46px;text-align:right">Share</span></div>';
+  list.forEach(function (s) {
+    var head = '<span style="display:flex;align-items:center;gap:12px;width:100%">' +
+      '<b style="flex:1;min-width:0">' + _admEsc(s.k) + '</b>' + bar(s.n) + fig(s.n) + '</span>';
+    var hs = Object.keys(s.h).map(function (k) { return [k, s.h[k]]; })
+      .sort(function (p, q) { return q[1] - p[1] || (p[0] < q[0] ? -1 : 1); });
+    if (two && hs.length && typeof _naAcc === 'function') {
+      html += _naAcc(head, '<table class="au-tbl" style="margin-top:8px"><thead><tr>' +
+        '<th>How They Heard (as recorded)</th><th class="n">Leads</th></tr></thead><tbody>' +
+        hs.map(function (p) { return '<tr><td>' + _admEsc(p[0]) + '</td><td class="n" style="font-weight:800">' +
+          _admN(p[1]) + '</td></tr>'; }).join('') + '</tbody></table>');
+    } else {
+      html += '<div style="border:1px solid var(--bor);border-radius:10px;margin-bottom:8px;padding:10px 12px">' +
+        head + '</div>';
+    }
+  });
+  if (!list.length) html += '<div class="au-empty">No leads inside this window.</div>';
+  _admModal(b + ' · ' + ay + ' · ' + ADM_LY_CAT[c] + ' leads', sub, html);
+  /* Export CSV reads the modal's own row list, which an HTML modal leaves
+     empty — it would have exported only whichever inner table was open. */
+  if (typeof modalAllRows !== 'undefined') {
+    var out = [];
+    list.forEach(function (s) {
+      var hs = Object.keys(s.h);
+      if (two && hs.length) hs.sort(function (p, q) { return s.h[q] - s.h[p] || (p < q ? -1 : 1); })
+        .forEach(function (k) {
+          out.push({ Branch: b, Year: ay, Category: ADM_LY_CAT[c], Sub: s.k, Heard: k, Leads: s.h[k] }); });
+      else out.push({ Branch: b, Year: ay, Category: ADM_LY_CAT[c], Sub: s.k, Heard: '', Leads: s.n });
+    });
+    modalAllRows = out;
+    window._modalColumns = [{ key: 'Branch', label: 'Branch' }, { key: 'Year', label: 'Academic Year' },
+      { key: 'Category', label: 'Lead Category' },
+      { key: 'Sub', label: two ? 'Sub-source (detail only)' : 'Source' }]
+      .concat(two ? [{ key: 'Heard', label: 'How They Heard (as recorded)' }] : [])
+      .concat([{ key: 'Leads', label: 'Leads' }]);
+  }
+}
+
 // ── 5. pace against previous seasons ───────────────────────────────────────
 function _admPace() {
   var el = document.getElementById('adm-pace'); if (!el) return;
@@ -25296,7 +25659,7 @@ function _admPaint() {
       return t.kind === 'enquiry' && (!S.scope || t.branch === S.scope); }).length === 1) ? '' : 's') + ' read';
   _admNotes(); _admKpis(); _ambMonthStatus(); _admTrend();
   _admCompare(); _admPlanPanel(); _admYoY();
-  _admFunnel(); _admSource(); _admClassPanel(); _admPace();
+  _admFunnel(); _admSource(); _admClassPanel(); _admLeadYears(); _admPace();
   _admWalkRank(); _admCouns(); _admFollow(); _admHist();
   _admModel(); _admMethod();
   _admClean();
