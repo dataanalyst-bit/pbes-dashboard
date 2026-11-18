@@ -19394,8 +19394,12 @@ window.AUDIT = (function () {
     { n:'Ms. Racha Swetha',             b:'Bachupally', r:'Stage 3 and 4 Coordinator',        g:[2]   },
     { n:'Ms. M Nirmaladevi',            b:'Bachupally', r:'Stage 1 & 2 Coordinator',         g:[1]   },
     { n:'Ms. Mekapothula Ramya',        b:'Bachupally', r:'EY Coordinator',                  g:[0]   },
-    { n:'Ms. Dharshini',                b:'Bachupally', r:'HM CAIE, 6 TO 8',                 g:[3]   },
-    { n:'Ms. Srivalli',                 b:'Pocharam',   r:'CBSE Coordinator, 1 to 10',       g:[1,2,3,4] },
+    { n:'Ms. Dharshini',                b:'Bachupally', r:'HM CAIE, Stage 6 to 9',           g:[3,4] },
+    /* Roster change, 18 Nov 2026 — Pocharam: Ms. Sumana Maheshwari joined for Grades 1 to 4 and
+       Ms. Srivalli moved to Grades 5 to 8. The audit sheet scores Grades 3, 4
+       and 5 in one column, so that column sits with both of them. */
+    { n:'Ms. Sumana Maheshwari',        b:'Pocharam',   r:'Academic Coordinator, 1 to 4',    g:[1,2] },
+    { n:'Ms. Srivalli',                 b:'Pocharam',   r:'Academic Coordinator, 5 to 8',    g:[2,3] },
     { n:'Ms. Divya Nair',               b:'Pocharam',   r:'CAIE Coordinator, 1 to 8',        g:[1,2,3]   },
     { n:'Ms. Reetu',                    b:'Pocharam',   r:'EY Coordinator & Prep',           g:[0]   },
     { n:'Ms. Nisha Banoth',             b:'Boduppal',   r:'HM, 3 to 5',                      g:[2]   },
@@ -19474,8 +19478,11 @@ window.AUDIT = (function () {
       var ord = list.map(function (x, k) { return { k: k, v: x.per[i] && x.per[i].v }; })
         .filter(function (o) { return o.v !== null && o.v !== undefined; })
         .sort(function (a, b) { return b.v - a.v; });
+      /* The same figure is the same rank. Two coordinators who share a stage at
+         one branch carry one audit result, and must not be placed apart by the
+         order the roster happens to list them in. */
       var r = {};
-      ord.forEach(function (o, n) { r[o.k] = n + 1; });
+      ord.forEach(function (o, n) { r[o.k] = (n && o.v === ord[n-1].v) ? r[ord[n-1].k] : n + 1; });
       return { rank: r, n: ord.length };
     });
     var MEDAL = ['\ud83e\udd47', '\ud83e\udd48', '\ud83e\udd49'];
@@ -19494,6 +19501,8 @@ window.AUDIT = (function () {
         'title="' + c.n + ' checks \u00b7 click for the audit file">' + c.v.toFixed(1) + '%' + badge + '</td>';
     }
     list.forEach(function(x, i){ x.__i = i; });
+    var RK = [];                                   // overall rank, equal figures level
+    list.forEach(function(x, i){ RK[i] = (i && x.v === list[i-1].v) ? RK[i-1] : i + 1; });
     var MED = ['\ud83e\udd47','\ud83e\udd48','\ud83e\udd49'];
     return '<div style="overflow-x:auto"><table class="hrs kpt" style="min-width:720px">' +
       '<thead><tr><th class="nm">Rank</th><th class="nm">Coordinator</th>' +
@@ -19502,7 +19511,7 @@ window.AUDIT = (function () {
       list.map(function(x, i){
         var aw = awardOf(x.v);
         return '<tr class="clk" data-co="' + i + '" style="cursor:pointer">' +
-          '<td class="nm" style="font-weight:800">' + (i < 3 ? MED[i] : (i+1)) + '</td>' +
+          '<td class="nm" style="font-weight:800">' + (RK[i] <= 3 ? MED[RK[i]-1] : RK[i]) + '</td>' +
           '<td class="nm"><b>' + A.esc(x.name) + '</b>' +
             '<div style="font-size:10px;color:var(--txm)">' + A.esc(x.role) + ' \u00b7 ' + A.esc(x.b) + '</div></td>' +
           A.GRADES.map(function(g, gi){ return cell(x, gi); }).join('') +
