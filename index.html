@@ -1224,53 +1224,98 @@ table.vckt tr.vck-c td.nm{font-weight:600;color:var(--tx)}
 #pane-adm27 .au-yoy td,#pane-adm27 .au-yoy th{white-space:nowrap}
 #pane-adm27 .au-bar{height:12px}
 
-/* ══ WALK-IN AND DIGITAL LEADS, SEASON AGAINST SEASON (18 Nov 2026) ══
-   One card a branch; a row a year, newest first; two bars a row.
-
-   EACH CARD HAS ITS OWN SCALE, and that is deliberate. The question the panel
-   answers is asked inside a branch — is this season ahead of that branch's
-   earlier ones — and the branches differ five- to tenfold, so on one shared
-   scale Gowdavalli's and Keesara's years were five hairlines of equal length
-   and the comparison they were drawn for could not be seen. Walk-in and
-   digital share the card's scale, so the two are comparable within a branch.
-   Across branches the bars are NOT comparable, which is why every bar carries
-   its figure beside it: the number is what is read across cards.
-
-   The two series colours are the first two slots of the same validated order
-   the branch dots come from — the widest-apart pair in it (colour-vision
-   separation 24.7 light / 26.8 dark, against a floor of 8; ordinary vision
-   33.6 / 31.8, floor 15). Because those two hues are also Boduppal's and
-   Pocharam's dots, this panel prints branch names without dots, and every
-   column is headed with its swatch AND its name, so neither colour is asked
-   to say two things at once. They are set on :root, not on the pane, because
-   the list behind a figure opens in the modal, which lives outside it. */
-:root{--ly-w:#2A78D6;--ly-d:#EB6834}
-:root[data-theme="dark"]{--ly-w:#3987E5;--ly-d:#D95926}
+/* ══ WALK-IN AND DIGITAL LEADS, YEAR AGAINST YEAR (18 Nov 2026) ══
+   A table in the branch comparison's own dress: its three tinted blocks
+   (table.cmp — walk-in, digital, total) and the season table's nowrap cells.
+   Nothing here is new colour; the panel reads as part of the tab. */
 #pane-adm27 .ly-top{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 14px}
 #pane-adm27 .ly-top .amt-b{font-size:13.5px;padding:7px 15px}
 #pane-adm27 .ly-top .cap{font-size:13px;color:var(--txm);margin-left:8px}
-#pane-adm27 .ly-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:14px}
-#pane-adm27 .ly-grid.one{grid-template-columns:minmax(0,620px)}
-#pane-adm27 .ly-card{border:1px solid var(--bor);border-radius:14px;background:var(--sur);
-  padding:15px 12px 10px;min-width:0}
-#pane-adm27 .ly-card h4{margin:0 6px 10px;font-size:17px;font-weight:800;letter-spacing:-.01em;color:var(--tx)}
-#pane-adm27 .ly-row{display:grid;grid-template-columns:80px minmax(0,1fr) minmax(0,1fr);gap:12px;
-  align-items:center;padding:5px 6px;border-radius:9px;min-height:36px}
-#pane-adm27 .ly-row.hd{min-height:0;padding-bottom:7px;font-size:11.5px;font-weight:800;
-  letter-spacing:.07em;text-transform:uppercase;color:var(--txm)}
-#pane-adm27 .ly-row.now{background:var(--pl)}
-#pane-adm27 .ly-sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
-#pane-adm27 .ly-yr{font-size:14px;font-weight:700;white-space:nowrap;color:var(--tx);line-height:1.2}
-#pane-adm27 .ly-yr small{display:block;font-size:10px;font-weight:800;color:var(--p);
-  letter-spacing:.06em;text-transform:uppercase}
-#pane-adm27 .ly-c{display:flex;align-items:center;gap:7px;min-width:0;width:100%;border:0;
-  background:transparent;padding:4px 0;min-height:26px;font:inherit;color:var(--tx);text-align:left;
-  cursor:pointer;border-radius:6px}
-#pane-adm27 button.ly-c:hover{background:rgba(42,120,214,.09)}
-#pane-adm27 button.ly-c:focus-visible{outline:2px solid var(--p);outline-offset:1px}
-#pane-adm27 .ly-c i{display:block;flex:0 0 auto;height:14px;min-width:2px;border-radius:0 4px 4px 0}
-#pane-adm27 .ly-c b{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
-#pane-adm27 .ly-c.none{cursor:default;color:var(--txm);font-weight:700;padding-left:1px}
+#pane-adm27 .ly-t .ly-w{font-weight:500;text-transform:none;letter-spacing:0;color:var(--txm);font-size:11px}
+#pane-adm27 .ly-t tbody td:first-child{font-weight:700}
+#pane-adm27 .ly-t td[onclick]:hover{text-decoration:underline}
+#pane-adm27 table.ly-t .grp{font-size:11px;padding:7px 8px}
+#pane-adm27 table.ly-t th,#pane-adm27 table.ly-t td{padding-left:8px;padding-right:8px}
+#pane-adm27 table.ly-t td:first-child,#pane-adm27 table.ly-t th:first-child{padding-left:11px}
+
+/* ══ BRANCH PERFORMANCE — THE LAST 7 DAYS (18 Nov 2026) ══
+   The strip that replaced the ten-day table. Two colours carry it and both
+   are variables, so the dark theme steps them and either can be changed in
+   one place: --bp-hit fills a day that has admissions, --bp-nil one that has
+   none. The bar at the left of a strip and the tint of its weekly total are
+   the branch's own colour (--bc), the same five the dots use; the name is
+   always printed beside it, so the colour never has to identify the branch
+   alone. */
+#pane-adm27{--bp-hit:#047857;--bp-hit-tx:#FFF;--bp-nil:#EDF1F7;--bp-nil-tx:#7C8AA0}
+:root[data-theme="dark"] #pane-adm27{--bp-hit:#34D399;--bp-hit-tx:#052E1F;--bp-nil:#222D40;--bp-nil-tx:#8793A8}
+#pane-adm27 .bp-hd{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;
+  gap:8px 14px;margin-bottom:10px}
+#pane-adm27 .bp-hd .amt-bar{margin:0}
+#pane-adm27 .bp-hd .amt-b{font-size:13px;padding:6px 14px}
+#pane-adm27 .bp-sub{font-size:12.5px;font-weight:600;color:var(--txm);margin-top:2px}
+#pane-adm27 .bp-scroll{overflow-x:auto;flex:1 1 auto;display:flex}
+#pane-adm27 .bp-grid{display:flex;flex-direction:column;gap:7px;min-width:548px;width:100%}
+#pane-adm27 .bp-r{display:grid;align-items:center;gap:4px;flex:1 1 auto;
+  grid-template-columns:minmax(110px,1.5fr) repeat(7,minmax(40px,1fr)) minmax(100px,1.15fr);
+  padding:7px 8px 7px 12px;background:var(--sur);border:1px solid var(--bor);
+  border-left:5px solid var(--bc,var(--bor));border-radius:12px}
+#pane-adm27 .bp-r.bp-days{flex:0 0 auto;border-color:transparent;background:transparent;
+  padding-top:0;padding-bottom:1px}
+/* a counsellor's strip is .cns, not .sub: every .sub on this tab is switched
+   off by the visuals-only rule further down */
+#pane-adm27 .bp-r.cns{flex:0 0 auto;margin-left:16px;padding-top:4px;padding-bottom:4px;
+  background:var(--pl);border-left-width:3px}
+#pane-adm27 .bp-d{text-align:center;font-size:11.5px;font-weight:700;color:var(--txm);line-height:1.25;
+  white-space:nowrap}
+#pane-adm27 .bp-d small{display:block;font-size:10.5px;font-weight:500}
+#pane-adm27 .bp-d.now{color:var(--p)}
+#pane-adm27 .bp-d.sun{opacity:.6}
+#pane-adm27 .bp-n{display:flex;align-items:center;gap:6px;min-width:0;border:0;background:none;padding:0;
+  font:inherit;font-size:15.5px;font-weight:800;letter-spacing:-.01em;color:var(--tx);text-align:left;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+#pane-adm27 button.bp-n:hover{color:var(--p)}
+#pane-adm27 .bp-n i{font-style:normal;flex:0 0 10px;font-size:10px;color:var(--txm)}
+#pane-adm27 span.bp-n{display:block;font-size:13px;font-weight:600;color:var(--txm);cursor:default}
+#pane-adm27 .bp-c{display:flex;flex-direction:column;align-items:center;gap:3px;border:0;background:none;
+  padding:0;font:inherit;color:inherit;cursor:pointer}
+#pane-adm27 span.bp-c{cursor:default}
+#pane-adm27 .bp-c b{display:flex;align-items:center;justify-content:center;width:34px;height:34px;
+  border-radius:50%;background:var(--bp-nil);color:var(--bp-nil-tx);font-size:15px;font-weight:800;
+  font-variant-numeric:tabular-nums}
+#pane-adm27 .bp-c.hit b{background:var(--bp-hit);color:var(--bp-hit-tx);box-shadow:0 2px 6px rgba(4,120,87,.26)}
+#pane-adm27 .bp-c small{font-size:11.5px;font-weight:600;color:var(--txm);line-height:1;
+  font-variant-numeric:tabular-nums}
+#pane-adm27 button.bp-c:hover b,#pane-adm27 button.bp-c:focus-visible b{outline:2px solid var(--p);outline-offset:2px}
+#pane-adm27 .bp-r.cns .bp-c b{width:26px;height:26px;font-size:12.5px}
+#pane-adm27 .bp-t{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  margin-left:6px;padding:5px 8px;border:1px solid var(--bor);border-radius:10px;font:inherit;
+  color:var(--tx);white-space:nowrap;cursor:pointer;background:var(--pl);
+  background:color-mix(in srgb,var(--bc,var(--bor)) 15%,var(--sur))}
+#pane-adm27 span.bp-t{cursor:default}
+#pane-adm27 button.bp-t:hover{border-color:var(--p)}
+#pane-adm27 .bp-t small{font-size:9.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--txm)}
+#pane-adm27 .bp-t span{font-size:15px;font-weight:600;color:var(--txm);font-variant-numeric:tabular-nums}
+#pane-adm27 .bp-t b{font-size:19px;font-weight:800;color:var(--tx)}
+#pane-adm27 .bp-r.cns .bp-t{background:transparent;border-color:transparent;padding-top:0;padding-bottom:0}
+#pane-adm27 .bp-r.cns .bp-t small{display:none}
+#pane-adm27 .bp-r.cns .bp-t b{font-size:15px}
+#pane-adm27 .bp-ft{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:8px;margin-top:10px}
+#pane-adm27 .bp-f{display:block;border:1px solid var(--bor);border-radius:12px;background:var(--pl);
+  padding:9px 14px;font:inherit;color:var(--tx);text-align:left}
+#pane-adm27 button.bp-f{cursor:pointer}
+#pane-adm27 button.bp-f:hover{border-color:var(--p)}
+#pane-adm27 .bp-f small{display:block;margin-bottom:2px;font-size:10.5px;font-weight:800;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--txm)}
+#pane-adm27 .bp-f>div{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 22px}
+#pane-adm27 .bp-y{display:inline-flex;align-items:baseline;gap:6px;white-space:nowrap}
+#pane-adm27 .bp-y b{font-size:24px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+#pane-adm27 .bp-y i{font-style:normal;font-size:13px;font-weight:700;color:var(--txm)}
+#pane-adm27 .bp-y u{text-decoration:none;font-size:14px;font-weight:600;color:var(--txm);
+  font-variant-numeric:tabular-nums}
+#pane-adm27 .bp-y em{font-style:normal;font-size:13px;font-weight:800;color:var(--txm)}
+#pane-adm27 .bp-y em.up{color:var(--ok)}
+#pane-adm27 .bp-y em.dn{color:var(--bad)}
 
 /* ══ ADMISSION STATUS — this month, target against achieved ══
    Added 7 Nov 2026, to the layout the group circulates for its other schools
@@ -3823,14 +3868,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
 
       <div class="au-sec">
-        <h3>📋 The monthly plan, against what has come in</h3>
-        <div class="sub">The branch-wise lead and admission targets for October 2026 to June 2027, exactly as
-          the consolidated plan sets them. These are fixed — nothing on this page adjusts them. Months that
-          have started show what arrived over the plan; months still ahead show the plan alone.</div>
-        <div id="adm-plan"></div>
-      </div>
-
-      <div class="au-sec">
         <h3>⏰ Follow-up report as on today</h3>
         <div class="sub">Where the follow-up stands this morning: what was worked today and yesterday, what
           is due today, what is still open, and what has run past its date. Everything on the pending side
@@ -3854,17 +3891,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           A counsellor holding fewer than <b>5</b> walk-ins is listed under the ranking rather than
           inside it, because one admission out of two is not a rate. Click a name for their walk-ins.</div>
         <div id="adm-wrank"></div>
-      </div>
-
-      <div class="au-sec">
-        <h3>👥 Counsellor performance, branch by branch</h3>
-        <div class="sub">Every lead in this season carries the name of the counsellor holding it, so this is
-          the one place the work can be read per person. Tap a branch for its counsellors. <b>Admitted per
-          100</b> is the column that matters: a counsellor holding two hundred leads and converting six per
-          hundred is doing less for the school than one holding sixty and converting fifteen. The two
-          columns beside it say why — how many of their leads nobody has reached yet, and how many
-          call tasks they are carrying past their due date.</div>
-        <div id="adm-couns"></div>
       </div>
 
       <div class="au-sec">
@@ -3892,6 +3918,35 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
 
       <div class="au-sec">
+        <h3>🚶 Walk-in and digital leads, year against year</h3>
+        <div class="sub">Every branch, each academic year on record, walk-in beside digital. <b>As on
+          today</b> cuts every year at the same day of its own season, counting from 1 September;
+          <b>Overall</b> is every lead recorded for the year; <b>Average per month</b> is the leads
+          dated inside the season divided by the months that carry any. A dash is a register that
+          was never kept, not a zero. Click a figure for the sources behind it.</div>
+        <div id="adm-leadyrs"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>📋 The monthly plan, against what has come in</h3>
+        <div class="sub">The branch-wise lead and admission targets for October 2026 to June 2027, exactly as
+          the consolidated plan sets them. These are fixed — nothing on this page adjusts them. Months that
+          have started show what arrived over the plan; months still ahead show the plan alone.</div>
+        <div id="adm-plan"></div>
+      </div>
+
+      <div class="au-sec">
+        <h3>👥 Counsellor performance, branch by branch</h3>
+        <div class="sub">Every lead in this season carries the name of the counsellor holding it, so this is
+          the one place the work can be read per person. Tap a branch for its counsellors. <b>Admitted per
+          100</b> is the column that matters: a counsellor holding two hundred leads and converting six per
+          hundred is doing less for the school than one holding sixty and converting fifteen. The two
+          columns beside it say why — how many of their leads nobody has reached yet, and how many
+          call tasks they are carrying past their due date.</div>
+        <div id="adm-couns"></div>
+      </div>
+
+      <div class="au-sec">
         <h3>📣 What each source is actually worth</h3>
         <div class="sub">Volume and conversion are different questions and a source can win one while losing
           the other. The column to read is <b>admitted per hundred leads</b>: a source that sends fewer
@@ -3906,16 +3961,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           where a waiting list will form. Cells naming a range of grades are counted as leads but left
           out of this chart, because placing them on one grade would invent demand that was never stated.</div>
         <div id="adm-class"></div>
-      </div>
-
-      <div class="au-sec">
-        <h3>🚶 Walk-in and digital leads, year against year</h3>
-        <div class="sub">Every branch, each academic year on record, walk-in beside digital. <b>As on
-          today</b> cuts every year at the same day of its own season, counting from 1 September;
-          <b>Overall</b> is every lead recorded for the year; <b>Average per month</b> is the leads
-          dated inside the season divided by the months that carry any. A dash is a register that
-          was never kept, not a zero. Click a figure for the sources behind it.</div>
-        <div id="adm-leadyrs"></div>
       </div>
 
       <div class="au-sec">
@@ -24914,9 +24959,9 @@ function admOpenClass(k) {
     _admN(rows.filter(_admIsWon).length) + ' admitted', head + _admByBranchAcc(rows));
 }
 
-/* ══ WALK-IN AND DIGITAL LEADS, SEASON AGAINST SEASON (18 November 2026) ════
-   Asked for by the analyst: every branch, every academic year on record, the
-   two kinds of lead side by side, with three ways of cutting it —
+/* ══ WALK-IN AND DIGITAL LEADS, YEAR AGAINST YEAR (18 November 2026) ════════
+   Every branch against its own earlier years, walk-in, digital and the two
+   together, with three ways of cutting it —
 
      As on today        each year cut at the same day of its own season,
                         counting from 1 September — the window the admissions
@@ -24926,38 +24971,48 @@ function admOpenClass(k) {
      Average per month  the leads dated inside the season, divided by the
                         months of it in which that register recorded any.
 
+   IT IS A TABLE, AND IT SHOWS THREE YEARS. The first version was a card a
+   branch with a bar a year over five years, and it was sent back as clumsy.
+   It is now the same shape as the branch comparison at the top of the tab:
+   three tinted blocks — walk-in, digital, total — in that table's own
+   colours, each holding the last three academic years side by side, newest
+   first, so a branch's three years of walk-ins are three adjacent cells.
+   ADM_LY_YEARS is the only thing to change to show more.
+
    THREE REGISTERS, ONE SHAPE. This season comes from the live tracker, last
-   season from the CRM lead export, and the years before from the
+   season from the CRM lead export, and the year before from the
    "All Enquiries" tab, which the server sends grouped (see _adReadLeadHist in
    Code.gs). All three are folded into the same cells here — one per year,
    branch and category, holding the day of the season each lead arrived and
    the source it named — so one function counts all of them and the three
    switches cannot drift apart.
 
-   A DASH IS NOT A ZERO. The older registers are not complete: Bachupally has
-   no digital register for 2024-25, Boduppal none before 2025-26, Pocharam
-   nothing at all for 2023-24. A year with no leads of a category in the
-   register is printed as a dash, because "0 digital leads" would be read as a
-   finding and it is only a missing book. A register that exists but had not
-   started by today's day of its season prints 0, which is true.
+   A DASH IS NOT A ZERO. Where a register holds no lead of a category for a
+   year the cell is a dash: Gowdavalli before it opened, or a book that was
+   never kept. A register that exists but had not started by today's day of
+   its season prints 0, which is true.
 
-   For the same reason there is no all-branches total: a group figure for
-   2024-25 would be one branch's digital register set against four branches'
-   this year.
+   THE CHANGE COLUMN is this season against last, and is left out of Overall:
+   a season eleven weeks old set against a finished year is not a comparison.
 
    THE MONTH AVERAGE divides by the months that carry leads rather than by
    twelve, so a register that ran September and October only — Keesara's
    2025-26 walk-ins — is read as twenty a month, not three. For the season in
-   progress the current month counts for the part of it that has passed.
+   progress the current month counts for the part of it that has passed. A
+   total is averaged over the months in which EITHER kind of lead arrived, so
+   it is not the two averages added together.
 
-   Every figure opens the sources behind it. For the "All Enquiries" years
+   Every figure opens the sources behind it. For the "All Enquiries" year
    that is the Sub-source column, each line opening onto the "How They Heard"
    wording under it; for the tracker and the CRM it is their own source
    field, which is the nearest thing either holds. */
 var _admLyMode = 'today';
+var ADM_LY_YEARS = 3;
 var ADM_LY_MODES = [['today', 'As on today'], ['all', 'Overall'], ['avg', 'Average per month']];
-var ADM_LY_CAT = ['Walk-in', 'Digital'];
-var ADM_LY_COL = ['var(--ly-w,#2A78D6)', 'var(--ly-d,#EB6834)'];
+var ADM_LY_CAT = ['Walk-in', 'Digital', 'All'];
+/* the branch comparison's three blocks: class, heading, solid colour */
+var ADM_LY_GRP = [['gw', 'Walk-in leads', '#D97706'], ['gd', 'Digital leads', '#6366F1'],
+                  ['gt', 'Total leads', '#059669']];
 function admLyMode(m) { _admLyMode = m; _admLeadYears(); }
 
 function _admLyUtc(iso) { return Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)); }
@@ -24979,7 +25034,7 @@ function _admLyModel() {
     if (ay >= season || (ay === lastAy && LD.length)) return;
     years.push({ ay: ay, kind: 'hist' });
   });
-  years = years.slice(0, 5);
+  years = years.slice(0, ADM_LY_YEARS);
   years.forEach(function (y) {
     y.a = _admYoyStart(y.ay);
     y.end = _admLyDays(y.a, parseInt(y.ay.slice(0, 4), 10) + '-08-31');
@@ -25024,9 +25079,24 @@ function _admLyModel() {
   return { years: years, cells: cells, day: day, today: today, season: season, branches: brs,
            histTab: (H && H.tab) || '' };
 }
+/* One cell of the table: a branch ('' for every branch in scope), a year and
+   a category — 0 walk-in, 1 digital, 2 the two together. Null where the
+   register holds nothing, which is what prints as a dash. */
+function _admLyCell(M, ay, b, c) {
+  var out = null;
+  (b ? [b] : M.branches).forEach(function (br) {
+    (c === 2 ? [0, 1] : [c]).forEach(function (ci) {
+      var x = M.cells[ay + '|' + br + '|' + ci];
+      if (!x || !x.n) return;
+      if (!out) out = { n: 0, items: [] };
+      out.n += x.n; out.items = out.items.concat(x.items);
+    });
+  });
+  return out;
+}
 
 /* Is this lead inside what the switch is showing? One test, used by the
-   figure on the card and by the list behind it. */
+   figure in the table and by the list behind it. */
 function _admLyIn(M, y, mode, dy) {
   if (mode === 'all') return true;
   if (mode === 'today') return y.now ? true : (dy !== null && dy >= 0 && dy <= M.day);
@@ -25072,18 +25142,8 @@ function _admLeadYears() {
       'This panel reads the "All Enquiries" tab of the admissions workbook.</div>';
     return;
   }
-  var mode = _admLyMode;
-  var grid = {}, maxOf = {};
-  M.branches.forEach(function (b) {
-    maxOf[b] = 1;                                   // one scale a card — see the stylesheet
-    M.years.forEach(function (y) {
-      [0, 1].forEach(function (c) {
-        var v = _admLyVal(M, y, M.cells[y.ay + '|' + b + '|' + c], mode);
-        grid[y.ay + '|' + b + '|' + c] = v;
-        if (!v.none && v.v > maxOf[b]) maxOf[b] = v.v;
-      });
-    });
-  });
+  var mode = _admLyMode, Y = M.years, chg = mode !== 'all';
+  var q = function (s) { return JSON.stringify(s).replace(/"/g, '&quot;'); };
 
   var cap = mode === 'today'
     ? 'Day ' + M.day + ' of each season · 1 Sep to ' + _admDate(M.today).slice(0, 6)
@@ -25094,49 +25154,69 @@ function _admLeadYears() {
         '\')" aria-pressed="' + (m[0] === mode) + '">' + m[1] + '</button>'; }).join('') +
     '<span class="cap">' + _admEsc(cap) + '</span></div>';
 
-  h += '<div class="ly-grid' + (M.branches.length === 1 ? ' one' : '') + '">';
-  M.branches.forEach(function (b) {
-    h += '<div class="ly-card"><h4>' + _admEsc(b) + '</h4>' +
-      '<div class="ly-row hd"><span>Year</span>' +
-      [0, 1].map(function (c) {
-        return '<span><i class="ly-sw" style="background:' + ADM_LY_COL[c] + '"></i>' + ADM_LY_CAT[c] + '</span>';
-      }).join('') + '</div>';
-    M.years.forEach(function (y) {
-      h += '<div class="ly-row' + (y.now ? ' now' : '') + '"><span class="ly-yr">' + _admEsc(y.ay) +
-        (y.now ? '<small>this season</small>' : '') + '</span>';
-      [0, 1].forEach(function (c) {
-        var v = grid[y.ay + '|' + b + '|' + c];
+  var span = Y.length + (chg ? 1 : 0);
+  h += '<div style="overflow-x:auto"><table class="au-tbl au-yoy cmp ly-t" style="min-width:' +
+    (170 + 3 * span * 70) + 'px"><thead><tr><th rowspan="2" style="vertical-align:bottom">Branch</th>' +
+    ADM_LY_GRP.map(function (g) {
+      return '<th colspan="' + span + '" class="grp g0 ' + g[0] + '" style="text-align:center">' + g[1] + '</th>';
+    }).join('') + '</tr><tr>' +
+    ADM_LY_GRP.map(function (g) {
+      return Y.map(function (y, k) {
+        return '<th class="n ' + g[0] + (k ? '' : ' g0') + '"' + (y.now ? ' style="color:var(--tx)"' : '') + '>' +
+          _admEsc(y.ay) + (mode === 'today'
+            ? '<div class="ly-w">' + _admDate(y.now ? M.today : y.b) + '</div>' : '') + '</th>';
+      }).join('') + (chg ? '<th class="n ' + g[0] + '" title="' + _admEsc(Y[0].ay + ' against ' + Y[1].ay) +
+        '">Change</th>' : '');
+    }).join('') + '</tr></thead><tbody>';
+
+  var row = function (b, foot) {
+    var name = b || 'All branches';
+    var out = '<tr' + (foot ? ' style="font-weight:800;border-top:2px solid var(--bor)"' : '') + '><td>' +
+      (foot ? _admEsc(name) : _admDot(b) + ' ' + _admEsc(b)) + '</td>';
+    ADM_LY_GRP.forEach(function (g, c) {
+      var vals = Y.map(function (y) { return _admLyVal(M, y, _admLyCell(M, y.ay, b, c), mode); });
+      vals.forEach(function (v, k) {
+        var y = Y[k], cls = 'n ' + g[0] + (k ? '' : ' g0');
         if (v.none) {
-          h += '<span class="ly-c none" title="' + _admEsc('No ' + ADM_LY_CAT[c].toLowerCase() +
-            ' leads on record for ' + b + ' in ' + y.ay) + '">–</span>';
+          out += '<td class="' + cls + '" style="color:var(--txl)" title="' + _admEsc('No ' +
+            (c === 2 ? '' : ADM_LY_CAT[c].toLowerCase() + ' ') + 'leads on record for ' + name + ' in ' + y.ay) +
+            '">–</td>';
           return;
         }
-        var tip = b + ' · ' + y.ay + ' · ' + ADM_LY_CAT[c] + ' — ' +
+        var tip = name + ' · ' + y.ay + ' · ' + g[1] + ' — ' +
           (mode === 'avg'
             ? _admN(v.n) + ' leads ÷ ' + _admLyMonths(v.months)
             : _admN(v.n) + ' leads' + (mode === 'today' && !y.now
                 ? ', ' + _admDate(y.a) + ' to ' + _admDate(y.b) +
                   (v.first > 14 ? ' (first lead on record ' + _admDate(_admAddDays(y.a, v.first)) + ')' : '')
-                : '')) +
-          ' · click for the sources';
-        h += '<button class="ly-c" title="' + _admEsc(tip) + '" onclick="admOpenLy(' +
-          JSON.stringify(y.ay).replace(/"/g, '&quot;') + ',' +
-          JSON.stringify(b).replace(/"/g, '&quot;') + ',' + c + ')">' +
-          '<i style="width:calc((100% - 54px) * ' + (v.v / maxOf[b]).toFixed(4) + ');background:' +
-            ADM_LY_COL[c] + '"></i><b>' + _admLyFmt(v.v, mode) + '</b></button>';
+                : '')) + (v.n ? ' · click for the sources' : '');
+        out += '<td class="' + cls + '" style="font-weight:800' + (v.n ? ';cursor:pointer' : '') + '" title="' +
+          _admEsc(tip) + '"' + (v.n ? ' onclick="admOpenLy(' + q(y.ay) + ',' + q(b) + ',' + c + ')"' : '') +
+          '>' + _admLyFmt(v.v, mode) + '</td>';
       });
-      h += '</div>';
+      if (!chg) return;
+      var now = vals[0], was = vals[1], cc = 'n ' + g[0];
+      if (now.none || was.none || !was.v) {
+        out += '<td class="' + cc + '" style="color:var(--txl)">–</td>';
+      } else {
+        var p = Math.round(100 * (now.v - was.v) / was.v);
+        out += '<td class="' + cc + '" style="font-weight:800;color:' +
+          (p === 0 ? 'var(--txm)' : p > 0 ? 'var(--ok)' : 'var(--bad)') + '">' + (p > 0 ? '+' : '') + p + '%</td>';
+      }
     });
-    h += '</div>';
-  });
-  el.innerHTML = h + '</div>';
+    return out + '</tr>';
+  };
+  M.branches.forEach(function (b) { h += row(b, 0); });
+  h += '</tbody>' + (M.branches.length < 2 ? '' : '<tfoot>' + row('', 1) + '</tfoot>') + '</table></div>';
+  el.innerHTML = h;
 }
 
-/* the sources behind one figure */
+/* the sources behind one figure — b '' is every branch in scope, c 2 is
+   walk-in and digital together */
 function admOpenLy(ay, b, c) {
   var M = _admLyModel(); if (!M) return;
   var y = null; M.years.forEach(function (x) { if (x.ay === ay) y = x; });
-  var cell = M.cells[ay + '|' + b + '|' + c];
+  var cell = y ? _admLyCell(M, ay, b, c) : null;
   if (!y || !cell) return;
   var mode = _admLyMode, v = _admLyVal(M, y, cell, mode);
   var subs = {}, order = [];
@@ -25150,8 +25230,8 @@ function admOpenLy(ay, b, c) {
     if (it.h) s.h[it.h] = (s.h[it.h] || 0) + n;
   });
   var list = order.map(function (k) { return subs[k]; }).sort(function (p, q) { return q.n - p.n || (p.k < q.k ? -1 : 1); });
-  var tot = v.n, top = list.length ? list[0].n : 1, col = c ? 'var(--ly-d,#EB6834)' : 'var(--ly-w,#2A78D6)';
-  var two = y.kind === 'hist';
+  var tot = v.n, top = list.length ? list[0].n : 1, col = ADM_LY_GRP[c][2];
+  var two = y.kind === 'hist', name = b || 'All branches';
 
   var sub = _admN(tot) + ' lead' + (tot === 1 ? '' : 's') +
     (mode === 'today' ? (y.now ? ' so far this season' : ' · ' + _admDate(y.a) + ' to ' + _admDate(y.b))
@@ -25198,7 +25278,8 @@ function admOpenLy(ay, b, c) {
     }
   });
   if (!list.length) html += '<div class="au-empty">No leads inside this window.</div>';
-  _admModal(b + ' · ' + ay + ' · ' + ADM_LY_CAT[c] + ' leads', sub, html);
+  var catLab = c === 2 ? 'Walk-in and digital' : ADM_LY_CAT[c];
+  _admModal(name + ' · ' + ay + ' · ' + catLab + ' leads', sub, html);
   /* Export CSV reads the modal's own row list, which an HTML modal leaves
      empty — it would have exported only whichever inner table was open. */
   if (typeof modalAllRows !== 'undefined') {
@@ -25207,8 +25288,8 @@ function admOpenLy(ay, b, c) {
       var hs = Object.keys(s.h);
       if (two && hs.length) hs.sort(function (p, q) { return s.h[q] - s.h[p] || (p < q ? -1 : 1); })
         .forEach(function (k) {
-          out.push({ Branch: b, Year: ay, Category: ADM_LY_CAT[c], Sub: s.k, Heard: k, Leads: s.h[k] }); });
-      else out.push({ Branch: b, Year: ay, Category: ADM_LY_CAT[c], Sub: s.k, Heard: '', Leads: s.n });
+          out.push({ Branch: name, Year: ay, Category: catLab, Sub: s.k, Heard: k, Leads: s.h[k] }); });
+      else out.push({ Branch: name, Year: ay, Category: catLab, Sub: s.k, Heard: '', Leads: s.n });
     });
     modalAllRows = out;
     window._modalColumns = [{ key: 'Branch', label: 'Branch' }, { key: 'Year', label: 'Academic Year' },
@@ -27051,7 +27132,7 @@ function admOpenDayCell(key) {
   ad.concat(ld).forEach(function (r) { if (seen[r.id]) return; seen[r.id] = 1; rows.push(r); });
   var p = key.split('|'), whoP = p[0].split('\u241f'), day = p[1];
   var lab = (whoP[0] === '*' ? 'All branches' : whoP[0]) + (whoP[1] ? ' \u00b7 ' + whoP[1] : '');
-  _admModal(lab + ' \u00b7 ' + (day === '*' ? 'the last ten days' : _admDate(day)) +
+  _admModal(lab + ' \u00b7 ' + (day === '*' ? 'the last ' + ADM_STRIP_DAYS + ' days' : _admDate(day)) +
       (B.lab === 'Total' ? '' : ' \u00b7 ' + B.lab),
     _admN(ad.length) + ' admission' + (ad.length === 1 ? '' : 's') + ' completed \u00b7 ' +
     _admN(ld.length) + ' lead' + (ld.length === 1 ? '' : 's') + ' arrived',
@@ -27078,6 +27159,34 @@ function _admDayHead(iso) {
   return { d: +p[2] + '/' + (+p[1]), w: _ADM_DOW[dt.getDay()], sun: dt.getDay() === 0 };
 }
 
+/* ══ BRANCH PERFORMANCE — THE LAST 7 DAYS (18 November 2026) ════════════════
+   Replaces the ten-day table, to the layout the analyst supplied: a strip a
+   branch, a disc a day, the oldest day on the left and today on the right.
+   The number in the disc is the admissions completed that day and the figure
+   under it the leads that arrived, so a day reads "2 /14" exactly as the
+   table did; the box at the end of the strip is the branch's week.
+
+   What changed from the supplied picture, and why:
+     · it follows the dashboard's own theme instead of the dark panel it was
+       drawn on, as asked;
+     · a day with admissions is filled in the tab's "achieved" green rather
+       than red. Red on this tab means behind target — it is the colour the
+       status card beside this one uses for exactly that — and a strip of
+       red discs against the best branch read as an alarm;
+     · the season total under each branch name is gone (struck out on the
+       picture), and the foot of the card carries this year against last
+       year as on date, which was asked for in its place.
+
+   Everything the table did is still here: the Total / Walk-in / Digital
+   switch, a branch opening into its counsellors, and every disc and total
+   opening the admissions and leads it counts. Counting is unchanged — a lead
+   on the day it was created, an admission on the day it was completed.
+
+   THIS YEAR AGAINST LAST YEAR uses the window the season comparison uses:
+   1 September to today's day of the season, in each year. This year is the
+   tracker; last year is the CRM export, a lead on its Created date and an
+   admission on the day it was marked completed. */
+var ADM_STRIP_DAYS = 7;
 function _admTrend() {
   var el = document.getElementById('adm-trend'); if (!el) return;
   var S = _admSet(), R = _admRaw;
@@ -27085,115 +27194,132 @@ function _admTrend() {
 
   var M = ADM_DAY_METRICS.filter(function (m) { return m.k === _admDayMetric; })[0]
        || ADM_DAY_METRICS[0];
-  var DAYS = _admLastDays(10), brs = _admBranches(S);
+  var DAYS = _admLastDays(ADM_STRIP_DAYS).reverse(), brs = _admBranches(S);   // oldest first
   var pos = {}; DAYS.forEach(function (d, i) { pos[d] = i; });
+  var todayIso = DAYS[DAYS.length - 1];
 
   /* One pass for both halves. A lead is placed on the day it arrived — the
      Created column — and an admission on the day it was completed, which the
      stage-change log records and the Updated column is meant to. */
-  var A = {}, L = {}, aTot = {}, lTot = {}, aCol = {}, lCol = {}, aAll = 0, lAll = 0;
+  var A = {}, L = {}, aTot = {}, lTot = {}, aAll = 0, lAll = 0;
   var who = {};                               // branch -> { counsellor: 1 }
-  /* the rows behind every figure, so a cell can open what it counts */
+  /* the rows behind every figure, so a disc can open what it counts */
   var bagA = {}, bagL = {};
   var put = function (bag, k, r) { (bag[k] || (bag[k] = [])).push(r); };
-  var bump = function (m, tot, col, b, c, day, bag, r) {
+  var bump = function (m, tot, b, c, day, bag, r) {
     m[b + '|' + day] = (m[b + '|' + day] || 0) + 1;
-    m[b + '\u241f' + c + '|' + day] = (m[b + '\u241f' + c + '|' + day] || 0) + 1;
+    m[b + '␟' + c + '|' + day] = (m[b + '␟' + c + '|' + day] || 0) + 1;
     tot[b] = (tot[b] || 0) + 1;
-    tot[b + '\u241f' + c] = (tot[b + '\u241f' + c] || 0) + 1;
-    col[day] = (col[day] || 0) + 1;
+    tot[b + '␟' + c] = (tot[b + '␟' + c] || 0) + 1;
     put(bag, b + '|' + day, r);
-    put(bag, b + '\u241f' + c + '|' + day, r);
+    put(bag, b + '␟' + c + '|' + day, r);
     put(bag, b + '|*', r);
-    put(bag, b + '\u241f' + c + '|*', r);
+    put(bag, b + '␟' + c + '|*', r);
     put(bag, '*|' + day, r);
     put(bag, '*|*', r);
   };
+  var seasonA = 0, seasonL = 0;               // this season to date, same switch
   S.rows.forEach(function (r) {
     if (!M.f(r)) return;
+    seasonL++; if (_admIsWon(r)) seasonA++;
     var c = String(r.owner || '').trim() || '(not assigned)';
     var cre = String(r.d || '').slice(0, 10);
     var won = _admIsWon(r) ? _admWonDay(r) : '';
     /* every counsellor the branch has, whether or not they show in the
-       window: a counsellor with a row of dots is the thing a branch head is
-       looking for, and dropping them for having nothing would hide it */
+       window: a counsellor with a row of empty discs is the thing a branch
+       head is looking for, and dropping them for having nothing would hide it */
     (who[r.b] || (who[r.b] = {}))[c] = 1;
-    var inC = cre && pos[cre] !== undefined, inW = won && pos[won] !== undefined;
-    if (inC) { bump(L, lTot, lCol, r.b, c, cre, bagL, r); lAll++; }
-    if (inW) { bump(A, aTot, aCol, r.b, c, won, bagA, r); aAll++; }
+    if (cre && pos[cre] !== undefined) { bump(L, lTot, r.b, c, cre, bagL, r); lAll++; }
+    if (won && pos[won] !== undefined) { bump(A, aTot, r.b, c, won, bagA, r); aAll++; }
   });
-
-  var btn = ADM_DAY_METRICS.map(function (m) {
-    return '<button class="amt-b' + (m.k === M.k ? ' on' : '') +
-      '" onclick="admSetDayMetric(\'' + m.k + '\')">' + m.lab + '</button>';
-  }).join('');
-
-  /* the shading follows the leads, which is the figure that varies day to day;
-     an admission is called out by weight instead */
   window._DAY_BAG = { a: bagA, l: bagL, lab: M.lab };
-  var peak = 0;
-  for (var k2 in L) if (L.hasOwnProperty(k2) && L[k2] > peak) peak = L[k2];
-  /* every cell opens its own two sets — the admissions it counts and the
-     leads behind them — keyed the same way they were counted */
-  /* The Tot column was drawn with the same muted treatment as a single day,
-     so the one figure a branch head reads first was the faintest on the row.
-     It now carries its own class: both halves in solid ink, both bold. */
-  var cell = function (a, l, key, tot) {
-    if (!a && !l) return '<td class="n' + (tot ? ' amt-tot' : '') +
-      '" style="color:var(--txm)">·</td>';
-    var sh = peak && l ? 0.05 + 0.26 * (l / peak) : 0;
-    return '<td class="n' + (tot ? ' amt-tot' : '') + '" style="cursor:pointer' +
-      (sh && !tot ? ';background:rgba(13,148,136,' + sh.toFixed(3) + ')' : '') + '"' +
-      ' title="Click to view these ' + a + ' admission' + (a === 1 ? '' : 's') +
-      ' and ' + l + ' lead' + (l === 1 ? '' : 's') + '"' +
-      ' onclick="admOpenDayCell(' + JSON.stringify(key).replace(/"/g, '&quot;') + ')">' +
-      '<span class="a" style="color:' + (tot ? 'var(--tx)' : (a ? '#0D9488' : 'var(--txm)')) + '">' + a + '</span>' +
-      '<span class="l">/' + l + '</span></td>';
+
+  var q = function (s) { return JSON.stringify(s).replace(/"/g, '&quot;'); };
+  var disc = function (a, l, key, lab) {
+    var has = a || l;
+    return '<' + (has ? 'button onclick="admOpenDayCell(' + q(key) + ')"' : 'span') +
+      ' class="bp-c' + (a ? ' hit' : '') + (has ? '' : ' nil') + '" title="' +
+      _admEsc(lab + ' — ' + a + ' admission' + (a === 1 ? '' : 's') + ', ' + l + ' lead' +
+        (l === 1 ? '' : 's') + (has ? ' · click to view them' : '')) + '">' +
+      '<b>' + a + '</b><small>/' + l + '</small></' + (has ? 'button' : 'span') + '>';
+  };
+  var total = function (a, l, key, lab) {
+    var has = a || l;
+    return '<' + (has ? 'button onclick="admOpenDayCell(' + q(key) + ')"' : 'span') +
+      ' class="bp-t" title="' + _admEsc(lab + ' — the last ' + ADM_STRIP_DAYS + ' days' +
+        (has ? ' · click to view them' : '')) + '"><small>' + ADM_STRIP_DAYS + '-day total</small>' +
+      '<span><b>' + _admN(a) + '</b> / ' + _admN(l) + '</span></' + (has ? 'button' : 'span') + '>';
+  };
+  var strip = function (key, label, sub, open, b) {
+    var col = ADM_DOT_VAR[b] ? 'var(' + ADM_DOT_VAR[b] + ',' + ADM_DOT[b] + ')' : '#94A3B8';
+    var name = sub
+      ? '<span class="bp-n">' + _admEsc(label) + '</span>'
+      : '<button class="bp-n" onclick="admDayToggle(' + q(b) + ')" aria-expanded="' + open + '" title="' +
+          (open ? 'Close' : 'Open this branch by counsellor') + '"><i>' +
+          (open ? '▾' : '▸') + '</i>' + _admEsc(label) + '</button>';
+    return '<div class="bp-r' + (sub ? ' cns' : '') + '" style="--bc:' + col + '">' + name +
+      DAYS.map(function (d) {
+        return disc(A[key + '|' + d] || 0, L[key + '|' + d] || 0, key + '|' + d, label + ' · ' + _admDate(d));
+      }).join('') + total(aTot[key] || 0, lTot[key] || 0, key + '|*', label) + '</div>';
   };
 
-  var h = '<div class="amt"><div class="amt-h">Admissions — the last ten days</div>' +
-    '<div class="amt-s" title="Each cell is admissions over leads. An admission sits on the day it ' +
-      'was completed, a lead on the day it arrived.">' +
-      _admEsc(S.scope || 'all five branches') + ' · ' + _admEsc(M.lab.toLowerCase()) +
-      ' · <b style="color:var(--tx)">' + _admN(aAll) + '</b> admission' + (aAll === 1 ? '' : 's') +
-      ' from <b style="color:var(--tx)">' + _admN(lAll) + '</b> lead' + (lAll === 1 ? '' : 's') + '</div>' +
-    '<div class="amt-bar">' + btn + '</div>' +
-    '<div class="amt-wrap"><table class="au-tbl amt-10"><thead><tr>' +
-    '<th style="white-space:nowrap">Branch</th>' +
-    DAYS.map(function (d, i) {
-      var H = _admDayHead(d);
-      return '<th class="n" style="white-space:nowrap' +
-        (i === 0 ? ';color:#0D9488' : '') + (H.sun ? ';opacity:.6' : '') + '">' + H.d +
-        '<div class="dow">' + H.w + '</div></th>';
-    }).join('') +
-    '<th class="n" style="white-space:nowrap">Tot</th></tr></thead><tbody>';
+  var h = '<div class="amt bp"><div class="bp-hd"><div>' +
+      '<div class="amt-h">⚡ Branch performance — last ' + ADM_STRIP_DAYS + ' days</div>' +
+      '<div class="bp-sub">Admissions / Leads</div></div>' +
+    '<div class="amt-bar">' + ADM_DAY_METRICS.map(function (m) {
+      return '<button class="amt-b' + (m.k === M.k ? ' on' : '') + '" aria-pressed="' + (m.k === M.k) +
+        '" onclick="admSetDayMetric(\'' + m.k + '\')">' + m.lab + '</button>'; }).join('') +
+    '</div></div><div class="bp-scroll"><div class="bp-grid">' +
+    '<div class="bp-r bp-days"><span></span>' + DAYS.map(function (d) {
+      var H = _admDayHead(d), p = d.split('-');
+      return '<span class="bp-d' + (d === todayIso ? ' now' : '') + (H.sun ? ' sun' : '') + '">' +
+        (+p[2]) + ' ' + _admDate(d).slice(3, 6) + '<small>' + H.w + '</small></span>';
+    }).join('') + '<span></span></div>';
 
-  var line = function (key, label, depth, open, onBr) {
-    var lead = depth
-      ? '<td class="cns" style="white-space:nowrap">' + _admEsc(label) + '</td>'
-      : '<td style="white-space:nowrap"><button class="amt-brn" onclick="admDayToggle(' +
-          JSON.stringify(onBr).replace(/"/g, '&quot;') + ')" title="' +
-          (open ? 'Close' : 'Open this branch by counsellor') + '"><i class="ar">' +
-          (open ? '\u25be' : '\u25b8') + '</i>' + _admDot(onBr) + ' ' + _admEsc(label) + '</button></td>';
-    return '<tr' + (depth ? ' class="cnsr"' : '') + '>' + lead +
-      DAYS.map(function (d) { return cell(A[key + '|' + d] || 0, L[key + '|' + d] || 0, key + '|' + d); }).join('') +
-      cell(aTot[key] || 0, lTot[key] || 0, key + '|*', 1) + '</tr>';
-  };
   brs.forEach(function (b) {
     var open = !!_admDayOpen[b];
-    h += line(b, b, 0, open, b);
+    h += strip(b, b, 0, open, b);
     if (!open) return;
     Object.keys(who[b] || {}).sort(function (x, y) {
-      return (lTot[b + '\u241f' + y] || 0) - (lTot[b + '\u241f' + x] || 0) ||
+      return (lTot[b + '␟' + y] || 0) - (lTot[b + '␟' + x] || 0) ||
              String(x).localeCompare(String(y));
-    }).forEach(function (c) { h += line(b + '\u241f' + c, c, 1, false, b); });
+    }).forEach(function (c) { h += strip(b + '␟' + c, c, 1, false, b); });
   });
+  h += '</div></div>';
 
-  h += '</tbody>' + (brs.length < 2 ? '' :
-    '<tfoot><tr style="border-top:2px solid var(--bor)"><td style="font-weight:800">All</td>' +
-    DAYS.map(function (d) { return cell(aCol[d] || 0, lCol[d] || 0, '*|' + d); }).join('') +
-    cell(aAll, lAll, '*|*', 1) + '</tr></tfoot>') +
-    '</table></div></div>';
+  /* ── the foot: the week for the whole scope, and this year against last ── */
+  var season = R.season || '', day = -1, lastAy = _admLastSeason(season);
+  if (season) day = Math.round((new Date(todayIso) - new Date(_admYoyStart(season))) / 86400000);
+  var LD = (typeof LEAD_DATES !== 'undefined' && LEAD_DATES) ? LEAD_DATES : [];
+  var cmp = '';
+  if (lastAy && LD.length && day >= 0) {
+    var la = _admYoyStart(lastAy), lb = _admAddDays(la, day);
+    var chan = M.k === 'walk' ? function (r) { return r.Channel === 'Walk-In'; }
+             : M.k === 'dig'  ? function (r) { return r.Channel !== 'Walk-In'; }
+             : function () { return true; };
+    var lastA = 0, lastL = 0;
+    LD.forEach(function (r) {
+      if (!r || !r.Branch || (S.scope && r.Branch !== S.scope) || !chan(r)) return;
+      if (r.Date && r.Date >= la && r.Date <= lb) lastL++;
+      if (_admCrmIn(r, la, lb)) lastA++;
+    });
+    var pair = function (lab, now, was) {
+      var v = was ? Math.round(100 * (now - was) / was) : null;
+      return '<span class="bp-y"><i>' + lab + '</i><b>' + _admN(now) + '</b><u>vs ' + _admN(was) + '</u>' +
+        (v === null ? '' : '<em class="' + (v > 0 ? 'up' : v < 0 ? 'dn' : '') + '">' +
+          (v > 0 ? '▲ +' : v < 0 ? '▼ ' : '') + v + '%</em>') + '</span>';
+    };
+    cmp = '<div class="bp-f" title="' + _admEsc(season + ': 1 Sep to today. ' + lastAy + ': ' +
+        _admDate(la) + ' to ' + _admDate(lb) + ', the same day of its season.') + '">' +
+      '<small>This year vs last year · as on ' + _admDate(todayIso).slice(0, 6) + '</small>' +
+      '<div>' + pair('Admissions', seasonA, lastA) + pair('Leads', seasonL, lastL) + '</div></div>';
+  }
+  h += '<div class="bp-ft"><' + (aAll || lAll ? 'button onclick="admOpenDayCell(' + q('*|*') + ')"' : 'div') +
+      ' class="bp-f wk"><small>Last ' + ADM_STRIP_DAYS + ' days · ' +
+        _admEsc(S.scope || 'all branches') + (M.k === 'all' ? '' : ' · ' + _admEsc(M.lab.toLowerCase())) + '</small>' +
+      '<div><span class="bp-y"><b>' + _admN(aAll) + '</b><i>Admissions</i></span>' +
+      '<span class="bp-y"><b>' + _admN(lAll) + '</b><i>Leads</i></span></div></' +
+      (aAll || lAll ? 'button' : 'div') + '>' + cmp + '</div></div>';
 
   el.innerHTML = h;
 }
@@ -27534,85 +27660,11 @@ function _admYoY() {
   var start = _admYoyStart(season), today = _admIso(new Date());
   var day = Math.round((new Date(today) - new Date(start)) / 86400000);
   if (day < 0) { el.innerHTML = '<div class="au-empty">The season has not opened yet.</div>'; return; }
-
-  var LD = (typeof LEAD_DATES !== 'undefined' && LEAD_DATES) ? LEAD_DATES : [];
-  var scope = S.scope;
-  var CRM_HIST = 'Touched Leads', TRK = '27-28 tabs';
-  var crmWon = function (a, b) {
-    return LD.filter(function (r) {
-      return (!scope || r.Branch === scope) && _admCrmIn(r, a, b);
-    }).length;
-  };
-  var trkWon = function () { return S.rows.filter(_admIsWon).length; };
-
-  var lastAy = _admLastSeason(season);
-  var rows = [];
-  rows.push({ ay: season, src: TRK, a: start, b: today, n: trkWon(), full: null, now: 1 });
-  if (lastAy && LD.length) {
-    var la = _admYoyStart(lastAy);
-    rows.push({ ay: lastAy, src: CRM_HIST, a: la, b: _admAddDays(la, day),
-                n: crmWon(la, _admAddDays(la, day)),
-                /* every lead in the export at stage 08 — a total, not a window */
-                full: crmWon('', '') });
-  }
-  (R.histAys || []).filter(function (ay) { return ay < season && ay !== lastAy; }).slice(-3).reverse()
-    .forEach(function (ay) {
-      var a = _admYoyStart(ay), b = _admAddDays(a, day);
-      rows.push({ ay: ay, src: ADM_HIST_TAB, a: a, b: b,
-        n: S.hist.filter(function (r) { return r.ay === ay && r.d && r.d >= a && r.d <= b; }).length,
-        full: S.hist.filter(function (r) { return r.ay === ay; }).length, hist: 1 });
-    });
-  if (rows.length < 2) {
-    el.innerHTML = '<div class="au-empty">No earlier season carries dated records to compare with.</div>';
-    return;
-  }
-
-  var now = rows[0].n;
-  var h = '<div style="overflow-x:auto"><table class="au-tbl au-yoy" style="min-width:1010px"><thead><tr>' +
-    '<th>Academic year</th><th>Read from</th><th>Same window</th>' +
-    '<th class="n">Admissions by this day</th><th class="n">This season vs it</th>' +
-    '<th class="n">That year\'s full intake</th><th class="n">Share won by this day</th>' +
-    '</tr></thead><tbody>';
-  rows.forEach(function (r) {
-    var chg = (r.now || !r.n) ? null : Math.round(100 * (now - r.n) / r.n);
-    var name = r.hist
-      ? '<button class="na-secbtn" onclick="admOpenYoY(' + JSON.stringify(r.ay).replace(/"/g, '&quot;') +
-        ',' + day + ')">' + _admEsc(r.ay) + ' ›</button>'
-      : '<b>' + _admEsc(r.ay) + '</b>';
-    h += '<tr' + (r.now ? ' style="background:var(--pl)"' : '') + '><td>' + name +
-        (r.now ? ' <span class="na-pill" style="background:var(--sur);color:var(--p)">this season</span>' : '') + '</td>' +
-      '<td style="color:var(--txm)">' + _admEsc(r.src) + '</td>' +
-      '<td style="color:var(--txm)">' + _admDate(r.a) + ' to ' + _admDate(r.b) + '</td>' +
-      (function () {
-        var can = r.n && _admYoYHas(r.ay, scope || '', r.a, r.b);
-        return '<td class="n" style="font-weight:800' +
-          (r.now ? ';font-size:1.1em;color:var(--ok)' : '') +
-          (can ? ';cursor:pointer' : '') + '"' +
-          (can ? ' title="Click to view these admissions" onclick="admOpenYear(' +
-            JSON.stringify(r.ay).replace(/"/g, '&quot;') + ',' +
-            JSON.stringify(scope || '').replace(/"/g, '&quot;') + ',' +
-            JSON.stringify(r.a).replace(/"/g, '&quot;') + ',' +
-            JSON.stringify(r.b).replace(/"/g, '&quot;') + ')"' : '') +
-          '>' + _admN(r.n) + '</td>';
-      })() +
-      '<td class="n" style="font-weight:800;color:' + (chg === null ? 'var(--txm)'
-        : chg >= 0 ? 'var(--ok)' : 'var(--bad)') + '">' +
-        (chg === null ? '–' : (chg >= 0 ? '+' : '') + _admN(chg) + '%') + '</td>' +
-      '<td class="n" style="color:var(--txm)">' + (r.full == null ? 'in progress' : _admN(r.full)) + '</td>' +
-      '<td class="n" style="color:var(--txm)">' +
-        (r.full ? (100 * r.n / r.full).toFixed(1) + '%' : '–') + '</td></tr>';
-  });
-  var past = rows.slice(1);
-  var avg = past.length ? past.reduce(function (t, r) { return t + r.n; }, 0) / past.length : null;
-  h += '</tbody>' + (past.length < 2 ? '' :
-    '<tfoot><tr style="font-weight:800;border-top:2px solid var(--bor)">' +
-    '<td>Average of the earlier years</td><td></td><td style="color:var(--txm)">day ' + day + '</td>' +
-    '<td class="n">' + avg.toFixed(0) + '</td>' +
-    '<td class="n" style="color:' + (now >= avg ? 'var(--ok)' : 'var(--bad)') + '">' +
-      (avg ? (now >= avg ? '+' : '') + Math.round(100 * (now - avg) / avg) + '%' : '–') + '</td>' +
-    '<td class="n"></td><td class="n"></td></tr></tfoot>') + '</table></div>' +
-    _admYoYBranches(S, R, season, lastAy, scope, day);
-  el.innerHTML = h;
+  /* 18 November 2026 — the year-by-year table that headed this panel was taken
+     out at the analyst's request. Its figures are the "All branches" line of
+     the branch table, one year to a row; that table is the whole panel now. */
+  el.innerHTML = _admYoYBranches(S, R, season, _admLastSeason(season), S.scope, day) ||
+    '<div class="au-empty">No earlier season carries dated records to compare with.</div>';
 }
 
 /* ── EVERY BRANCH, THE SAME PERIOD EACH YEAR ──
@@ -27801,7 +27853,7 @@ function _admYoYBranches(S, R, season, lastAy, scope, day) {
       JSON.stringify(w[1]).replace(/"/g, '&quot;') + ')">' + _admN(v) + '</td>';
   };
 
-  var h = '<div style="margin:22px 0 10px;font-size:17px;font-weight:800;color:var(--tx)">' +
+  var h = '<div style="margin:0 0 12px;font-size:17px;font-weight:800;color:var(--tx)">' +
       'Every branch, the same period each year · admissions by day ' + day + '</div>' +
     '<div style="overflow-x:auto"><table class="au-tbl au-yoy" style="min-width:' +
       (210 + cols.length * 175) + 'px"><thead><tr><th rowspan="2" style="vertical-align:bottom">Branch</th>' +
