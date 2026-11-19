@@ -1317,6 +1317,19 @@ table.vckt tr.vck-c td.nm{font-weight:600;color:var(--tx)}
 #pane-adm27 .bp-y em.up{color:var(--ok)}
 #pane-adm27 .bp-y em.dn{color:var(--bad)}
 
+/* ══ A TAB THAT COULD NOT LOAD (19 Nov 2026) ══
+   One plain line, a way to try again, and the technical text folded away.
+   Deliberately not red: it is shown to people who cannot act on it. */
+.ffail{display:flex;flex-direction:column;align-items:center;gap:9px;padding:28px 16px;text-align:center}
+.ffail-t{font-size:15.5px;font-weight:800;color:var(--tx)}
+.ffail-m{font-size:13.5px;line-height:1.5;color:var(--txm);max-width:440px}
+.ffail-b{border:1px solid var(--bor);background:var(--sur);color:var(--p);font:inherit;font-size:13px;
+  font-weight:700;padding:7px 20px;border-radius:99px;cursor:pointer}
+.ffail-b:hover{border-color:var(--p)}
+.ffail-d{font-size:12px;color:var(--txm);max-width:580px}
+.ffail-d summary{cursor:pointer;font-weight:600;list-style-position:inside}
+.ffail-d div{margin-top:7px;line-height:1.55;text-align:left;word-break:break-word;white-space:pre-wrap}
+
 /* ══ ADMISSION STATUS — this month, target against achieved ══
    Added 7 Nov 2026, to the layout the group circulates for its other schools
    so the five branches can be read beside them without anybody translating
@@ -1516,7 +1529,7 @@ window._LIVE = window._LIVE || {};
 /* true when the sheet has not been asked for this section in the last minute */
 function _liveDue(id){ var o=window._LIVE[id]; return !o || !o.netAt || (Date.now()-o.netAt) > 60000; }
 /* record a copy that came back; returns true when it differs from the one shown */
-function _liveMark(id, gen, reread, busy){
+function _liveMark(id, gen, reread, busy, staleMs){
   var o=window._LIVE[id]||(window._LIVE[id]={});
   var changed = o.gen !== gen;
   o.netAt=Date.now(); o.gen=gen;
@@ -1533,7 +1546,10 @@ function _liveMark(id, gen, reread, busy){
      re-read every ten minutes per section, which is the server's own rebuild
      cycle, so it can never become a loop and can always fire again. */
   var RE_GAP = 10*60000;
-  if(reread && !isNaN(t) && (Date.now()-t) > 15*60000 &&
+  /* staleMs: a section whose server copy is handed out at any age (see
+     SECTION_SERVE_STALE in Code.gs) asks for its rebuild from here, so its
+     threshold is the ten-minute cycle itself rather than the 15-minute net */
+  if(reread && !isNaN(t) && (Date.now()-t) > (staleMs || 15*60000) &&
      (!o.reread || (Date.now()-o.reread) > RE_GAP)){
     o.reread=Date.now();
     (function wait(){ if(busy && busy()) return setTimeout(wait,400); try{ reread(); }catch(e){} })();
@@ -1547,6 +1563,127 @@ function _liveLabel(gen){
   return 'Live \u00b7 updated '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
 }
 window._liveDue=_liveDue; window._liveMark=_liveMark; window._liveLabel=_liveLabel;
+
+/* These sit in the first script of the page, not beside the loaders further
+   down: a tab can be asked for its data before the later scripts have been
+   read, and a failure handler that is not defined yet is a second failure. */
+/* ══ ONE WAY FOR A TAB TO FAIL (19 November 2026) ══════════════════════════
+   A tab that could not reach its feed used to say so in a red paragraph —
+   which Apps Script function to run, which deployment to edit — and two tabs
+   (Admissions 2027-28 and Digital Marketing) printed it across the top even
+   while they were showing perfectly good figures, because a background
+   refresh had run long. To the people who read this dashboard that is an
+   alarm about nothing, and none of it is theirs to act on.
+
+   So, for every separately-loaded tab:
+
+     · A SLOW ANSWER IS RETRIED, QUIETLY. The first request's rebuild carries
+       on at the server after the browser stops waiting and stores its result,
+       so a second, ordinary read a few seconds later is normally served that
+       result. Three attempts, and only the first may ask for a rebuild — a
+       retry that asked again would start a second one beside the first.
+
+     · FIGURES ON SCREEN ARE NEVER PUT UNDER A RED LINE. If a refresh fails
+       while a tab is showing data, the tab keeps it and says, in its ordinary
+       status colour, when it was read. The live cycle asks again by itself.
+
+     · A TAB WITH NOTHING TO SHOW says so in one plain line with a Try again
+       button. The technical text is not thrown away — it is folded under
+       "Details for the administrator" and written to the console, because
+       that is who it was always for. */
+var FEED_TRIES = 3;
+var FEED_FIX = { syl:'refreshSylCache', audit:'refreshAuditCache', naa:'refreshNaaCache', bio:'refreshBioCache',
+  adm27:'refreshAdm27Cache', dm:'refreshDmCache', vchk:'refreshVchkCache', kptm:'refreshKptmCache',
+  term1:'refreshTerm1Cache', pt1:'refreshPT1Cache', ptm:'refreshPTMCache', civil:'refreshCivilCache' };
+function _feedErr(short, detail){
+  var e = new Error(short); e.feedShort = short; e.feedDetail = detail || ''; e.feedDown = true; return e;
+}
+/* the one line a reader is shown */
+function _feedShort(err){
+  if (err && err.feedShort) return err.feedShort;
+  var m = String(err && err.message || err || '').replace(/\s+/g, ' ').trim();
+  var http = m.match(/^HTTP (\d+) from \/api\/data/);
+  if (http) return 'The data service answered with an error (HTTP ' + http[1] + ').';
+  /* Everything else — an exception relayed from Apps Script, a tab that was
+     not found, a deployment that is behind — is for whoever maintains the
+     script, and is one click away under the details. The reader gets the one
+     thing that is true for them. */
+  return 'The data for this tab could not be read.';
+}
+/* everything that was known, for whoever maintains the script */
+function _feedDetail(err){
+  return String((err && err.feedDetail) || (err && err.message) || err || '');
+}
+/* "09:10" today, "18 Nov, 17:20" otherwise */
+function _feedAsOf(gen){
+  var t = Date.parse(String(gen || '')); if (isNaN(t)) return 'earlier';
+  var d = new Date(t), n = new Date(), p = function (x) { return String(x).padStart(2, '0'); };
+  var hm = p(d.getHours()) + ':' + p(d.getMinutes());
+  if (d.toDateString() === n.toDateString()) return 'at ' + hm;
+  return 'on ' + d.getDate() + ' ' + ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()] + ', ' + hm;
+}
+/* a tab that has data and could not refresh it: calm, and true */
+function _feedKept(gen){ return 'Showing the figures read ' + _feedAsOf(gen) + ' \u00b7 updating by itself'; }
+function _feedFailBox(title, err, retry){
+  var esc = function (x) { return String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+  var short = _feedShort(err), detail = _feedDetail(err);
+  try { console.warn('[PBES] ' + title + ' \u2014 ' + detail); } catch (e) {}
+  var more = (err && err.feedDetailHtml) ? err.feedDetailHtml : (detail && detail !== short ? esc(detail) : '');
+  return '<div class="ffail"><div class="ffail-t">' + esc(title) + '</div>' +
+    '<div class="ffail-m">' + esc(short) + '</div>' +
+    (retry ? '<button type="button" class="ffail-b" onclick="_feedRetry(this,\'' + retry + '\')">Try again</button>' : '') +
+    (more ? '<details class="ffail-d"><summary>Details for the administrator</summary><div>' + more + '</div></details>' : '') +
+    '</div>';
+}
+/* a tab that received its data and could not draw it. No Try again: asking
+   for the same data again draws the same thing, and the live cycle redraws by
+   itself once the sheet is corrected. */
+function _feedBuildBox(title, e){
+  return _feedFailBox(title, { feedShort:'This view could not be drawn from the data it received.',
+    feedDetail:String(e && e.message || e || ''), message:String(e && e.message || e || '') }, '');
+}
+function _feedRetry(btn, fn){
+  var box = btn && btn.closest ? btn.closest('.ffail') : null;
+  if (box) box.innerHTML = '<div class="ffail-m">Reading the sheet\u2026</div>';
+  try { if (typeof window[fn] === 'function') window[fn](false); } catch (e) {}
+}
+
+/* one request, with an explicit limit: "Failed to fetch" with no further
+   detail is what the browser reports when a request is cut off, and it tells
+   nobody which end was slow */
+async function _lazyFetchOnce(section, force, session, ms, extra){
+  var ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+  var timer = setTimeout(function(){ if(ctl) ctl.abort(); }, ms || 55000);
+  try{
+    return await fetch(DATA_API+'?section='+section+(force?'&nocache=1':'')+(extra||'')+'&_t='+Date.now(),
+      { headers:{ 'Authorization':'Bearer '+session.access_token }, signal: ctl?ctl.signal:undefined });
+  }catch(err){
+    if(err && (err.name==='AbortError')) throw _feedErr('The data service did not answer in time.',
+      'The '+section+' feed did not answer within '+Math.round((ms||55000)/1000)+' seconds. The usual cause '+
+      'is a rebuild still running in Apps Script; it stores its result when it ends, so the tab normally '+
+      'fills in by itself within a few minutes. If it does not, run '+(FEED_FIX[section]||'the section\'s refresh function')+
+      '() in the Apps Script editor and look under Executions for the error.');
+    throw _feedErr('Could not reach the data service.',
+      'The request for the '+section+' feed failed before any answer arrived: '+String(err && err.message || err)+
+      '. Check the internet connection on this device.');
+  }finally{ clearTimeout(timer); }
+}
+async function _lazyFetch(section, force, session, ms, extra, tries){
+  var n = tries || FEED_TRIES, res = null;
+  for (var a = 0; a < n; a++) {
+    try {
+      res = await _lazyFetchOnce(section, force && a === 0, session, ms, extra);
+      /* the proxy's "the script is slow" answers are the same situation as a
+         timeout; anything else is the caller's to read */
+      if (!(res && (res.status >= 500 || res.status === 429)) || a >= n - 1) return res;
+    } catch (err) {
+      if (a >= n - 1) throw err;
+    }
+    await new Promise(function (r) { setTimeout(r, a ? 6000 : 2500); });
+  }
+  return res;
+}
+
 
 /* every separately-loaded section: the tab that needs it, and how to fetch it */
 var LIVE_SECTIONS = [
@@ -1612,6 +1749,35 @@ function _banner(msg, bg, color, autohide) {
   if (autohide) setTimeout(() => { if (b) b.style.display = 'none'; }, autohide);
 }
 function showLoadError(msg)  { _banner('⚠️ ' + msg, '#FEF2F2', '#DC2626', 0); }
+/* ══ THE MAIN FEED FAILING, WITHOUT THE RED BANNER (19 November 2026) ══
+   The dashboard asks for its main data every two minutes. One of those
+   requests failing — a dropped connection, a slow rebuild — used to put a red
+   banner across every tab and leave it there, over figures that were minutes
+   old and entirely usable. Now:
+     · with figures on screen, the first two failures in a row are silent and
+       retried; from the third, one amber line says the update is paused and
+       when the figures were read. It clears on the next good answer.
+     · with nothing on screen, one amber line says what happened and that it
+       is trying again.
+   The detail is the line's tooltip and goes to the console. */
+var _mainFails = 0;
+function _mainFail(short, detail, retry, always) {
+  _mainFails++;
+  try { console.warn('[PBES] main feed \u2014 ' + short + (detail ? ' ' + detail : '')); } catch (e) {}
+  var esc = function (x) { return String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); };
+  var wrap = function (t) { return '<span' + (detail ? ' title="' + esc(detail) + '"' : '') + '>' + esc(t) + '</span>'; };
+  if (_liveDataLoaded) {
+    if (always) _banner(wrap('\u26a0\ufe0f ' + short + ' The figures on screen are from the last good copy.'), '#FFFBEB', '#B45309', 0);
+    else if (_mainFails >= 3) _banner(wrap('\u23f8\ufe0f Live update paused \u2014 showing the figures read ' +
+      _feedAsOf(window._mainGenAt) + '. It will resume by itself.'), '#FFFBEB', '#B45309', 0);
+  } else {
+    _banner(wrap('\u26a0\ufe0f ' + short + (retry ? ' Trying again\u2026' : '')), '#FFFBEB', '#B45309', 0);
+  }
+  /* three quick retries, then the two-minute cycle carries it; with nothing
+     on screen it keeps trying, because there is nothing else to show */
+  if (retry && (_mainFails <= 3 || !_liveDataLoaded))
+    setTimeout(function () { loadLiveData(true); }, [5000, 15000, 30000][Math.min(_mainFails, 3) - 1]);
+}
 function showLoading()       { _banner('⏳ Loading live data from Google Sheet…', '#EFF6FF', '#1E4FD8', 0); }
 /* Syllabus & Notebook reads its own large ledger instead of riding in the main
    payload, so it used to start downloading only when the tab was clicked — and
@@ -1736,7 +1902,7 @@ async function paintFromCache(){
     if(_payloadEmpty(c.data)) return false;
     const rr=await idbGet('pbes_role'); if(rr){ window._ROLE=rr.role||''; window._USER_BRANCH=rr.branch||null; }
     applyLiveData(c.data);
-    _liveDataLoaded=true;
+    _liveDataLoaded=true; window._mainGenAt=c.data.generatedAt||'';
     if(typeof renderAll==='function') renderAll();
     try{ applyRoleAccess(); }catch(e){}
     _banner('⚡ Opened instantly from saved data · refreshing in background…','#EFF6FF','#1E4FD8',4000);
@@ -1769,9 +1935,17 @@ async function loadLiveData(isRefresh) {
       window._USER_BRANCH=md.branch||null;
     }catch(e){ window._ROLE=''; window._USER_BRANCH=null; }
 
-    const res = await fetch(DATA_API + '?_t=' + Date.now(), {
-      headers: { 'Authorization': 'Bearer ' + session.access_token }
-    });
+    /* a request that never answered used to leave "Loading…" up for good, and
+       the two-minute timer stacked another request behind it each time */
+    const _ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    const _tm = setTimeout(() => { if (_ctl) _ctl.abort(); }, window.MAIN_FEED_MS || 90000);
+    let res;
+    try {
+      res = await fetch(DATA_API + '?_t=' + Date.now(), {
+        headers: { 'Authorization': 'Bearer ' + session.access_token },
+        signal: _ctl ? _ctl.signal : undefined
+      });
+    } finally { clearTimeout(_tm); }
     if (res.status === 401) {            // token rejected → force re-login
       await sb.auth.signOut();
       window.location.href = 'login.html';
@@ -1779,21 +1953,20 @@ async function loadLiveData(isRefresh) {
     }
     const txt = await res.text();
     if (!res.ok) {
-      showLoadError('Data service returned HTTP ' + res.status + ' — retrying in 5 seconds…');
-      setTimeout(() => loadLiveData(true), 5000);
+      _mainFail('The data service answered with an error (HTTP ' + res.status + ').', '', true);
       return;
     }
     let data;
     try { data = JSON.parse(txt); }
     catch (e) {
-      showLoadError('Data server returned an invalid response (HTTP ' + res.status + ') — retrying in 5 seconds…');
-      setTimeout(() => loadLiveData(true), 5000);
+      _mainFail('The data service sent a reply that could not be read.',
+        'HTTP ' + res.status + '; the reply begins: ' + String(txt || '').slice(0, 160), true);
       return;
     }
 
     if (data.error) {
-      showLoadError('Server error: ' + data.message +
-        ' — open Apps Script, run testReadCounts() and check the Execution log.');
+      _mainFail('The data service reported an error.', String(data.message || '') +
+        ' \u2014 open Apps Script, run testReadCounts() and check the Execution log.', false);
       return;
     }
 
@@ -1801,16 +1974,14 @@ async function loadLiveData(isRefresh) {
        cache, and reported with whatever the server said about it. Anything
        already painted from a good snapshot stays. */
     if (_payloadEmpty(data)) {
-      showLoadError('The sheet returned no data at all. ' + _emptyWhy(data) +
-        (_liveDataLoaded ? ' The figures on screen are from the last good copy.'
-                         : ' Nothing is being shown rather than showing zeros.') +
-        ' Open Apps Script \u2192 Executions to see the run.');
+      _mainFail('The sheet returned no data.', _emptyWhy(data) +
+        ' Open Apps Script \u2192 Executions to see the run.', false, true);
       return;
     }
 
     // Apply + cache, then render
     applyLiveData(data);
-    _liveDataLoaded = true;
+    _liveDataLoaded = true; _mainFails = 0; window._mainGenAt = data.generatedAt || '';
     showLoadOk(data.generatedAt, data.computeMs);
     /* a builder that threw is named on screen rather than left in the payload */
     if (data._errors && data._errors.length) setTimeout(function(){
@@ -1827,10 +1998,12 @@ async function loadLiveData(isRefresh) {
     applyRoleAccess();
 
   } catch (err) {
-    showLoadError(
-      'Cannot reach the live data source: ' + err.message +
-      ' — check your internet connection and that the Apps Script is deployed with access set to "Anyone".'
-    );
+    if (err && err.name === 'AbortError')
+      _mainFail('The data service did not answer in time.', 'No answer to the main request within ' +
+        Math.round((window.MAIN_FEED_MS || 90000) / 1000) + ' seconds. In Apps Script, check that the ' +
+        'refreshCache trigger is running (Triggers) and look under Executions.', true);
+    else _mainFail('Could not reach the data service.', String(err && err.message || err) +
+      ' \u2014 check the internet connection, and that the Apps Script is deployed with access set to "Anyone".', true);
   }
 }
 
@@ -18076,8 +18249,7 @@ async function loadPT1Review(force){
 
     // force=true (↻ Refresh) adds nocache=1 so the edge cache AND the Apps Script
     // cache are both rebuilt — otherwise Refresh looks like it does nothing.
-    var res=await fetch(DATA_API+'?section=pt1'+(force?'&nocache=1':'')+'&_t='+Date.now(),
-                        { headers:{ 'Authorization':'Bearer '+session.access_token } });
+    var res=await _lazyFetch('pt1', force, session, 55000);
     if(res.status===401){ await sb.auth.signOut(); window.location.href='login.html'; return; }
     if(!res.ok) throw new Error('HTTP '+res.status+' from /api/data. A 404 means the Apps Script '+
       'deployment URL is stale \u2014 in Apps Script use Deploy \u2192 Manage deployments \u2192 edit the '+
@@ -18133,10 +18305,9 @@ async function loadPT1Review(force){
     if(!_pt1Loaded){
       _pt1HideLoader(false);
       var l=document.getElementById('exm-loader');
-      if(l) l.innerHTML='<div style="color:var(--r);font-weight:700">Could not load the academic review</div>'+
-        '<div style="font-size:11px;color:var(--txm);max-width:460px">'+String(err&&err.message||err)+'</div>';
+      if(l) l.innerHTML=_feedFailBox('Could not load the academic review', err, 'loadPT1Review');
+      _pt1SetStatus(_feedShort(err), true);
     }
-    if(!_pt1Loaded) _pt1SetStatus(String(err && err.message || err), true);
   }finally{ _pt1Loading=false; }
 }
 
@@ -20425,8 +20596,7 @@ function _auPaint(){
   }catch(err){
     _auShow(false);
     var l=document.getElementById('au-loader');
-    if(l) l.innerHTML='<div style="color:var(--r);font-weight:700">Could not build the audit view</div>'+
-      '<div style="font-size:11.5px;color:var(--txm);max-width:660px;white-space:pre-wrap;text-align:left;line-height:1.55;margin-top:10px">'+String(err&&err.message||err)+'</div>';
+    if(l) l.innerHTML=_feedBuildBox('Could not build the audit view', err);
   }
 }
 
@@ -20569,9 +20739,8 @@ async function loadNaa(force) {
     if (!_naLoaded) {
       _naShow(false);
       var l = document.getElementById('na-loader');
-      if (l) l.innerHTML = '<div style="color:var(--r);font-weight:700">Could not load the non-academic audit</div>' +
-        '<div style="font-size:11px;color:var(--txm);max-width:460px">' + String(err && err.message || err) + '</div>';
-      _naStatus(String(err && err.message || err), true);
+      if (l) l.innerHTML = _feedFailBox('Could not load the non-academic audit', err, 'loadNaa');
+      _naStatus(_feedShort(err), true);
     }
   } finally {
     _naLoading = false;
@@ -21503,10 +21672,9 @@ async function loadAudit(force){
     if(!_auLoaded){
       _auShow(false);
       var l=document.getElementById('au-loader');
-      if(l) l.innerHTML='<div style="color:var(--r);font-weight:700">Could not load the audit</div>'+
-        '<div style="font-size:11px;color:var(--txm);max-width:460px">'+String(err&&err.message||err)+'</div>';
+      if(l) l.innerHTML=_feedFailBox('Could not load the audit', err, 'loadAudit');
+      _auStatus(_feedShort(err), true);
     }
-    if(!_auLoaded) _auStatus(String(err && err.message || err), true);
   }finally{
     _auLoading=false;
     if(_auQueued){ _auQueued=false; setTimeout(function(){ loadAudit(true); }, 50); }
@@ -22713,10 +22881,8 @@ async function loadBio(force) {
     if (!_bioLoaded) {
       _bioShow(false);
       var l = document.getElementById('bio-loader');
-      if (l) l.innerHTML = '<div style="color:var(--r);font-weight:700">Could not load the biometric report</div>' +
-        '<div style="font-size:11px;color:var(--txm);max-width:470px">' +
-        _bioEsc(String(err && err.message || err)) + '</div>';
-      _bioStatus(String(err && err.message || err), true);
+      if (l) l.innerHTML = _feedFailBox('Could not load the biometric report', err, 'loadBio');
+      _bioStatus(_feedShort(err), true);
     }
   } finally {
     _bioLoading = false;
@@ -25862,20 +26028,25 @@ async function loadAdm27(force) {
     if (raw.problem) throw new Error(raw.problem);
 
     var changed = _liveMark('adm27', raw.generatedAt,
-      function () { loadAdm27(true); }, function () { return _admLoading; }) || !_admLoaded;
+      function () { loadAdm27(true); }, function () { return _admLoading; }, 10 * 60000) || !_admLoaded;
     _admRaw = raw; _admLoaded = true;
     try { idbSet('pbes_adm27', { t: Date.now(), data: raw }); } catch (e) {}
     if (changed || !document.getElementById('adm-body').style.display) _admPaint();
     else _admPaint();
-    _admStatus(_liveLabel(raw.generatedAt));
+    /* an older copy is on screen for the minute its rebuild takes: say so */
+    var _ageMs = Date.now() - Date.parse(String(raw.generatedAt || ''));
+    _admStatus(_ageMs > 10 * 60000 ? 'Read ' + _feedAsOf(raw.generatedAt) + ' \u00b7 updating\u2026'
+                                   : _liveLabel(raw.generatedAt));
   } catch (err) {
-    var msg = String(err && err.message || err);
-    _admStatus(msg, true);
-    if (!_admLoaded) {
+    if (_admLoaded) {
+      /* figures are on screen: keep them, and say when they were read in the
+         ordinary colour — the live cycle asks again by itself (19 Nov 2026) */
+      try { console.warn('[PBES] admissions feed \u2014 ' + _feedDetail(err)); } catch (e) {}
+      _admStatus(_feedKept(_admRaw && _admRaw.generatedAt));
+    } else {
+      _admStatus(_feedShort(err), true);
       var l = document.getElementById('adm-loader');
-      if (l) l.innerHTML = '<div style="color:var(--r);font-weight:700">Could not load Admissions 2027-28</div>' +
-        '<div style="font-size:13.5px;color:var(--txm);max-width:520px;line-height:1.6">' +
-        msg.replace(/</g, '&lt;') + '</div>';
+      if (l) l.innerHTML = _feedFailBox('Could not load Admissions 2027-28', err, 'loadAdm27');
     }
   } finally {
     _admLoading = false;
@@ -29392,8 +29563,7 @@ function _ptmPaint(){
   catch(err){
     _ptmShow(false);
     var l=document.getElementById('pt-loader');
-    if(l) l.innerHTML='<div style="color:var(--r);font-weight:700">Could not build the feedback view</div>'+
-      '<div style="font-size:11px;color:var(--txm);max-width:460px">'+String(err&&err.message||err)+'</div>';
+    if(l) l.innerHTML=_feedBuildBox('Could not build the feedback view', err);
   }
 }
 
@@ -29414,8 +29584,7 @@ async function loadPTM(force){
     try{ var s=await sb.auth.getSession(); session=s && s.data && s.data.session; }catch(e){}
     if(!session){ window.location.href='login.html'; return; }
 
-    var res=await fetch(DATA_API+'?section=ptm'+(force?'&nocache=1':'')+'&_t='+Date.now(),
-                        { headers:{ 'Authorization':'Bearer '+session.access_token } });
+    var res=await _lazyFetch('ptm', force, session, 55000);
     if(res.status===401){ await sb.auth.signOut(); window.location.href='login.html'; return; }
     if(!res.ok) throw new Error('HTTP '+res.status+' from /api/data. A 404 means the Apps Script '+
       'deployment URL is stale \u2014 in Apps Script use Deploy \u2192 Manage deployments \u2192 edit the '+
@@ -29437,10 +29606,9 @@ async function loadPTM(force){
     if(!_ptmLoaded){
       _ptmShow(false);
       var l=document.getElementById('pt-loader');
-      if(l) l.innerHTML='<div style="color:var(--r);font-weight:700">Could not load parent feedback</div>'+
-        '<div style="font-size:11px;color:var(--txm);max-width:460px">'+String(err&&err.message||err)+'</div>';
+      if(l) l.innerHTML=_feedFailBox('Could not load parent feedback', err, 'loadPTM');
+      _ptmStatus(_feedShort(err), true);
     }
-    if(!_ptmLoaded) _ptmStatus(String(err && err.message || err), true);
   }finally{ _ptmLoading=false; }
 }
 
@@ -31033,8 +31201,7 @@ function _cvPaint(){
   catch(err){
     _cvShow(false);
     var l=document.getElementById('cv-loader');
-    if(l) l.innerHTML='<div style="color:var(--r);font-weight:700">Could not build the civil work view</div>'+
-      '<div style="font-size:11px;color:var(--txm);max-width:460px">'+String(err&&err.message||err)+'</div>';
+    if(l) l.innerHTML=_feedBuildBox('Could not build the civil work view', err);
   }
 }
 
@@ -31057,8 +31224,7 @@ async function loadCivil(force){
     try{ var s=await sb.auth.getSession(); session=s && s.data && s.data.session; }catch(e){}
     if(!session){ window.location.href='login.html'; return; }
 
-    var res=await fetch(DATA_API+'?section=civil'+(force?'&nocache=1':'')+'&_t='+Date.now(),
-                        { headers:{ 'Authorization':'Bearer '+session.access_token } });
+    var res=await _lazyFetch('civil', force, session, 55000);
     if(res.status===401){ await sb.auth.signOut(); window.location.href='login.html'; return; }
     if(!res.ok) throw new Error('HTTP '+res.status+' from /api/data. A 404 means the Apps Script '+
       'deployment URL is stale \u2014 in Apps Script use Deploy \u2192 Manage deployments \u2192 edit the '+
@@ -31082,10 +31248,9 @@ async function loadCivil(force){
     if(!_cvLoaded){
       _cvShow(false);
       var l=document.getElementById('cv-loader');
-      if(l) l.innerHTML='<div style="color:var(--r);font-weight:700">Could not load civil work</div>'+
-        '<div style="font-size:11px;color:var(--txm);max-width:460px">'+String(err&&err.message||err)+'</div>';
+      if(l) l.innerHTML=_feedFailBox('Could not load civil work', err, 'loadCivil');
+      _cvStatus(_feedShort(err), true);
     }
-    if(!_cvLoaded) _cvStatus(String(err && err.message || err), true);
   }finally{ _cvLoading=false; }
 }
 
@@ -31482,8 +31647,7 @@ async function loadCivil(force){
     try{ build(); }
     catch(err){
       var el=document.getElementById('ccr-table');
-      if(el) el.innerHTML='<div class="no-data" style="color:var(--r)">The compliance report could not be built: '
-        +String(err&&err.message||err)+'</div>';
+      if(el) el.innerHTML=_feedBuildBox('Could not build the compliance report', err);
     }
   }
   window.__renderComplianceReport=safeBuild;
@@ -32155,8 +32319,12 @@ function _sylShow(ok){
 function _sylFail(msg){
   _sylShow(false);
   var l=document.getElementById('syl-loader');
-  if(l) l.innerHTML='<div style="color:var(--r);font-weight:700">Could not build the monitoring view</div>'+
-    '<div style="font-size:11px;color:var(--txm);max-width:520px;line-height:1.5">'+msg+'</div>';
+  /* a feed failure arrives as an error; what the sheet itself got wrong
+     arrives as prepared text, which is kept whole under the details */
+  var e=(msg && typeof msg==='object') ? msg
+       : { feedShort:'The monitoring ledger could not be read.', feedDetailHtml:String(msg||''),
+           message:String(msg||'').replace(/<[^>]*>/g,' ') };
+  if(l) l.innerHTML=_feedFailBox('Could not build the monitoring view', e, 'loadSyl');
 }
 function _sylSig(raw){
   if(!raw) return '';
@@ -32299,28 +32467,6 @@ window.addEventListener('message',function(ev){
   /* height messages are ignored on purpose — see the note on the iframe */
 });
 
-
-/* A lazy section fetch that gives up cleanly instead of hanging. "Failed to
-   fetch" with no further detail is what the browser reports when the request is
-   cut off, and it tells the reader nothing about which end was slow — so the
-   timeout is explicit here and the message says what to do about it. */
-async function _lazyFetch(section, force, session, ms, extra){
-  var ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-  var timer = setTimeout(function(){ if(ctl) ctl.abort(); }, ms || 55000);
-  try{
-    var res = await fetch(DATA_API+'?section='+section+(force?'&nocache=1':'')+(extra||'')+'&_t='+Date.now(),
-      { headers:{ 'Authorization':'Bearer '+session.access_token }, signal: ctl?ctl.signal:undefined });
-    return res;
-  }catch(err){
-    if(err && (err.name==='AbortError')) throw new Error(
-      'The '+section+' feed did not answer within '+Math.round((ms||55000)/1000)+' seconds. '+
-      'This is almost always the first load after a Code.gs deploy, when the cache is cold and Apps '+
-      'Script has to read the whole sheet. Press Refresh once more \u2014 the second load is served '+
-      'from cache. If it keeps failing, run refreshSylCache() or refreshAuditCache() in the Apps '+
-      'Script editor to warm it there instead.');
-    throw new Error('Could not reach the data service: '+String(err && err.message || err));
-  }finally{ clearTimeout(timer); }
-}
 
 /* The first request after a Code.gs deploy has to read the whole sheet, so it
    can outrun the timeout. Other tabs never showed that to the reader, and this
@@ -33954,15 +34100,15 @@ async function loadDm(force) {
     if (changed || !_dmPostedOnce) _dmPost();
     _dmStatus(_liveLabel(raw.meta && raw.meta.generatedAt));
   } catch (err) {
-    var msg = String(err && err.message || err);
-    _dmStatus(msg, true);
-    if (!_dmLoaded) {
+    if (_dmLoaded) {
+      try { console.warn('[PBES] digital marketing feed \u2014 ' + _feedDetail(err)); } catch (e) {}
+      _dmStatus(_feedKept(_dmRaw && _dmRaw.generatedAt));
+    } else {
+      _dmStatus(_feedShort(err), true);
       var l = document.getElementById('dm-loader');
-      if (l) l.innerHTML = '<div style="color:var(--r);font-weight:700">Could not load Digital Marketing</div>' +
-        '<div style="font-size:11px;color:var(--txm);max-width:470px">' +
-        msg.replace(/</g, '&lt;') + '</div>';
+      if (l) l.innerHTML = _feedFailBox('Could not load Digital Marketing', err, 'loadDm');
       var w = _dmFrameWin();
-      if (w && _dmFrameReady) w.postMessage({ type: 'PBES_DM_ERR', message: msg }, '*');
+      if (w && _dmFrameReady) w.postMessage({ type: 'PBES_DM_ERR', message: _feedShort(err) }, '*');
     }
   } finally {
     _dmLoading = false;
@@ -35025,7 +35171,7 @@ async function _sylFetch(force, announce, fresh){
 
     /* a forced read rebuilds from the sheet, which can take longer than a
        cached one — it is given the longer allowance */
-    var res=await _lazyFetch('syl', force, session, force ? 95000 : 55000, fresh ? '&fresh=1' : '');
+    var res=await _lazyFetch('syl', force, session, force ? 95000 : 55000, fresh ? '&fresh=1' : '', 1);
     if(res.status===401){ await sb.auth.signOut(); window.location.href='login.html'; return; }
     if(!res.ok) throw new Error('HTTP '+res.status+' from /api/data. A 404 means the Apps Script '+
       'deployment URL is stale \u2014 in Apps Script use Deploy \u2192 Manage deployments \u2192 edit the '+
@@ -35070,7 +35216,7 @@ async function _sylFetch(force, announce, fresh){
     }
   }catch(err){
     var msg = String(err && err.message || err);
-    var coldStart = /did not answer within|Failed to fetch|Could not reach/i.test(msg);
+    var coldStart = !!(err && err.feedDown) || /did not answer|Failed to fetch|Could not reach/i.test(msg);
     if(coldStart && !_sylRetried){
       /* The rebuild keeps running on the server after the browser stops
          waiting, and stores its result. So the retry is an ordinary read a
@@ -35084,9 +35230,9 @@ async function _sylFetch(force, announce, fresh){
       setTimeout(function(){ _sylFetch(false, announce, !!force); }, force ? 8000 : 1200);
       return;
     }
-    if(!_sylLoaded) _sylFail(msg);
+    if(!_sylLoaded) _sylFail(err);
     else if(announce) _sylStatus('Refresh did not complete \u2014 still showing the copy '+
-      (_sylReadAt(_sylRaw && _sylRaw.generatedAt).replace(/^Read/,'read')||'already on screen')+'. '+msg, true);
+      (_sylReadAt(_sylRaw && _sylRaw.generatedAt).replace(/^Read/,'read')||'already on screen')+'.');
     else _sylStatus(_sylAgeLabel(_sylRaw && _sylRaw.generatedAt));
   }finally{
     _sylLoading=false;
@@ -36353,8 +36499,7 @@ window.CARE_PROBLEMS = (function () {
 
   function safe(){ try { build(); } catch (e) {
     var el = document.getElementById('cp-body');
-    if (el) el.innerHTML = '<div class="no-data" style="color:var(--r)">Could not build the problem comparison: ' +
-      String(e && e.message || e) + '</div>';
+    if (el) el.innerHTML = _feedBuildBox('Could not build the problem comparison', e);
   } }
   window.__renderCareProblems = safe;
 
@@ -36520,8 +36665,7 @@ window.CARE_PROBLEMS = (function () {
 
   function safe(){ try { build(); } catch (e) {
     var el = document.getElementById('gr-top10');
-    if (el) el.innerHTML = '<div class="no-data" style="color:var(--r)">Could not build: ' +
-      String(e && e.message || e) + '</div>';
+    if (el) el.innerHTML = _feedBuildBox('Could not build this panel', e);
   } }
   window.__renderGrievTop10 = safe;
   var _o = window.renderGrievance;
@@ -37365,8 +37509,7 @@ window.VCHK = (function () {
 
   function safe(){ try{ build(); }catch(e){
     var el=$('vck-body');
-    if(el) el.innerHTML='<div class="no-data" style="color:var(--r)">Could not build the checklist insights: '+
-      esc(String(e&&e.message||e))+'</div>';
+    if(el) el.innerHTML=_feedBuildBox('Could not build the checklist insights', e);
   } }
   window.__renderVchk = safe;
 
@@ -37409,8 +37552,8 @@ window.VCHK = (function () {
       if(st){ st.textContent=_liveLabel(raw.generatedAt); st.className='exm-status'; }
     }catch(err){
       if(!loaded){ var el=$('vck-body');
-        if(el) el.innerHTML='<div class="no-data" style="color:var(--r)">'+esc(String(err&&err.message||err))+'</div>';
-        if(st){ st.textContent=String(err&&err.message||err); st.className='exm-status err'; } }
+        if(el) el.innerHTML=_feedFailBox('Could not load the vigilance checklist', err, 'loadVchk');
+        if(st){ st.textContent=_feedShort(err); st.className='exm-status err'; } }
     }finally{ loading=false; }
   };
 
@@ -37700,7 +37843,7 @@ window.VCHK = (function () {
   }
   function safe(){ try{ build(); }catch(e){
     var el=$('cpy-body');
-    if(el) el.innerHTML='<div class="no-data" style="color:var(--r)">Could not build: '+esc(String(e&&e.message||e))+'</div>';
+    if(el) el.innerHTML=_feedBuildBox('Could not build this panel', e);
   } }
   window.__renderCareYear=safe;
   /* The month-on-month panel is redrawn by renderCareSummary, which is itself
@@ -38378,7 +38521,7 @@ window.KPTM = (function () {
 
   function safe(){ try{ build(); }catch(e){
     var el=$('kp-body');
-    if(el) el.innerHTML='<div class="no-data" style="color:var(--r)">Could not build: '+esc(String(e&&e.message||e))+'</div>';
+    if(el) el.innerHTML=_feedBuildBox('Could not build the PTM feedback view', e);
   } }
   window.__renderKptm=safe;
 
@@ -38413,8 +38556,8 @@ window.KPTM = (function () {
       if(st){ st.textContent=_liveLabel(raw.generatedAt); st.className='exm-status'; }
     }catch(err){
       if(!loaded){ var el=$('kp-body');
-        if(el) el.innerHTML='<div class="no-data" style="color:var(--r)">'+esc(String(err&&err.message||err))+'</div>';
-        if(st){ st.textContent=String(err&&err.message||err); st.className='exm-status err'; } }
+        if(el) el.innerHTML=_feedFailBox('Could not load the PTM feedback', err, 'loadKptm');
+        if(st){ st.textContent=_feedShort(err); st.className='exm-status err'; } }
     }finally{ loading=false; }
   };
 
@@ -40941,8 +41084,7 @@ window.T1 = (function () {
     catch (e) {
       show(false);
       var l = $('t1-loader');
-      if (l) l.innerHTML = '<div class="no-data" style="color:var(--r)">Could not build the report: ' +
-        String(e && e.message || e) + '</div>';
+      if (l) l.innerHTML = _feedBuildBox('Could not build the report', e);
     }
   }
   window.__renderTerm1 = paint;
@@ -41006,9 +41148,8 @@ window.T1 = (function () {
       if (!loaded) {
         show(false);
         var l = $('t1-loader');
-        if (l) l.innerHTML = '<div class="no-data" style="color:var(--r)">' +
-          String(err && err.message || err) + '</div>';
-        status(String(err && err.message || err), true);
+        if (l) l.innerHTML = _feedFailBox('Could not load the Term 1 result', err, 'loadTerm1');
+        status(_feedShort(err), true);
       }
     } finally { loading = false; }
   };
