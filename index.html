@@ -4606,13 +4606,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div class="au-sec">
         <h3>🚶 Walk-in and digital leads, year against year</h3>
         <div class="sub">Every branch, each academic year on record, walk-in beside digital, with the
-          branches ranked on unsatisfied parents (from the care calls) beside them. <b>As on
+          branches ranked on unsatisfied parents (from the enquiries themselves) beside them. <b>As on
           today</b> cuts every year at the same day of its own season, counting from 1 September;
           <b>Overall</b> is every lead recorded for the year; <b>Average per month</b> is the leads
           dated inside the season divided by the months that carry any. A dash is a register that
           was never kept, not a zero. Click a figure for the sources behind it. The ranking does not
-          follow those three switches — it is the care calls for this academic year, and the share of
-          answered calls where the parent was not satisfied; click it for the parents behind it.</div>
+          follow those three switches — it is this season's enquiries, and the share of them where the
+          parent was let down (a follow-up not done, or left waiting) or rejected the school (dropped
+          after a visit, or lost on a stated ground); click it for the parents behind it.</div>
         <div id="adm-leadyrs"></div>
       </div>
 
@@ -25712,99 +25713,151 @@ function admLyMode(m) { _admLyMode = m; _admLeadYears(); }
 
    The third block of this table was walk-in plus digital added together, which
    the two blocks beside it already say. What they cannot say is why one
-   branch's walk-ins hold while another's fall — and most walk-ins come on the
-   word of a parent already in the school. So the block now ranks the branches
-   on the parents who are NOT satisfied.
+   branch's walk-ins hold while another's fall — and a walk-in usually comes on
+   the word of a parent who dealt with the school and was content.
 
-   WHERE IT COMES FROM. The care calls: every class teacher rings every parent
-   each month. It is the Care Calls tab's own figure turned over — an answered
-   call counts as satisfied by exactly the test that tab uses (CARE_NLP.classify),
-   so "Parents Satisfied 72%" there is "28% unsatisfied" here, and the two
-   cannot disagree. A call nobody answered is not an opinion and is left out
-   of both sides. Rank 1 is the branch with the highest share.
+   WHERE IT COMES FROM. The enquiry tracker itself: this season's enquiries,
+   their stages, their lost reasons and their follow-up log. No other feed. A
+   parent is counted as unsatisfied for one of four reasons, in two kinds:
 
-   It is the academic year so far and does not move with the three switches
-   above the table — those choose how leads are counted, and this is not leads.
+     LET DOWN BY US
+       · Follow-up not done — a task the counsellor raised is still pending
+         past its own time. The same test, and the same task list, the
+         Follow-up report above uses, so the two cannot disagree.
+       · Left waiting — the enquiry is still open and nothing has been said to
+         the parent for over a fortnight.
+     THEY REJECTED US
+       · Dropped after engaging — the enquiry reached a campus visit or an
+         application and was then lost or declined.
+       · Rejected on a stated ground — closed for a reason that names the
+         school or the offer: the fee, the distance, another school.
 
-   49,000 calls take most of a second to read, so they are read in slices in
-   the background and the table is drawn again when the count is ready; the
-   last count stays on screen while a newer one is being made.
+   One parent, one count, however many of the four apply to them.
 
-   A figure opens the parents behind it, most unsatisfied first: the ones who
-   raised a concern on the most calls. Each opens onto those calls. */
-var _admUns = { sig: '', model: null, busy: false };
-function _admUnsReady() {
-  return typeof CARE_DATA !== 'undefined' && Array.isArray(CARE_DATA) && CARE_DATA.length &&
-    window.CARE_NLP && typeof CARE_NLP.classify === 'function' && typeof window._careAnswerable === 'function';
+   NOT EVERY DEAD LEAD IS AN UNHAPPY PARENT. An invalid number, a job seeker,
+   a duplicate, a child who pressed an advertisement — those are not parents
+   the school disappointed, and they are taken out of both the count AND the
+   enquiries it is divided by, so a branch whose ads draw more junk is not
+   flattered by it. The modal says how many were set aside.
+
+   Rank 1 is the highest share. It is this season, and it does not follow the
+   three switches above the table — those choose how LEADS are counted. */
+var ADM_UNS_QUIET = 14;              /* days of silence on an open enquiry */
+/* An enquiry that was never a parent asking about a place at the school */
+var ADM_UNS_JUNK = /invalid|fraud|suspicious|no number|not a parent|job |vacanc|hiring|duplicate|irrelevant|not relevant|mistak|by mistake|didnt enquire|dint enquire|didn.t enquire|not looking for admission|existing parent|\btest\b|wrong lead/i;
+/* A ground that is about the school or its offer, not about the lead's quality */
+var ADM_UNS_GROUND = /\bfees?\b|distance|\bfar\b|city limit|re-locat|relocat|other school|another school|taken admission in|next ay|not eligible|undecided|transport|timing/i;
+/* Evidence the parent actually engaged — a campus visit or an application.
+   "Not interested" and "not relevant" are struck out of the text first: they
+   contain the word "interested" and would otherwise read as engagement. */
+var ADM_UNS_NOT = /\bnot\s+(interested|relevant|looking|eligible)\b/ig;
+var ADM_UNS_ENGAGED = /\bvisit|application|form issued|admission form|\binterested\b/i;
+var ADM_UNS_REASONS = [
+  { k: 'fu',    g: 'Let down by us',  lab: 'Follow-up not done',          why: 'a task is past its day, still open, and nobody has been back to the enquiry since' },
+  { k: 'quiet', g: 'Let down by us',  lab: 'Left waiting',                why: 'still open, and nobody has written a note or ticked a task on it for over ' + ADM_UNS_QUIET + ' days' },
+  { k: 'drop',  g: 'They rejected us',lab: 'Dropped after engaging',      why: 'reached a campus visit or an application, then lost or declined' },
+  { k: 'why',   g: 'They rejected us',lab: 'Rejected on a stated ground', why: 'closed naming the fee, the distance or another school' }
+];
+var _admUns = { sig: '', model: null };
+
+/* The last day a PERSON did something about this parent — a note written or a
+   task ticked (_admWorkedOn, the same reading the work columns use). Where
+   nobody ever has, the day they enquired stands in its place, because that is
+   when their wait began. The Updated column is deliberately not used: the
+   tracker stamps it whenever anything at all is edited, so it says the row
+   moved, not that the parent was spoken to. */
+function _admUnsLast(r) {
+  var w = _admWorkedOn(r);
+  if (w) return w;
+  return r.d ? String(r.d).slice(0, 10) : '';
+}
+function _admUnsJunk(r) {
+  if (r.test) return true;
+  return ADM_UNS_JUNK.test(String(r.lost || '') + ' · ' + String(r.sub || ''));
+}
+/* did this enquiry ever reach a campus visit or an application? The stage it
+   is at now cannot say — a lost lead reads "lost" — so the stage-change log
+   is read, with the sub-status as a fallback. */
+function _admUnsEngaged(r) {
+  var clean = function (t) { return String(t || '').replace(ADM_UNS_NOT, ' '); };
+  if (ADM_UNS_ENGAGED.test(clean(r.sub))) return true;
+  return (r.cm || []).some(function (c) {
+    var m = /\[([^\]]*)\]/.exec(String(c));
+    return m ? ADM_UNS_ENGAGED.test(clean(m[1])) : false;
+  });
 }
 function _admUnsModel() {
-  /* The care calls arrive in the main payload and this tab is loaded on
-     demand, so the table can be drawn before they are here. Rather than leave
-     four dashes for good, it asks again a few times and redraws itself. */
-  if (!_admUnsReady()) {
-    if (!_admUns.wait) {
-      _admUns.wait = 0;
-      (function again() {
-        if (_admUnsReady()) { _admUns.wait = 0; try { _admLeadYears(); } catch (e) {} return; }
-        if (++_admUns.wait > 30) { _admUns.wait = 0; return; }       // about a minute, then stop
-        setTimeout(again, 2000);
-      })();
-    }
-    return null;
-  }
-  var sig = (window._mainGenAt || '') + '|' + CARE_DATA.length;
-  if (_admUns.sig === sig || _admUns.busy) return _admUns.model;
-  _admUns.busy = true;
-  var src = CARE_DATA, i = 0, by = {};
-  (function step() {
-    try {
-      var end = Math.min(src.length, i + 2500);
-      for (; i < end; i++) {
-        var r = src[i], b = r && r.Branch; if (!b) continue;
-        var o = by[b] || (by[b] = { calls: 0, ans: 0, uns: 0, rows: [] });
-        o.calls++;
-        if (!window._careAnswerable(r)) continue;
-        o.ans++;
-        if (!CARE_NLP.classify(r).satisfied) { o.uns++; o.rows.push(r); }
-      }
-    } catch (e) { _admUns.busy = false; return; }
-    if (i < src.length) { setTimeout(step, 0); return; }
-    /* rank 1 = the highest share of unsatisfied parents; a tie shares the place */
-    var list = Object.keys(by).filter(function (b) { return by[b].ans > 0; })
-      .map(function (b) { by[b].pct = 100 * by[b].uns / by[b].ans; return b; })
-      .sort(function (p, q) { return by[q].pct - by[p].pct || (p < q ? -1 : 1); });
-    list.forEach(function (b, k) {
-      by[b].rank = (k && by[list[k - 1]].pct === by[b].pct) ? by[list[k - 1]].rank : k + 1; });
-    _admUns.model = { by: by, n: list.length }; _admUns.sig = sig; _admUns.busy = false;
-    try { _admLeadYears(); } catch (e) {}
-  })();
+  var S = _admSet(), R = _admRaw;
+  if (!R || !S.rows.length) return null;
+  var sig = (R.generatedAt || '') + '|' + S.scope + '|' + S.season + '|' + S.rows.length;
+  if (_admUns.sig === sig && _admUns.model) return _admUns.model;
+
+  var today = _admToday(), quietBefore = _admShiftDay(-ADM_UNS_QUIET);
+  /* the overdue follow-ups, by lead id — the Follow-up report's own list */
+  /* The Follow-up report's own Overdue test, word for word: open, past its
+     day, and nobody has been back to the lead since it fell due. A task left
+     open only because the counsellor rang the parent and never ticked the box
+     is "worked, not ticked" there, and must not become an unhappy parent here. */
+  var over = {};
+  _admFollowUps().forEach(function (f) {
+    if (!f.open || !f.due) return;
+    var d = _admDay(f.due); if (d >= today) return;
+    var last = _admWorkedOn(f.r);
+    if (last && last >= d) return;
+    var k = f.r && (f.r.id || f.r.row);
+    if (k != null) (over[k] = over[k] || []).push(f);
+  });
+
+  var by = {}, junk = {};
+  S.rows.forEach(function (r) {
+    var b = r.b; if (!b) return;
+    var o = by[b] || (by[b] = { n: 0, uns: 0, rows: [], cnt: {} });
+    if (_admUnsJunk(r)) { junk[b] = (junk[b] || 0) + 1; return; }
+    o.n++;
+    var key = r.id || r.row, closed = _admIsClosed(r), won = _admIsWon(r);
+    var last = _admUnsLast(r), why = String(r.lost || '') + ' · ' + String(r.sub || '');
+    var hit = [];
+    if ((over[key] || []).length) hit.push('fu');
+    if (!closed && !won && last && last < quietBefore) hit.push('quiet');
+    if (closed && !won && _admUnsEngaged(r)) hit.push('drop');
+    if (closed && !won && ADM_UNS_GROUND.test(why)) hit.push('why');
+    if (!hit.length) return;
+    o.uns++;
+    hit.forEach(function (k) { o.cnt[k] = (o.cnt[k] || 0) + 1; });
+    r.__uns = { hit: hit, fus: over[key] || [], last: last,
+                waited: last ? Math.round((new Date(today) - new Date(last)) / 86400000) : null };
+    o.rows.push(r);
+  });
+  var list = Object.keys(by).filter(function (b) { return by[b].n > 0; })
+    .map(function (b) { by[b].junk = junk[b] || 0; by[b].pct = 100 * by[b].uns / by[b].n; return b; })
+    .sort(function (p, q) { return by[q].pct - by[p].pct || (p < q ? -1 : 1); });
+  list.forEach(function (b, k) {
+    by[b].rank = (k && by[list[k - 1]].pct === by[b].pct) ? by[list[k - 1]].rank : k + 1; });
+  _admUns.model = { by: by, n: list.length, junk: junk };
+  _admUns.sig = sig;
   return _admUns.model;
 }
-var ADM_UNS_COLS = ['Answered calls', 'Unsatisfied', '% unsatisfied', 'Rank'];
+var ADM_UNS_COLS = ['Enquiries', 'Unsatisfied', '% unsatisfied', 'Rank'];
 function _admUnsCol(p) { return p > 40 ? 'var(--bad)' : p > 20 ? '#D97706' : 'var(--ok)'; }
 /* the four cells of one branch (b '' = every branch in the table) */
 function _admUnsCells(U, b, branches) {
   var q = function (s) { return JSON.stringify(s).replace(/"/g, '&quot;'); };
-  var name = b || 'All branches', dash = function (first, tip) {
-    return '<td class="n gu' + (first ? ' g0' : '') + '" style="color:var(--txl)" title="' + _admEsc(tip) + '">–</td>'; };
-  if (!_admUnsReady()) {
-    var t0 = 'The care-call data has not loaded yet.';
-    return dash(1, t0) + dash(0, t0) + dash(0, t0) + dash(0, t0);
-  }
+  var name = b || 'All branches';
   if (!U) {
-    var t1 = 'Reading the care calls…';
-    return '<td class="n gu g0" style="color:var(--txl)" title="' + t1 + '">…</td>' +
-      ['', '', ''].map(function () { return '<td class="n gu" style="color:var(--txl)" title="' + t1 + '">…</td>'; }).join('');
+    var t1 = 'The enquiry register has not loaded yet.';
+    return ADM_UNS_COLS.map(function (x, k) {
+      return '<td class="n gu' + (k ? '' : ' g0') + '" style="color:var(--txl)" title="' + t1 + '">–</td>'; }).join('');
   }
   var o;
   if (b) o = U.by[b];
-  else { o = { ans: 0, uns: 0 }; branches.forEach(function (x) { var y = U.by[x]; if (y) { o.ans += y.ans; o.uns += y.uns; } });
-         o.pct = o.ans ? 100 * o.uns / o.ans : null; }
-  if (!o || !o.ans) {
-    var t2 = 'No answered care call on record for ' + name + '.';
-    return dash(1, t2) + dash(0, t2) + dash(0, t2) + dash(0, t2);
+  else { o = { n: 0, uns: 0 }; branches.forEach(function (x) { var y = U.by[x]; if (y) { o.n += y.n; o.uns += y.uns; } });
+         o.pct = o.n ? 100 * o.uns / o.n : null; }
+  if (!o || !o.n) {
+    var t2 = 'No enquiry on record for ' + name + ' this season.';
+    return ADM_UNS_COLS.map(function (x, k) {
+      return '<td class="n gu' + (k ? '' : ' g0') + '" style="color:var(--txl)" title="' + _admEsc(t2) + '">–</td>'; }).join('');
   }
-  var tip = name + ' — ' + _admN(o.uns) + ' of ' + _admN(o.ans) + ' answered care calls where the parent was not satisfied (' +
+  var tip = name + ' — ' + _admN(o.uns) + ' of ' + _admN(o.n) + ' enquiries where the parent was let down or rejected the school (' +
     o.pct.toFixed(1) + '%) · click for the parents, most unsatisfied first';
   var go = ' style="cursor:pointer" onclick="admOpenUns(' + q(b) + ')" title="' + _admEsc(tip) + '"';
   var rank = '–', rc = 'var(--txl)';
@@ -25812,7 +25865,7 @@ function _admUnsCells(U, b, branches) {
     rc = o.rank === 1 ? 'var(--bad)' : o.rank === U.n ? 'var(--ok)' : 'var(--tx)';
     rank = '<b style="font-size:15px">' + o.rank + '</b><span style="font-weight:600;color:var(--txm);font-size:11px"> of ' + U.n + '</span>';
   }
-  return '<td class="n gu g0"' + go + '>' + _admN(o.ans) + '</td>' +
+  return '<td class="n gu g0"' + go + '>' + _admN(o.n) + '</td>' +
     '<td class="n gu"' + go.replace('style="', 'style="font-weight:800;color:var(--bad);') + '>' + _admN(o.uns) + '</td>' +
     '<td class="n gu"' + go.replace('style="', 'style="font-weight:800;color:' + _admUnsCol(o.pct) + ';') + '>' + o.pct.toFixed(1) + '%</td>' +
     '<td class="n gu" style="color:' + rc + '" title="' + _admEsc(b && U.n > 1
@@ -25821,80 +25874,98 @@ function _admUnsCells(U, b, branches) {
 }
 /* the parents behind one branch's figure, most unsatisfied first */
 function admOpenUns(b) {
-  var U = _admUns.model; if (!U) return;
+  var U = _admUnsModel(); if (!U) return;
   var M = (typeof _admLyModel === 'function') ? _admLyModel() : null;
   var brs = b ? [b] : ((M && M.branches) || Object.keys(U.by)), name = b || 'All branches';
-  var rows = [], ans = 0;
-  brs.forEach(function (x) { var o = U.by[x]; if (o) { rows = rows.concat(o.rows); ans += o.ans; } });
-  /* one line a parent: the child the calls were about */
-  var P = {}, order = [];
-  rows.forEach(function (r) {
-    var k = [r.Branch, r.Class, r.RollNo, r.Student].join('␟'), p = P[k];
-    if (!p) { p = P[k] = { b: r.Branch, cls: r.Class || '–', stu: r.Student || '(name not recorded)', n: 0, cats: {}, last: '', rows: [] }; order.push(k); }
-    p.n++; p.rows.push(r);
-    var c = r.Grievance || 'Other'; p.cats[c] = (p.cats[c] || 0) + 1;
-    var d = String(r.Date || ''); if (d > p.last) p.last = d;
+  var rows = [], n = 0, junk = 0, cnt = {};
+  brs.forEach(function (x) {
+    var o = U.by[x]; if (!o) return;
+    rows = rows.concat(o.rows); n += o.n; junk += o.junk || 0;
+    Object.keys(o.cnt).forEach(function (k) { cnt[k] = (cnt[k] || 0) + o.cnt[k]; });
   });
-  var list = order.map(function (k) { return P[k]; }).sort(function (x, y) {
-    return y.n - x.n || (y.last < x.last ? -1 : y.last > x.last ? 1 : 0) || (x.stu < y.stu ? -1 : 1); });
-  var cats = {}; rows.forEach(function (r) { var c = r.Grievance || 'Other'; cats[c] = (cats[c] || 0) + 1; });
-  var catList = Object.keys(cats).map(function (c) { return [c, cats[c]]; }).sort(function (x, y) { return y[1] - x[1]; });
   var multi = brs.length > 1, SHOW = 100;
+  var list = rows.slice().sort(function (p, q) {
+    return q.__uns.hit.length - p.__uns.hit.length ||
+           (q.__uns.waited || 0) - (p.__uns.waited || 0) ||
+           String(p.name || '').localeCompare(String(q.name || '')); });
+  var labOf = function (k) { var d = ADM_UNS_REASONS.filter(function (x) { return x.k === k; })[0]; return d ? d.lab : k; };
 
-  var html = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px">' + catList.slice(0, 8).map(function (c) {
-      return '<span style="border:1px solid var(--bor);border-radius:99px;padding:5px 12px;font-size:12.5px">' +
-        _admEsc(c[0]) + ' <b style="color:var(--bad)">' + _admN(c[1]) + '</b></span>'; }).join('') + '</div>' +
+  var html = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:0 0 6px">' +
+    ADM_UNS_REASONS.map(function (d) {
+      var v = cnt[d.k] || 0;
+      return '<span title="' + _admEsc(d.g + ' — ' + d.why) + '" style="border:1px solid var(--bor);border-radius:99px;' +
+        'padding:5px 12px;font-size:12.5px' + (v ? '' : ';opacity:.5') + '">' + _admEsc(d.lab) +
+        ' <b style="color:' + (v ? 'var(--bad)' : 'var(--txl)') + '">' + _admN(v) + '</b></span>'; }).join('') + '</div>' +
+    '<div style="font-size:12px;color:var(--txm);margin:0 2px 14px;line-height:1.6">A parent is counted once however many apply. ' +
+      _admN(junk) + ' enquir' + (junk === 1 ? 'y was' : 'ies were') + ' set aside as not a parent asking about a place — ' +
+      'invalid numbers, job seekers, duplicates, advertisements pressed by a child — and are in neither figure.</div>' +
     '<div style="display:flex;gap:12px;align-items:center;padding:0 12px 8px 34px;font-size:11px;font-weight:800;' +
       'letter-spacing:.07em;text-transform:uppercase;color:var(--txm)">' +
       '<span style="flex:0 0 34px">Rank</span><span style="flex:1">Parent of · class</span>' +
-      '<span style="flex:0 0 200px">Raised</span><span style="flex:0 0 96px;text-align:right">Unsatisfied calls</span></div>';
+      '<span style="flex:0 0 230px">Why</span><span style="flex:0 0 92px;text-align:right">Waiting</span></div>';
   var rk = 0, prev = null;
-  list.slice(0, SHOW).forEach(function (p, i) {
-    if (p.n !== prev) { rk = i + 1; prev = p.n; }
-    var cs = Object.keys(p.cats).sort(function (x, y) { return p.cats[y] - p.cats[x]; });
+  list.slice(0, SHOW).forEach(function (r, i) {
+    var U2 = r.__uns, keyN = U2.hit.length;
+    if (keyN !== prev) { rk = i + 1; prev = keyN; }
     var head = '<span style="display:flex;align-items:center;gap:12px;width:100%">' +
       '<b style="flex:0 0 34px;color:' + (rk <= 3 ? 'var(--bad)' : 'var(--txm)') + '">' + rk + '</b>' +
-      '<span style="flex:1;min-width:0"><b>' + _admEsc(p.stu) + '</b><span style="color:var(--txm);font-size:12.5px"> · ' +
-        _admEsc(p.cls) + (multi ? ' · ' + _admEsc(p.b) : '') + '</span></span>' +
-      '<span style="flex:0 0 200px;color:var(--txm);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
-        _admEsc(cs.slice(0, 2).join(', ')) + (cs.length > 2 ? ' +' + (cs.length - 2) : '') + '</span>' +
-      '<b style="flex:0 0 96px;text-align:right;color:var(--bad);font-variant-numeric:tabular-nums">' + _admN(p.n) + '</b></span>';
-    var calls = p.rows.slice().sort(function (x, y) { return String(y.Date || '') < String(x.Date || '') ? -1 : 1; });
-    /* A call cannot have happened after today. The sheet carries a few rows
-       whose date was typed with the wrong month or year, and they sort to the
-       top of this list looking like the most recent thing that happened. They
-       are still counted — the Care Calls tab counts them and these two figures
-       must agree — but they are marked for what they are. */
-    var _nowIso = new Date().toISOString().slice(0, 10);
-    var body = '<div style="overflow-x:auto"><table class="au-tbl" style="margin-top:8px;font-size:13px"><thead><tr><th>Date</th><th>Month</th>' +
-      '<th>Concern</th><th>What the parent said</th><th>Follow-up</th><th>Status</th></tr></thead><tbody>' +
-      calls.map(function (r) {
-        var d = r.Date ? String(r.Date).slice(0, 10) : '', ahead = d && d > _nowIso;
-        return '<tr><td style="white-space:nowrap' + (ahead ? ';color:var(--warn);font-weight:700' : '') + '"' +
-          (ahead ? ' title="This call is dated after today — the date was mistyped in the sheet. It is still counted."' : '') + '>' +
-          _admEsc(d ? _admDate(d) : '–') + (ahead ? ' \u26a0' : '') + '</td><td>' + _admEsc(r.Month || '–') +
-          '</td><td style="font-weight:700">' + _admEsc(r.Grievance || '–') + '</td><td style="min-width:240px">' + _admEsc(r.Remarks || '–') +
-          '</td><td style="min-width:180px;color:var(--txm)">' + _admEsc(r.Followup || '–') + '</td><td>' + _admEsc(r.Status || '–') + '</td></tr>'; }).join('') +
-      '</tbody></table></div>';
+      '<span style="flex:1;min-width:0"><b>' + _admEsc(r.name || '(name not recorded)') + '</b>' +
+        '<span style="color:var(--txm);font-size:12.5px"> · ' + _admEsc(r.cls || '–') +
+        (multi ? ' · ' + _admEsc(r.b) : '') + '</span></span>' +
+      '<span style="flex:0 0 230px;color:var(--txm);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
+        _admEsc(U2.hit.map(labOf).join(', ')) + '</span>' +
+      '<b style="flex:0 0 92px;text-align:right;color:' + (U2.waited > 30 ? 'var(--bad)' : 'var(--txm)') +
+        ';font-variant-numeric:tabular-nums">' + (U2.waited == null ? '–' : U2.waited + 'd') + '</b></span>';
+    var line = function (l, v) {
+      return '<tr><td style="color:var(--txm);white-space:nowrap;width:150px">' + l + '</td><td>' + v + '</td></tr>'; };
+    var fuRows = (r.fu || []).map(function (raw) {
+      var f = _admFuParse(raw);
+      if (!f) return '';
+      var late = f.open && _admDay(f.due) < _admToday();
+      return '<tr><td style="white-space:nowrap' + (late ? ';color:var(--bad);font-weight:700' : '') + '">' +
+        _admEsc(_admDate(_admDay(f.due))) + (late ? ' ⚠' : '') + '</td><td>' + _admEsc(f.kind) + '</td><td>' +
+        (f.done ? '<span style="color:var(--ok)">done ' + _admEsc(_admDate(_admDay(f.done))) + '</span>'
+                : f.open ? '<span style="color:' + (late ? 'var(--bad)' : 'var(--txm)') + '">pending' + (late ? ' — overdue' : '') + '</span>'
+                : '<span style="color:var(--txm)">–</span>') +
+        '</td><td style="min-width:200px;color:var(--txm)">' + _admEsc(f.note || '') + '</td></tr>'; }).join('');
+    var cmRows = (r.cm || []).slice(-8).map(function (c) {
+      return '<tr><td colspan="4" style="color:var(--txm)">' + _admEsc(c) + '</td></tr>'; }).join('');
+    var body = '<div style="overflow-x:auto"><table class="au-tbl" style="margin-top:8px;font-size:13px"><tbody>' +
+      line('Why counted', U2.hit.map(function (k) {
+        var d = ADM_UNS_REASONS.filter(function (x) { return x.k === k; })[0];
+        return '<b>' + _admEsc(d ? d.lab : k) + '</b> <span style="color:var(--txm)">— ' + _admEsc(d ? d.why : '') + '</span>'; }).join('<br>')) +
+      line('Parent', _admEsc(r.parent || '–') + (r.ph ? ' · ' + _admEsc(r.ph) : '')) +
+      line('Stage', _admEsc(typeof _admStageLab === 'function' ? _admStageLab(r.st) : r.st) + (r.sub ? ' · ' + _admEsc(r.sub) : '')) +
+      (r.lost ? line('Lost reason', _admEsc(r.lost)) : '') +
+      line('Source', _admEsc(r.src || '–') + ' · ' + _admEsc(r.ch || '')) +
+      line('Counsellor', _admEsc(r.owner || '(not assigned)')) +
+      line('Enquired', _admEsc(r.d ? _admDate(String(r.d).slice(0, 10)) : '–') +
+        ' · last worked ' + _admEsc(_admWorkedOn(r) ? _admDate(_admWorkedOn(r)) : 'never')) +
+      '</tbody></table></div>' +
+      (fuRows ? '<div style="overflow-x:auto;margin-top:10px"><table class="au-tbl" style="font-size:13px"><thead><tr>' +
+        '<th>Due</th><th>Task</th><th>State</th><th>Note</th></tr></thead><tbody>' + fuRows + '</tbody></table></div>'
+             : '<div class="au-empty" style="margin-top:10px;text-align:left">No follow-up task was ever raised against this enquiry.</div>') +
+      (cmRows ? '<div style="overflow-x:auto;margin-top:10px"><table class="au-tbl" style="font-size:12.5px"><thead><tr>' +
+        '<th colspan="4">What is written against the enquiry</th></tr></thead><tbody>' + cmRows + '</tbody></table></div>' : '');
     html += (typeof _naAcc === 'function') ? _naAcc(head, body)
       : '<div style="border:1px solid var(--bor);border-radius:10px;margin-bottom:8px;padding:10px 12px">' + head + '</div>';
   });
-  if (!list.length) html += '<div class="au-empty">No unsatisfied parent on record.</div>';
+  if (!list.length) html += '<div class="au-empty">No unsatisfied parent on record — every enquiry was followed up, and none was lost on a stated ground.</div>';
   if (list.length > SHOW) html += '<div class="au-empty" style="text-align:left">Showing the ' + SHOW + ' most unsatisfied of ' +
-    _admN(list.length) + ' parents. Export CSV carries every call behind all of them.</div>';
+    _admN(list.length) + ' parents. Export CSV carries every one of them.</div>';
   _admModal(name + ' · most unsatisfied parents',
-    _admN(rows.length) + ' of ' + _admN(ans) + ' answered care calls (' + (ans ? (100 * rows.length / ans).toFixed(1) : '0') +
-    '%) · ' + _admN(list.length) + ' parent' + (list.length === 1 ? '' : 's') + ' · this academic year · tap a name for the calls', html);
+    _admN(list.length) + ' of ' + _admN(n) + ' enquiries (' + (n ? (100 * list.length / n).toFixed(1) : '0') +
+    '%) · ' + _admEsc((_admRaw && _admRaw.season) || '') + ' · tap a name for the enquiry and its follow-ups', html);
   if (typeof modalAllRows !== 'undefined') {
-    var out = [];
-    list.forEach(function (p, i) { p.rows.forEach(function (r) {
-      out.push({ Rank: i + 1, Branch: p.b, Class: p.cls, Student: p.stu, Unsatisfied: p.n, Date: r.Date || '', Month: r.Month || '',
-        Concern: r.Grievance || '', Remarks: r.Remarks || '', Followup: r.Followup || '', Status: r.Status || '' }); }); });
-    modalAllRows = out;
-    window._modalColumns = [{ key: 'Rank', label: 'Rank' }, { key: 'Branch', label: 'Branch' }, { key: 'Class', label: 'Class' },
-      { key: 'Student', label: 'Student' }, { key: 'Unsatisfied', label: 'Unsatisfied calls' }, { key: 'Date', label: 'Date' },
-      { key: 'Month', label: 'Month' }, { key: 'Concern', label: 'Concern' }, { key: 'Remarks', label: 'Remarks' },
-      { key: 'Followup', label: 'Follow-up' }, { key: 'Status', label: 'Status' }];
+    modalAllRows = list.map(function (r, i) {
+      return { Rank: i + 1, Branch: r.b, Id: r.id, Student: r.name, Class: r.cls, Parent: r.parent, Phone: r.ph,
+        Why: r.__uns.hit.map(labOf).join(' + '), Stage: r.st, Sub: r.sub || '', Lost: r.lost || '',
+        Owner: r.owner || '', Enquired: r.d || '', Last: r.__uns.last || '', Waiting: r.__uns.waited == null ? '' : r.__uns.waited }; });
+    window._modalColumns = [{ key: 'Rank', label: 'Rank' }, { key: 'Branch', label: 'Branch' }, { key: 'Id', label: 'Enquiry ID' },
+      { key: 'Student', label: 'Student' }, { key: 'Class', label: 'Class' }, { key: 'Parent', label: 'Parent' },
+      { key: 'Phone', label: 'Phone' }, { key: 'Why', label: 'Why counted' }, { key: 'Stage', label: 'Stage' },
+      { key: 'Sub', label: 'Sub-status' }, { key: 'Lost', label: 'Lost reason' }, { key: 'Owner', label: 'Counsellor' },
+      { key: 'Enquired', label: 'Enquired on' }, { key: 'Last', label: 'Last worked' }, { key: 'Waiting', label: 'Days waiting' }];
   }
 }
 
@@ -26044,7 +26115,7 @@ function _admLeadYears() {
     GRP.map(function (g) {
       return '<th colspan="' + span + '" class="grp g0 ' + g[0] + '" style="text-align:center">' + g[1] + '</th>';
     }).join('') + '<th colspan="' + ADM_UNS_COLS.length + '" class="grp g0 gu" style="text-align:center" title="' +
-      'From the care calls, this academic year: answered calls where the parent was not satisfied. Rank 1 is the highest share.">' +
+      'From the enquiry tracker: this season\'s enquiries where the parent was let down (follow-up not done, left waiting) or rejected the school (dropped after a visit, or a stated ground). Rank 1 is the highest share.">' +
       'Most unsatisfied parents · ranking</th></tr><tr>' +
     GRP.map(function (g) {
       return Y.map(function (y, k) {
@@ -26054,7 +26125,7 @@ function _admLeadYears() {
       }).join('') + (chg ? '<th class="n ' + g[0] + '" title="' + _admEsc(Y[0].ay + ' against ' + Y[1].ay) +
         '">Change</th>' : '');
     }).join('') + ADM_UNS_COLS.map(function (c, k) {
-      return '<th class="n gu' + (k ? '' : ' g0') + '">' + c + (k ? '' : '<div class="ly-w">care calls</div>') + '</th>'; }).join('') +
+      return '<th class="n gu' + (k ? '' : ' g0') + '">' + c + (k ? '' : '<div class="ly-w">this season</div>') + '</th>'; }).join('') +
     '</tr></thead><tbody>';
 
   var row = function (b, foot) {
