@@ -283,7 +283,13 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);font-si
 .logo-box{background:#fff!important;border-color:#F2C230!important;color:#0B5D33!important}
 
 /* FILTER BAR */
-.fb{background:var(--sur);border-bottom:2px solid var(--bor);position:sticky;top:72px;z-index:190;box-shadow:0 2px 10px rgba(30,79,216,.06)}
+/* The bar is pinned directly under the header. That used to be written as
+   72px, the header's height on a desktop. On a phone the header wraps to
+   several lines and is far taller, so the bar came to rest 72px down —
+   underneath it, out of sight. --hdr-h is the header's measured height, kept
+   up to date by the script after the bar's markup; 72px is only the value
+   used until that script has run. */
+.fb{background:var(--sur);border-bottom:2px solid var(--bor);position:sticky;top:var(--hdr-h,72px);z-index:190;box-shadow:0 2px 10px rgba(30,79,216,.06)}
 .fb-in{max-width:1700px;margin:0 auto;padding:0 28px;display:flex;align-items:center;gap:14px;min-height:50px;flex-wrap:wrap}
 .fl{font-size:11px;font-weight:700;color:var(--txm);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
 .fsel{
@@ -537,6 +543,53 @@ table.hrm tr.hrm-on .hrm-b{box-shadow:1px 0 0 var(--bor),inset 3px 0 0 var(--p)}
 
 @media(max-width:1200px){.k5,.k6{grid-template-columns:repeat(3,1fr)}.r3{grid-template-columns:1fr 1fr}.r12,.r21,.r32{grid-template-columns:1fr}}
 @media(max-width:768px){.content,.fb-in,.hdr-in{padding-left:14px;padding-right:14px}.k4,.k5,.k6{grid-template-columns:1fr 1fr}.r2,.r3{grid-template-columns:1fr}}
+/* ══ PHONES: THE BRANCH AND MONTH BAR STAYS IN VIEW (19 November 2026) ══
+   Two pinned bars are affordable on a phone only if they are short. As they
+   stood, the header wrapped to four lines (188px) and the bar to three
+   (117px): pinned together that is nearly half of a phone screen. So below
+   700px:
+     · the header is two short lines — menu, crest and title, then its
+       controls on ONE line that slides sideways rather than wrapping;
+     · the bar is one line — the two dropdowns side by side, with the scope
+       badge and the on-hold chip after them, reached by sliding the bar. The
+       words BRANCH and MONTH are dropped; each dropdown already says which
+       it is ("All Branches", "All Months").
+   Nothing is removed from either bar, only laid out in a line. */
+@media(max-width:700px){
+  .hdr-in{padding-top:8px;padding-bottom:8px;gap:6px 10px}
+  .hdr-in>.logo-row{flex:1 1 0;min-width:0;gap:9px}
+  .logo-box{width:34px;height:34px;border-radius:9px;padding:3px!important}
+  .logo-text{min-width:0}
+  .logo-text h1{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .logo-text p{display:none}
+  .sn-burger{width:34px;height:34px;font-size:15px}
+  .hdr-right{flex:1 1 100%;flex-wrap:nowrap;overflow-x:auto;gap:8px;scrollbar-width:none}
+  .hdr-right::-webkit-scrollbar{display:none}
+  .hdr-right>*{flex:0 0 auto;white-space:nowrap}
+  .fb-in{flex-wrap:nowrap;overflow-x:auto;gap:8px;min-height:46px;scrollbar-width:none}
+  .fb-in::-webkit-scrollbar{display:none}
+  .fb-in>*{flex:0 0 auto}
+  .fb .fl,.fb .fsep{display:none}
+  .fb .fsel{min-width:0;width:calc(50vw - 18px);max-width:220px}
+  /* the examination switch is three buttons in one pill: it slides rather
+     than pushing the whole page wider than the screen */
+  .sh-r{max-width:100%}
+  .ex-switch{max-width:100%;overflow-x:auto}
+}
+/* A phone on its side is wide but very short — 340px or so of height — and
+   the header wrapped to two lines there as well. Everything in it fits one
+   line at that width, so it is held to one. */
+@media(max-height:520px) and (min-width:701px){
+  .hdr-in{padding-top:6px;padding-bottom:6px;flex-wrap:nowrap}
+  .hdr-in>.logo-row{flex:0 0 auto;gap:9px}
+  .logo-box{width:34px;height:34px;border-radius:9px;padding:3px!important}
+  .logo-text h1{font-size:16px;white-space:nowrap}
+  .logo-text p{display:none}
+  .hdr-right{flex:0 1 auto;min-width:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .hdr-right::-webkit-scrollbar{display:none}
+  .hdr-right>*{flex:0 0 auto;white-space:nowrap}
+  .fb-in{min-height:44px}
+}
 
 
 /* the scope a tab has inherited from the global filter bar */
@@ -1345,6 +1398,37 @@ table.vckt tr.vck-c td.nm{font-weight:600;color:var(--tx)}
 /* the foot holds two blocks side by side at every width the cards sit side by
    side, so its type steps down with the screen rather than wrapping or
    clipping: below 1640 the icons go, below 1440 the figures tighten */
+/* On a phone the whole week has to fit the card without sliding: the discs
+   and the gaps come down, the month is dropped from the day headings (the
+   weekday stays), and the weekly box loses its caption but keeps its figure. */
+@media(max-width:520px){
+  #pane-adm27 .amt.bp{padding:12px 10px 10px}
+  #pane-adm27 .bp-grid{min-width:0}
+  #pane-adm27 .bp-r{grid-template-columns:minmax(0,1fr) repeat(7,24px) auto;gap:2px;
+    padding:4px 5px 4px 6px;border-left-width:4px}
+  #pane-adm27 .bp-n{font-size:12px;gap:3px}
+  #pane-adm27 .bp-n i{display:none}
+  #pane-adm27 .bp-c b{width:24px;height:24px;font-size:12px}
+  #pane-adm27 .bp-c small{font-size:9.5px}
+  #pane-adm27 .bp-d{font-size:11px}
+  #pane-adm27 .bp-d .mo{display:none}
+  #pane-adm27 .bp-d small{font-size:9px}
+  #pane-adm27 .bp-t{margin-left:2px;padding:3px 5px;min-width:44px}
+  #pane-adm27 .bp-t small{display:none}
+  #pane-adm27 .bp-t span{font-size:11.5px}
+  #pane-adm27 .bp-t b{font-size:14.5px}
+  #pane-adm27 .bp-r.cns{margin-left:8px}
+  #pane-adm27 .bp-r.cns .bp-c b{width:20px;height:20px;font-size:10.5px}
+  #pane-adm27 .bp-r.cns .bp-t b{font-size:13px}
+}
+/* the smallest phones (320px): the branch names are kept whole and the strip
+   slides a little, rather than every name being cut to three letters */
+@media(max-width:380px){
+  #pane-adm27 .bp-grid{min-width:300px}
+  #pane-adm27 .bp-r{grid-template-columns:minmax(62px,1fr) repeat(7,22px) auto}
+  #pane-adm27 .bp-n{font-size:11px}
+  #pane-adm27 .bp-c b{width:22px;height:22px;font-size:11px}
+}
 @media(max-width:1640px){
   #pane-adm27 .bp-ic{display:none}
   #pane-adm27 .bp-y b{font-size:20px}
@@ -1542,6 +1626,23 @@ table.vckt tr.vck-c td.nm{font-weight:600;color:var(--tx)}
   #pane-adm27 .amb-ttl{font-size:22px}
   #pane-adm27 .amb-k b{font-size:19px}
   #pane-adm27 .amb-p{width:104px}
+}
+/* on a phone the four columns did not fit the card and the % column was cut
+   off at its edge (19 Nov 2026): the cells tighten and the bar shortens */
+@media(max-width:520px){
+  #pane-adm27 .amb-ttl{font-size:19px}
+  #pane-adm27 .amb-tbl td,#pane-adm27 .amb-tbl th{padding-left:6px;padding-right:6px}
+  #pane-adm27 .amb-p{width:70px}
+  #pane-adm27 .amb-sub{max-width:116px}
+  #pane-adm27 .amb-t,#pane-adm27 .amb-a{font-size:14px}
+  /* and if a narrower phone still cannot hold it, the card slides rather than
+     cutting a column off */
+  #pane-adm27 .amb{overflow-x:auto}
+}
+@media(max-width:380px){
+  #pane-adm27 .amb-tbl td,#pane-adm27 .amb-tbl th{padding-left:4px;padding-right:4px}
+  #pane-adm27 .amb-p{width:56px}
+  #pane-adm27 .amb-sub{max-width:92px}
 }
 </style>
 <script>
@@ -2485,6 +2586,31 @@ document.addEventListener('DOMContentLoaded', async () => {
       style="display:none;margin-left:8px;padding:5px 11px;border-radius:999px;border:1.5px solid #DDD6FE;background:#F5F3FF;color:#6D28D9;font:700 11.5px Inter,sans-serif;cursor:pointer;white-space:nowrap">⏸ <span id="hold-chip-n">0</span> on hold · not counted</button>
   </div>
 </div>
+
+<script>
+/* ══ THE FILTER BAR SITS UNDER THE HEADER, HOWEVER TALL THE HEADER IS ══
+   (19 November 2026) Writes the header's real height to --hdr-h, which is
+   where .fb is pinned. Re-measured whenever the header changes size: a phone
+   turned on its side, the role badge arriving after sign-in, the web font
+   landing. Rounded DOWN, so the bar tucks a fraction under the header rather
+   than leaving a hairline of page showing between the two. */
+(function(){
+  var hdr = document.querySelector('.hdr'); if (!hdr) return;
+  var last = '';
+  function set(){
+    var h = Math.floor(hdr.getBoundingClientRect().height);
+    if (!h) return;
+    var v = h + 'px';
+    if (v !== last) { last = v; document.documentElement.style.setProperty('--hdr-h', v); }
+  }
+  set();
+  if (window.ResizeObserver) { try { new ResizeObserver(set).observe(hdr); } catch (e) {} }
+  window.addEventListener('resize', set);
+  window.addEventListener('orientationchange', function(){ setTimeout(set, 250); });
+  window.addEventListener('load', set);
+  if (document.fonts && document.fonts.ready) { try { document.fonts.ready.then(set); } catch (e) {} }
+})();
+</script>
 
 <aside class="sidenav" id="sidenav">
   <div class="sn-top">
@@ -27490,7 +27616,7 @@ function _admTrend() {
     '<div class="bp-r bp-days"><span></span>' + DAYS.map(function (d) {
       var H = _admDayHead(d), p = d.split('-');
       return '<span class="bp-d' + (d === todayIso ? ' now' : '') + (H.sun ? ' sun' : '') + '">' +
-        (+p[2]) + ' ' + _admDate(d).slice(3, 6) + '<small>' + H.w + '</small></span>';
+        (+p[2]) + '<span class="mo"> ' + _admDate(d).slice(3, 6) + '</span><small>' + H.w + '</small></span>';
     }).join('') + '<span></span></div>';
 
   brs.forEach(function (b) {
@@ -38977,10 +39103,10 @@ window.renderCivilTab = function (raw) {
       if (cs.position !== 'sticky' && cs.position !== 'fixed') return;
       if (el.offsetParent === null) return;                  // hidden on this tab
       /* Where this bar COMES TO REST: its own top offset plus its height, not
-         its height alone. The two bars overlap by design — the filter bar is
-         pinned at 72px while the header above it is taller than that — so
-         adding their heights put every table heading lower than the chrome
-         actually reaches, and left a strip of rows showing through above it. */
+         its height alone. (The filter bar was once pinned at a fixed 72px and
+         overlapped a taller header; since 19 Nov 2026 it is pinned at the
+         header's measured height, so this is simply the foot of the lower
+         bar — and still right if the two ever overlap again.) */
       var top = parseFloat(cs.top);
       if (!isFinite(top)) top = 0;
       n = Math.max(n, top + el.getBoundingClientRect().height);
@@ -39054,6 +39180,10 @@ window.renderCivilTab = function (raw) {
   var MINROWS = 8;                 // below this a heading cannot scroll away
   function scan(){
     fzTop();
+    /* narrow, or a touch screen of any width: a tablet on its side is 1024px
+       wide and pins its bars to the page in exactly the same way */
+    var narrow = !!(window.matchMedia &&
+      window.matchMedia('(max-width:1000px), (hover:none) and (pointer:coarse)').matches);
     var ts = document.querySelectorAll('table');
     for (var i = 0; i < ts.length; i++){
       var t = ts[i];
@@ -39066,6 +39196,21 @@ window.renderCivilTab = function (raw) {
         /* a wide table must scroll inside its own box for the pin to work */
         var p = t.parentElement;
         if (p && t.scrollWidth > p.clientWidth + 2 && getComputedStyle(p).overflowX === 'visible') p.style.overflowX = 'auto';
+      }
+      /* ON A PHONE, EVERY TABLE DOES (19 Nov 2026). A table wider than the
+         screen with nothing to scroll it made the whole PAGE wider than the
+         screen — and a phone pins its header and filter bar to the page, not
+         to the glass, so on such a tab both slid out of view as the page was
+         moved. On a narrow or touch screen a table that does not fit its box
+         is given that box to slide in, and the page stays the width of the
+         screen. A desktop window is left exactly as it was. */
+      else if (narrow){
+        var pn = t.parentElement;
+        if (pn && pn !== document.body && t.scrollWidth > pn.clientWidth + 2){
+          var pcs = getComputedStyle(pn);
+          if (pcs.overflowX === 'visible' && /^(block|flex|grid|flow-root|list-item)$/.test(pcs.display))
+            pn.style.overflowX = 'auto';
+        }
       }
       /* and the heading row, for any table long enough to lose it */
       if (t.tHead && t.tHead.rows.length && t.rows.length >= MINROWS){
@@ -39100,6 +39245,15 @@ window.renderCivilTab = function (raw) {
   new MutationObserver(function(){ setTimeout(reseat, 0); })
     .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   window.addEventListener('resize', soon);
+  /* A table drawn while its tab was hidden has no width to measure, so none
+     of the above could size it up — and opening the tab changes a class, not
+     the tree, so nothing asked again. A tab coming into view is now a reason
+     to look (19 Nov 2026). */
+  try {
+    var paneWatch = new MutationObserver(soon), panes = document.querySelectorAll('.pane');
+    for (var pi = 0; pi < panes.length; pi++)
+      paneWatch.observe(panes[pi], { attributes: true, attributeFilter: ['class'] });
+  } catch (e) {}
   /* the filter bar changes height when its controls wrap, and the header can
      be scrolled away on a short viewport — both move where a heading pins */
   window.addEventListener('scroll', function(){ try { fzTop(); } catch(e){} }, { passive: true });
