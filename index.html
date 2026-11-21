@@ -3903,6 +3903,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
     </div>
   </div>
+
+  <!-- Complete mileage report — branch → vehicle → every fuel entry -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="ch"><h3>&#9981; Complete Mileage Report</h3>
+      <span class="fnote">Every fuel entry on record, branch by branch. Click a branch for its vehicles, and a
+        vehicle for each of its readings. Each ratio is worked out over the entries that carry what it needs, and
+        the last column says how much of the register can be measured at all.</span></div>
+    <div class="cb" style="padding:10px 16px 14px;"><div id="tr-mile-report"></div></div>
+  </div>
 </div>
 
 <!-- ═══ IT REPORT ═══ -->
@@ -12757,6 +12766,9 @@ function renderTransport(){
     }).join('');
     if(cur && [...rsel.options].some(o=>o.value===cur)){ rsel.value=cur; } else { const rr=document.getElementById('tr-route-report'); if(rr)rr.innerHTML='<div class="no-data" style="padding:16px;">Choose a route above to see its full report.</div>'; }
   }
+  /* the report first: it is plain HTML and must not be lost if the chart
+     library is slow, blocked or missing, which throws inside the insights */
+  try{ renderMileageReport(); }catch(e){ console.error('mileage report:', e && e.message); }
   renderMileageInsights(mileage);
 }
 
@@ -12796,6 +12808,315 @@ function renderMileageInsights(mileage){
   };
   mkMil('tr-mil-veh',byVeh,'veh'); mkMil('tr-mil-route',byRoute,'route');
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   COMPLETE MILEAGE REPORT — branch, vehicle, entry       (21 November 2026)
+
+   The charts above rank vehicles and routes. They cannot answer the question
+   a transport manager actually asks at the end of a month: what did each
+   branch burn, what did it cost, and how far did it go on it. This is that
+   table, and every figure in it opens the entries it was made from.
+
+   EVERY RATIO IS COMPUTED OVER THE ENTRIES THAT CARRY WHAT IT NEEDS, and the
+   table says how many those were. The fuel register is not filled in the same
+   way at every branch, and a single divide across all of it is wrong in a way
+   that looks authoritative:
+
+     · Bachupally records the fill but not the distance on 97% of its entries.
+       Litres ÷ every entry's kilometres gave 0.19 KM/L — not a figure about
+       any bus, just a count of missing cells.
+     · Boduppal records the distance but almost never the amount paid, so a
+       cost per kilometre there would be ₹0.00.
+     · Gowdavalli has six entries whose arithmetic gives 20 to 1,128 KM/L,
+       which is a part-fill written against a full week. Carried into the
+       branch figure they turned 5.4 KM/L into 21.5.
+
+   So: litres and spend count every entry that records them; KM/L divides the
+   kilometres by the litres of the entries that record BOTH, leaving out
+   readings outside 1–15 KM/L as not believable; cost per kilometre and cost
+   per litre each take only the entries carrying their own pair. Where there
+   is nothing to compute from, the cell is a dash — never a zero.
+
+   DISTANCE LOGGED is the share of entries that carry a reading at all, and is
+   the first thing to read: a branch at 3% has a fuel book, not a mileage one.
+
+   A vehicle is matched to the fleet register on its number with the spacing
+   and punctuation ignored, because the register writes "TG08 U 1235" and the
+   fuel book writes "TG08U1235". What still does not match is shown as it was
+   written and marked — among them a generator and a line reading "spares for
+   diesel buses in camps", which are real fuel but not a bus.
+   ══════════════════════════════════════════════════════════════════════════ */
+var TR_MILE_MIN = 1, TR_MILE_MAX = 15;     /* a believable KM/L for a school bus */
+/* A distance between two fills. Gowdavalli's 4 November entry reads 86,602 —
+   the odometer, not the run — and the next entry reads −85,912, the difference
+   written back as a negative. Both are thrown out rather than netted off. */
+var TR_MILE_MAXKM = 5000;
+/* ── THE SAME FILL, ENTERED AGAIN ──
+   139 entries in the register repeat one already there — same branch, date,
+   vehicle, route, distance, litres and cost to the paisa. One Pocharam fill
+   of 35.81 litres appears fourteen times. A bus does not buy the identical
+   litres for the identical rupees twice in a day, so these are copies, and
+   counted they added 5,228 litres and ₹5.4 lakh to the group's fuel bill.
+   The first of each is counted and the rest are marked and set aside; they
+   are still listed against the vehicle, so the register can be put right. */
+var _trRepSrc = null;
+function _trMileTag() {
+  var all = (_trData().mileage || []);
+  if (_trRepSrc === all) return;
+  var seen = {};
+  all.forEach(function (r) {
+    var k = [r.Branch, r.Date, r.VehicleNo, r.Route, r.KMRun, r.Fuel, r.FuelCost].join('\u241f');
+    try { r.__rep = !!seen[k]; } catch (e) {}
+    seen[k] = 1;
+  });
+  _trRepSrc = all;
+}
+function _trMileKey(v) { return String(v == null ? '' : v).toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+function _trMileN(v) { var n = (v === null || v === undefined || v === '') ? NaN : +v; return isFinite(n) ? n : NaN; }
+/* one fuel entry, read the same way wherever it is used */
+function _trMileEntry(r) {
+  var km = _trMileN(r.KMRun), l = _trMileN(r.Fuel), c = _trMileN(r.FuelCost);
+  var wrote = isFinite(km) && km !== 0;              // a distance was written, good or not
+  var hasL = l > 0, hasC = c > 0;
+  var kmpl = (km > 0 && hasL) ? km / l : null;
+  /* a reading is usable when it is a forward run of a believable length, and —
+     where the litres are there too — gives a believable KM/L */
+  var ok = km > 0 && km <= TR_MILE_MAXKM &&
+           (kmpl === null || (kmpl <= TR_MILE_MAX && kmpl >= TR_MILE_MIN));
+  return { r: r, km: km, kmOk: ok, wrote: wrote, l: hasL ? l : 0, c: hasC ? c : 0,
+           hasL: hasL, hasC: hasC, kmpl: kmpl, doubt: wrote && !ok, rep: !!r.__rep,
+           d: String(r.Date || '').slice(0, 10) };
+}
+function _trMileAgg(rows) {
+  _trMileTag();
+  var a = { n: 0, litres: 0, litresN: 0, spend: 0, spendN: 0, km: 0, kmN: 0, wroteN: 0,
+            pKm: 0, pL: 0, pN: 0, doubt: 0,
+            cKm: 0, cKmSpend: 0, cKmN: 0, cL: 0, cLSpend: 0, cLN: 0, rep: 0, first: '', last: '', veh: {}, ent: [] };
+  (rows || []).forEach(function (r) {
+    var e = _trMileEntry(r);
+    a.ent.push(e);
+    a.veh[_trMileKey(r.VehicleNo)] = 1;
+    if (e.rep) { a.rep++; return; }               // the same fill, entered again
+    a.n++;
+    if (e.hasL) { a.litres += e.l; a.litresN++; }
+    if (e.hasC) { a.spend += e.c; a.spendN++; }
+    if (e.wrote) a.wroteN++;
+    if (e.doubt) a.doubt++;
+    if (e.kmOk) { a.km += e.km; a.kmN++; }
+    if (e.kmOk && e.hasL) { a.pKm += e.km; a.pL += e.l; a.pN++; }
+    if (e.hasC && e.kmOk) { a.cKm += e.km; a.cKmSpend += e.c; }
+    if (e.hasC && e.kmOk) a.cKmN++;
+    if (e.hasC && e.hasL) { a.cL += e.l; a.cLSpend += e.c; a.cLN++; }
+    if (e.d) { if (!a.first || e.d < a.first) a.first = e.d; if (e.d > a.last) a.last = e.d; }
+  });
+  a.nVeh = Object.keys(a.veh).length;
+  a.kmpl = a.pL > 0 ? a.pKm / a.pL : null;
+  a.perKm = a.cKm > 0 ? a.cKmSpend / a.cKm : null;
+  a.perL = a.cL > 0 ? a.cLSpend / a.cL : null;
+  a.cover = a.n ? 100 * a.wroteN / a.n : null;
+  return a;
+}
+function _trMileCol(v) { return v == null ? 'var(--txm)' : v >= 5.5 ? '#047857' : v >= 4 ? '#D97706' : '#DC2626'; }
+function _trCoverCol(v) { return v == null ? 'var(--txm)' : v >= 80 ? '#047857' : v >= 40 ? '#D97706' : '#DC2626'; }
+function _trMileDate(d) {
+  if (!d) return '–';
+  var M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], p = String(d).split('-');
+  return p.length < 3 ? d : (+p[2]) + ' ' + (M[+p[1] - 1] || '') + " '" + String(p[0]).slice(2);
+}
+var _trMileOpen = {};
+
+function renderMileageReport() {
+  var host = document.getElementById('tr-mile-report'); if (!host) return;
+  var rows = _trFilt(_trData().mileage || []);
+  var brs = (fBranch === 'ALL' ? TR_BRANCHES : [fBranch]).filter(function (b) {
+    return rows.some(function (r) { return r.Branch === b; }); });
+  /* a branch spelled in the fuel book but not in the branch list is still fuel */
+  (rows || []).forEach(function (r) {
+    var b = r.Branch; if (b && b !== '–' && brs.indexOf(b) < 0) brs.push(b); });
+  if (!rows.length || !brs.length) {
+    host.innerHTML = '<div class="no-data" style="padding:16px">No fuel entry on record for this selection.</div>';
+    return;
+  }
+  var dash = '<span style="color:var(--txl)">–</span>';
+  var n1 = function (v, dp) { return v == null ? dash : v.toFixed(dp == null ? 1 : dp); };
+  var cell = function (html, strong) { return '<td class="n"' + (strong ? ' style="font-weight:800"' : '') + '>' + html + '</td>'; };
+  /* a ratio is only as good as the entries under it, so each says how many */
+  var sub = function (k) { return '<span class="pl-sub" style="font-weight:500;color:var(--txm);font-size:10.5px;display:block">from ' +
+    fi(k) + ' entr' + (k === 1 ? 'y' : 'ies') + '</span>'; };
+  var line = function (b, A, foot) {
+    var q = JSON.stringify(b).replace(/"/g, '&quot;');
+    var nm = foot ? '<b>All branches</b>'
+      : '<button class="na-secbtn" onclick="trOpenMile(' + q + ')" title="' + _escAttr(b +
+          ' — every vehicle, and every fuel entry behind each of them') + '"><span class="bd b' + _escAttr(b) +
+          '"></span>' + _escAttr(b) + ' <span style="color:#2563EB;font-size:11px">›</span></button>';
+    return '<tr' + (foot ? ' style="background:var(--pl);font-weight:700"' : '') + '><td>' + nm + '</td>' +
+      cell(fi(A.nVeh)) +
+      cell(fi(A.n) + '<span class="pl-sub" style="font-weight:500;color:var(--txm);font-size:10.5px;display:block">' +
+        (A.first ? _trMileDate(A.first) + ' – ' + _trMileDate(A.last) : '') +
+        (A.rep ? (A.first ? ' · ' : '') + '<span style="color:#C2410C">' + A.rep + ' repeated</span>' : '') + '</span>') +
+      cell(A.litresN ? fi(Math.round(A.litres)) : dash) +
+      cell(A.spendN ? '₹' + fi(Math.round(A.spend)) : dash) +
+      cell(A.kmN ? fi(Math.round(A.km)) : dash) +
+      '<td class="n" style="font-weight:800;color:' + _trMileCol(A.kmpl) + '">' + n1(A.kmpl, 2) +
+        (A.pN ? '<span class="pl-sub" style="font-weight:500;color:var(--txm);font-size:10.5px;display:block">from ' +
+          fi(A.pN) + ' entr' + (A.pN === 1 ? 'y' : 'ies') + (A.doubt ? ' · ' + A.doubt + ' set aside' : '') + '</span>' : '') + '</td>' +
+      '<td class="n">' + (A.perKm == null ? dash : '₹' + n1(A.perKm, 2) + sub(A.cKmN)) + '</td>' +
+      '<td class="n">' + (A.perL == null ? dash : '₹' + n1(A.perL, 1) + sub(A.cLN)) + '</td>' +
+      '<td class="n" style="font-weight:700;color:' + _trCoverCol(A.cover) + '">' +
+        (A.cover == null ? dash : Math.round(A.cover) + '%') +
+        '<span class="pl-sub" style="font-weight:500;color:var(--txm);font-size:10.5px;display:block">' +
+        fi(A.wroteN) + ' of ' + fi(A.n) + '</span></td></tr>';
+  };
+  var body = brs.map(function (b) {
+    return line(b, _trMileAgg(rows.filter(function (r) { return r.Branch === b; })), 0); }).join('');
+  var tot = _trMileAgg(rows);
+  host.innerHTML = '<div style="overflow-x:auto"><table class="dt" style="min-width:940px">' +
+    '<thead><tr><th>Branch</th><th class="n">Vehicles</th><th class="n">Fuel entries</th><th class="n">Litres</th>' +
+    '<th class="n">Fuel spend</th><th class="n">KM run</th><th class="n" title="Kilometres ÷ litres, over the entries that record both">KM / litre</th>' +
+    '<th class="n" title="Spend ÷ kilometres, over the entries that record both">Cost / km</th>' +
+    '<th class="n" title="Spend ÷ litres, over the entries that record both">Cost / litre</th>' +
+    '<th class="n" title="The share of fuel entries that carry a distance reading at all">Distance logged</th></tr></thead>' +
+    '<tbody>' + body + (brs.length > 1 ? line('', tot, 1) : '') + '</tbody></table></div>' +
+    '<div style="font-size:11.5px;color:var(--txm);line-height:1.65;margin:10px 2px 0">' +
+      '<b>KM / litre</b> is kilometres ÷ litres over the entries that record both, leaving out readings outside ' +
+      TR_MILE_MIN + '–' + TR_MILE_MAX + ' KM/L as not believable' +
+      (tot.doubt ? ' (' + tot.doubt + ' set aside — they are listed, marked, inside each vehicle)' : '') +
+      '. <b>Cost / km</b> and <b>cost / litre</b> likewise take only the entries carrying their own pair, so a branch ' +
+      'that records the fill but not the price shows a dash rather than ₹0. <b>Distance logged</b> is how much of ' +
+      'the register can be measured at all.' +
+      (tot.rep ? ' <b style="color:#C2410C">' + tot.rep + ' entries repeat one already in the register</b> \u2014 the same ' +
+        'branch, date, vehicle, distance, litres and cost to the paisa. The first of each is counted and the rest ' +
+        'are set aside; they are listed, marked, against their vehicle.' : '') +
+      ' Click a branch for its vehicles, and a vehicle for every reading behind it.</div>';
+}
+
+/* ── one branch: its vehicles, each opening on its own fuel entries ── */
+function trOpenMile(branch) {
+  _trMileOpen = {};
+  window._TR_MILE_BR = branch;
+  _trMilePaint();
+}
+function trMileTog(k) {
+  if (_trMileOpen[k]) delete _trMileOpen[k]; else _trMileOpen[k] = 1;
+  _trMilePaint(1);
+}
+function _trMilePaint(keepScroll) {
+  var branch = window._TR_MILE_BR;
+  var T = _trData(), rows = (T.mileage || []).filter(function (r) { return r.Branch === branch; });
+  var reg = {};
+  (T.vehicles || []).forEach(function (v) { reg[_trMileKey(v.VehicleNo)] = v; });
+  var by = {};
+  rows.forEach(function (r) {
+    var k = _trMileKey(r.VehicleNo);
+    var o = by[k] || (by[k] = { k: k, no: (reg[k] && reg[k].VehicleNo) || r.VehicleNo || '(not recorded)',
+      known: !!reg[k], v: reg[k] || null, rows: [] });
+    o.rows.push(r);
+  });
+  var list = Object.keys(by).map(function (k) { var o = by[k]; o.a = _trMileAgg(o.rows); return o; })
+    .sort(function (p, q) {
+      if (p.known !== q.known) return p.known ? -1 : 1;
+      return (q.a.litres || 0) - (p.a.litres || 0); });
+  var A = _trMileAgg(rows);
+  var dash = '<span style="color:var(--txl)">–</span>';
+  var q = function (s) { return JSON.stringify(s).replace(/"/g, '&quot;'); };
+
+  var entryRows = function (o) {
+    var ent = o.a.ent.slice().sort(function (x, y) { return String(y.d).localeCompare(String(x.d)); });
+    return '<tr class="trm-sub"><td colspan="9" style="padding:0 0 0 26px;background:var(--pl)">' +
+      '<div style="overflow-x:auto;padding:8px 10px 12px 0"><table class="dt" style="min-width:620px;background:var(--sur);border-radius:8px">' +
+      '<thead><tr><th>Date</th><th>Route</th><th class="n">KM run</th><th class="n">Litres</th><th class="n">Cost</th>' +
+      '<th class="n">KM / litre</th><th class="n">Cost / km</th></tr></thead><tbody>' +
+      ent.map(function (e) {
+        var r = e.r, pk = (e.hasC && e.kmOk) ? e.c / e.km : null;
+        return '<tr' + (e.rep ? ' style="background:var(--pl);color:var(--txm)"' : e.doubt ? ' style="background:#FFF7ED"' : '') + '>' +
+          '<td style="white-space:nowrap">' + _escAttr(_trMileDate(e.d)) +
+            (e.rep ? ' <span style="color:#C2410C;font-size:10.5px;font-weight:700" title="The same fill is already in the register on this date with the same distance, litres and cost. Counted once; this copy is set aside.">repeat</span>' : '') + '</td>' +
+          '<td>' + _escAttr(r.Route && r.Route !== '–' ? r.Route : '–') + '</td>' +
+          '<td class="n"' + (e.doubt ? ' style="color:#C2410C;font-weight:700"' : '') + '>' +
+            (e.wrote ? fi(e.km) : dash) + '</td>' +
+          '<td class="n">' + (e.hasL ? e.l.toFixed(2) : dash) + '</td>' +
+          '<td class="n">' + (e.hasC ? '₹' + fi(Math.round(e.c)) : dash) + '</td>' +
+          '<td class="n" style="font-weight:700;color:' + (e.doubt ? '#C2410C' : _trMileCol(e.kmpl)) + '">' +
+            (e.kmpl == null ? dash : e.kmpl.toFixed(2)) +
+            (e.doubt ? ' <span title="Set aside — a distance of ' + fi(e.km) + ' km' +
+              (e.kmpl == null ? '' : ' gives ' + e.kmpl.toFixed(1) + ' KM/L') +
+              ', outside ' + TR_MILE_MIN + '–' + TR_MILE_MAX + ' KM/L or over ' + fi(TR_MILE_MAXKM) +
+              ' km. A part fill written against a longer run, or an odometer typed into the distance column. ' +
+              'Left out of the vehicle and branch figures.">⚠</span>' : '') + '</td>' +
+          '<td class="n">' + (pk == null ? dash : '₹' + pk.toFixed(2)) + '</td></tr>';
+      }).join('') + '</tbody></table></div></td></tr>';
+  };
+
+  var vehRow = function (o) {
+    var open = !!_trMileOpen[o.k], a = o.a;
+    var sub = [];
+    if (o.v && o.v.RouteNo && o.v.RouteNo !== '–') sub.push(_escAttr(o.v.RouteNo));
+    if (o.v && o.v.Driver && o.v.Driver !== '–') sub.push(_escAttr(o.v.Driver));
+    if (!o.known) sub.push('<span style="color:#C2410C;font-weight:600">not in the fleet register</span>');
+    return '<tr><td style="padding-left:10px">' +
+      '<button class="na-secbtn" onclick="trMileTog(' + q(o.k) + ')" aria-expanded="' + open + '">' +
+      '<span style="color:var(--txm);font-size:10px;width:12px;display:inline-block">' + (open ? '▾' : '▸') + '</span>' +
+      '<b>' + _escAttr(o.no) + '</b></button>' +
+      (sub.length ? '<span class="pl-sub" style="display:block;padding-left:12px;font-size:10.5px;color:var(--txm)">' + sub.join(' · ') + '</span>' : '') +
+      '</td>' +
+      '<td class="n">' + fi(a.n) + '</td>' +
+      '<td class="n">' + (a.litresN ? fi(Math.round(a.litres)) : dash) + '</td>' +
+      '<td class="n">' + (a.spendN ? '₹' + fi(Math.round(a.spend)) : dash) + '</td>' +
+      '<td class="n">' + (a.kmN ? fi(Math.round(a.km)) : dash) + '</td>' +
+      '<td class="n" style="font-weight:800;color:' + _trMileCol(a.kmpl) + '">' + (a.kmpl == null ? dash : a.kmpl.toFixed(2)) +
+        (a.doubt ? '<span class="pl-sub" style="font-weight:500;color:#C2410C;font-size:10.5px;display:block">' + a.doubt + ' set aside</span>' : '') + '</td>' +
+      '<td class="n">' + (a.perKm == null ? dash : '₹' + a.perKm.toFixed(2)) + '</td>' +
+      '<td class="n">' + (a.perL == null ? dash : '₹' + a.perL.toFixed(1)) + '</td>' +
+      '<td class="n" style="white-space:nowrap">' + _escAttr(_trMileDate(a.last)) + '</td></tr>' +
+      (open ? entryRows(o) : '');
+  };
+
+  var html = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px">' +
+    [['Vehicles', fi(list.length)], ['Fuel entries', fi(A.n)],
+     ['Litres', A.litresN ? fi(Math.round(A.litres)) : '–'],
+     ['Spend', A.spendN ? '₹' + fi(Math.round(A.spend)) : '–'],
+     ['KM run', A.kmN ? fi(Math.round(A.km)) : '–'],
+     ['KM / litre', A.kmpl == null ? '–' : A.kmpl.toFixed(2)],
+     ['Distance logged', A.cover == null ? '–' : Math.round(A.cover) + '%']
+    ].concat(A.rep ? [['Repeated, set aside', String(A.rep)]] : []).map(function (x) {
+      return '<span style="border:1px solid var(--bor);border-radius:10px;padding:7px 13px;font-size:12.5px">' +
+        x[0] + ' <b style="font-size:14px">' + x[1] + '</b></span>'; }).join('') + '</div>' +
+    '<div style="font-size:12px;color:var(--txm);margin:0 2px 12px;line-height:1.6">Tap a vehicle for every fuel entry ' +
+      'recorded against it. A reading outside ' + TR_MILE_MIN + '–' + TR_MILE_MAX + ' KM/L is shaded and left out of the ' +
+      'vehicle and branch figures' + (A.doubt ? ' — ' + A.doubt + ' here' : '') + '.' +
+      (A.rep ? ' An entry marked <b style="color:#C2410C">repeat</b> is the same fill already in the register — counted once.' : '') + '</div>' +
+    '<div style="overflow-x:auto"><table class="dt trm-t" style="min-width:860px"><thead><tr><th>Vehicle</th>' +
+    '<th class="n">Entries</th><th class="n">Litres</th><th class="n">Spend</th><th class="n">KM run</th>' +
+    '<th class="n">KM / litre</th><th class="n">Cost / km</th><th class="n">Cost / litre</th><th class="n">Last fill</th>' +
+    '</tr></thead><tbody>' + list.map(vehRow).join('') + '</tbody></table></div>';
+
+  var keep = null;
+  if (keepScroll) { var b0 = document.getElementById('modal-html'); if (b0) keep = b0.scrollTop; }
+  if (typeof openHTMLModal === 'function') {
+    openHTMLModal('⛽ ' + branch + ' — complete mileage report',
+      fi(list.length) + ' vehicle' + (list.length === 1 ? '' : 's') + ' · ' + fi(A.n) + ' fuel entries · ' +
+      (A.first ? _trMileDate(A.first) + ' to ' + _trMileDate(A.last) : 'no dates recorded'), html);
+  }
+  if (keep != null) { var b1 = document.getElementById('modal-html'); if (b1) b1.scrollTop = keep; }
+  /* Export CSV: every fuel entry behind this branch, not just what is on screen */
+  if (typeof modalAllRows !== 'undefined') {
+    modalAllRows = list.reduce(function (out, o) {
+      o.a.ent.forEach(function (e) {
+        out.push({ Branch: branch, Vehicle: o.no, InRegister: o.known ? 'yes' : 'no',
+          Route: (e.r.Route && e.r.Route !== '–') ? e.r.Route : '', Date: e.d,
+          KMRun: e.wrote ? e.km : '', Litres: e.hasL ? e.l : '', Cost: e.hasC ? e.c : '',
+          KMPL: e.kmpl == null ? '' : +e.kmpl.toFixed(2),
+          Doubtful: e.rep ? 'repeat — set aside' : e.doubt ? 'set aside' : '' });
+      });
+      return out;
+    }, []);
+    window._modalColumns = [{ key: 'Branch', label: 'Branch' }, { key: 'Vehicle', label: 'Vehicle' },
+      { key: 'InRegister', label: 'In fleet register' }, { key: 'Route', label: 'Route' },
+      { key: 'Date', label: 'Date' }, { key: 'KMRun', label: 'KM run' }, { key: 'Litres', label: 'Litres' },
+      { key: 'Cost', label: 'Fuel cost' }, { key: 'KMPL', label: 'KM / litre' }, { key: 'Doubtful', label: 'Reading' }];
+  }
+}
+
 function viewMileage(kind,key){
   const T=_trData(); const bf=r=>(fBranch==='ALL'||r.Branch===fBranch);
   let rows=(T.mileage||[]).filter(bf);
