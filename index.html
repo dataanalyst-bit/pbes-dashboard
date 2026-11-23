@@ -4525,8 +4525,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
       <div class="au-sec">
         <h3>Parent voice — NLP & sentiment analytics</h3>
-        <div class="sub">Question 5 is used only for grouped enjoyment keywords. Question 6 is the sole source for positive/negative sentiment. Every drill-down shows the matched parent, student, contact, ratings and both written answers.</div>
-        <div id="av-nlp-kpis" class="au-kpis"></div>
+        <div class="sub">Question 5 is used only for grouped enjoyment keywords. Question 6 is the sole source for satisfied/not satisfied classification. Every drill-down shows the matched parent, student, contact, ratings and both written answers.</div>
         <div id="av-nlp-summary"></div>
         <div class="av-chart-grid av-nlp-grid">
           <div class="av-chart-card"><div class="av-chart-head"><h4>Overall rating distribution</h4><button type="button" onclick="window.avExpandChart('av-dist-chart')">Expand ↗</button></div><canvas id="av-dist-chart"></canvas></div>
@@ -42849,23 +42848,16 @@ window.T1 = (function () {
     chart('av-enjoy-kw-chart','bar',{labels:enjoyKw.map(function(x){return x.label;}),datasets:[{label:'Parent comments mentioning keyword group',data:enjoyKw.map(function(x){return x.count;}),backgroundColor:'#15966D'}]},{indexAxis:'y',scales:{x:{beginAtZero:true,ticks:{precision:0}}}},function(di,idx){return enjoyKw[idx].docs;},'Question 5 — what parents enjoyed','Grouped keyphrases with related expressions; counts are comments, not raw word frequency',function(di,idx){return idx===null?enjoyed:enjoyKw[idx].docs;});
     function q6SentimentCard(label,docs){
       var pct=totalResponses?((docs.length/totalResponses)*100).toFixed(1):'0.0';
-      return '<button type="button" class="av-sent-card av-'+label.toLowerCase()+'" onclick="window.avQ6SentDrill(\''+label+'\')"><b>'+docs.length+'</b><span>'+label+' · '+pct+'% of all responses</span><small>Tap to view parent records</small></button>';
+      var css=label==='Satisfied'?'av-positive':'av-negative';
+      return '<button type="button" class="av-sent-card '+css+'" onclick="window.avQ6SentDrill(\''+label+'\')"><b>'+docs.length+'</b><span>'+label+' · '+pct+'% of all responses</span><small>Tap to view parent records</small></button>';
     }
     $('av-nlp-summary').innerHTML=
       '<div class="av-nlp-summary-grid">'+
         '<div><h4>Question 5 · What parents enjoyed</h4><p>'+enjoyed.length+' substantive responses. Related expressions are grouped into meaningful keyword clusters; one comment may match more than one cluster.</p><div class="av-method-note">Keyword groups include student performances, dance and music, theme and creative concept, guest speeches, student participation, and event arrangements. Click a bar to inspect the exact parent comments.</div></div>'+
-        '<div><h4>Question 6 · Suggestions for improvement — sentiment analysis</h4><p>'+suggestions.length+' substantive responses classified. Percentages use all '+totalResponses+' submitted responses.</p><div class="av-sentiment-cards">'+q6SentimentCard('Positive',positiveParents)+q6SentimentCard('Negative',negativeParents)+'</div></div>'+
+        '<div><h4>Question 6 · Suggestions for improvement — satisfaction analysis</h4><p>'+suggestions.length+' substantive responses classified. Percentages use all '+totalResponses+' submitted responses.</p><div class="av-sentiment-cards">'+q6SentimentCard('Satisfied',positiveParents)+q6SentimentCard('Not satisfied',negativeParents)+'</div></div>'+
       '</div>'+
-      '<div class="av-method-note"><b>Classification method:</b> Question 6 alone determines sentiment. Explicit appreciation/no-change statements are Positive. Complaints, requests, improvement language and actionable suggestions are Negative / improvement requested. Ambiguous substantive suggestions are conservatively flagged as Negative for human review. Blank or placeholder Q6 answers are excluded from sentiment counts, but remain in the total-response denominator. Ratings and Question 5 are displayed as context in the drill-down; they do not override Q6 sentiment.</div>';
-    window.avQ6SentDrill=function(label){var ds=label==='Positive'?positiveParents:negativeParents;openDrill('Question 6 — '+label+' parent responses','Sentiment is calculated only from the improvement-suggestion column. Percentages use all '+totalResponses+' submitted responses.',ds);};
-    window.avNlpKpi=function(i){var ds=[enjoyed,suggestions,positiveParents,negativeParents][i]||[];openDrill(['Enjoyment comments — Q5','Improvement suggestions — Q6','Positive responses — Q6 only','Negative / improvement-needed responses — Q6 only'][i],'Parent/student details, all four scores, Q5 and Q6 text are shown for each matched response.',ds);};
-    $('av-nlp-kpis').innerHTML=[
-      [enjoyed.length+' ('+pctOfTotal(enjoyed.length)+'%)','ENJOYMENT COMMENTS','Q5 · % of all '+totalResponses+' responses'],
-      [suggestions.length+' ('+pctOfTotal(suggestions.length)+'%)','SUGGESTION COMMENTS','Q6 · % of all '+totalResponses+' responses'],
-      [positiveParents.length+' ('+pctOfTotal(positiveParents.length)+'%)','POSITIVE PARENTS','Q6 sentiment only · % of all responses'],
-      [negativeParents.length+' ('+pctOfTotal(negativeParents.length)+'%)','NEGATIVE PARENTS','Q6 sentiment only · % of all responses']
-    ].map(function(k,i){return '<button type="button" class="au-kpi av-click-kpi" onclick="window.avNlpKpi('+i+')"><div class="v">'+esc(k[0])+'</div><div class="k">'+esc(k[1])+'</div><div class="d">'+esc(k[2])+'</div><span class="av-tap-hint">Tap to view ↗</span></button>';}).join('');
-    window.avNlpKpi=function(i){var ds=[enjoyed,suggestions,positiveParents,negativeParents][i];openDrill(['Enjoyment comments — Q5','Improvement suggestions — Q6','Positive responses — Q6 only','Negative / improvement-needed responses — Q6 only'][i],'Parent and student details, all four scores, Q5 and Q6 text are shown for every matching response.',ds);};
+      '<div class="av-method-note"><b>Classification method:</b> Question 6 alone determines the satisfied / not satisfied classification. Explicit appreciation/no-change statements are classified as Satisfied. Complaints, requests, improvement language and actionable suggestions are classified as Not satisfied / improvement requested. Ambiguous substantive suggestions are conservatively flagged as Not satisfied for human review. Blank or placeholder Q6 answers are excluded from sentiment counts, but remain in the total-response denominator. Ratings and Question 5 are displayed as context in the drill-down; they do not override Q6 sentiment.</div>';
+    window.avQ6SentDrill=function(label){var ds=label==='Satisfied'?positiveParents:negativeParents;openDrill('Question 6 — '+label+' parent responses','Satisfaction classification is calculated only from the improvement-suggestion column. Percentages use all '+totalResponses+' submitted responses.',ds);};
     var topTheme=improveThemes[0],staffLow=a.filter(function(r){return score(r[4])<=3;}).length;
     $('av-actions').innerHTML=
       '<div class="av-action"><strong>1. Preserve the strongest experience — student performances</strong>Performance and dance were the most frequently identified enjoyment topic ('+enjoyThemes.filter(function(x){return x.label==='Student performances & dance';}).reduce(function(s,x){return s+x.count;},0)+' comments matched this theme). Retain student participation and stage opportunities.</div>'+
