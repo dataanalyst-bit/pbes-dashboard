@@ -42639,14 +42639,25 @@ window.T1 = (function () {
     var text=String(r&&r[7]||'').replace(/\s+/g,' ').trim();
     if(!validText(text))return {label:'No comment',polarity:0,reason:'No substantive Question 6 response'};
     var t=text.toLowerCase();
+
+    // First identify explicit dissatisfaction or a clear request for change.
+    // Neutral topic words (arrangement, food, seating, staff, audio/video) are
+    // not negative by themselves; they need an actual concern/request context.
+    var concernPattern=/\b(technical issues?|issues?|problems?|poor|bad|worst|unacceptable|disappoint(?:ed|ing)?|not good|not enough|lack(?:ing)?|need(?:s|ed)?|should|must|please (?:improve|provide|arrange|change|increase|reduce)|improv(?:e|ement)|better|provide|arrange for|change|avoid|reduce|increase|more|less|delay(?:ed)?|late|difficult(?:y)?|uncomfortable|unsafe|safety concern|crowd(?:ed|ing)?|pushing|confus(?:ion|ing)|traffic|parking problem|not satisfied|cannot|can't|didn't|don't)\b/i;
+    if(concernPattern.test(t))return {label:'Not satisfied',polarity:-1,reason:'Question 6 contains a clear concern or improvement request'};
+
+    // Appreciation and positive experience take precedence over neutral topic
+    // words. This correctly handles praise that mentions event arrangements.
+    var praisePattern=/\b(enjoy(?:ed|ing)?|phenomenal|wonderful|excellent|amazing|fantastic|great|good|beautiful|lovely|memorable|appreciat(?:e|ed)|satisfied|happy|perfect|awesome|thank(?:s|ful)?)\b/i;
+    if(praisePattern.test(t))return {label:'Satisfied',polarity:1,reason:'Positive appreciation in Question 6'};
+
     var noChangePattern=/^(nothing|none|nil|no|no suggestions?|no further suggestions?|no changes?|no improvements?|nothing to improve|nothing to change|nothing to add|everything (is |was )?(good|great|fine|excellent)|all (is |was )?(good|fine)|all good|no issues|no complaints|very good|excellent|great|satisfied|happy|keep it up|continue the same)[.!\\s]*$/i;
-    if(noChangePattern.test(t))return {label:'Positive',polarity:1,reason:'Explicit appreciation or no improvement requested'};
-    var improvementPattern=/\b(need|needs|needed|should|must|improve|improvement|better|provide|arrange|arrangements|change|avoid|reduce|increase|more|less|lack|poor|worst|delay|delayed|late|issue|issues|problem|problems|difficult|difficulty|uncomfortable|unsafe|safety|crowd|pushing|food|snack|snacks|breakfast|lunch|water|seating|seat|handover|dispersal|disbursement|timing|timings|schedule|audio|video|microphone|mic|lighting|staff|dress|practice|practise|steps|criteria|quality|confusion|confusing|traffic|parking|not enough|could not|cannot|can't|don't|didn't|never)\b/i;
-    if(improvementPattern.test(t))return {label:'Negative',polarity:-1,reason:'Actionable improvement request or concern'};
+    if(noChangePattern.test(t))return {label:'Satisfied',polarity:1,reason:'No improvement requested'};
+
     var lex=sentiment(text);
-    if(lex.label==='Positive')return {label:'Positive',polarity:Math.max(0.25,lex.polarity),reason:'Positive wording in Question 6'};
-    if(lex.label==='Negative')return {label:'Negative',polarity:Math.min(-0.25,lex.polarity),reason:'Negative wording in Question 6'};
-    return {label:'Negative',polarity:-0.2,reason:'Ambiguous substantive suggestion; flagged for human review'};
+    if(lex.label==='Positive')return {label:'Satisfied',polarity:Math.max(0.25,lex.polarity),reason:'Positive wording in Question 6'};
+    if(lex.label==='Negative')return {label:'Not satisfied',polarity:Math.min(-0.25,lex.polarity),reason:'Negative wording in Question 6'};
+    return {label:'Not satisfied',polarity:-0.2,reason:'Substantive suggestion; review recommended'};
   }
   function makeDocs(list,idx,type){
     var out=[];
@@ -42819,8 +42830,8 @@ window.T1 = (function () {
     var improvementRows=a.filter(function(r){var v=score(r[4]);return Number.isFinite(v)&&v<=3;});
     // Q6 alone determines sentiment. Each response is counted once; blank Q6
     // responses remain in the overall-response denominator but not sentiment counts.
-    var positiveParents=suggestions.filter(function(d){return d.sentiment==='Positive';});
-    var negativeParents=suggestions.filter(function(d){return d.sentiment==='Negative';});
+    var positiveParents=suggestions.filter(function(d){return d.sentiment==='Satisfied';});
+    var negativeParents=suggestions.filter(function(d){return d.sentiment==='Not satisfied';});
     var enjoyKw=extractEnjoyKeywords(enjoyed),improveThemes=themeCounts(suggestions,SUGGEST_THEMES),enjoyThemes=themeCounts(enjoyed,ENJOY_THEMES);
     $('av-meta').textContent=n+' live parent responses · '+(raw.source||'PBES-All Reports 2026-27')+' · Bachupally';
     $('av-kpis').innerHTML=[
@@ -42853,11 +42864,11 @@ window.T1 = (function () {
     }
     $('av-nlp-summary').innerHTML=
       '<div class="av-nlp-summary-grid">'+
-        '<div><h4>Question 5 · What parents enjoyed</h4><p>'+enjoyed.length+' substantive responses. Related expressions are grouped into meaningful keyword clusters; one comment may match more than one cluster.</p><div class="av-method-note">Keyword groups include student performances, dance and music, theme and creative concept, guest speeches, student participation, and event arrangements. Click a bar to inspect the exact parent comments.</div></div>'+
+        '<div><h4>Question 5 · What parents enjoyed</h4><p>'+enjoyed.length+' substantive responses. Related expressions are grouped into meaningful keyword clusters; one comment may match more than one cluster.</p></div>'+
         '<div><h4>Question 6 · Suggestions for improvement — satisfaction analysis</h4><p>'+suggestions.length+' substantive responses classified. Percentages use all '+totalResponses+' submitted responses.</p><div class="av-sentiment-cards">'+q6SentimentCard('Satisfied',positiveParents)+q6SentimentCard('Not satisfied',negativeParents)+'</div></div>'+
       '</div>'+
-      '<div class="av-method-note"><b>Classification method:</b> Question 6 alone determines the satisfied / not satisfied classification. Explicit appreciation/no-change statements are classified as Satisfied. Complaints, requests, improvement language and actionable suggestions are classified as Not satisfied / improvement requested. Ambiguous substantive suggestions are conservatively flagged as Not satisfied for human review. Blank or placeholder Q6 answers are excluded from sentiment counts, but remain in the total-response denominator. Ratings and Question 5 are displayed as context in the drill-down; they do not override Q6 sentiment.</div>';
-    window.avQ6SentDrill=function(label){var ds=label==='Satisfied'?positiveParents:negativeParents;openDrill('Question 6 — '+label+' parent responses','Satisfaction classification is calculated only from the improvement-suggestion column. Percentages use all '+totalResponses+' submitted responses.',ds);};
+      '';
+    window.avQ6SentDrill=function(label){var ds=label==='Satisfied'?positiveParents:negativeParents;openDrill('Question 6 — '+label+' parent responses','Question 6 responses only.',ds);};
     var topTheme=improveThemes[0],staffLow=a.filter(function(r){return score(r[4])<=3;}).length;
     $('av-actions').innerHTML=
       '<div class="av-action"><strong>1. Preserve the strongest experience — student performances</strong>Performance and dance were the most frequently identified enjoyment topic ('+enjoyThemes.filter(function(x){return x.label==='Student performances & dance';}).reduce(function(s,x){return s+x.count;},0)+' comments matched this theme). Retain student participation and stage opportunities.</div>'+
