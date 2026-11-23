@@ -49,7 +49,7 @@ const CACHE_TTL_SECONDS = 300; // edge freshness window (Apps Script keep-warm k
 // still one entry here — plus one line in step 4 if it carries personal data.
 const ALLOWED_SECTIONS = {
   pt1: 1, audit: 1, ptm: 1, civil: 1, syl: 1, vchk: 1, kptm: 1, sylc: 1,
-  term1: 1, meet: 1, dm: 1, naa: 1, bio: 1, adm27: 1
+  term1: 1, meet: 1, dm: 1, naa: 1, bio: 1, adm27: 1, auravya: 1
 };
 
 // Heavier than the main payload and most sections change only when marks are
@@ -66,7 +66,7 @@ const SECTION_TTL_SECONDS = 1800;
    so a two-minute edge copy was costing a full rebuild for no freshness. */
 /* The 2027-28 enquiry tracker is worked all day by counsellors, so a long
    edge copy would show a principal this morning's pipeline at four o'clock. */
-const SECTION_TTL_OVERRIDE = { syl: 120, sylc: 120, meet: 30, dm: 900, naa: 300, bio: 300, adm27: 120 };
+const SECTION_TTL_OVERRIDE = { syl: 120, sylc: 120, meet: 30, dm: 900, naa: 300, bio: 300, adm27: 120, auravya: 300 };
 
 // Column headers that carry the campus name, in the order they are looked for.
 // The three PT-1 tabs all use "Branch", but this keeps a rename from silently
@@ -361,6 +361,29 @@ export async function onRequestGet({ request, env }) {
       return json({ error: true, message: "Cached payload unreadable: " + err.message }, 502);
     }
     return withCookie(json(filterBioByBranch(bioData, userBranch)));
+  }
+
+  // Auravya feedback belongs only to Bachupally. Group-wide users retain
+  // access; a branch-scoped user from another campus receives an empty feed.
+  // The Apps Script payload contains anonymised rows and no parent identifiers.
+  const AURAVYA_ALL_BRANCH = { management: 1, admin_manager: 1, hr: 1 };
+  if (section === "auravya" && userBranch &&
+      !sameBranch(userBranch, "Bachupally") && !AURAVYA_ALL_BRANCH[role]) {
+    let auravyaData;
+    try {
+      auravyaData = await upstream.json();
+    } catch (err) {
+      return json({ error: true, message: "Cached Auravya payload unreadable: " + err.message }, 502);
+    }
+    if (auravyaData && auravyaData.AURAVYA_RAW) {
+      auravyaData.AURAVYA_RAW = {
+        ...auravyaData.AURAVYA_RAW,
+        rows: [],
+        totalRows: 0,
+        accessNote: "Auravya feedback is available only to Bachupally branch users."
+      };
+    }
+    return withCookie(json(auravyaData || { AURAVYA_RAW: { rows: [], totalRows: 0 } }));
   }
 
   // ── 3. Full-access roles: stream straight through (no parse) ──
