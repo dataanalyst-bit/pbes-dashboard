@@ -3226,7 +3226,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   <!-- Recruiter Speed (full width) -->
   <div class="row" style="margin-bottom:16px;">
     <div class="card">
-      <div class="ch"><h3>⚡ Recruiter Speed Analysis — Days to Close</h3><span class="fnote">Closed positions only · days = Closed Date − Post Date · open positions shown as ageing · click a row to view</span></div>
+      <div class="ch"><h3>⚡ Recruiter Speed Analysis — Days to Close</h3><span class="fnote">Closed positions only · days = Closed Date − Post Date · a closure with no date cannot be timed, so it is counted but not banded · click any number for just those records</span></div>
       <div class="cb" style="font-size:11px;color:#64748B;padding:0 4px 6px;">Fast ≤7 days · Medium 8–21 days · Slow &gt;21 days — ranked by avg. closure speed</div>
       <div class="cb" style="overflow-x:auto;">
         <table style="width:100%;border-collapse:collapse;min-width:480px;" id="hr-speed-table">
@@ -3273,7 +3273,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 <!-- All Records -->
   <div style="margin-bottom:14px;">
-    <button onclick="viewHRRecords('ALL')" style="padding:8px 18px;background:#1E4FD8;color:#fff;border:none;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">📋 View All 229 HR Records →</button>
+    <button id="hr-allbtn" onclick="viewHRRecords('ALL')" style="padding:8px 18px;background:#1E4FD8;color:#fff;border:none;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">📋 View all HR records →</button>
     <button onclick="viewHRRecords('Open')" style="padding:8px 14px;background:#FFFBEB;color:#D97706;border:1.5px solid #FDE68A;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;margin-left:8px;">⏳ View Open Positions</button>
   </div>
 </div>
@@ -3310,7 +3310,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   <!-- ═══ ADMISSIONS — green/teal family ═══ -->
   <div style="font-size:11px;font-weight:800;letter-spacing:.5px;color:#059669;text-transform:uppercase;margin:0 0 8px 2px;display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:3px;background:#059669;display:inline-block;"></span>🎓 Admissions (Portal-confirmed)</div>
   <div class="krow k6" style="margin-bottom:18px;">
-    <div class="kc green clickable" onclick="viewConfirmedAdmissions()" title="Click to view by branch"><div class="kc-ico">🎓</div><div class="kc-lbl">Confirmed (Portal)</div><div class="kc-val" id="adm-confirmed">–</div><div class="kc-sub" id="adm-confirmed-s">EXTRAEDGE stage-08: –</div></div>
+    <div class="kc green clickable" onclick="viewConfirmedAdmissions('2026-27')" title="Click for these 2026-27 portal records"><div class="kc-ico">🎓</div><div class="kc-lbl">Confirmed (Portal)</div><div class="kc-val" id="adm-confirmed">–</div><div class="kc-sub" id="adm-confirmed-s">EXTRAEDGE stage-08: –</div></div>
     <div class="kc green clickable" onclick="viewAdmWindow('today')" title="Click to view records"><div class="kc-ico">📅</div><div class="kc-lbl">Today</div><div class="kc-val" id="adm-today">–</div><div class="kc-sub">New enrollments · click to view</div></div>
     <div class="kc green clickable" onclick="viewAdmWindow('thisWeek')" title="Click to view records"><div class="kc-ico">📆</div><div class="kc-lbl">This Week</div><div class="kc-val" id="adm-thisweek">–</div><div class="kc-sub">Sun–today · click to view</div></div>
     <div class="kc green clickable" onclick="viewAdmWindow('lastWeek')" title="Click to view records"><div class="kc-ico">📆</div><div class="kc-lbl">Last Week</div><div class="kc-val" id="adm-lastweek">–</div><div class="kc-sub">Sun–Sat · click to view</div></div>
@@ -5733,12 +5733,23 @@ function ovObs(){
 }
 
 /* ── The plain counters: a branch-wise split instead of a tab jump ── */
+/* What counts as "still open", per kind. The overview tiles above and the
+   branch-wise panel below both read these, so the number on a tile and the
+   number of records behind it are worked out by the same test. */
+var OV_OPEN={
+  admin:function(r){ return !/done|complete/i.test(String(r.Status||'')); },
+  vig:  function(r){ return !/closed|resolved|done/i.test(String(r.Status||'')); },
+  hr:   function(r){ return /^open$/i.test(String(r.Status||'').trim()); },
+  /* rejected is not open either - it is finished with, just not delivered */
+  pur:  function(r){ return !/delivered|closed|cancel|complete|reject/i.test(String(r.PurchaseStatus||r.Status||'')); },
+  griev:function(r){ return !/resolved|closed/i.test(String(r.Status||'')); }
+};
 function ovCount(kind){
   var BR=(typeof BRANCHES!=='undefined')?BRANCHES:[];
   var scope=(typeof fBranch!=='undefined'&&fBranch!=='ALL')?[fBranch]:BR;
   var CFG={
     admin:{t:'\ud83c\udfd7\ufe0f Admin tasks',src:function(){ return (typeof ADMIN_DATA!=='undefined'&&ADMIN_DATA)||[]; },
-      open:function(r){ return !/done|complete/i.test(String(r.Status||'')); },
+      open:OV_OPEN.admin,
       /* what the KPI card itself counts, so the panel and the tile agree */
       st:function(r){ return String(r.Status||'').trim()||'(not set)'; },
       item:function(r){ return String(r.Task||r.TaskID||'(untitled task)'); },
@@ -5749,7 +5760,7 @@ function ovCount(kind){
         {key:'Remarks',label:'Remarks',maxW:'260px'},{key:'Status',label:'Status',pill:true}],
       what:'open tasks'},
     vig:{t:'\ud83d\udee1\ufe0f Vigilance issues',src:function(){ return (typeof VIG_DATA!=='undefined'&&VIG_DATA)||[]; },
-      open:function(r){ return !/closed|resolved|done/i.test(String(r.Status||'')); },
+      open:OV_OPEN.vig,
       st:function(r){ return String(r.Status||'').trim()||'(not set)'; },
       item:function(r){ return String(r.Issue||'(no description)'); },
       meta:function(r){ return [String(r.Area||'\u2013'), String(r.RiskLevel||'\u2013')]; },
@@ -5759,7 +5770,7 @@ function ovCount(kind){
         {key:'BranchRemarks',label:'Remarks',maxW:'240px'},{key:'Status',label:'Status',pill:true}],
       what:'open issues'},
     hr:{t:'\ud83d\udc54 HR open positions',src:function(){ return (typeof HR_RECORDS!=='undefined'&&HR_RECORDS)||[]; },
-      open:function(r){ return /^open$/i.test(String(r.Status||'').trim()); },
+      open:OV_OPEN.hr,
       st:function(r){ return String(r.Status||'').trim()||'(not set)'; },
       item:function(r){ return String(r.Position||'(no position named)'); },
       meta:function(r){ return [String(r.Department||'\u2013'), String(r.HR||'\u2013')]; },
@@ -5770,7 +5781,7 @@ function ovCount(kind){
     /* the purchase sheet names its column PurchaseStatus, not Status; read as
        Status every row looked open and every branch read 0% closed */
     pur:{t:'\ud83d\uded2 Purchase requests',src:function(){ return (typeof PUR_DATA!=='undefined'&&PUR_DATA)||[]; },
-      open:function(r){ return !/delivered|closed|cancel|complete/i.test(String(r.PurchaseStatus||r.Status||'')); },
+      open:OV_OPEN.pur,
       st:function(r){ return String(r.PurchaseStatus||r.Status||'').trim()||'(not set)'; },
       item:function(r){ return String(r.Item||'(no item named)'); },
       meta:function(r){ return [String(r.Qty||'\u2013'), String(r.Dept||'\u2013')]; },
@@ -5781,7 +5792,7 @@ function ovCount(kind){
         {key:'Remarks',label:'Remarks',maxW:'240px'},{key:'PurchaseStatus',label:'Status',pill:true}],
       what:'not yet delivered'},
     griev:{t:'\ud83d\udce3 Grievance cases',src:function(){ return (typeof GRIEVANCE_DATA!=='undefined'&&GRIEVANCE_DATA)||[]; },
-      open:function(r){ return !/resolved|closed/i.test(String(r.Status||'')); },
+      open:OV_OPEN.griev,
       st:function(r){ return String(r.Status||'').trim()||'(not set)'; },
       item:function(r){ return String(r.Description||r.Category||'(nothing recorded)'); },
       meta:function(r){ return [String(r.Category||'\u2013'), String(r.Severity||'\u2013')]; },
@@ -5792,8 +5803,21 @@ function ovCount(kind){
       what:'open cases'}
   };
   var c=CFG[kind]; if(!c) return;
-  var all=(c.src()||[]).filter(function(r){ return scope.indexOf(r.Branch)>=0; });
+  /* Viewing all branches means ALL of it. Rows recorded against something
+     other than the five branch names - a shared posting such as "Bachupally &
+     Gowdavalli", or a blank - used to be dropped here, which left the panel
+     one or two short of the tile it was opened from. They now get a line of
+     their own, so the two always add up to the same number. */
+  var onePicked=(typeof fBranch!=='undefined'&&fBranch!=='ALL');
+  var all=(c.src()||[]).filter(function(r){
+    return onePicked ? scope.indexOf(r.Branch)>=0 : true; });
   var open=all.filter(c.open);
+  if(!onePicked){
+    var extra=[];
+    all.forEach(function(r){ var b=String(r.Branch||'').trim()||'(branch not recorded)';
+      if(scope.indexOf(r.Branch)<0 && extra.indexOf(b)<0) extra.push(b); });
+    scope=scope.concat(extra.sort());
+  }
 
   /* ── WHAT IS STILL OPEN, BRANCH BY BRANCH, ITEM BY ITEM ──
      Added 6 Nov 2026. The panel used to stop at a number per branch: a
@@ -5857,7 +5881,9 @@ function ovCount(kind){
   gOrder.sort(function(x,y){ return gBy[y]-gBy[x]; });
 
   var rows=scope.map(function(b){
-    var mine=all.filter(function(r){ return r.Branch===b; });
+    var mine=all.filter(function(r){
+      var rb=String(r.Branch||'').trim();
+      return b==='(branch not recorded)' ? !rb : rb===b; });
     var o=mine.filter(c.open);
     var pct=mine.length?Math.round((mine.length-o.length)/mine.length*100):null;
     return {name:b, pct:pct, col:o.length?(pct!=null&&pct>=85?'#059669':pct!=null&&pct>=70?'#D97706':'#DC2626'):'#059669',
@@ -6204,7 +6230,7 @@ function renderOverview(){
     // Vigilance — show OPEN count, sub: Closed (status now only Open/Closed)
     const VIG=(typeof VIG_DATA!=='undefined'&&Array.isArray(VIG_DATA))?VIG_DATA:[];
     const vClosed=VIG.filter(r=>/closed/i.test(r.Status||'')).length;
-    const vOpen=VIG.filter(r=>/open/i.test(r.Status||'')).length;
+    const vOpen=VIG.filter(OV_OPEN.vig).length;
     setTxt('ov-vig', fi(vOpen));
     setTxt('ov-vig-s', fi(vClosed)+' Closed');
 
@@ -6218,13 +6244,13 @@ function renderOverview(){
     // HR — show OPEN positions, sub: Closed positions
     const HR=(typeof HR_RECORDS!=='undefined'&&Array.isArray(HR_RECORDS))?HR_RECORDS:[];
     const hrClosed=HR.filter(r=>/closed|filled/i.test(r.Status||'')).length;
-    const hrOpen=HR.filter(r=>/open|pending/i.test(r.Status||'')).length;
+    const hrOpen=HR.filter(OV_OPEN.hr).length;
     setTxt('ov-hr', fi(hrOpen));
     setTxt('ov-hr-s', fi(hrClosed)+' Closed positions');
 
     // Grievance — Open cases (anything not Resolved) + Parents Satisfied %
     const GR=(typeof GRIEVANCE_DATA!=='undefined'&&Array.isArray(GRIEVANCE_DATA))?GRIEVANCE_DATA:[];
-    const grOpen=GR.filter(r=>!/resolved/i.test(r.Status||'')).length;
+    const grOpen=GR.filter(OV_OPEN.griev).length;
     setTxt('ov-griev', fi(grOpen));
     setTxt('ov-griev-s', 'of '+fi(GR.length)+' total cases');
     // Parents satisfied %
@@ -6273,11 +6299,13 @@ function renderOverview(){
 
 // ── Overview chart drill-down helpers ──
 // Confirmed Admissions drill-down — portal-confirmed records (all branches separate)
-function viewConfirmedAdmissions(){
-  /* AY 2027-28 first: that is what the tile now counts, so that is what a
-     click on it has to open. The 2026-27 portal view is kept underneath as
-     the fallback for a session where the 2027-28 payload has not arrived. */
-  var A27=_ovAdm27();
+function viewConfirmedAdmissions(season){
+  /* AY 2027-28 first: that is what the OVERVIEW tile counts, so that is what a
+     click on it has to open. The 2026-27 portal view is kept underneath - and
+     the Admission Analysis 2026-27 tab asks for it by name, because its own
+     tile counts 2026-27 portal confirmations and opening 2027-28 under a
+     2026-27 number is how a reader loses trust in both. */
+  var A27=(season==='2026-27')?null:_ovAdm27();
   if(A27 && A27.total){
     var R=(typeof _admRaw!=='undefined')?_admRaw:null;
     var lab=function(code){ return (typeof _admStageLab==='function')?_admStageLab(code):code; };
@@ -8170,11 +8198,15 @@ function viewVigilanceRecords(filterKey){
   const ALLVIG=(typeof VIG_DATA!=='undefined'&&Array.isArray(VIG_DATA))?VIG_DATA:[];
   let rows=ALLVIG.filter(r=>(fBranch==='ALL'||r.Branch===fBranch)&&(fMonth==='ALL'||r.Month===fMonth));
   const isAdmDone=r=>/closed|done|completed|resolved/i.test(String(r.AdminStatus||''));
-  if(filterKey==='Critical') rows=rows.filter(r=>r.RiskLevel==='Critical');
+  /* The card reads "Critical risk (OPEN)", so this opens the open critical
+     issues. It used to open every critical issue ever raised - 34 records
+     under a figure of 0. */
+  if(filterKey==='Critical') rows=rows.filter(r=>r.RiskLevel==='Critical'&&r.Status!=='Closed');
   else if(filterKey==='AwaitingAdmin') rows=rows.filter(r=>r.Status==='Closed'&&!isAdmDone(r));
   else rows=rows.filter(r=>r.Status===filterKey);
   const bl=fBranch==='ALL'?'All Branches':fBranch, ml=fMonth==='ALL'?'All Months':fMonth+' 2026';
-  const label=filterKey==='AwaitingAdmin'?'Awaiting Admin Update':filterKey;
+  const label=filterKey==='AwaitingAdmin'?'Awaiting Admin Update'
+             :filterKey==='Critical'?'Critical risk, still open':filterKey;
   openModal(`🛡️ Vigilance — ${label}`,`${rows.length.toLocaleString('en-IN')} records · ${bl} · ${ml}`,rows,_VIG_COLS);
 }
 // All issues for one branch (from the Safety Performance ranking)
@@ -8311,6 +8343,9 @@ function renderPurchaseManagerPerf(rows,BRANCHES){
     }
     return 0;
   }
+  /* The overdue set is worked out here with odDaysOf(); keep it so a click on
+     "n overdue" opens those n requests and not the branch's whole register. */
+  const _PUR_OD={};
   const stats=BRANCHES.map(b=>{
     const br=rows.filter(r=>r.Branch===b);
     const tot=br.length;
@@ -8332,9 +8367,11 @@ function renderPurchaseManagerPerf(rows,BRANCHES){
       &&((r.Qty&&r.Qty!=='–')||(r.Amount&&r.Amount!=='–'))).length;
     const docScore=+((docOk/tot)*100).toFixed(1);
     const score=Math.round(statusScore*0.5+timeScore*0.4+docScore*0.1);
+    _PUR_OD[b]=odRows;
     return {branch:b,tot,delivered,ordered,inProg,overdue:odRows.length,avgOd:+avgOd.toFixed(0),
             statusScore,timeScore,docOk,docScore,score};
   }).filter(Boolean).sort((a,b)=>b.score-a.score);
+  window._PUR_OD=_PUR_OD;
   const medals=['🥇','🥈','🥉'];
   el.innerHTML=stats.map((s,i)=>{
     const qc=s.score>=80?'#059669':s.score>=60?'#D97706':'#DC2626';
@@ -8344,7 +8381,7 @@ function renderPurchaseManagerPerf(rows,BRANCHES){
       <div style="font-size:22px;width:32px;text-align:center;">${rankBadge}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-weight:700;font-size:13.5px;color:#0F172A;"><span class="bd b${s.branch}"></span>${s.branch}</div>
-        <div style="font-size:11px;color:#64748B;margin-top:2px;">✅ ${s.delivered} delivered · 📦 ${s.ordered} ordered · 🔄 ${s.inProg} in progress · ⏰ ${s.overdue} overdue${s.overdue>0?' (~'+s.avgOd+'d)':''}</div>
+        <div style="font-size:11px;color:#64748B;margin-top:2px;">${[['Delivered','✅',s.delivered,'delivered'],['Ordered','📦',s.ordered,'ordered'],['In Progress','🔄',s.inProg,'in progress'],['Overdue','⏰',s.overdue,'overdue'+(s.overdue>0?' (~'+s.avgOd+'d)':'')]].map(x=>`<span style="${x[2]>0?'cursor:pointer;text-decoration:underline dotted rgba(100,116,139,.55);text-underline-offset:3px;':''}" ${x[2]>0?`onclick="event.stopPropagation();viewPurchaseByBranchStatus('${s.branch}','${x[0]}')" title="Click for these ${x[2]} request(s) only"`:''}>${x[1]} ${x[2]} ${x[3]}</span>`).join(' · ')}</div>
         <div style="font-size:10.5px;color:#94A3B8;margin-top:1px;">status ${s.statusScore} ×50% · timeliness ${s.timeScore} ×40% · docs ${s.docScore}% ×10%</div>
         <div style="background:#E0E8FF;border-radius:5px;height:6px;margin-top:5px;overflow:hidden;"><div style="background:${qc};width:${Math.max(s.score,2)}%;height:6px;"></div></div>
       </div>
@@ -8357,15 +8394,19 @@ function renderPurchaseManagerPerf(rows,BRANCHES){
 function viewPurchaseByBranchStatus(branch,status){
   const ALL=(typeof PUR_DATA!=='undefined'&&Array.isArray(PUR_DATA))?PUR_DATA:[];
   let rows=ALL.filter(r=>r.Branch===branch);
-  if(status==='Delivered') rows=rows.filter(r=>/delivered/i.test(r.PurchaseStatus||''));
-  else if(status==='Ordered') rows=rows.filter(r=>/ordered|order placed/i.test(r.PurchaseStatus||''));
-  else if(status==='In Progress') rows=rows.filter(r=>/^in progress/i.test(String(r.PurchaseStatus||'').trim()));
-  else if(status==='Rejected') rows=rows.filter(r=>/rejected|cancel/i.test(r.PurchaseStatus||''));
+  /* Same tests the Branch Performance row counts with, so the number clicked
+     and the number of records opened are always the same number. */
+  const _st=r=>String(r.PurchaseStatus||'').trim();
+  if(status==='Delivered') rows=rows.filter(r=>/^delivered/i.test(_st(r)));
+  else if(status==='Ordered') rows=rows.filter(r=>/^order/i.test(_st(r)));
+  else if(status==='In Progress') rows=rows.filter(r=>/^in progress/i.test(_st(r)));
+  else if(status==='Rejected') rows=rows.filter(r=>/rejected|cancel/i.test(_st(r)));
+  else if(status==='Overdue') rows=((window._PUR_OD||{})[branch]||[]).slice();
   const cols=[{key:'Branch',label:'Branch'},{key:'Date',label:'Date',date:true},{key:'Item',label:'Item',maxW:'200px'},
     {key:'Spec',label:'Specification',maxW:'160px'},{key:'Dept',label:'Dept'},{key:'Qty',label:'Qty'},
     {key:'Amount',label:'Amount'},{key:'Priority',label:'Priority',pill:true},{key:'PurchaseStatus',label:'Status',pill:true},
     {key:'RaisedBy',label:'Raised By'},{key:'Remarks',label:'Remarks',maxW:'180px'}];
-  openModal(`🛒 ${branch} — ${status==='ALL'?'All Purchases':status}`,`${rows.length} records`,rows,cols);
+  openModal(`🛒 ${branch} — ${status==='ALL'?'All Purchases':status==='Overdue'?'Overdue requests only':status+' only'}`,`${rows.length} records`,rows,cols);
 }
 
 // Lead Owner portal-upload drilldown (Uploaded / NotUploaded / ALL)
@@ -8549,6 +8590,7 @@ function renderHR(){
   if(dtcAll.length){ totDays=+(dtcAll.reduce((a,b)=>a+b,0)/dtcAll.length).toFixed(1); }
   const compRate=totPos>0?+(totClosed/totPos*100).toFixed(1):0;
   setTxt('hr-total',fi(totPos));
+  setTxt('hr-allbtn','📋 View all '+fi(totPos)+' HR records →');
   setTxt('hr-closed',fi(totClosed));
   setTxt('hr-closed-s',compRate+'% closure rate');
   setTxt('hr-open',fi(totOpen));
@@ -8597,8 +8639,8 @@ function renderHR(){
         <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:700;font-size:14px;color:${k.compliance>=4.5?'#059669':'#D97706'}">${k.compliance}</td>
         <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;"><span style="font-size:18px;font-weight:900;color:${scoreColor}">${sc(k.overall)}</span></td>
         <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;"><span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;${badge};" title="${k.isNew?'Joined this month \u2014 nothing closed yet, so not rated':''}">${rIcon} ${k.rating==='New'?'New \u2014 joined this month':k.rating}</span></td>
-        <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:700;color:#059669;font-size:13px;">${k.closed}</td>
-        <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:700;color:${k.open>5?'#DC2626':'#D97706'};font-size:13px;">${k.open}</td>
+        <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:700;color:#059669;font-size:13px;cursor:pointer;text-decoration:underline dotted rgba(100,116,139,.55);text-underline-offset:3px; onclick="event.stopPropagation();viewHRByRecruiter('${h.replace(/'/g,"\\'")}','Closed')" title="Click for ${h}'s ${k.closed} closed position(s) only">${k.closed}</td>
+        <td style="padding:10px 14px;text-align:center;border-bottom:1px solid #E0E8FF;font-weight:700;color:${k.open>5?'#DC2626':'#D97706'};font-size:13px;cursor:pointer;text-decoration:underline dotted rgba(100,116,139,.55);text-underline-offset:3px; onclick="event.stopPropagation();viewHRByRecruiter('${h.replace(/'/g,"\\'")}','Open')" title="Click for ${h}'s ${k.open} open position(s) only">${k.open}</td>
       </tr>`;
     }).join('');
     }
@@ -8650,9 +8692,10 @@ function renderHR(){
       const ages=openRows.map(r=>{const pd=new Date(r.PostDate);return isNaN(pd)?null:Math.max(0,Math.round((today-pd)/86400000));}).filter(v=>v!==null);
       const avgAge=ages.length?Math.round(ages.reduce((a,b)=>a+b,0)/ages.length):null;
       return {h,fast,med,slow,avg:avg===null?null:+avg.toFixed(1),total:dtc.length,
-              open:openRows.length,avgAge};
+              closedAll:closedRows.length,open:openRows.length,avgAge};
     }).sort((a,b)=>(a.avg===null?1e9:a.avg)-(b.avg===null?1e9:b.avg));
 
+    const CUE_SPEED='cursor:pointer;text-decoration:underline dotted rgba(100,116,139,.55);text-underline-offset:3px;';
     speedBody.innerHTML=recStats.map((s,i)=>{
       const bg=i%2===0?'#fff':'#F8FAFF';
       const avgColor=s.avg===null?'#94A3B8':s.avg<=7?'#059669':s.avg<=21?'#D97706':'#DC2626';
@@ -8665,11 +8708,11 @@ function renderHR(){
         <div style="width:${slowW}%;background:#DC2626;"></div>
       </div>`:'';
       return `<tr style="background:${bg};cursor:pointer;" onclick="viewHRByRecruiter('${s.h.replace(/'/g,"\\'")}','Closed')" title="Click to view ${s.h}'s closed positions">
-        <td style="padding:8px 12px;font-size:12.5px;font-weight:700;border-bottom:1px solid #E0E8FF;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${HR_COLORS[s.h]||'#64748B'};margin-right:6px;"></span>${s.h}<small style="color:#94A3B8;display:block;font-size:9px;">${s.total} closed</small></td>
-        <td style="padding:8px 12px;text-align:center;border-bottom:1px solid #E0E8FF;"><span style="font-weight:800;color:#059669;">${s.fast}</span><small style="color:#94A3B8;display:block;font-size:9.5px;">${fastW}%</small>${bar}</td>
-        <td style="padding:8px 12px;text-align:center;border-bottom:1px solid #E0E8FF;"><span style="font-weight:700;color:#D97706;">${s.med}</span><small style="color:#94A3B8;display:block;font-size:9.5px;">${medW}%</small></td>
-        <td style="padding:8px 12px;text-align:center;border-bottom:1px solid #E0E8FF;"><span style="font-weight:700;color:#DC2626;">${s.slow}</span><small style="color:#94A3B8;display:block;font-size:9.5px;">${slowW}%</small></td>
-        <td style="padding:8px 12px;text-align:center;border-bottom:1px solid #E0E8FF;">${s.avg===null?'<span style="color:#94A3B8;font-size:11px;">no closures</span>':`<span style="font-size:15px;font-weight:800;color:${avgColor};">${s.avg}d</span>`}<small style="color:${s.open>0?'#DC2626':'#94A3B8'};display:block;font-size:9.5px;font-weight:600;">${s.open} open${s.avgAge!==null?' · aging '+s.avgAge+'d':''}</small></td>
+        <td style="padding:8px 12px;font-size:12.5px;font-weight:700;border-bottom:1px solid #E0E8FF;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${HR_COLORS[s.h]||'#64748B'};margin-right:6px;"></span>${s.h}<small style="color:#94A3B8;display:block;font-size:9px;">${s.closedAll} closed${s.closedAll>s.total?' · '+(s.closedAll-s.total)+' undated':''}</small></td>
+        <td style="padding:8px 12px;text-align:center;border-bottom:1px solid #E0E8FF;cursor:pointer;text-decoration:underline dotted rgba(100,116,139,.55);text-underline-offset:3px;" onclick="event.stopPropagation();viewHRByRecruiter('${s.h.replace(/'/g,"\\'")}','Fast')" title="Click for the ${s.fast} position(s) closed within 7 days"><span style="font-weight:800;color:#059669;">${s.fast}</span><small style="color:#94A3B8;display:block;font-size:9.5px;">${fastW}%</small>${bar}</td>
+        <td style="padding:8px 12px;text-align:center;border-bottom:1px solid #E0E8FF;cursor:pointer;text-decoration:underline dotted rgba(100,116,139,.55);text-underline-offset:3px;" onclick="event.stopPropagation();viewHRByRecruiter('${s.h.replace(/'/g,"\\'")}','Medium')" title="Click for the ${s.med} position(s) closed in 8-21 days"><span style="font-weight:700;color:#D97706;">${s.med}</span><small style="color:#94A3B8;display:block;font-size:9.5px;">${medW}%</small></td>
+        <td style="padding:8px 12px;text-align:center;border-bottom:1px solid #E0E8FF;cursor:pointer;text-decoration:underline dotted rgba(100,116,139,.55);text-underline-offset:3px;" onclick="event.stopPropagation();viewHRByRecruiter('${s.h.replace(/'/g,"\\'")}','Slow')" title="Click for the ${s.slow} position(s) that took over 21 days"><span style="font-weight:700;color:#DC2626;">${s.slow}</span><small style="color:#94A3B8;display:block;font-size:9.5px;">${slowW}%</small></td>
+        <td style="padding:8px 12px;text-align:center;border-bottom:1px solid #E0E8FF;">${s.avg===null?'<span style="color:#94A3B8;font-size:11px;">no closures</span>':`<span style="font-size:15px;font-weight:800;color:${avgColor};">${s.avg}d</span>`}<small style="color:${s.open>0?'#DC2626':'#94A3B8'};display:block;font-size:9.5px;font-weight:600;${s.open>0?CUE_SPEED:''}" ${s.open>0?`onclick="event.stopPropagation();viewHRByRecruiter('${s.h.replace(/'/g,"\\'")}','Open')" title="Click for the ${s.open} open position(s) only"`:''}>${s.open} open${s.avgAge!==null?' · aging '+s.avgAge+'d':''}</small></td>
       </tr>`;
     }).join('');
   }
@@ -9106,6 +9149,7 @@ function renderHRRanking(){
      rather than the reader having to trust four percentages. */
   window._HR_UNIFIED={}; stats.forEach(s=>{ window._HR_UNIFIED[s.hr]=s; });
 
+  const CUE_RANK='cursor:pointer;text-decoration:underline dotted rgba(100,116,139,.55);text-underline-offset:3px;';
   const medals=['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣'];
   let _rank=0;
   tbody.innerHTML=stats.map((s,i)=>{
@@ -9117,7 +9161,7 @@ function renderHRRanking(){
     return `<tr style="cursor:pointer" onclick="viewHRByRecruiter('${s.hr.replace(/'/g,"\\\\'")}','ALL')">
       <td style="font-size:17px;text-align:center">${isNew?'🌱':(medals[_rank-1]||_rank)}</td>
       <td><strong>${s.hr}</strong><br><small style="color:#94A3B8;font-size:10px;">${s.branch}${isNew?' · <span style="color:#1E4FD8">new this month</span>':''}</small></td>
-      <td><strong>${fi(s.closed)}</strong></td><td>${s.open>0?`<span style="color:#DC2626;font-weight:600">${s.open}</span>`:'0'}</td>
+      <td style="${CUE_RANK}" onclick="event.stopPropagation();viewHRByRecruiter('${s.hr.replace(/'/g,"\\'")}','Closed')" title="Click for the ${fi(s.closed)} closed position(s) only"><strong>${fi(s.closed)}</strong></td><td style="${s.open>0?CUE_RANK:''}" ${s.open>0?`onclick="event.stopPropagation();viewHRByRecruiter('${s.hr.replace(/'/g,"\\'")}','Open')" title="Click for the ${s.open} open position(s) only"`:''}>${s.open>0?`<span style="color:#DC2626;font-weight:600">${s.open}</span>`:'0'}</td>
       <td><strong style="color:${cmp(s.u.wh)}">${s.u.wh}%</strong><small style="display:block;font-size:9px;color:#94A3B8">${fi(s.closed+s.open)} roles</small></td>
       <td><strong style="color:${cmp(s.u.ce)}">${s.u.ce}%</strong><small style="display:block;font-size:9px;color:#94A3B8">${fi(s.closed)} of ${fi(s.closed+s.open)}</small></td>
       <td><strong style="color:${cmp(s.u.cs)}">${s.u.cs}%</strong><small style="display:block;font-size:9px;color:#94A3B8">${s.avgDays===null?'–':s.avgDays+'d avg vs 15d'}</small></td>
@@ -9152,6 +9196,17 @@ function viewHRByRecruiter(hr,status){
   if(status==='Open') rows=rows.filter(r=>/^open$/i.test(String(r.Status||'').trim()));
   else if(status==='Closed') rows=rows.filter(r=>/closed|filled/i.test(String(r.Status||'')));
   else if(status==='Hold') rows=((window._HOLD&&window._HOLD.HR)||[]).filter(r=>r.HR===hr);
+  /* The speed bands: clicking "4 fast" must show those four and nothing else.
+     Same bands as the Recruiter Speed table - Fast <=7d, Medium 8-21d, Slow >21d. */
+  else if(status==='Fast'||status==='Medium'||status==='Slow'){
+    const lo=status==='Fast'?-1:status==='Medium'?7:21;
+    const hi=status==='Fast'?7:status==='Medium'?21:Infinity;
+    rows=rows.filter(r=>{
+      if(!/closed|filled/i.test(String(r.Status||''))) return false;
+      const d=(typeof hrCloseDays==='function')?hrCloseDays(r):null;
+      return d!==null&&d>lo&&d<=hi;
+    });
+  }
   const cols=[{key:'HR',label:'HR'},{key:'PostDate',label:'Posted',date:true},{key:'Priority',label:'Priority',pill:true},
     {key:'Position',label:'Position',maxW:'180px'},{key:'Branch',label:'Branch'},{key:'Status',label:'Status',pill:true},
     {key:'ClosedDate',label:'Closed',date:true},{key:'DaysToClose',label:'Days'},
@@ -9172,7 +9227,9 @@ function viewHRByRecruiter(hr,status){
   const st=(window._HR_UNIFIED||{})[hr];
   /* No formula strip here: this view is asked for to read the RECORDS. The
      score's working is still on the scorecard row itself. */
-  openModal(`👥 ${hr} — ${status==='ALL'?'All Positions':status}`,
+  const _HRLAB={ALL:'All positions',Open:'Open positions only',Closed:'Closed positions only',Hold:'On hold',
+    Fast:'Closed fast — within 7 days',Medium:'Closed in 8–21 days',Slow:'Closed slow — over 21 days'};
+  openModal(`👥 ${hr} — ${_HRLAB[status]||status}`,
     `${rows.length} positions`+(st?` · score ${st.score}`:'')+
     (status==='Closed'?' · latest closed first':''),rows,cols,null);
 }
@@ -11113,6 +11170,10 @@ function renderCareSummary(){
   const reachable=filteredRows.filter(window._careAnswerable).length;
   const noAnswer=filteredRows.length-reachable;
   const satisfiedN=_nlpAll.filter(c=>c.satisfied).length;
+  /* Keep the very rows this number counted. The tile reads the remark, so the
+     calls behind it are not the same set as the calls tagged "No Concern" -
+     clicking it used to open 37,068 records under a figure of 37,022. */
+  window._CARE_SAT=filteredRows.filter((r,i)=>_nlpAll[i]&&_nlpAll[i].satisfied);
   const flaggedN=_nlpAll.filter(c=>c.flagged).length;
   const satisfiedPct=reachable?Math.round(satisfiedN/reachable*100):0;
   const _sliced=(sentFilteredRows.length!==filteredRows.length);
@@ -11593,7 +11654,7 @@ function renderCareSummary(){
   // ── KPI strip: Parents Satisfied + Resolved + In Progress + Pending ──
   const satColor=satisfiedPct>=80?'#059669':satisfiedPct>=60?'#D97706':'#DC2626';
   let h='<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;">'
-    +`<div style="flex:1;min-width:180px;background:linear-gradient(135deg,#ECFDF5,#F0FDFA);border:1px solid #A7F3D0;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="viewCareGrievance('No Concern')" title="Click to view satisfied parents">
+    +`<div style="flex:1;min-width:180px;background:linear-gradient(135deg,#ECFDF5,#F0FDFA);border:1px solid #A7F3D0;border-radius:11px;padding:12px 15px;cursor:pointer;" onclick="viewCareSatisfied()" title="Click to view these satisfied parents">
         <div style="font-size:11px;font-weight:700;color:#059669;text-transform:uppercase;">😊 Parents Satisfied</div>
         <div style="font-size:30px;font-weight:800;color:${satColor};line-height:1.1;margin-top:2px;">${satisfiedPct}%</div>
         <div style="font-size:11px;color:#64748B;">${fi(satisfiedN)} of ${fi(reachable)} answered calls</div>
@@ -12069,6 +12130,20 @@ function viewCareWithSentiment(status){
               :(/^pending$/i.test(status))?'\u23f3 Pending calls'
               :'\u2705 Resolved calls';
   openModal(_title,`${rows.length} call(s) · ${bl} · answered calls only · ${_careSentLabel()}`,rows,cols);
+}
+
+/* The calls behind the Parents Satisfied tile - exactly the rows it counted. */
+function viewCareSatisfied(){
+  const src=(window._CARE_SAT||[]);
+  const rows=src.map(r=>({Branch:r.Branch,Month:r.Month,Student:r.Student,Class:r.Class,Date:r.Date,
+      Grievance:r.GrievanceRaw||r.Grievance, Sentiment:_careRowSentiment(r),
+      Remarks:r.Remarks,Followup:r.Followup,Status:r.StatusRaw||r.Status}));
+  const cols=[{key:'Branch',label:'Branch'},{key:'Student',label:'Student',maxW:'160px'},{key:'Class',label:'Class'},
+    {key:'Date',label:'Date',date:true},{key:'Grievance',label:'Grievance'},{key:'Sentiment',label:'Sentiment',pill:true},
+    {key:'Remarks',label:'Remarks',maxW:'280px'},{key:'Followup',label:'Follow-up Action',maxW:'240px'},{key:'Status',label:'Status'}];
+  const bl=(typeof fBranch!=='undefined'&&fBranch!=='ALL')?fBranch:'All Branches';
+  openModal('😊 Parents satisfied — care calls',
+    `${rows.length} call(s) · ${bl} · read from the remark, not the tag`,rows,cols);
 }
 
 // Drill-down: care calls in a grievance category (respects current branch+month filter)
@@ -13145,7 +13220,9 @@ function viewTrDocs(branch, kind){
       const missing=!txt||txt==='\u2013'||isNaN(t);
       const days=missing?null:Math.round((t-nowT)/DAY);
       const state=missing?'none':(days<=0?'expired':(days<=30?'due':'ok'));
-      if(state===kind || (kind==='due'&&state==='due') )
+      /* A valid document was listed twice - once here and once below - so the
+         count came out at double what the table on the tab shows. */
+      if(kind!=='ok' && state===kind)
         hits.push(d[0]+' \u2014 '+(missing?'no date recorded'
           :days<=0?('expired '+Math.abs(days)+'d ago'):('due in '+days+'d')));
       if(kind==='ok'&&(state==='ok'||state==='due')&&!missing&&days>0)
@@ -13207,7 +13284,8 @@ function viewTransport(kind,branch){
     // Branch-wise total riders count with expand dropdown to view all riders
     const cols=[{key:'Student',label:'Student',maxW:'180px'},{key:'Class',label:'Class'},{key:'Section',label:'Section'},{key:'Route',label:'Route'},{key:'VehicleNo',label:'Vehicle'},{key:'Distance',label:'Distance'},{key:'RiderType',label:'Rider Type'},{key:'Status',label:'Status'}];
     const groups=scope.map(b=>{const rows=(T.students||[]).filter(r=>r.Branch===b);return {key:b,count:rows.length,rows:rows};});
-    openBranchAccordion('🎒 Transport Students — Branch-wise Riders','Riders per branch · expand to view all riders',groups,cols,'riders');
+    openBranchAccordion('🎒 Transport Students — Branch-wise Riders',fi(groups.reduce((a,g)=>a+g.count,0))+' riders across '+groups.length+
+      ' branch(es) · expand a branch to view them',groups,cols,'riders');
     return;
   }
   if(kind==='occupancy'){
@@ -13242,15 +13320,21 @@ function viewTransport(kind,branch){
   if(kind==='vehicles'||kind==='fleet'){
     // Branch-wise total vehicles count with expand dropdown to view all vehicles
     const cols=[{key:'VehicleNo',label:'Vehicle No'},{key:'Category',label:'Type'},{key:'Make',label:'Make'},{key:'Seats',label:'Seats'},{key:'Fuel',label:'Fuel'},{key:'AC',label:'AC'},{key:'Driver',label:'Driver',maxW:'150px'},{key:'GPS',label:'GPS'},{key:'Status',label:'Status'},{key:'Compliance',label:'Compliance'}];
-    const groups=scope.map(b=>{const rows=(T.vehicles||[]).filter(r=>r.Branch===b);return {key:b,count:rows.length,rows:rows};});
-    openBranchAccordion('🚌 Total Vehicles — Branch-wise Fleet','Vehicles per branch · expand to view all vehicles',groups,cols,'vehicles');
+    /* The tile counts the fleet still in service, so a sold or retired vehicle
+       does not belong in here either - it made the two differ by one. */
+    const _ret=(T.vehicles||[]).filter(r=>scope.indexOf(r.Branch)>=0&&_trIsRetired(r)).length;
+    const groups=scope.map(b=>{const rows=(T.vehicles||[]).filter(r=>r.Branch===b&&!_trIsRetired(r));return {key:b,count:rows.length,rows:rows};});
+    openBranchAccordion('🚌 Total Vehicles — Branch-wise Fleet',fi(groups.reduce((a,g)=>a+g.count,0))+' vehicles in service across '+groups.length+
+      ' branch(es)'+(_ret?' · '+_ret+' sold or retired, not counted':'')+
+      ' · expand a branch to view them',groups,cols,'vehicles');
     return;
   }
   if(kind==='spare'){
     const allSpare=(window._TR_SPARE||[]).filter(bf);
     const cols=_TR_VCOLS();
     const groups=scope.map(b=>{const rows=allSpare.filter(r=>r.Branch===b);return {key:b,count:rows.length,rows:rows};}).filter(g=>g.count>0);
-    if(groups.length>0){ openBranchAccordion('🔄 Spare / Standby Vehicles — Branch-wise','Status = Spare · expand to view details',groups,cols,'spare'); }
+    if(groups.length>0){ openBranchAccordion('🔄 Spare / Standby Vehicles — Branch-wise',fi(groups.reduce((a,g)=>a+g.count,0))+' spare vehicles across '+groups.length+
+      ' branch(es) · status = Spare · expand a branch to view them',groups,cols,'spare'); }
     else { openModal('🔄 Spare Vehicles','No spare vehicles found · '+bl,[],cols); }
     return;
   }
@@ -13531,6 +13615,12 @@ function renderITMonthly(){
     const pct = tot ? work / tot * 100 : null;
     const col = pct === null ? '#64748B' : pct >= 95 ? '#059669' : pct >= 80 ? '#D97706' : '#DC2626';
     const src = note || ((check > 0) ? '' : ' · total from the asset master; this check recorded none');
+    /* Keep the total this cell settled on. The drill-down used to work its own
+       out from the asset master, so a cell reading 245/245 opened under the
+       heading "245 working of 228". One number, decided once, used twice. */
+    window._IT_CELL = window._IT_CELL || {};
+    window._IT_CELL[b + '\u241f' + sys + '\u241f' + mk] =
+      { work: work, tot: tot, down: down, pend: pend, own: own, check: check, note: note };
     return '<td style="font-weight:700;color:' + col + ';cursor:pointer" ' +
       'title="' + work + ' working of ' + tot + (pct === null ? '' : ' · ' + Math.round(pct) + '%') + src + '" ' +
       'onclick="viewITMonth(\'' + b.replace(/'/g, "\\'") + '\',\'' + sys.replace(/'/g, "\\'") + '\',\'' + mk + '\')">' +
@@ -13640,10 +13730,13 @@ function viewITMonth(branch, system, mk){
   const D = _itData();
   const rows = (D.health || []).filter(r =>
     r.Branch === branch && r.System === system && itMonthKey(r.Date) === mk);
-  const work = rows.reduce((a, r) => a + (r.Working || 0), 0);
+  /* The figure the matrix cell showed, if it drew this cell - so the heading
+     here always repeats the number that was clicked. */
+  const cell = (window._IT_CELL || {})[branch + '\u241f' + system + '\u241f' + mk];
+  const work = cell ? cell.work : rows.reduce((a, r) => a + (r.Working || 0), 0);
   const own = (D.assets || []).filter(r => r.Branch === branch && r.System === system)
                               .reduce((a, r) => a + (r.Total || 0), 0);
-  const tot = own || rows.reduce((a, r) => a + (r.Total || 0), 0);
+  const tot = cell ? cell.tot : (own || rows.reduce((a, r) => a + (r.Total || 0), 0));
   openModal('💻 ' + branch + ' — ' + system + ' · ' + itMonthLabel(mk),
     work + ' working of ' + tot, rows,
     [{key:'Branch',label:'Branch'},{key:'Date',label:'Date',date:true},{key:'System',label:'System'},
@@ -13651,7 +13744,9 @@ function viewITMonth(branch, system, mk){
      {key:'Pending',label:'Pending'},{key:'Remarks',label:'Remarks',maxW:'240px'}],
     { expr: 'working % = working ÷ total assets × 100',
       work: work + ' ÷ ' + tot + ' × 100 = ' + fxPct(work, tot),
-      note: own ? 'The total is the standing count from the IT Assets tab, so it does not move month to month — only the working figure does.'
+      note: (cell && cell.note) ? ('This is the figure on the matrix cell.' + cell.note.replace(/^ · /, ' — '))
+          : (cell && cell.check > 0) ? 'The total is what this month\'s check accounted for.'
+          : own ? 'The total is the standing count from the IT Assets tab, so it does not move month to month — only the working figure does.'
                 : 'No entry for this branch and system in the IT Assets tab, so the total is taken from this month\'s check.' });
 }
 
@@ -13779,7 +13874,9 @@ function renderIT(){
 
   // Assets by branch (for the selected system) — click to view
   const scope=fBranch==='ALL'?['Bachupally','Boduppal','Gowdavalli','Keesara','Pocharam']:[fBranch];
-  const srcB=health.length?health:assets;
+  /* The snapshot again: adding every month's check made each branch's bar
+     several times its real size. */
+  const srcB=basis;
   const bTot={}; scope.forEach(b=>bTot[b]=srcB.filter(r=>r.Branch===b).reduce((s,r)=>s+(+r.Total||0),0));
   const bLabels=scope.filter(b=>bTot[b]>0);
   window._IT_BRANCHES=bLabels;
@@ -13820,7 +13917,11 @@ function renderIT(){
 }
 function viewIT(kind,branch,system){
   const D=_itData(); const health=D.health||[]; const assets=D.assets||[];
-  const base=(health.length?health:assets);
+  /* The same snapshot the tiles count - each branch-and-system pair's latest
+     check, not every month's check added together. Without this a tile reading
+     3,923 assets opened records adding up to 18,795. */
+  const snap=(window._IT_CURROWS&&window._IT_CURROWS.length)?window._IT_CURROWS:null;
+  const base=snap||(health.length?health:assets);
   // Honor the currently-selected system category (dropdown) unless a specific system was clicked.
   const selSys=(window._IT_SYS && window._IT_SYS!=='ALL')?window._IT_SYS:null;
   const sysFilter=system||selSys||null;
@@ -13833,7 +13934,12 @@ function viewIT(kind,branch,system){
   const bl=branch||(fBranch==='ALL'?'All Branches':fBranch);
   const sysLabel=sysFilter?(' · '+sysFilter):'';
   const title=kind==='down'?'🔴 Not-Working Assets':kind==='pending'?'⏳ Pending Assets':(kind==='system'&&system)?('🖥️ '+system):'🖥️ IT Assets';
-  openModal(title,`${rows.length} record(s) · ${bl}${sysLabel}`,rows,cols);
+  /* The cards above count UNITS - one row can carry 245 cameras - so the
+     drill-down leads with the same figure and then says how many rows hold it. */
+  const _u=k=>rows.reduce((a,r)=>a+(+r[k]||0),0);
+  const units=kind==='down'?_u('NotWorking'):kind==='pending'?_u('Pending'):_u('Total');
+  const uLab=kind==='down'?'not working':kind==='pending'?'pending':'assets';
+  openModal(title,`${fi(units)} ${uLab} across ${rows.length} record(s) · ${bl}${sysLabel}`,rows,cols);
 }
 
 
@@ -16682,18 +16788,10 @@ function renderGrievRanking(rows, ALLB){
   };
 })();
 
-/* Same-day cases from the KPI card */
-(function(){
-  var _origView=window.viewGrievRecords;
-  window.viewGrievRecords=function(key){
-    if(key==='SameDay'){
-      var rows=_grievRows().filter(grIsSameDay);
-      return openModal('⚡ Same-Day Closures',
-        rows.length.toLocaleString('en-IN')+' cases raised and closed on the same date',rows,_GR_COLS);
-    }
-    return _origView.apply(this,arguments);
-  };
-})();
+/* The same-day drill-down used to be wrapped on here. It is handled inside
+   viewGrievRecords itself now: the restored copy of that function further down
+   the page is declared after this point and replaced the wrapper, so clicking
+   the card opened every grievance on record. */
 </script>
 
 <script>
@@ -23969,7 +24067,7 @@ function admOpenKpi(k) {
   else if (k === 'cold') { f = function (r) { return r.st === 'not_connected' || r.st === 'new'; };
                            title = 'Not reached, and not yet called'; }
   else if (k === 'lost') { f = _admIsClosed; title = 'Closed without admission'; }
-  else if (k === 'conv' || k === 'gap') { return admOpenTargets(); }
+  else if (k === 'conv' || k === 'gap') { return admOpenTargets(k); }
   else                   { f = function () { return true; }; title = 'Total Leads'; }
   var rows = S.rows.filter(f);
   sub = _admN(rows.length) + ' leads · ' + (S.season || '');
@@ -24051,12 +24149,19 @@ function admOpenBranch(b) {
   _admModal(b, _admN(rows.length) + ' leads · ' + (S.season || ''),
     head + _admEnqTable(rows, false));
 }
-function admOpenTargets() {
+function admOpenTargets(from) {
   var S = _admSet();
   var h = '<div style="font-size:15px;color:var(--txm);line-height:1.6;margin-bottom:12px">' +
     'Every branch against the fixed monthly plan for AY 2027-28, added up to today. Tap a branch for its pipeline.</div>' +
     _admByBranchAcc(S.rows);
-  _admModal('Against the target', (S.season || '') + ' · ' + _admN(S.rows.length) + ' leads', h);
+  /* Lead with the figure that was clicked, so the reader can see their number
+     in the view it opened. */
+  var won = S.rows.filter(_admIsWon).length;
+  var tgt = (_admRaw && _admRaw.branches || []).reduce(function (a, b) { return a + (_admTarget(b) || 0); }, 0);
+  var lead = (from === 'gap' && tgt) ? (_admN(Math.max(0, tgt - won)) + ' still to find of a ' + _admN(tgt) + ' target')
+           : (from === 'conv') ? (_admN(won) + ' admitted of ' + _admN(S.rows.length) + ' leads')
+           : (_admN(S.rows.length) + ' leads');
+  _admModal('Against the target', lead + ' · ' + (S.season || ''), h);
 }
 
 // ── 2. the funnel ──────────────────────────────────────────────────────────
@@ -26672,7 +26777,7 @@ function _admPace() {
          than opening an empty box. Updated 17 November 2026. */
       var live = v > 0 && (cur || _admHistMonth(ay, m).length > 0);
       var call = cur ? 'admOpenPaceMonth(\'' + m + '\')'
-        : 'admOpenHistMonth(' + JSON.stringify(ay).replace(/"/g, '&quot;') + ',\'' + m + '\')';
+        : 'admOpenHistMonth(' + JSON.stringify(ay).replace(/"/g, '&quot;') + ',\'' + m + '\',' + v + ')';
       h += '<td class="n" style="font-size:13.5px;' + (live ? 'cursor:pointer;' : '') +
         (v ? 'background:rgba(99,102,241,' + (0.08 + 0.55 * sh).toFixed(2) + ');font-weight:' +
              (sh > 0.45 ? '800' : '600') : 'color:var(--txm)') + '"' +
@@ -29088,12 +29193,23 @@ function _admHistMonth(ay, mon) {
     if (S.scope && r.b !== S.scope) return false;
     return parseInt(String(r.d).slice(5, 7), 10) === n; });
 }
-function admOpenHistMonth(ay, mon) {
+function admOpenHistMonth(ay, mon, shown) {
   var rows = _admHistMonth(ay, mon);
   if (!rows.length) return;
-  _admModal(ay + ' · ' + mon,
-    _admN(rows.length) + ' admission' + (rows.length === 1 ? '' : 's') + ' completed in this month',
-    _admYoYTable({ kind: 'hist', rows: rows }));
+  /* The cell's number comes from the Monthly Trends tab, which holds a count
+     per month and no children behind it. The list below comes from the student
+     history tab. Where the two tabs disagree, say so here rather than letting
+     a cell reading 37 open a list of 29 with no explanation. */
+  var sub = _admN(rows.length) + ' admission' + (rows.length === 1 ? '' : 's') +
+            ' with a student record in this month';
+  if (shown && +shown !== rows.length) {
+    var d = +shown - rows.length;
+    sub += ' · the Monthly Trends tab reports ' + _admN(+shown) + ' for this month, so ' +
+      (d > 0 ? _admN(d) + ' of them have no student row in the history tab'
+             : _admN(-d) + ' more carry a student row than that tab counts') +
+      ' · the two sheets need reconciling';
+  }
+  _admModal(ay + ' · ' + mon, sub, _admYoYTable({ kind: 'hist', rows: rows }));
 }
 function _admYoYBranches(S, R, season, lastAy, scope, day) {
   var LD = (typeof LEAD_DATES !== 'undefined' && LEAD_DATES) ? LEAD_DATES : [];
@@ -32950,7 +33066,18 @@ function viewGrievRecords(filterKey){
   if(filterKey==='Open'){ rows=rows.filter(r=>_isOpen(r.Status)); title='📂 Open Grievance Cases'; }
   else if(filterKey==='Resolved'){ rows=rows.filter(r=>_isResolved(r.Status)); title='✅ Resolved Cases'; }
   else if(filterKey==='Overdue'){ rows=rows.filter(r=>_isOverdue(r)); title='⏰ Overdue Cases'; }
-  else if(filterKey==='Satisfied'){ rows=rows.filter(r=>r.ParentSatisfaction&&!/^nan$/i.test(r.ParentSatisfaction)); title='😊 Parent Satisfaction'; }
+  /* The card counts the parents who said they were satisfied - 710 of the 733
+     who gave a rating - so that is what opens. It used to open all 736 cases,
+     rated or not. */
+  else if(filterKey==='Satisfied'){ rows=rows.filter(r=>/^satisfied/i.test(String(r.ParentSatisfaction||''))); title='😊 Parents satisfied'; }
+  else if(filterKey==='Rated'){ rows=rows.filter(r=>r.ParentSatisfaction&&r.ParentSatisfaction!=='–'&&!/^nan$/i.test(r.ParentSatisfaction)); title='😊 Cases with a parent rating'; }
+  /* Same-day closures. This used to live in a wrapper further up the page,
+     which a later restored copy of this function silently replaced - so the
+     card opened every grievance on record instead of the same-day ones. */
+  else if(filterKey==='SameDay'){
+    rows=(typeof grIsSameDay==='function')?rows.filter(grIsSameDay):rows;
+    title='⚡ Same-day closures';
+  }
   else { title='📋 All Grievance Records'; }
   const bl=fBranch==='ALL'?'All Branches':fBranch;
   openModal(title,`${rows.length.toLocaleString('en-IN')} records · ${bl}`,rows,_GR_COLS);
@@ -34084,7 +34211,11 @@ const CG_BLOCKS = [
     ]},
   { icon:'📞', name:'Care calls', cols:[
       {l:'Calls made',         g:d=>d.care.made,                       k:'care'},
-      {l:'Not resolved',       g:d=>d.care.made-d.care.resolved,       k:'care-pending', bad:true},
+      /* This read "calls made minus resolved" - a third definition of the same
+         question, 286 against the 151 its own click-through opens and the 151
+         the care tab reports. It now uses the one definition the whole
+         dashboard uses: concerns that are not yet resolved. */
+      {l:'Pending to be addressed', g:d=>d.care.pending,              k:'care-pending', bad:true},
       {l:'In progress',        g:d=>d.care.progress,                   k:'care-progress', bad:true},
       {l:'Resolved',           g:d=>d.care.resolved,                   k:'care-resolved'}
     ]},
@@ -34327,7 +34458,8 @@ function cgCell(key, branch){
       { expr: 'closed % = (issues raised − issues open) ÷ issues raised × 100',
         work: '(' + d.vig.total + ' − ' + d.vig.open + ') ÷ ' + d.vig.total + ' × 100 = ' + fxPct(d.vig.total - d.vig.open, d.vig.total),
         note: '"Work done — verification pending" counts as open here, matching the Vigilance tab.' });
-    case 'obs':   return T('Observations', d.obs.done + ' done of ' + d.obs.required + ' required', d.obs.rows, CG_COLS.obs,
+    case 'obs':   return T('Observations', Math.max(0, d.obs.required - d.obs.done) + ' short · ' +
+      d.obs.done + ' done of ' + d.obs.required + ' required', d.obs.rows, CG_COLS.obs,
       { expr: 'completion % = observations done ÷ required × 100, where required = Σ per role (working days × daily quota)',
         work: d.obs.done + ' ÷ ' + d.obs.required + ' × 100 = ' + fxPct(d.obs.done, d.obs.required, true),
         note: 'Quota 2/day for leadership roles, 1/day for each subject HOD. Capped at 100.' });
@@ -34570,7 +34702,19 @@ function cgObsCompletion(branch, d){
 
   const esc = v => String(v == null ? '' : v).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
   const col = p => p === null ? '#94A3B8' : p >= 80 ? '#059669' : p >= 50 ? '#D97706' : '#DC2626';
+  const _setOff = () => {
+    const off = (d.obs.done || 0) - gDone;
+    _offNote = off > 0
+      ? ' · ' + off + ' more observation' + (off === 1 ? '' : 's') + ' carr' +
+        (off === 1 ? 'ies' : 'y') + ' no usable month, so ' + (off === 1 ? 'it is' : 'they are') +
+        ' not in the table below'
+      : '';
+  };
 
+  /* An observation whose Month is blank, or outside the months configured for
+     this branch, cannot be placed in any row of the table below. Say how many
+     rather than let this total sit one or two short of the figure on the tab. */
+  let _offNote = '';
   let gReq = 0, gDone = 0, body = '';
   months.forEach((mk, i) => {
     const mObs = obs.filter(r => r.Month === mk);
@@ -34634,8 +34778,9 @@ function cgObsCompletion(branch, d){
       'without a separate HM is not marked down for a post it does not have. Capped at 100% per month.</p>' +
     '</div>';
 
+  _setOff();
   openHTMLModal('\uD83D\uDC41\uFE0F ' + branch + ' \u2014 observation completion',
-    gDone + ' of ' + gReq + ' required \u00b7 ' + months.length + ' month(s)', html, null);
+    gDone + ' of ' + gReq + ' required \u00b7 ' + months.length + ' month(s)' + _offNote, html, null);
 }
 
 /* Vehicle documents, showing ONLY the ones that are a problem.
