@@ -4529,7 +4529,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div id="av-nlp-summary"></div>
         <div class="av-chart-grid av-nlp-grid">
           <div class="av-chart-card"><div class="av-chart-head"><h4>Overall rating distribution</h4><button type="button" onclick="window.avExpandChart('av-dist-chart')">Expand ↗</button></div><canvas id="av-dist-chart"></canvas></div>
-          <div class="av-chart-card"><div class="av-chart-head"><h4>Question 6 · Key improvement themes (8 keyword groups)</h4><button type="button" onclick="window.avExpandChart('av-q6-kw-chart')">Expand ↗</button></div><canvas id="av-q6-kw-chart"></canvas><div class="av-method-note">Each bar counts parent comments mentioning that improvement theme. A comment may appear in more than one theme. Click a bar to view the exact matching parent records.</div></div>
+          <div class="av-chart-card av-q6-keyword-card"><div class="av-chart-head"><h4>Question 6 · One primary improvement theme per student</h4><button type="button" onclick="window.avExpandChart('av-q6-kw-chart')">Expand ↗</button></div><canvas id="av-q6-kw-chart"></canvas><div class="av-method-note">Each student/class combination is assigned to one best-fit theme only. Multiple parent submissions for the same student stay in that one category. Unmatched students appear under “Other / general feedback”. Click a bar to view all matching parent records.</div></div>
           <div class="av-chart-card"><div class="av-chart-head"><h4>What parents enjoyed — keyword groups (Question 5)</h4><button type="button" onclick="window.avExpandChart('av-enjoy-kw-chart')">Expand ↗</button></div><canvas id="av-enjoy-kw-chart"></canvas></div>
         </div>
       </div>
@@ -42849,13 +42849,35 @@ window.T1 = (function () {
     window.avGroupDrill=function(b){var selected=a.filter(function(r){return gradeBand(r[0])===b;});var ds=selected.map(function(r){var t='Seating: '+(r[2]==null?'—':r[2])+'/5 · Student performances: '+(r[3]==null?'—':r[3])+'/5 · Staff support: '+(r[4]==null?'—':r[4])+'/5 · Overall: '+(r[5]==null?'—':r[5])+'/5\\nEnjoyed: '+(r[6]||'—')+'\\nSuggestion: '+(r[7]||'—');var s=sentiment((r[6]||'')+' '+(r[7]||''));return {row:r,grade:r[0],type:'Grade-group response',text:t,sentiment:classifySuggestion(r).label,polarity:classifySuggestion(r).polarity};});openDrill(b+' — feedback detail',selected.length+' source records',ds);};
     var dist=[1,2,3,4,5].map(function(s){return overall.filter(function(v){return v===s;}).length;});
     chart('av-dist-chart','doughnut',{labels:['1 · Needs improvement','2 · Average','3 · Good','4 · Very good','5 · Outstanding'],datasets:[{data:dist,backgroundColor:['#D94848','#E78A43','#E9C34A','#4C9AD8','#15966D']}]},{},function(di,idx){var v=idx+1;return a.filter(function(r){return score(r[5])===v;}).map(function(r){var s=classifySuggestion(r);return {row:r,grade:r[0],type:'Overall rating '+v,text:'Enjoyed: '+(r[6]||'—')+' | Suggestion: '+(r[7]||'—'),sentiment:s.label,polarity:s.polarity};});},'Overall rating distribution','Overall event ratings',function(di,idx){if(idx===null)return a.map(function(r){return {row:r,grade:r[0],type:'Rating record',text:'Overall rating: '+r[5]+' / 5 · Enjoyed: '+(r[6]||'—')+' · Suggestion: '+(r[7]||'—'),sentiment:'Rating record',polarity:0};});var v=idx+1;return a.filter(function(r){return score(r[5])===v;}).map(function(r){var s=classifySuggestion(r);return {row:r,grade:r[0],type:'Overall rating '+v,text:'Enjoyed: '+(r[6]||'—')+' | Suggestion: '+(r[7]||'—'),sentiment:s.label,polarity:s.polarity};});});
-    // Q6 keyword analysis: show all eight predefined improvement themes,
-    // including zero-count themes, so the categories remain consistent.
-    var q6KeywordGroups=SUGGEST_THEMES.map(function(rule){
-      var matched=suggestions.filter(function(d){return rule[1].test(d.text);});
-      return {label:rule[0],count:matched.length,docs:matched};
+    // Q6 keyword analysis: group by student + class first, then assign each
+    // student to ONE best-fit theme. Multiple parent submissions for the same
+    // student stay together in one bar; the drill-down retains every source row.
+    // Theme selection uses the greatest number of keyword hits; ties use the
+    // fixed theme order. Unmatched students are placed under Other.
+    var q6ThemeRules=SUGGEST_THEMES.concat([['Other / general feedback',/$^/]]);
+    var q6KeywordGroups=q6ThemeRules.map(function(rule){return {label:rule[0],count:0,docs:[]};});
+    var q6StudentMap={};
+    suggestions.forEach(function(d){
+      var student=String(d.row&&d.row[9]||'').trim().toLowerCase();
+      var grade=String(d.row&&d.row[0]||'').trim().toLowerCase();
+      var key=student?(grade+'|'+student):('__response__'+d.rowIndex);
+      if(!q6StudentMap[key])q6StudentMap[key]={text:'',docs:[]};
+      q6StudentMap[key].text+=' '+d.text;
+      q6StudentMap[key].docs.push(d);
     });
-    chart('av-q6-kw-chart','bar',{labels:q6KeywordGroups.map(function(x){return x.label;}),datasets:[{label:'Q6 parent comments mentioning theme',data:q6KeywordGroups.map(function(x){return x.count;}),backgroundColor:'#D97706'}]},{indexAxis:'y',scales:{x:{beginAtZero:true,ticks:{precision:0}}}},function(di,idx){return q6KeywordGroups[idx]?q6KeywordGroups[idx].docs:[];},'Question 6 — key improvement themes','Eight keyword groups extracted only from parent suggestions in Question 6. A comment may match multiple themes.',function(di,idx){return idx===null?suggestions:(q6KeywordGroups[idx]?q6KeywordGroups[idx].docs:[]);});
+    Object.keys(q6StudentMap).forEach(function(key){
+      var studentGroup=q6StudentMap[key],bestIndex=q6ThemeRules.length-1,bestScore=0;
+      q6ThemeRules.slice(0,-1).forEach(function(rule,i){
+        var flags=rule[1].flags.replace(/g/g,'').replace(/y/g,'');
+        var re=new RegExp(rule[1].source,flags+'g');
+        var hits=studentGroup.text.match(re);
+        var score=hits?hits.length:0;
+        if(score>bestScore){bestScore=score;bestIndex=i;}
+      });
+      q6KeywordGroups[bestIndex].count++;
+      Array.prototype.push.apply(q6KeywordGroups[bestIndex].docs,studentGroup.docs);
+    });
+    chart('av-q6-kw-chart','bar',{labels:q6KeywordGroups.map(function(x){return x.label;}),datasets:[{label:'Unique students assigned to primary theme',data:q6KeywordGroups.map(function(x){return x.count;}),backgroundColor:'#2563EB',borderRadius:6,maxBarThickness:24}]},{indexAxis:'y',layout:{padding:{left:8,right:22,top:8,bottom:4}},font:{family:'Plus Jakarta Sans, Inter, system-ui, sans-serif',size:13,weight:'600'},plugins:{legend:{display:false},datalabels:{font:{family:'Plus Jakarta Sans, Inter, system-ui, sans-serif',size:12,weight:'800'},color:'#1E293B',anchor:'end',align:'end',offset:5}},scales:{x:{beginAtZero:true,grace:'8%',ticks:{precision:0,color:'#475569',font:{family:'Plus Jakarta Sans, Inter, system-ui, sans-serif',size:11,weight:'600'}},grid:{color:'rgba(148,163,184,.18)'}},y:{ticks:{autoSkip:false,color:'#334155',font:{family:'Plus Jakarta Sans, Inter, system-ui, sans-serif',size:12,weight:'700'},padding:8},grid:{display:false}}}},function(di,idx){return q6KeywordGroups[idx]?q6KeywordGroups[idx].docs:[];},'Question 6 — one primary improvement theme per student','Each student/class combination is counted once. All parent submissions for that student remain available in the drill-down.',function(di,idx){return idx===null?suggestions:(q6KeywordGroups[idx]?q6KeywordGroups[idx].docs:[]);});
     chart('av-enjoy-kw-chart','bar',{labels:enjoyKw.map(function(x){return x.label;}),datasets:[{label:'Parent comments mentioning keyword group',data:enjoyKw.map(function(x){return x.count;}),backgroundColor:'#15966D'}]},{indexAxis:'y',scales:{x:{beginAtZero:true,ticks:{precision:0}}}},function(di,idx){return enjoyKw[idx].docs;},'Question 5 — what parents enjoyed','Grouped keyphrases with related expressions; counts are comments, not raw word frequency',function(di,idx){return idx===null?enjoyed:enjoyKw[idx].docs;});
     function q6SentimentCard(label,docs){
       var pct=totalResponses?((docs.length/totalResponses)*100).toFixed(1):'0.0';
