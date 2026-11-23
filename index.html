@@ -4515,7 +4515,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
       <div class="au-sec">
         <h3>Parent voice — NLP & sentiment analytics</h3>
-        <div class="sub">Text analysis of the complete written responses in feedback columns 5 and 6. Tap a value or chart segment to inspect the underlying parent comments; use Expand for a larger visual.</div>
+        <div class="sub">Text analysis of the complete written responses in feedback columns 5 and 6. Numerical values are displayed on the charts. Tap a value or chart segment to inspect the underlying parent comments; use Expand for a larger visual.</div>
         <div id="av-nlp-kpis" class="au-kpis"></div>
         <div id="av-nlp-summary"></div>
         <div class="av-chart-grid av-nlp-grid">
@@ -42684,7 +42684,41 @@ window.T1 = (function () {
   function chart(id,type,data,options,pointHandler,title,sub,docsProvider){
     if(charts[id])charts[id].destroy();
     var el=$(id);if(!el||!window.Chart)return;
-    var opts=Object.assign({responsive:true,maintainAspectRatio:false,plugins:{legend:{display:type==='doughnut'||type==='pie'||type==='bar'&&!!(options&&options.indexAxis==='y'),position:'bottom'}}},options||{});
+    var supplied=options||{};
+    var isHorizontal=supplied.indexAxis==='y';
+    var isStacked=!!(supplied.scales&&((supplied.scales.x&&supplied.scales.x.stacked)||(supplied.scales.y&&supplied.scales.y.stacked)));
+    var labelDefaults={
+      display:function(ctx){
+        var v=Number(ctx.dataset.data[ctx.dataIndex]||0);
+        if(!Number.isFinite(v)||v===0)return false;
+        // Very small stacked sentiment slices cannot hold legible text.
+        if(isStacked && v<12)return false;
+        return true;
+      },
+      color:(type==='doughnut'||type==='pie'||isStacked)?'#FFFFFF':'#263449',
+      anchor:(type==='doughnut'||type==='pie')?'end':(isHorizontal?'end':'end'),
+      align:(type==='doughnut'||type==='pie')?'end':(isStacked?'center':'end'),
+      offset:(type==='doughnut'||type==='pie')?5:4,
+      clamp:true,
+      clip:false,
+      font:{family:'Inter, sans-serif',size:11,weight:'700'},
+      textStrokeColor:(type==='doughnut'||type==='pie'||isStacked)?'rgba(15,23,42,.28)':'rgba(255,255,255,.92)',
+      textStrokeWidth:(type==='doughnut'||type==='pie'||isStacked)?2:3,
+      formatter:function(value,ctx){
+        var v=Number(value);
+        if(!Number.isFinite(v)||v===0)return '';
+        if(type==='doughnut'||type==='pie')return String(Math.round(v));
+        return Number.isInteger(v)?String(v):v.toFixed(2);
+      }
+    };
+    var defaultPlugins={
+      legend:{display:type==='doughnut'||type==='pie'||type==='bar'&&isHorizontal,position:'bottom'},
+      tooltip:{enabled:true},
+      datalabels:labelDefaults
+    };
+    var opts=Object.assign({responsive:true,maintainAspectRatio:false},supplied);
+    opts.plugins=Object.assign({},defaultPlugins,supplied.plugins||{});
+    opts.plugins.datalabels=Object.assign({},labelDefaults,(supplied.plugins&&supplied.plugins.datalabels)||{});
     if(pointHandler)opts.onClick=function(evt,els,instance){if(!els||!els.length)return;var hit=els[0],docs=pointHandler(hit.datasetIndex,hit.index)||[];var label=(data.labels||[])[hit.index]||'';openDrill((title||id)+(label?' · '+label:''),sub||'Selected visual segment',docs);};
     charts[id]=new Chart(el.getContext('2d'),{type:type,data:data,options:opts});
     chartMeta[id]={type:type,data:data,options:opts,title:title||id,sub:sub||'',docsProvider:docsProvider||function(){return[];},pointHandler:pointHandler};
