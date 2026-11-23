@@ -4530,26 +4530,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div id="av-nlp-summary"></div>
         <div class="av-chart-grid av-nlp-grid">
           <div class="av-chart-card"><div class="av-chart-head"><h4>Overall rating distribution</h4><button type="button" onclick="window.avExpandChart('av-dist-chart')">Expand ↗</button></div><canvas id="av-dist-chart"></canvas></div>
-          <div class="av-chart-card"><div class="av-chart-head"><h4>Suggestions sentiment — Question 6 only</h4><button type="button" onclick="window.avExpandChart('av-sent-chart')">Expand ↗</button></div><canvas id="av-sent-chart"></canvas></div>
+          <div class="av-chart-card"><div class="av-chart-head"><h4>Question 6 · Key improvement themes (8 keyword groups)</h4><button type="button" onclick="window.avExpandChart('av-q6-kw-chart')">Expand ↗</button></div><canvas id="av-q6-kw-chart"></canvas><div class="av-method-note">Each bar counts parent comments mentioning that improvement theme. A comment may appear in more than one theme. Click a bar to view the exact matching parent records.</div></div>
           <div class="av-chart-card"><div class="av-chart-head"><h4>What parents enjoyed — keyword groups (Question 5)</h4><button type="button" onclick="window.avExpandChart('av-enjoy-kw-chart')">Expand ↗</button></div><canvas id="av-enjoy-kw-chart"></canvas></div>
         </div>
-      </div>
-      <div class="au-sec">
-        <h3>Class and section-wise performance</h3>
-        <div class="sub">Response count and average overall event rating for each class/section represented in the downloaded file.</div>
-        <div id="av-class-table"></div>
-      </div>
-      <div class="au-sec">
-        <h3>Parent voice — appreciation and suggestions</h3>
-        <div class="sub">Substantive written comments only. Search the feedback to identify specific points for follow-up.</div>
-        <input id="av-search" type="search" placeholder="Search parent comments or class…" style="width:100%;max-width:460px;padding:10px 12px;border:1px solid var(--bor);border-radius:9px;margin:8px 0 12px;background:var(--sur);color:var(--tx)">
-        <div id="av-comments"></div>
       </div>
       <div class="au-sec">
         <h3>Management insights and recommended actions</h3>
         <div id="av-actions"></div>
       </div>
-      <div style="font-size:11px;color:var(--txm);padding:4px 2px">Live source: PBES-All Reports 2026-27 → Bachupally AURAVYA 2026. Analytics are recalculated from the current master-sheet comments; parent contact details are excluded.</div>
+      <div style="font-size:11px;color:var(--txm);padding:4px 2px">Live source: PBES-All Reports 2026-27 → Bachupally AURAVYA 2026. Analytics are recalculated from the current master-sheet responses; parent contact details appear only in the corresponding drill-down records.</div>
     </div>
     <div id="av-nlp-modal" class="av-nlp-modal" aria-hidden="true">
       <div class="av-nlp-modal-card" role="dialog" aria-modal="true" aria-labelledby="av-nlp-modal-title">
@@ -42835,8 +42824,13 @@ window.T1 = (function () {
     window.avGroupDrill=function(b){var selected=a.filter(function(r){return r[1]===b;});var ds=selected.map(function(r){var t='Seating: '+(r[2]==null?'—':r[2])+'/5 · Student performances: '+(r[3]==null?'—':r[3])+'/5 · Staff support: '+(r[4]==null?'—':r[4])+'/5 · Overall: '+(r[5]==null?'—':r[5])+'/5\\nEnjoyed: '+(r[6]||'—')+'\\nSuggestion: '+(r[7]||'—');var s=sentiment((r[6]||'')+' '+(r[7]||''));return {row:r,grade:r[0],type:'Grade-group response',text:t,sentiment:classifySuggestion(r).label,polarity:classifySuggestion(r).polarity};});openDrill(b+' — feedback detail',selected.length+' source records',ds);};
     var dist=[1,2,3,4,5].map(function(s){return overall.filter(function(v){return v===s;}).length;});
     chart('av-dist-chart','doughnut',{labels:['1 · Needs improvement','2 · Average','3 · Good','4 · Very good','5 · Outstanding'],datasets:[{data:dist,backgroundColor:['#D94848','#E78A43','#E9C34A','#4C9AD8','#15966D']}]},{},function(di,idx){var v=idx+1;return a.filter(function(r){return score(r[5])===v;}).map(function(r){var s=classifySuggestion(r);return {row:r,grade:r[0],type:'Overall rating '+v,text:'Enjoyed: '+(r[6]||'—')+' | Suggestion: '+(r[7]||'—'),sentiment:s.label,polarity:s.polarity};});},'Overall rating distribution','Overall event ratings',function(di,idx){if(idx===null)return a.map(function(r){return {row:r,grade:r[0],type:'Rating record',text:'Overall rating: '+r[5]+' / 5 · Enjoyed: '+(r[6]||'—')+' · Suggestion: '+(r[7]||'—'),sentiment:'Rating record',polarity:0};});var v=idx+1;return a.filter(function(r){return score(r[5])===v;}).map(function(r){var s=classifySuggestion(r);return {row:r,grade:r[0],type:'Overall rating '+v,text:'Enjoyed: '+(r[6]||'—')+' | Suggestion: '+(r[7]||'—'),sentiment:s.label,polarity:s.polarity};});});
-    var q6Sentiments=['Positive','Negative'];
-    chart('av-sent-chart','bar',{labels:['Q6 · Suggestions for improvement'],datasets:q6Sentiments.map(function(s,i){return {label:s,data:[i===0?positiveParents.length:negativeParents.length],backgroundColor:i===0?'#15966D':'#D94848'};})},{scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,ticks:{precision:0}}}},function(di,idx){return q6Sentiments[di]==='Positive'?positiveParents:negativeParents;},'Question 6 — parent suggestion sentiment','Q6-only binary classification: positive appreciation / no concern vs negative / improvement requested',function(di,idx){if(di===null)return suggestions;return q6Sentiments[di]==='Positive'?positiveParents:negativeParents;});
+    // Q6 keyword analysis: show all eight predefined improvement themes,
+    // including zero-count themes, so the categories remain consistent.
+    var q6KeywordGroups=SUGGEST_THEMES.map(function(rule){
+      var matched=suggestions.filter(function(d){return rule[1].test(d.text);});
+      return {label:rule[0],count:matched.length,docs:matched};
+    });
+    chart('av-q6-kw-chart','bar',{labels:q6KeywordGroups.map(function(x){return x.label;}),datasets:[{label:'Q6 parent comments mentioning theme',data:q6KeywordGroups.map(function(x){return x.count;}),backgroundColor:'#D97706'}]},{indexAxis:'y',scales:{x:{beginAtZero:true,ticks:{precision:0}}}},function(di,idx){return q6KeywordGroups[idx]?q6KeywordGroups[idx].docs:[];},'Question 6 — key improvement themes','Eight keyword groups extracted only from parent suggestions in Question 6. A comment may match multiple themes.',function(di,idx){return idx===null?suggestions:(q6KeywordGroups[idx]?q6KeywordGroups[idx].docs:[]);});
     chart('av-enjoy-kw-chart','bar',{labels:enjoyKw.map(function(x){return x.label;}),datasets:[{label:'Parent comments mentioning keyword group',data:enjoyKw.map(function(x){return x.count;}),backgroundColor:'#15966D'}]},{indexAxis:'y',scales:{x:{beginAtZero:true,ticks:{precision:0}}}},function(di,idx){return enjoyKw[idx].docs;},'Question 5 — what parents enjoyed','Grouped keyphrases with related expressions; counts are comments, not raw word frequency',function(di,idx){return idx===null?enjoyed:enjoyKw[idx].docs;});
     function q6SentimentCard(label,docs){
       var pct=totalResponses?((docs.length/totalResponses)*100).toFixed(1):'0.0';
@@ -42857,11 +42851,6 @@ window.T1 = (function () {
       [negativeParents.length+' ('+pctOfTotal(negativeParents.length)+'%)','NEGATIVE PARENTS','Q6 sentiment only · % of all responses']
     ].map(function(k,i){return '<button type="button" class="au-kpi av-click-kpi" onclick="window.avNlpKpi('+i+')"><div class="v">'+esc(k[0])+'</div><div class="k">'+esc(k[1])+'</div><div class="d">'+esc(k[2])+'</div><span class="av-tap-hint">Tap to view ↗</span></button>';}).join('');
     window.avNlpKpi=function(i){var ds=[enjoyed,suggestions,positiveParents,negativeParents][i];openDrill(['Enjoyment comments — Q5','Improvement suggestions — Q6','Positive responses — Q6 only','Negative / improvement-needed responses — Q6 only'][i],'Parent and student details, all four scores, Q5 and Q6 text are shown for every matching response.',ds);};
-    var cl={};a.forEach(function(r){var k=String(r[0]||'Unspecified').trim(),v=score(r[5]);if(Number.isFinite(v))(cl[k]||(cl[k]=[])).push(v);});
-    var cls=Object.keys(cl).map(function(k){return {name:k,n:cl[k].length,avg:mean(cl[k])};}).sort(function(x,y){return y.n-x.n||x.name.localeCompare(y.name);});
-    $('av-class-table').innerHTML='<div class="av-table-wrap"><table class="av-table"><thead><tr><th>Class / section</th><th>Responses</th><th>Average overall rating</th></tr></thead><tbody>'+cls.map(function(x){return '<tr class="av-tap-row" tabindex="0" onclick="window.avClassDrill(\''+esc(x.name).replace(/'/g,"\\'")+'\')"><td>'+esc(x.name)+'</td><td>'+x.n+'</td><td>'+x.avg.toFixed(2)+'/5</td></tr>';}).join('')+'</tbody></table></div><div class="av-tap-hint">Tap a class row to inspect its parent comments.</div>';
-    window.avClassDrill=function(name){var selected=a.filter(function(r){return String(r[0]||'').trim()===name;});var ds=selected.map(function(r){var t='Seating: '+(r[2]==null?'—':r[2])+'/5 · Student performances: '+(r[3]==null?'—':r[3])+'/5 · Staff support: '+(r[4]==null?'—':r[4])+'/5 · Overall: '+(r[5]==null?'—':r[5])+'/5\\nEnjoyed: '+(r[6]||'—')+'\\nSuggestion: '+(r[7]||'—');var s=sentiment((r[6]||'')+' '+(r[7]||''));return {row:r,grade:r[0],type:'Class response',text:t,sentiment:classifySuggestion(r).label,polarity:classifySuggestion(r).polarity};});openDrill(name+' — class feedback','Rating and text responses',ds);};
-    renderComments();
     var topTheme=improveThemes[0],staffLow=a.filter(function(r){return score(r[4])<=3;}).length;
     $('av-actions').innerHTML=
       '<div class="av-action"><strong>1. Preserve the strongest experience — student performances</strong>Performance and dance were the most frequently identified enjoyment topic ('+enjoyThemes.filter(function(x){return x.label==='Student performances & dance';}).reduce(function(s,x){return s+x.count;},0)+' comments matched this theme). Retain student participation and stage opportunities.</div>'+
@@ -42870,13 +42859,6 @@ window.T1 = (function () {
       '<div class="av-action"><strong>4. Improve parent logistics</strong>Food and refreshments, scheduling, seating and venue access appear repeatedly in the written feedback. Review these as separate operational workstreams rather than one general event-arrangement issue.</div>'+
       '<div class="av-action"><strong>5. Validate sentiment and themes with human review</strong>Use the clickable comments to check context before taking action. Lexicon sentiment and phrase-based themes can misread sarcasm, mixed comments and short phrases.</div>';
   }
-  function renderComments(){
-    var q=($('av-search')&&$('av-search').value||'').toLowerCase().trim(),a=rows(),out=[];
-    a.forEach(function(r){[['Enjoyed',r[6]],['Suggestion',r[7]]].forEach(function(pair){var t=String(pair[1]||'').replace(/\s+/g,' ').trim();if(!validText(t))return;var s=sentiment(t),hay=(r[0]+' '+pair[0]+' '+t).toLowerCase();if(!q||hay.indexOf(q)>=0)out.push({grade:r[0],type:pair[0],text:t,sentiment:s.label,polarity:s.polarity});});});
-    $('av-comments').innerHTML=out.length?out.map(function(x,i){return '<button type="button" class="av-comment av-comment-button" onclick="window.avCommentDrill('+i+')"><small>'+esc(x.grade)+' · '+esc(x.type)+' · '+esc(x.sentiment)+'</small>'+esc(x.text)+'<span class="av-tap-hint">Tap to expand ↗</span></button>';}).join(''):'<div class="no-data">No matching substantive comments.</div>';
-    window.__avVisibleComments=out;
-  }
-  window.avCommentDrill=function(i){var d=(window.__avVisibleComments||[])[i];if(d)openDrill(d.grade+' · '+d.type,'Full parent comment', [d]);};
   async function load(force){
     if(loading)return;if(loaded&&!force){render();return;}loading=true;
     try{
@@ -42896,7 +42878,6 @@ window.T1 = (function () {
   }
   window.loadAuravya=load;
   window.addEventListener('DOMContentLoaded',function(){
-    var search=$('av-search');if(search)search.addEventListener('input',renderComments);
     var modal=$('av-nlp-modal');if(modal){modal.addEventListener('click',function(e){if(e.target===modal)closeDrill();});}
     document.addEventListener('keydown',function(e){if(e.key==='Escape')closeDrill();});
     var old=window.showTab;window.showTab=function(id,btn){var r=old.apply(this,arguments);if(id==='auravya')load(false);return r;};
