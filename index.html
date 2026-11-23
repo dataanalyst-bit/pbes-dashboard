@@ -1832,7 +1832,7 @@ window._liveDue=_liveDue; window._liveMark=_liveMark; window._liveLabel=_liveLab
 var FEED_TRIES = 3;
 var FEED_FIX = { syl:'refreshSylCache', audit:'refreshAuditCache', naa:'refreshNaaCache', bio:'refreshBioCache',
   adm27:'refreshAdm27Cache', dm:'refreshDmCache', vchk:'refreshVchkCache', kptm:'refreshKptmCache',
-  term1:'refreshTerm1Cache', pt1:'refreshPT1Cache', ptm:'refreshPTMCache', civil:'refreshCivilCache' };
+  term1:'refreshTerm1Cache', auravya:'refreshAuravyaCache', pt1:'refreshPT1Cache', ptm:'refreshPTMCache', civil:'refreshCivilCache' };
 function _feedErr(short, detail){
   var e = new Error(short); e.feedShort = short; e.feedDetail = detail || ''; e.feedDown = true; return e;
 }
@@ -2452,23 +2452,23 @@ const ROLE_TABS = {
   admin:             ['glance','admin','vigilance','civil','naa','bio'],
   /* Grievance officers — all three grievance roles — also get Syllabus &
      Notebook (28 Sep 2026). */
-  grievance_officer: ['glance','care','grievance','ptm','term1','syl','naa'],
+  grievance_officer: ['glance','care','grievance','ptm','term1','auravya','syl','naa'],
   /* Same as grievance_officer, plus Admissions. Kept as its own role rather
      than widening grievance_officer, because that would silently hand
      Admissions to every other grievance officer at the same time. */
-  grievance_admissions: ['glance','care','grievance','ptm','term1','admissions','kptm','syl','naa'],
-  hr_grievance:      ['glance','hr','observations','care','grievance','ptm','term1','syl','naa','bio'],
+  grievance_admissions: ['glance','care','grievance','ptm','term1','auravya','admissions','kptm','syl','naa'],
+  hr_grievance:      ['glance','hr','observations','care','grievance','ptm','term1','auravya','syl','naa','bio'],
   /* Academic coordinators, own branch only. 28 Sep 2026: Admin Tracker, School
      Audit, Teacher Observations and Consolidated Glance added on request.
      Still NOT given Vigilance, Purchase, HR, Transport or Admissions. */
-  coordinator:       ['glance','care','pt1','ptm','term1','grievance','syl','kptm',
+  coordinator:       ['glance','care','pt1','ptm','term1','auravya','grievance','syl','kptm',
                       'admin','audit','observations','naa','bio'],
   /* 'glance' and 'activity' were added after this table was written, so they
      were invisible to principals — including the Team Activity tab they are
      expected to file their own observations into. Both are branch-filtered
      server-side, so a principal sees only their own campus. */
   principal:         ['overview','glance','admp','care','observations','admissions','grievance',
-                      'transport','it','pt1','audit','ptm','term1','civil','syl','meet','kptm',
+                      'transport','it','pt1','audit','ptm','term1','auravya','civil','syl','meet','kptm',
                       /* A principal is accountable for admin tasks, safety issues and vacancies at
                          their own campus, so they need these three. All are branch-filtered
                          server-side, so they still see only their own. */
@@ -2854,6 +2854,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   }catch(e){}
 })();
 </script>
+
+<style>
+.av-chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:12px}
+.av-chart-card{min-width:0;background:var(--sur);border:1px solid var(--bor);border-radius:12px;padding:14px;min-height:280px}
+.av-chart-card h4{font-size:12px;font-weight:800;margin:0 0 12px;color:var(--tx)}
+.av-chart-card canvas{width:100%!important;height:230px!important}
+.av-table-wrap{overflow:auto;max-height:560px}
+.av-table{width:100%;border-collapse:collapse;font-size:12px}
+.av-table th{position:sticky;top:0;background:var(--pl);color:var(--tx);text-align:left;padding:9px 8px;white-space:nowrap}
+.av-table td{padding:8px;border-bottom:1px solid var(--bor)}
+.av-table tr:hover td{background:var(--bg)}
+.av-pill{display:inline-block;padding:3px 8px;border-radius:20px;background:var(--gl);color:var(--g);font-size:10px;font-weight:800}
+.av-comment{padding:11px 12px;border:1px solid var(--bor);border-radius:10px;margin:7px 0;background:var(--sur)}
+.av-comment small{color:var(--txm);display:block;margin-bottom:5px}
+.av-comment b{font-size:11px;color:var(--p)}
+.av-action{padding:12px 14px;border:1px solid var(--bor);border-left:4px solid var(--a);border-radius:9px;margin:8px 0;background:var(--sur)}
+.av-action strong{display:block;margin-bottom:4px}
+@media(max-width:760px){.av-chart-grid{grid-template-columns:1fr}.av-chart-card{min-height:260px}}
+</style>
+
 </head>
 <body>
 <header class="hdr">
@@ -4063,7 +4083,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 <!-- ═══ PTM PARENT FEEDBACK ═══ -->
 <div id="pane-ptm" class="pane">
   <div class="au-wrap">
-    <div class="grpsw"><button data-tab="term1" onclick="showTab('term1')">📝 Term 1 Feedback</button><button data-tab="ptm" onclick="showTab('ptm')">💬 PTM Feedback</button><button data-tab="kptm" onclick="showTab('kptm')">⭐ K-Innovative PTM</button></div>
+    <div class="grpsw"><button data-tab="term1" onclick="showTab('term1')">📝 Term 1 Feedback</button><button data-tab="ptm" onclick="showTab('ptm')">💬 PTM Feedback</button><button data-tab="kptm" onclick="showTab('kptm')">⭐ K-Innovative PTM</button><button data-tab="auravya" onclick="showTab('auravya')">🎭 Bachupally Auravya 2026</button></div>
 
     <div class="au-head">
       <div>
@@ -4317,7 +4337,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 <!-- ═══ TERM 1 PARENT FEEDBACK & NPS ═══ -->
 <div id="pane-term1" class="pane">
   <div class="au-wrap">
-    <div class="grpsw"><button data-tab="term1" onclick="showTab('term1')">📝 Term 1 Feedback</button><button data-tab="ptm" onclick="showTab('ptm')">💬 PTM Feedback</button><button data-tab="kptm" onclick="showTab('kptm')">⭐ K-Innovative PTM</button></div>
+    <div class="grpsw"><button data-tab="term1" onclick="showTab('term1')">📝 Term 1 Feedback</button><button data-tab="ptm" onclick="showTab('ptm')">💬 PTM Feedback</button><button data-tab="kptm" onclick="showTab('kptm')">⭐ K-Innovative PTM</button><button data-tab="auravya" onclick="showTab('auravya')">🎭 Bachupally Auravya 2026</button></div>
 
     <div class="au-head">
       <div>
@@ -4418,7 +4438,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 <!-- ═══ K-INNOVATIVE PTM FEEDBACK ═══ -->
 <div id="pane-kptm" class="pane">
   <div class="au-wrap">
-    <div class="grpsw"><button data-tab="term1" onclick="showTab('term1')">📝 Term 1 Feedback</button><button data-tab="ptm" onclick="showTab('ptm')">💬 PTM Feedback</button><button data-tab="kptm" onclick="showTab('kptm')">⭐ K-Innovative PTM</button></div>
+    <div class="grpsw"><button data-tab="term1" onclick="showTab('term1')">📝 Term 1 Feedback</button><button data-tab="ptm" onclick="showTab('ptm')">💬 PTM Feedback</button><button data-tab="kptm" onclick="showTab('kptm')">⭐ K-Innovative PTM</button><button data-tab="auravya" onclick="showTab('auravya')">🎭 Bachupally Auravya 2026</button></div>
     <div class="au-head">
       <div><h2 style="margin:0;font-size:20px;font-weight:800">⭐ K-Innovative PTM Feedback</h2>
         <div style="font-size:12.5px;color:var(--txm);margin-top:3px" id="kp-meta">Loading…</div></div>
@@ -4427,6 +4447,66 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
     </div>
     <div id="kp-body"><div class="no-data">Reading the feedback sheet…</div></div>
+  </div>
+</div>
+
+
+<!-- ═══ BACHUPALLY AURAVYA 2026 PARENT FEEDBACK ═══ -->
+<div id="pane-auravya" class="pane">
+  <div class="au-wrap">
+    <div class="grpsw">
+      <button data-tab="term1" onclick="showTab('term1')">📝 Term 1 Feedback</button>
+      <button data-tab="ptm" onclick="showTab('ptm')">💬 PTM Feedback</button>
+      <button data-tab="kptm" onclick="showTab('kptm')">⭐ K-Innovative PTM</button>
+      <button data-tab="auravya" class="active" onclick="showTab('auravya')">🎭 Bachupally Auravya 2026</button>
+    </div>
+    <div class="au-head">
+      <div>
+        <h2 style="margin:0;font-size:20px;font-weight:800">🎭 Bachupally Auravya 2026 — Parent Feedback</h2>
+        <div id="av-meta" style="font-size:12.5px;color:var(--txm);margin-top:3px">Loading parent responses…</div>
+      </div>
+      <div class="au-ctl">
+        <span class="scope-chip"><i></i>Bachupally · Annual Day</span>
+        <span id="av-status" class="exm-status"></span>
+      </div>
+    </div>
+    <div id="av-loader" class="exm-loader"><div class="sp"></div><div>Analysing Auravya parent feedback…<br><span>Class groups · ratings · parent comments</span></div></div>
+    <div id="av-body" style="display:none;flex-direction:column;gap:16px">
+      <div id="av-kpis" class="au-kpis"></div>
+      <div class="au-sec">
+        <h3>Grade-group analysis</h3>
+        <div class="sub">Prep (EY), Grades 1–2, Grades 3–5 and Grades 6–9. Averages are calculated from the four rating questions, each scored out of five.</div>
+        <div id="av-groups"></div>
+      </div>
+      <div class="au-sec">
+        <h3>Visual performance dashboard</h3>
+        <div class="sub">Compare the four event dimensions and understand how parents distributed their overall ratings.</div>
+        <div class="av-chart-grid">
+          <div class="av-chart-card"><h4>Average rating by grade group</h4><canvas id="av-band-chart"></canvas></div>
+          <div class="av-chart-card"><h4>Average score by feedback dimension</h4><canvas id="av-dim-chart"></canvas></div>
+          <div class="av-chart-card"><h4>Overall rating distribution</h4><canvas id="av-dist-chart"></canvas></div>
+          <div class="av-chart-card"><h4>Response volume by grade group</h4><canvas id="av-count-chart"></canvas></div>
+          <div class="av-chart-card"><h4>What parents appreciated</h4><canvas id="av-enjoy-chart"></canvas></div>
+          <div class="av-chart-card"><h4>Improvement themes</h4><canvas id="av-theme-chart"></canvas></div>
+        </div>
+      </div>
+      <div class="au-sec">
+        <h3>Class and section-wise performance</h3>
+        <div class="sub">Response count and average overall event rating for each class/section represented in the downloaded file.</div>
+        <div id="av-class-table"></div>
+      </div>
+      <div class="au-sec">
+        <h3>Parent voice — appreciation and suggestions</h3>
+        <div class="sub">Substantive written comments only. Search the feedback to identify specific points for follow-up.</div>
+        <input id="av-search" type="search" placeholder="Search parent comments or class…" style="width:100%;max-width:460px;padding:10px 12px;border:1px solid var(--bor);border-radius:9px;margin:8px 0 12px;background:var(--sur);color:var(--tx)">
+        <div id="av-comments"></div>
+      </div>
+      <div class="au-sec">
+        <h3>Management insights and recommended actions</h3>
+        <div id="av-actions"></div>
+      </div>
+      <div style="font-size:11px;color:var(--txm);padding:4px 2px">Live source: PBES-All Reports 2026-27 → Bachupally AURAVYA 2026. Response count and feedback refresh from the master Google Sheet; parent contact details are excluded.</div>
+    </div>
   </div>
 </div>
 
@@ -42466,6 +42546,126 @@ window.T1 = (function () {
   };
 })(); 
 
+</script>
+
+
+<script>
+/* ═══ BACHUPALLY AURAVYA 2026 — parent feedback analytics ═══ */
+(function(){
+  'use strict';
+  var raw=null, charts={}, loading=false, loaded=false;
+  var BAND_ORDER=['Prep (EY)','Grades 1–2','Grades 3–5','Grades 6–9'];
+  var DIM_LABELS=['Seating','Student performances','Staff support','Overall event'];
+  function $(id){return document.getElementById(id);}
+  function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function rows(){return raw&&raw.rows?raw.rows:[];}
+  function score(v){if(v===null||v===undefined||v==='')return NaN;var n=Number(v);return Number.isFinite(n)&&n>=1&&n<=5?n:NaN;}
+  function bandStats(list){
+    var out={};
+    BAND_ORDER.forEach(function(b){var a=list.filter(function(r){return r[1]===b;});out[b]={n:a.length,means:[0,1,2,3].map(function(j){var v=a.map(function(r){return score(r[2+j]);}).filter(Number.isFinite);return v.length?v.reduce(function(x,y){return x+y;},0)/v.length:0;}), overall:a.map(function(r){return score(r[5]);}).filter(Number.isFinite)};});
+    return out;
+  }
+  function mean(a){var x=a.filter(Number.isFinite);return x.length?x.reduce(function(s,v){return s+v;},0)/x.length:0;}
+  function chart(id,type,data,options){
+    if(charts[id]) charts[id].destroy();
+    var el=$(id); if(!el||!window.Chart)return;
+    charts[id]=new Chart(el.getContext('2d'),{type:type,data:data,options:Object.assign({responsive:true,maintainAspectRatio:false,plugins:{legend:{display:type==='doughnut'||type==='pie',position:'bottom'}}},options||{})});
+  }
+  function classify(text, kind){
+    var s=String(text||'').toLowerCase(), out=[];
+    var rules=kind==='enjoy'?[
+      ['Student performances',/perform|dance|child|children|stage|acts|program|performance/],
+      ['Organisation and arrangements',/organis|arrange|management|coordination|smooth|well planned/],
+      ['Theme and presentation',/theme|decoration|lighting|visual|costume|dress/],
+      ['Guest and speeches',/chief guest|guest|speech|speaker/],
+      ['Overall experience',/everything|all|good|excellent|wonderful|great|nice|enjoy/]
+    ]:[
+      ['Seating and venue arrangements',/seat|sitting|space|crowd|venue|place|arrange/],
+      ['Food and refreshments',/snack|food|breakfast|water|refresh|eat|drink/],
+      ['Timing and scheduling',/time|delay|late|schedule|duration|waiting/],
+      ['Student comfort and safety',/child|kid|children|safety|comfort|washroom|toilet/],
+      ['Sound, visibility and announcements',/sound|audio|mic|voice|screen|visible|visibility|announce/],
+      ['Performance, costume and choreography',/dance|criteria|choreograph|costume|dress|practice|performance/]
+    ];
+    rules.forEach(function(r){if(r[1].test(s))out.push(r[0]);});
+    return out.length?out:['Other suggestions'];
+  }
+  function themes(list,idx,kind){
+    var c={};list.forEach(function(r){var t=String(r[idx]||'').trim();if(!t||t==='-'||/^n\/?a$/i.test(t))return;classify(t,kind).forEach(function(k){c[k]=(c[k]||0)+1;});});
+    return Object.keys(c).map(function(k){return [k,c[k]];}).sort(function(a,b){return b[1]-a[1];});
+  }
+  function render(){
+    var a=rows(), n=a.length;
+    if(!n)throw new Error('The Auravya feed returned no responses.');
+    var bs=bandStats(a), allScores=[0,1,2,3].map(function(j){return mean(a.map(function(r){return score(r[2+j]);}));});
+    var overall=a.map(function(r){return score(r[5]);}).filter(Number.isFinite);
+    var good=overall.filter(function(v){return v>=4;}).length, low=overall.filter(function(v){return v<=2;}).length;
+    $('av-meta').textContent=n+' live parent responses · '+(raw.source||'PBES-All Reports 2026-27')+' · Bachupally';
+    $('av-kpis').innerHTML=[
+      [n,'RESPONSES','All submitted records'],
+      [allScores[3].toFixed(2)+'/5','OVERALL RATING',Math.round(good/n*100)+'% rated 4 or 5'],
+      [allScores[1].toFixed(2)+'/5','BEST DIMENSION','Student performances'],
+      [allScores[2].toFixed(2)+'/5','IMPROVEMENT PRIORITY','Staff support and coordination'],
+      [Math.round(good/n*100)+'%','POSITIVE OVERALL','Ratings of 4 or 5'],
+      [Math.round(low/n*100)+'%','LOW OVERALL RATINGS','Ratings of 1 or 2']
+    ].map(function(k){return '<div class="au-kpi"><div class="v">'+esc(k[0])+'</div><div class="k">'+esc(k[1])+'</div><div class="d">'+esc(k[2])+'</div></div>';}).join('');
+    $('av-groups').innerHTML='<div class="av-table-wrap"><table class="av-table"><thead><tr><th>Grade group</th><th>Responses</th><th>Seating</th><th>Performances</th><th>Staff support</th><th>Overall</th><th>Overall 4–5</th></tr></thead><tbody>'+
+      BAND_ORDER.map(function(b){var x=bs[b],pct=x.overall.length?Math.round(x.overall.filter(function(v){return v>=4;}).length/x.overall.length*100):0;return '<tr><td><b>'+b+'</b></td><td>'+x.n+'</td>'+x.means.map(function(v){return '<td>'+v.toFixed(2)+'</td>';}).join('')+'<td><span class="av-pill">'+pct+'%</span></td></tr>';}).join('')+'</tbody></table></div>';
+    chart('av-band-chart','bar',{labels:BAND_ORDER,datasets:[{label:'Overall average / 5',data:BAND_ORDER.map(function(b){return mean(bs[b].overall).toFixed(2);}),backgroundColor:'#287A55'}]},{scales:{y:{beginAtZero:true,max:5}}});
+    chart('av-dim-chart','bar',{labels:DIM_LABELS,datasets:[{label:'Average rating / 5',data:allScores.map(function(v){return +v.toFixed(2);}),backgroundColor:['#5278D8','#15966D','#D58B20','#8258C8']}]},{indexAxis:'y',scales:{x:{beginAtZero:true,max:5}}});
+    var dist=[1,2,3,4,5].map(function(s){return overall.filter(function(v){return v===s;}).length;});
+    chart('av-dist-chart','doughnut',{labels:['1 · Needs improvement','2 · Average','3 · Good','4 · Very good','5 · Outstanding'],datasets:[{data:dist,backgroundColor:['#D94848','#E78A43','#E9C34A','#4C9AD8','#15966D']}]});
+    chart('av-count-chart','bar',{labels:BAND_ORDER,datasets:[{label:'Responses',data:BAND_ORDER.map(function(b){return bs[b].n;}),backgroundColor:'#5278D8'}]},{scales:{y:{beginAtZero:true,ticks:{precision:0}}}});
+    var en=themes(a,6,'enjoy').slice(0,6), im=themes(a,7,'suggest').slice(0,7);
+    chart('av-enjoy-chart','bar',{labels:en.map(function(x){return x[0];}),datasets:[{label:'Mention count',data:en.map(function(x){return x[1];}),backgroundColor:'#15966D'}]},{indexAxis:'y',scales:{x:{beginAtZero:true,ticks:{precision:0}}}});
+    chart('av-theme-chart','bar',{labels:im.map(function(x){return x[0];}),datasets:[{label:'Mention count',data:im.map(function(x){return x[1];}),backgroundColor:'#D58B20'}]},{indexAxis:'y',scales:{x:{beginAtZero:true,ticks:{precision:0}}}});
+    var cl={};a.forEach(function(r){var k=String(r[0]||'Unspecified').trim(),v=score(r[5]);if(Number.isFinite(v))(cl[k]||(cl[k]=[])).push(v);});
+    var cls=Object.keys(cl).map(function(k){return {name:k,n:cl[k].length,avg:mean(cl[k])};}).sort(function(x,y){return y.n-x.n||x.name.localeCompare(y.name);});
+    $('av-class-table').innerHTML='<div class="av-table-wrap"><table class="av-table"><thead><tr><th>Class / section</th><th>Responses</th><th>Average overall rating</th></tr></thead><tbody>'+cls.map(function(x){return '<tr><td>'+esc(x.name)+'</td><td>'+x.n+'</td><td>'+x.avg.toFixed(2)+'/5</td></tr>';}).join('')+'</tbody></table></div>';
+    renderComments();
+    var lowest=BAND_ORDER.map(function(b){return {b:b,v:mean(bs[b].overall)};}).sort(function(x,y){return x.v-y.v;})[0];
+    var staff=a.map(function(r){return score(r[4]);}).filter(Number.isFinite);
+    $('av-actions').innerHTML=
+      '<div class="av-action"><strong>1. Strength to retain — student performances</strong>Parents gave student performances the highest average score ('+allScores[1].toFixed(2)+'/5). Continue prioritising student participation, rehearsals and stage presentation.</div>'+
+      '<div class="av-action"><strong>2. Priority — staff support and coordination</strong>This dimension averaged '+allScores[2].toFixed(2)+'/5, the lowest of the four. Review parent-facing communication, event-day help desks, ushering and coordination responsibilities.</div>'+
+      '<div class="av-action"><strong>3. Focus group — '+lowest.b+'</strong>'+lowest.b+' recorded the lowest overall average ('+lowest.v.toFixed(2)+'/5). Review its comments and event experience before planning the next celebration.</div>'+
+      '<div class="av-action"><strong>4. Practical planning improvements</strong>Use the written suggestions to review seating capacity, refreshments, timing, announcements and child comfort. These are comment-derived themes, not verified counts of unique families.</div>'+
+      '<div class="av-action"><strong>5. Follow-up</strong>Assign an owner and deadline to each agreed improvement, then compare the same four rating dimensions in the next event feedback survey.</div>';
+  }
+  function renderComments(){
+    var q=($('av-search')&&$('av-search').value||'').toLowerCase().trim(), a=rows(), out=[];
+    a.forEach(function(r){[['Enjoyed',r[6]],['Suggestion',r[7]]].forEach(function(pair){var t=String(pair[1]||'').trim();if(!t||t==='-'||/^n\/?a$/i.test(t))return;var hay=(r[0]+' '+pair[0]+' '+t).toLowerCase();if(!q||hay.indexOf(q)>=0)out.push({grade:r[0],type:pair[0],text:t});});});
+    $('av-comments').innerHTML=out.length?out.map(function(x){return '<div class="av-comment"><small>'+esc(x.grade)+' · '+esc(x.type)+'</small>'+esc(x.text)+'</div>';}).join(''):'<div class="no-data">No matching substantive comments.</div>';
+  }
+  async function load(force){
+    if(loading)return;
+    if(loaded&&!force){render();return;}
+    loading=true;
+    try{
+      var session=null;try{var s=await sb.auth.getSession();session=s&&s.data&&s.data.session;}catch(e){}
+      if(!session){window.location.href='login.html';return;}
+      var res=await _lazyFetch('auravya',!!force,session,55000);
+      if(res.status===401){await sb.auth.signOut();window.location.href='login.html';return;}
+      if(!res.ok)throw new Error('HTTP '+res.status);
+      var d=await res.json();raw=d&&d.AURAVYA_RAW;
+      if(!raw||!Array.isArray(raw.rows))throw new Error('Auravya data was not found in the Apps Script response.');
+      loaded=true;render();
+      $('av-loader').style.display='none';$('av-body').style.display='flex';
+      $('av-status').textContent='Live · '+new Date(raw.generatedAt).toLocaleString();
+    }catch(e){
+      $('av-loader').innerHTML='<div style="color:var(--r);font-weight:700">Could not load Auravya feedback.</div><div style="font-size:11px;margin-top:6px">'+esc(e.message||e)+'</div><button class="tb" style="margin-top:10px" onclick="window.loadAuravya(true)">Retry</button>';
+      $('av-status').textContent='Feed error';
+    }finally{loading=false;}
+  }
+  window.loadAuravya=load;
+  window.addEventListener('DOMContentLoaded',function(){
+    var search=$('av-search');if(search)search.addEventListener('input',renderComments);
+    var old=window.showTab;
+    window.showTab=function(id,btn){var r=old.apply(this,arguments);if(id==='auravya')load(false);return r;};
+    var sw=window.switchTab;
+    window.switchTab=function(id){var r=sw.apply(this,arguments);if(id==='auravya')load(false);return r;};
+  });
+})();
 </script>
 
 </body>
