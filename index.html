@@ -2869,6 +2869,41 @@ document.addEventListener('DOMContentLoaded', async () => {
 .av-comment{padding:11px 12px;border:1px solid var(--bor);border-radius:10px;margin:7px 0;background:var(--sur)}
 .av-comment small{color:var(--txm);display:block;margin-bottom:5px}
 .av-comment b{font-size:11px;color:var(--p)}
+.av-chart-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.av-chart-head h4{margin:0}
+.av-chart-head button,.av-tap-hint{font-size:10px;color:var(--p);font-weight:700}
+.av-chart-head button{border:1px solid var(--bor);border-radius:7px;padding:5px 8px;background:var(--bg);cursor:pointer;white-space:nowrap}
+.av-click-kpi{border:1px solid var(--bor);text-align:left;cursor:pointer;color:var(--tx);font:inherit;position:relative}
+.av-click-kpi:hover,.av-sent-card:hover,.av-comment-button:hover{border-color:var(--p);transform:translateY(-1px)}
+.av-tap-hint{display:block;margin-top:7px;opacity:.82}
+.av-tap-row{cursor:pointer}
+.av-tap-row:hover td{background:var(--pl)!important}
+.av-nlp-summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:12px 0}
+.av-nlp-summary-grid>div{border:1px solid var(--bor);border-radius:12px;padding:14px;background:var(--sur)}
+.av-nlp-summary-grid h4{font-size:13px;margin:0 0 4px}
+.av-nlp-summary-grid p{font-size:11px;color:var(--txm);margin:0 0 10px}
+.av-sentiment-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.av-sent-card{border:1px solid var(--bor);border-radius:9px;padding:10px 8px;text-align:left;background:var(--bg);cursor:pointer;color:var(--tx);min-width:0}
+.av-sent-card b{display:block;font-size:22px}
+.av-sent-card span{display:block;font-size:10px;font-weight:800}
+.av-sent-card small{display:block;font-size:9px;color:var(--txm);margin-top:5px}
+.av-sent-card.av-positive b{color:#15966D}.av-sent-card.av-negative b{color:#D94848}.av-sent-card.av-neutral b{color:#64748B}
+.av-method-note{font-size:11px;line-height:1.55;color:var(--txm);border-left:3px solid var(--p);background:var(--bg);padding:10px 12px;border-radius:0 8px 8px 0;margin:10px 0 14px}
+.av-comment-button{display:block;width:100%;text-align:left;font:inherit;color:var(--tx);cursor:pointer}
+.av-nlp-modal{display:none;position:fixed;inset:0;z-index:10050;background:rgba(15,23,42,.66);backdrop-filter:blur(3px);padding:20px;overflow:auto;align-items:flex-start;justify-content:center}
+.av-nlp-modal.on{display:flex}
+.av-nlp-modal-card{width:min(1050px,100%);background:var(--sur);border:1px solid var(--bor);border-radius:15px;overflow:hidden;box-shadow:0 20px 70px rgba(0,0,0,.28);margin:auto}
+.av-nlp-modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;padding:16px 20px;background:var(--tx);color:#fff}
+.av-nlp-modal-head h3{margin:0;font-size:17px}
+.av-nlp-modal-head p{margin:4px 0 0;font-size:11px;color:#CBD5E1}
+.av-nlp-modal-head button{width:32px;height:32px;border:1px solid #64748B;border-radius:8px;background:transparent;color:#fff;font-size:23px;line-height:1;cursor:pointer}
+.av-nlp-modal-body{padding:16px 20px;max-height:76vh;overflow:auto}
+.av-drill-item{padding:12px;border:1px solid var(--bor);border-radius:10px;margin:8px 0;background:var(--bg)}
+.av-drill-item>div{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:11px}
+.av-drill-item>div span{color:var(--txm)}
+.av-drill-item p{font-size:13px;line-height:1.6;margin:8px 0 0;white-space:pre-wrap}
+.av-expanded-chart{height:min(62vh,560px);min-height:320px}
+@media(max-width:760px){.av-nlp-summary-grid{grid-template-columns:1fr}.av-nlp-modal{padding:8px}.av-nlp-modal-body{padding:12px;max-height:80vh}.av-sentiment-cards{gap:5px}.av-sent-card{padding:8px 5px}}
 .av-action{padding:12px 14px;border:1px solid var(--bor);border-left:4px solid var(--a);border-radius:9px;margin:8px 0;background:var(--sur)}
 .av-action strong{display:block;margin-bottom:4px}
 @media(max-width:760px){.av-chart-grid{grid-template-columns:1fr}.av-chart-card{min-height:260px}}
@@ -4479,15 +4514,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div id="av-groups"></div>
       </div>
       <div class="au-sec">
-        <h3>Visual performance dashboard</h3>
-        <div class="sub">Compare the four event dimensions and understand how parents distributed their overall ratings.</div>
-        <div class="av-chart-grid">
-          <div class="av-chart-card"><h4>Average rating by grade group</h4><canvas id="av-band-chart"></canvas></div>
-          <div class="av-chart-card"><h4>Average score by feedback dimension</h4><canvas id="av-dim-chart"></canvas></div>
-          <div class="av-chart-card"><h4>Overall rating distribution</h4><canvas id="av-dist-chart"></canvas></div>
-          <div class="av-chart-card"><h4>Response volume by grade group</h4><canvas id="av-count-chart"></canvas></div>
-          <div class="av-chart-card"><h4>What parents appreciated</h4><canvas id="av-enjoy-chart"></canvas></div>
-          <div class="av-chart-card"><h4>Improvement themes</h4><canvas id="av-theme-chart"></canvas></div>
+        <h3>Parent voice — NLP & sentiment analytics</h3>
+        <div class="sub">Text analysis of the complete written responses in feedback columns 5 and 6. Tap a value or chart segment to inspect the underlying parent comments; use Expand for a larger visual.</div>
+        <div id="av-nlp-kpis" class="au-kpis"></div>
+        <div id="av-nlp-summary"></div>
+        <div class="av-chart-grid av-nlp-grid">
+          <div class="av-chart-card"><div class="av-chart-head"><h4>Overall rating distribution</h4><button type="button" onclick="window.avExpandChart('av-dist-chart')">Expand ↗</button></div><canvas id="av-dist-chart"></canvas></div>
+          <div class="av-chart-card"><div class="av-chart-head"><h4>Sentiment by feedback question</h4><button type="button" onclick="window.avExpandChart('av-sent-chart')">Expand ↗</button></div><canvas id="av-sent-chart"></canvas></div>
+          <div class="av-chart-card"><div class="av-chart-head"><h4>Top keywords — what parents enjoyed</h4><button type="button" onclick="window.avExpandChart('av-enjoy-kw-chart')">Expand ↗</button></div><canvas id="av-enjoy-kw-chart"></canvas></div>
+          <div class="av-chart-card"><div class="av-chart-head"><h4>Top keywords — improvement suggestions</h4><button type="button" onclick="window.avExpandChart('av-suggest-kw-chart')">Expand ↗</button></div><canvas id="av-suggest-kw-chart"></canvas></div>
+          <div class="av-chart-card"><div class="av-chart-head"><h4>Improvement themes (multi-label)</h4><button type="button" onclick="window.avExpandChart('av-theme-chart')">Expand ↗</button></div><canvas id="av-theme-chart"></canvas></div>
+          <div class="av-chart-card"><div class="av-chart-head"><h4>What parents appreciated</h4><button type="button" onclick="window.avExpandChart('av-enjoy-theme-chart')">Expand ↗</button></div><canvas id="av-enjoy-theme-chart"></canvas></div>
         </div>
       </div>
       <div class="au-sec">
@@ -4505,7 +4542,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         <h3>Management insights and recommended actions</h3>
         <div id="av-actions"></div>
       </div>
-      <div style="font-size:11px;color:var(--txm);padding:4px 2px">Live source: PBES-All Reports 2026-27 → Bachupally AURAVYA 2026. Response count and feedback refresh from the master Google Sheet; parent contact details are excluded.</div>
+      <div style="font-size:11px;color:var(--txm);padding:4px 2px">Live source: PBES-All Reports 2026-27 → Bachupally AURAVYA 2026. Analytics are recalculated from the current master-sheet comments; parent contact details are excluded.</div>
+    </div>
+    <div id="av-nlp-modal" class="av-nlp-modal" aria-hidden="true">
+      <div class="av-nlp-modal-card" role="dialog" aria-modal="true" aria-labelledby="av-nlp-modal-title">
+        <div class="av-nlp-modal-head"><div><h3 id="av-nlp-modal-title">Parent feedback detail</h3><p id="av-nlp-modal-sub"></p></div><button type="button" onclick="window.avCloseDrill()" aria-label="Close">×</button></div>
+        <div id="av-nlp-modal-body" class="av-nlp-modal-body"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -42550,107 +42593,201 @@ window.T1 = (function () {
 
 
 <script>
-/* ═══ BACHUPALLY AURAVYA 2026 — parent feedback analytics ═══ */
+/* ═══ BACHUPALLY AURAVYA 2026 — interactive parent voice + NLP analytics ═══ */
 (function(){
   'use strict';
-  var raw=null, charts={}, loading=false, loaded=false;
+  var raw=null, charts={}, chartMeta={}, modalChart=null, loading=false, loaded=false;
   var BAND_ORDER=['Prep (EY)','Grades 1–2','Grades 3–5','Grades 6–9'];
   var DIM_LABELS=['Seating','Student performances','Staff support','Overall event'];
+  var POS=new Set(('good great excellent wonderful phenomenal motivated inspired happy satisfied enjoy enjoyed love loved amazing fantastic nice best appreciate appreciated thank thanks beautiful awesome perfect impressive joyful smooth organised organized successful lovely entertaining energetic engaging memorable brilliant outstanding').split(/\s+/));
+  var NEG=new Set(('worst bad poor disappointing disappointed unacceptable rude confusion difficult tired hungry waste meaningless useless crowded crowd pushing unsafe uncomfortable delayed delay late problem problems issue issues lack failed failure terrible horrible clumsy exhausting stressful embarrassed careless disorganized disorganised').split(/\s+/));
+  var NEGATORS=new Set(['not','no','never',"isn't","wasn't","weren't","don't","didn't","cannot","can't","hardly"]);
+  var STOP=new Set(('a an the and or but if then than so because as at by for from in into of on onto to with without about above after again against all am any are as be been before being below between both can could did do does doing down during each few further had has have having he her here hers herself him himself his how i if into is it its itself just me more most my myself no nor not now off once only other our ours ourselves out over own same she should some such than that the their theirs them themselves then there these they this those through too under until up very was we were what when where which while who whom why will would you your yours yourself yourselves').split(/\s+/));
+  ['annual','day','event','events','pallavi','auravya','please','kindly','need','needs','make','would','could','should','also','one','get','got','good','great','everything','nothing','much','many','lot','all','year','last','next','future','parents','parent','children','child','kids','student','students','school','management','team','really','like','well','thank','thanks','yes','sir','overall','every',"it's"].forEach(function(x){STOP.add(x);});
   function $(id){return document.getElementById(id);}
   function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
   function rows(){return raw&&raw.rows?raw.rows:[];}
   function score(v){if(v===null||v===undefined||v==='')return NaN;var n=Number(v);return Number.isFinite(n)&&n>=1&&n<=5?n:NaN;}
+  function mean(a){var x=a.filter(Number.isFinite);return x.length?x.reduce(function(s,v){return s+v;},0)/x.length:0;}
   function bandStats(list){
     var out={};
-    BAND_ORDER.forEach(function(b){var a=list.filter(function(r){return r[1]===b;});out[b]={n:a.length,means:[0,1,2,3].map(function(j){var v=a.map(function(r){return score(r[2+j]);}).filter(Number.isFinite);return v.length?v.reduce(function(x,y){return x+y;},0)/v.length:0;}), overall:a.map(function(r){return score(r[5]);}).filter(Number.isFinite)};});
+    BAND_ORDER.forEach(function(b){var a=list.filter(function(r){return r[1]===b;});out[b]={n:a.length,means:[0,1,2,3].map(function(j){var v=a.map(function(r){return score(r[2+j]);}).filter(Number.isFinite);return v.length?v.reduce(function(x,y){return x+y;},0)/v.length:0;}),overall:a.map(function(r){return score(r[5]);}).filter(Number.isFinite)};});
     return out;
   }
-  function mean(a){var x=a.filter(Number.isFinite);return x.length?x.reduce(function(s,v){return s+v;},0)/x.length:0;}
-  function chart(id,type,data,options){
-    if(charts[id]) charts[id].destroy();
-    var el=$(id); if(!el||!window.Chart)return;
-    charts[id]=new Chart(el.getContext('2d'),{type:type,data:data,options:Object.assign({responsive:true,maintainAspectRatio:false,plugins:{legend:{display:type==='doughnut'||type==='pie',position:'bottom'}}},options||{})});
+  function validText(v){var t=String(v||'').replace(/\s+/g,' ').trim();return !!t && !['-','na','n/a','nil'].includes(t.toLowerCase());}
+  function sentiment(text){
+    var tokens=String(text||'').toLowerCase().match(/[a-z']+/g)||[], rawScore=0;
+    tokens.forEach(function(w,i){
+      var val=POS.has(w)?1:(NEG.has(w)?-1:0);
+      if(val && tokens.slice(Math.max(0,i-3),i).some(function(x){return NEGATORS.has(x);}))val*=-0.8;
+      rawScore+=val;
+    });
+    var polarity=rawScore/Math.max(1,Math.sqrt(tokens.length));
+    return {polarity:polarity,label:polarity>=0.18?'Positive':(polarity<=-0.18?'Negative':'Neutral')};
   }
-  function classify(text, kind){
-    var s=String(text||'').toLowerCase(), out=[];
-    var rules=kind==='enjoy'?[
-      ['Student performances',/perform|dance|child|children|stage|acts|program|performance/],
-      ['Organisation and arrangements',/organis|arrange|management|coordination|smooth|well planned/],
-      ['Theme and presentation',/theme|decoration|lighting|visual|costume|dress/],
-      ['Guest and speeches',/chief guest|guest|speech|speaker/],
-      ['Overall experience',/everything|all|good|excellent|wonderful|great|nice|enjoy/]
-    ]:[
-      ['Seating and venue arrangements',/seat|sitting|space|crowd|venue|place|arrange/],
-      ['Food and refreshments',/snack|food|breakfast|water|refresh|eat|drink/],
-      ['Timing and scheduling',/time|delay|late|schedule|duration|waiting/],
-      ['Student comfort and safety',/child|kid|children|safety|comfort|washroom|toilet/],
-      ['Sound, visibility and announcements',/sound|audio|mic|voice|screen|visible|visibility|announce/],
-      ['Performance, costume and choreography',/dance|criteria|choreograph|costume|dress|practice|performance/]
-    ];
-    rules.forEach(function(r){if(r[1].test(s))out.push(r[0]);});
-    return out.length?out:['Other suggestions'];
+  function makeDocs(list,idx,type){
+    var out=[];
+    list.forEach(function(r,i){var text=String(r[idx]||'').replace(/\s+/g,' ').trim();if(!validText(text))return;
+      var s=sentiment(text);out.push({row:r,rowIndex:i,grade:r[0],band:r[1],type:type,text:text,polarity:s.polarity,sentiment:s.label});
+    });
+    return out;
   }
-  function themes(list,idx,kind){
-    var c={};list.forEach(function(r){var t=String(r[idx]||'').trim();if(!t||t==='-'||/^n\/?a$/i.test(t))return;classify(t,kind).forEach(function(k){c[k]=(c[k]||0)+1;});});
-    return Object.keys(c).map(function(k){return [k,c[k]];}).sort(function(a,b){return b[1]-a[1];});
+  function tokenize(text){
+    return (String(text||'').toLowerCase().match(/[a-z][a-z']{1,}/g)||[]).filter(function(w){return !STOP.has(w)&&w.length>2;});
   }
+  /* Corpus-level TF-IDF: term frequency per comment × smoothed inverse document
+     frequency. Unigrams and adjacent bigrams are ranked separately by field. */
+  function tfidf(docs,limit){
+    var df={},score={},docsTerms=[];
+    docs.forEach(function(d){
+      var t=tokenize(d.text), terms=t.slice();
+      for(var i=0;i<t.length-1;i++)terms.push(t[i]+' '+t[i+1]);
+      var counts={};terms.forEach(function(w){counts[w]=(counts[w]||0)+1;});
+      docsTerms.push({terms:terms,counts:counts});
+      Object.keys(counts).forEach(function(w){df[w]=(df[w]||0)+1;});
+    });
+    var N=docs.length||1;
+    docsTerms.forEach(function(d){
+      var denom=Math.max(1,d.terms.length);
+      Object.keys(d.counts).forEach(function(w){
+        var tf=d.counts[w]/denom, idf=Math.log(1+(N/(1+df[w])))+1;
+        score[w]=(score[w]||0)+tf*idf;
+      });
+    });
+    return Object.keys(score).filter(function(w){return w.length>2;})
+      .map(function(w){return {term:w,score:score[w],count:df[w]};})
+      .sort(function(a,b){return b.score-a.score;}).slice(0,limit||12);
+  }
+  var ENJOY_THEMES=[
+    ['Student performances & dance',/\b(performance|performances|performing|dance|dances|dancing|song|songs|skit|skits|stage|acts)\b/i],
+    ['Theme & creative presentation',/\b(theme|concept|era|india|avengers|youngistan|kashmir|decoration|costume|dress)\b/i],
+    ['Guest speeches & addresses',/\b(guest|speech|speaker|address|ips|sir)\b/i],
+    ['Organisation & coordination',/\b(arrangement|arrangements|organis|coordination|coordinated|management|effort|efforts)\b/i],
+    ['Overall enjoyment / positive experience',/\b(enjoy|enjoyed|wonderful|phenomenal|motivated|inspired|excellent|good|great|nice|happy|satisfied)\b/i]
+  ];
+  var SUGGEST_THEMES=[
+    ['Performance, practice & choreography',/\b(performance|performances|dance|steps|choreography|practice|practise|criteria|formation|song|songs|costume|dress)\b/i],
+    ['Food, water & refreshments',/\b(food|snack|snacks|breakfast|lunch|dinner|refreshment|refreshments|water|canteen|stall|stalls|eat|eating|hungry|meal|meals)\b/i],
+    ['Timing & programme schedule',/\b(time|timing|timings|delay|delayed|late|early|schedule|weekday|weekend|friday|morning|evening|duration|hours|start|started|finish|ending)\b/i],
+    ['Child safety, handover & dispersal',/\b(handover|handing|dispersal|disbursement|collect|collecting|pickup|pick up|pick-up|security|safe|safety|crowd|pushing|lost|left behind|class teacher)\b/i],
+    ['Seating & venue',/\b(seat|seating|balcony|venue|parking|space|floor|stairs|view|viewing|arrangement|arrangements|access|location|distance|traffic)\b/i],
+    ['Staff coordination & communication',/\b(staff|teacher|teachers|coordination|coordinat|communication|instructions|organis|management|responsibility|responsible|response|rude|security staff)\b/i],
+    ['Sound, lighting & AV',/\b(sound|audio|video|mic|microphone|projector|screen|lighting|light|noise|volume|speaker|editing|visual|visibility|announcement|announcing)\b/i],
+    ['Parent availability / event format',/\b(weekday|weekend|friday|working hours|corporate|leave|availability|working professionals|two halves|both slots|morning schedule)\b/i]
+  ];
+  function themeCounts(docs,rules){
+    return rules.map(function(rule){
+      var matched=docs.filter(function(d){return rule[1].test(d.text);});
+      return {label:rule[0],count:matched.length,docs:matched};
+    }).filter(function(x){return x.count;}).sort(function(a,b){return b.count-a.count;});
+  }
+  function chart(id,type,data,options,pointHandler,title,sub,docsProvider){
+    if(charts[id])charts[id].destroy();
+    var el=$(id);if(!el||!window.Chart)return;
+    var opts=Object.assign({responsive:true,maintainAspectRatio:false,plugins:{legend:{display:type==='doughnut'||type==='pie'||type==='bar'&&!!(options&&options.indexAxis==='y'),position:'bottom'}}},options||{});
+    if(pointHandler)opts.onClick=function(evt,els,instance){if(!els||!els.length)return;var hit=els[0],docs=pointHandler(hit.datasetIndex,hit.index)||[];var label=(data.labels||[])[hit.index]||'';openDrill((title||id)+(label?' · '+label:''),sub||'Selected visual segment',docs);};
+    charts[id]=new Chart(el.getContext('2d'),{type:type,data:data,options:opts});
+    chartMeta[id]={type:type,data:data,options:opts,title:title||id,sub:sub||'',docsProvider:docsProvider||function(){return[];},pointHandler:pointHandler};
+  }
+  function openDrill(title,sub,docs){
+    var modal=$('av-nlp-modal'),body=$('av-nlp-modal-body');
+    if(!modal||!body)return;
+    docs=docs||[];
+    if(modalChart){modalChart.destroy();modalChart=null;}
+    $('av-nlp-modal-title').textContent=title;
+    $('av-nlp-modal-sub').textContent=(sub||'')+' · '+docs.length+' matching written responses';
+    body.innerHTML=docs.length?docs.map(function(d){return '<article class="av-drill-item"><div><b>'+esc(d.grade||'Class not recorded')+'</b><span>'+esc(d.type)+' · '+esc(d.sentiment)+' · polarity '+Number(d.polarity).toFixed(2)+'</span></div><p>'+esc(d.text)+'</p></article>';}).join(''):'<div class="no-data">No matching written responses were found.</div>';
+    modal.classList.add('on');modal.setAttribute('aria-hidden','false');
+  }
+  function closeDrill(){var m=$('av-nlp-modal');if(m){m.classList.remove('on');m.setAttribute('aria-hidden','true');}}
+  function expandChart(id){
+    var m=chartMeta[id];if(!m)return;
+    if(modalChart){modalChart.destroy();modalChart=null;}
+    var modal=$('av-nlp-modal'),body=$('av-nlp-modal-body');
+    $('av-nlp-modal-title').textContent=m.title+' — expanded view';
+    $('av-nlp-modal-sub').textContent='Tap a chart segment or bar to inspect the matching parent comments.';
+    body.innerHTML='<div class="av-expanded-chart"><canvas id="av-nlp-expanded-canvas"></canvas></div><button class="tb" style="margin-top:12px" onclick="window.avShowChartData(\''+id+'\')">View underlying comments and records</button>';
+    modal.classList.add('on');modal.setAttribute('aria-hidden','false');
+    var ctx=$('av-nlp-expanded-canvas').getContext('2d');
+    modalChart=new Chart(ctx,{type:m.type,data:m.data,options:Object.assign({},m.options,{maintainAspectRatio:false,onClick:function(evt,els){if(!els||!els.length)return;var hit=els[0];openDrill(m.title+' · '+(m.data.labels[hit.index]||''),'Selected chart segment',m.docsProvider(hit.datasetIndex,hit.index));}})});
+  }
+  window.avExpandChart=expandChart;
+  window.avShowChartData=function(id){var m=chartMeta[id];if(m)openDrill(m.title,'All source comments represented in this visual',m.docsProvider(null,null));};
+  window.avCloseDrill=closeDrill;
+  function docsForGroup(b){return makeDocs(rows(),6,'Enjoyed').concat(makeDocs(rows(),7,'Suggestion')).filter(function(d){return d.band===b;});}
   function render(){
-    var a=rows(), n=a.length;
-    if(!n)throw new Error('The Auravya feed returned no responses.');
-    var bs=bandStats(a), allScores=[0,1,2,3].map(function(j){return mean(a.map(function(r){return score(r[2+j]);}));});
-    var overall=a.map(function(r){return score(r[5]);}).filter(Number.isFinite);
-    var good=overall.filter(function(v){return v>=4;}).length, low=overall.filter(function(v){return v<=2;}).length;
+    var a=rows(),n=a.length;if(!n)throw new Error('The Auravya feed returned no responses.');
+    var bs=bandStats(a),allScores=[0,1,2,3].map(function(j){return mean(a.map(function(r){return score(r[2+j]);}));});
+    var overall=a.map(function(r){return score(r[5]);}).filter(Number.isFinite),good=overall.filter(function(v){return v>=4;}).length,low=overall.filter(function(v){return v<=2;}).length;
+    var enjoyed=makeDocs(a,6,'Enjoyed'),suggestions=makeDocs(a,7,'Suggestion');
+    var enjoySent=['Positive','Neutral','Negative'].map(function(s){return enjoyed.filter(function(d){return d.sentiment===s;}).length;});
+    var suggestSent=['Positive','Neutral','Negative'].map(function(s){return suggestions.filter(function(d){return d.sentiment===s;}).length;});
+    var enjoyKw=tfidf(enjoyed,12),suggestKw=tfidf(suggestions,12),improveThemes=themeCounts(suggestions,SUGGEST_THEMES),enjoyThemes=themeCounts(enjoyed,ENJOY_THEMES);
     $('av-meta').textContent=n+' live parent responses · '+(raw.source||'PBES-All Reports 2026-27')+' · Bachupally';
     $('av-kpis').innerHTML=[
-      [n,'RESPONSES','All submitted records'],
-      [allScores[3].toFixed(2)+'/5','OVERALL RATING',Math.round(good/n*100)+'% rated 4 or 5'],
-      [allScores[1].toFixed(2)+'/5','BEST DIMENSION','Student performances'],
-      [allScores[2].toFixed(2)+'/5','IMPROVEMENT PRIORITY','Staff support and coordination'],
-      [Math.round(good/n*100)+'%','POSITIVE OVERALL','Ratings of 4 or 5'],
-      [Math.round(low/n*100)+'%','LOW OVERALL RATINGS','Ratings of 1 or 2']
-    ].map(function(k){return '<div class="au-kpi"><div class="v">'+esc(k[0])+'</div><div class="k">'+esc(k[1])+'</div><div class="d">'+esc(k[2])+'</div></div>';}).join('');
+      [n,'RESPONSES','All submitted records',a],
+      [allScores[3].toFixed(2)+'/5','OVERALL RATING',Math.round(good/Math.max(1,overall.length)*100)+'% rated 4 or 5',a.filter(function(r){return score(r[5])>=4;})],
+      [allScores[1].toFixed(2)+'/5','BEST DIMENSION','Student performances',a.filter(function(r){return score(r[3])>=4;})],
+      [allScores[2].toFixed(2)+'/5','IMPROVEMENT PRIORITY','Staff support and coordination',a.filter(function(r){return score(r[4])<=3;})],
+      [enjoyed.length,'ENJOYMENT COMMENTS','Substantive responses in column 5',enjoyed],
+      [suggestions.length,'SUGGESTION COMMENTS','Substantive responses in column 6',suggestions]
+    ].map(function(k,i){return '<button class="au-kpi av-click-kpi" type="button" onclick="window.avKpiDrill('+i+')" aria-label="Open '+esc(k[1])+' details"><div class="v">'+esc(k[0])+'</div><div class="k">'+esc(k[1])+'</div><div class="d">'+esc(k[2])+'</div><span class="av-tap-hint">Tap to view data ↗</span></button>';}).join('');
+    window.__avKpiDocs=[a,a.filter(function(r){return score(r[5])>=4;}),a.filter(function(r){return score(r[3])>=4;}),a.filter(function(r){return score(r[4])<=3;}),enjoyed,suggestions];
+    window.avKpiDrill=function(i){var ds=window.__avKpiDocs[i]||[];var docs=ds.length&&ds[0].row?ds:ds.map(function(r){var s=sentiment('');return {grade:r[0],type:'Rating response',text:'Seating '+r[2]+' · Performance '+r[3]+' · Staff '+r[4]+' · Overall '+r[5],sentiment:'Rating record',polarity:0};});openDrill(['All responses','Overall ratings 4–5','Performance ratings 4–5','Staff support ratings 1–3','Enjoyment comments','Suggestion comments'][i],'Tap a record to inspect the written feedback',docs);};
     $('av-groups').innerHTML='<div class="av-table-wrap"><table class="av-table"><thead><tr><th>Grade group</th><th>Responses</th><th>Seating</th><th>Performances</th><th>Staff support</th><th>Overall</th><th>Overall 4–5</th></tr></thead><tbody>'+
-      BAND_ORDER.map(function(b){var x=bs[b],pct=x.overall.length?Math.round(x.overall.filter(function(v){return v>=4;}).length/x.overall.length*100):0;return '<tr><td><b>'+b+'</b></td><td>'+x.n+'</td>'+x.means.map(function(v){return '<td>'+v.toFixed(2)+'</td>';}).join('')+'<td><span class="av-pill">'+pct+'%</span></td></tr>';}).join('')+'</tbody></table></div>';
-    chart('av-band-chart','bar',{labels:BAND_ORDER,datasets:[{label:'Overall average / 5',data:BAND_ORDER.map(function(b){return mean(bs[b].overall).toFixed(2);}),backgroundColor:'#287A55'}]},{scales:{y:{beginAtZero:true,max:5}}});
-    chart('av-dim-chart','bar',{labels:DIM_LABELS,datasets:[{label:'Average rating / 5',data:allScores.map(function(v){return +v.toFixed(2);}),backgroundColor:['#5278D8','#15966D','#D58B20','#8258C8']}]},{indexAxis:'y',scales:{x:{beginAtZero:true,max:5}}});
+      BAND_ORDER.map(function(b){var x=bs[b],pct=x.overall.length?Math.round(x.overall.filter(function(v){return v>=4;}).length/x.overall.length*100):0;return '<tr class="av-tap-row" tabindex="0" onclick="window.avGroupDrill(\''+b+'\')"><td><b>'+b+'</b></td><td>'+x.n+'</td>'+x.means.map(function(v){return '<td>'+v.toFixed(2)+'</td>';}).join('')+'<td><span class="av-pill">'+pct+'%</span></td></tr>';}).join('')+'</tbody></table></div><div class="av-tap-hint">Tap a grade group to view its underlying feedback.</div>';
+    window.avGroupDrill=function(b){var selected=a.filter(function(r){return r[1]===b;});var ds=selected.map(function(r){var t='Seating: '+(r[2]==null?'—':r[2])+'/5 · Student performances: '+(r[3]==null?'—':r[3])+'/5 · Staff support: '+(r[4]==null?'—':r[4])+'/5 · Overall: '+(r[5]==null?'—':r[5])+'/5\\nEnjoyed: '+(r[6]||'—')+'\\nSuggestion: '+(r[7]||'—');var s=sentiment((r[6]||'')+' '+(r[7]||''));return {grade:r[0],type:'Grade-group response',text:t,sentiment:s.label,polarity:s.polarity};});openDrill(b+' — feedback detail',selected.length+' source records',ds);};
     var dist=[1,2,3,4,5].map(function(s){return overall.filter(function(v){return v===s;}).length;});
-    chart('av-dist-chart','doughnut',{labels:['1 · Needs improvement','2 · Average','3 · Good','4 · Very good','5 · Outstanding'],datasets:[{data:dist,backgroundColor:['#D94848','#E78A43','#E9C34A','#4C9AD8','#15966D']}]});
-    chart('av-count-chart','bar',{labels:BAND_ORDER,datasets:[{label:'Responses',data:BAND_ORDER.map(function(b){return bs[b].n;}),backgroundColor:'#5278D8'}]},{scales:{y:{beginAtZero:true,ticks:{precision:0}}}});
-    var en=themes(a,6,'enjoy').slice(0,6), im=themes(a,7,'suggest').slice(0,7);
-    chart('av-enjoy-chart','bar',{labels:en.map(function(x){return x[0];}),datasets:[{label:'Mention count',data:en.map(function(x){return x[1];}),backgroundColor:'#15966D'}]},{indexAxis:'y',scales:{x:{beginAtZero:true,ticks:{precision:0}}}});
-    chart('av-theme-chart','bar',{labels:im.map(function(x){return x[0];}),datasets:[{label:'Mention count',data:im.map(function(x){return x[1];}),backgroundColor:'#D58B20'}]},{indexAxis:'y',scales:{x:{beginAtZero:true,ticks:{precision:0}}}});
+    chart('av-dist-chart','doughnut',{labels:['1 · Needs improvement','2 · Average','3 · Good','4 · Very good','5 · Outstanding'],datasets:[{data:dist,backgroundColor:['#D94848','#E78A43','#E9C34A','#4C9AD8','#15966D']}]},{},function(di,idx){var v=idx+1;return a.filter(function(r){return score(r[5])===v;}).map(function(r){var s=sentiment(r[7]||r[6]);return {grade:r[0],type:'Rating '+v,text:'Enjoyed: '+(r[6]||'—')+' | Suggestion: '+(r[7]||'—'),sentiment:s.label,polarity:s.polarity};});},'Overall rating distribution','Overall event ratings',function(di,idx){if(idx===null)return a.map(function(r){return {grade:r[0],type:'Rating record',text:'Overall rating: '+r[5]+' / 5 · Enjoyed: '+(r[6]||'—')+' · Suggestion: '+(r[7]||'—'),sentiment:'Rating record',polarity:0};});var v=idx+1;return a.filter(function(r){return score(r[5])===v;}).map(function(r){var s=sentiment(r[7]||r[6]);return {grade:r[0],type:'Rating '+v,text:'Enjoyed: '+(r[6]||'—')+' | Suggestion: '+(r[7]||'—'),sentiment:s.label,polarity:s.polarity};});});
+    var sentiments=['Positive','Neutral','Negative'];
+    chart('av-sent-chart','bar',{labels:['Enjoyment (Q5)','Suggestions (Q6)'],datasets:sentiments.map(function(s,i){return {label:s,data:[enjoySent[i],suggestSent[i]],backgroundColor:['#15966D','#94A3B8','#D94848'][i]};})},{scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,ticks:{precision:0}}} },function(di,idx){var field=idx===0?enjoyed:suggestions,lab=sentiments[di];return field.filter(function(d){return d.sentiment===lab;});},'Sentiment by feedback question','Lexicon-based sentiment with negation handling',function(di,idx){var field=idx===0?enjoyed:suggestions;if(di===null)return field;var lab=sentiments[di];return field.filter(function(d){return d.sentiment===lab;});});
+    chart('av-enjoy-kw-chart','bar',{labels:enjoyKw.map(function(x){return x.term;}),datasets:[{label:'TF-IDF relevance',data:enjoyKw.map(function(x){return +x.score.toFixed(3);}),backgroundColor:'#15966D'}]},{indexAxis:'y',scales:{x:{beginAtZero:true}}},function(di,idx){var term=enjoyKw[idx].term;return enjoyed.filter(function(d){return tokenize(d.text).join(' ').indexOf(term)>=0||d.text.toLowerCase().indexOf(term)>=0;});},'Top enjoyed keywords','TF-IDF ranked terms and phrases',function(di,idx){if(idx===null)return enjoyed;var term=enjoyKw[idx].term;return enjoyed.filter(function(d){return d.text.toLowerCase().indexOf(term)>=0;});});
+    chart('av-suggest-kw-chart','bar',{labels:suggestKw.map(function(x){return x.term;}),datasets:[{label:'TF-IDF relevance',data:suggestKw.map(function(x){return +x.score.toFixed(3);}),backgroundColor:'#D58B20'}]},{indexAxis:'y',scales:{x:{beginAtZero:true}}},function(di,idx){var term=suggestKw[idx].term;return suggestions.filter(function(d){return d.text.toLowerCase().indexOf(term)>=0;});},'Top improvement keywords','TF-IDF ranked terms and phrases',function(di,idx){if(idx===null)return suggestions;var term=suggestKw[idx].term;return suggestions.filter(function(d){return d.text.toLowerCase().indexOf(term)>=0;});});
+    chart('av-theme-chart','bar',{labels:improveThemes.map(function(x){return x.label;}),datasets:[{label:'Comments mentioning theme',data:improveThemes.map(function(x){return x.count;}),backgroundColor:'#5278D8'}]},{indexAxis:'y',scales:{x:{beginAtZero:true,ticks:{precision:0}}}},function(di,idx){return improveThemes[idx].docs;},'Improvement themes','Rule-based multi-label theme extraction; comments can appear in more than one theme',function(di,idx){return idx===null?suggestions:improveThemes[idx].docs;});
+    chart('av-enjoy-theme-chart','bar',{labels:enjoyThemes.map(function(x){return x.label;}),datasets:[{label:'Comments mentioning theme',data:enjoyThemes.map(function(x){return x.count;}),backgroundColor:'#15966D'}]},{indexAxis:'y',scales:{x:{beginAtZero:true,ticks:{precision:0}}}},function(di,idx){return enjoyThemes[idx].docs;},'What parents appreciated','Rule-based topic grouping of enjoyment comments',function(di,idx){return idx===null?enjoyed:enjoyThemes[idx].docs;});
+    function sentCards(docs,counts,field){
+      return '<div class="av-sentiment-cards">'+['Positive','Neutral','Negative'].map(function(l,i){var c=counts[i],pct=docs.length?Math.round(c/docs.length*100):0;return '<button type="button" class="av-sent-card av-'+l.toLowerCase()+'" onclick="window.avSentDrill(\''+field+'\',\''+l+'\')"><b>'+c+'</b><span>'+l+' · '+pct+'%</span><small>Tap to inspect comments</small></button>';}).join('')+'</div>';
+    }
+    $('av-nlp-summary').innerHTML='<div class="av-nlp-summary-grid"><div><h4>Column 5 · What parents enjoyed</h4><p>'+enjoyed.length+' substantive comments analysed</p>'+sentCards(enjoyed,enjoySent,'enjoy')+'</div><div><h4>Column 6 · Suggestions for improvement</h4><p>'+suggestions.length+' substantive comments analysed</p>'+sentCards(suggestions,suggestSent,'suggest')+'</div></div><div class="av-method-note"><b>Method:</b> sentiment uses a transparent word-lexicon score with a three-token negation window and length normalisation. TF-IDF ranks unigrams and bigrams across comments. Theme counts use multi-label phrase matching; a comment may contribute to more than one theme. This is an assistive text-mining signal, not a human-verified judgement.</div>';
+    window.avSentDrill=function(field,label){var ds=field==='enjoy'?enjoyed:suggestions;openDrill(label+' sentiment · '+(field==='enjoy'?'What parents enjoyed':'Suggestions'), 'Lexicon-based sentiment classification',ds.filter(function(d){return d.sentiment===label;}));};
+    $('av-nlp-kpis').innerHTML=[
+      [enjoyed.length,'ENJOYMENT TEXTS','Column 5'],
+      [suggestions.length,'SUGGESTION TEXTS','Column 6'],
+      [enjoySent[0]+' positive','POSITIVE ENJOYMENT','Lexicon sentiment'],
+      [suggestSent[2]+' negative','NEGATIVE SUGGESTIONS','Needs human review']
+    ].map(function(k,i){return '<button type="button" class="au-kpi av-click-kpi" onclick="window.avNlpKpi('+i+')"><div class="v">'+esc(k[0])+'</div><div class="k">'+esc(k[1])+'</div><div class="d">'+esc(k[2])+'</div><span class="av-tap-hint">Tap to view ↗</span></button>';}).join('');
+    window.avNlpKpi=function(i){var ds=[enjoyed,suggestions,enjoyed.filter(function(d){return d.sentiment==='Positive';}),suggestions.filter(function(d){return d.sentiment==='Negative';})][i];openDrill(['Enjoyment comments','Improvement suggestions','Positive enjoyment comments','Negative-tone suggestions'][i],'NLP source records',ds);};
     var cl={};a.forEach(function(r){var k=String(r[0]||'Unspecified').trim(),v=score(r[5]);if(Number.isFinite(v))(cl[k]||(cl[k]=[])).push(v);});
     var cls=Object.keys(cl).map(function(k){return {name:k,n:cl[k].length,avg:mean(cl[k])};}).sort(function(x,y){return y.n-x.n||x.name.localeCompare(y.name);});
-    $('av-class-table').innerHTML='<div class="av-table-wrap"><table class="av-table"><thead><tr><th>Class / section</th><th>Responses</th><th>Average overall rating</th></tr></thead><tbody>'+cls.map(function(x){return '<tr><td>'+esc(x.name)+'</td><td>'+x.n+'</td><td>'+x.avg.toFixed(2)+'/5</td></tr>';}).join('')+'</tbody></table></div>';
+    $('av-class-table').innerHTML='<div class="av-table-wrap"><table class="av-table"><thead><tr><th>Class / section</th><th>Responses</th><th>Average overall rating</th></tr></thead><tbody>'+cls.map(function(x){return '<tr class="av-tap-row" tabindex="0" onclick="window.avClassDrill(\''+esc(x.name).replace(/'/g,"\\'")+'\')"><td>'+esc(x.name)+'</td><td>'+x.n+'</td><td>'+x.avg.toFixed(2)+'/5</td></tr>';}).join('')+'</tbody></table></div><div class="av-tap-hint">Tap a class row to inspect its parent comments.</div>';
+    window.avClassDrill=function(name){var selected=a.filter(function(r){return String(r[0]||'').trim()===name;});var ds=selected.map(function(r){var t='Seating: '+(r[2]==null?'—':r[2])+'/5 · Student performances: '+(r[3]==null?'—':r[3])+'/5 · Staff support: '+(r[4]==null?'—':r[4])+'/5 · Overall: '+(r[5]==null?'—':r[5])+'/5\\nEnjoyed: '+(r[6]||'—')+'\\nSuggestion: '+(r[7]||'—');var s=sentiment((r[6]||'')+' '+(r[7]||''));return {grade:r[0],type:'Class response',text:t,sentiment:s.label,polarity:s.polarity};});openDrill(name+' — class feedback','Rating and text responses',ds);};
     renderComments();
-    var lowest=BAND_ORDER.map(function(b){return {b:b,v:mean(bs[b].overall)};}).sort(function(x,y){return x.v-y.v;})[0];
-    var staff=a.map(function(r){return score(r[4]);}).filter(Number.isFinite);
+    var topTheme=improveThemes[0],staffLow=a.filter(function(r){return score(r[4])<=3;}).length;
     $('av-actions').innerHTML=
-      '<div class="av-action"><strong>1. Strength to retain — student performances</strong>Parents gave student performances the highest average score ('+allScores[1].toFixed(2)+'/5). Continue prioritising student participation, rehearsals and stage presentation.</div>'+
-      '<div class="av-action"><strong>2. Priority — staff support and coordination</strong>This dimension averaged '+allScores[2].toFixed(2)+'/5, the lowest of the four. Review parent-facing communication, event-day help desks, ushering and coordination responsibilities.</div>'+
-      '<div class="av-action"><strong>3. Focus group — '+lowest.b+'</strong>'+lowest.b+' recorded the lowest overall average ('+lowest.v.toFixed(2)+'/5). Review its comments and event experience before planning the next celebration.</div>'+
-      '<div class="av-action"><strong>4. Practical planning improvements</strong>Use the written suggestions to review seating capacity, refreshments, timing, announcements and child comfort. These are comment-derived themes, not verified counts of unique families.</div>'+
-      '<div class="av-action"><strong>5. Follow-up</strong>Assign an owner and deadline to each agreed improvement, then compare the same four rating dimensions in the next event feedback survey.</div>';
+      '<div class="av-action"><strong>1. Preserve the strongest experience — student performances</strong>Performance and dance were the most frequently identified enjoyment topic ('+enjoyThemes.filter(function(x){return x.label==='Student performances & dance';}).reduce(function(s,x){return s+x.count;},0)+' comments matched this theme). Retain student participation and stage opportunities.</div>'+
+      '<div class="av-action"><strong>2. First planning priority — '+(topTheme?topTheme.label:'parent suggestions')+'</strong>'+(topTheme?topTheme.count+' of '+suggestions.length+' substantive suggestions matched this theme. Review it with the event committee and assign an accountable owner.':'Review all suggestions with the event committee.')+'</div>'+
+      '<div class="av-action"><strong>3. Safety and child handover deserve explicit review</strong>'+((improveThemes.find(function(x){return x.label.indexOf('Child safety')===0;})||{count:0}).count)+' suggestions matched child safety, handover or dispersal language. Audit the collection protocol, class-wise holding areas, signage and staff roles.</div>'+
+      '<div class="av-action"><strong>4. Improve parent logistics</strong>Food and refreshments, scheduling, seating and venue access appear repeatedly in the written feedback. Review these as separate operational workstreams rather than one general event-arrangement issue.</div>'+
+      '<div class="av-action"><strong>5. Validate sentiment and themes with human review</strong>Use the clickable comments to check context before taking action. Lexicon sentiment and phrase-based themes can misread sarcasm, mixed comments and short phrases.</div>';
   }
   function renderComments(){
-    var q=($('av-search')&&$('av-search').value||'').toLowerCase().trim(), a=rows(), out=[];
-    a.forEach(function(r){[['Enjoyed',r[6]],['Suggestion',r[7]]].forEach(function(pair){var t=String(pair[1]||'').trim();if(!t||t==='-'||/^n\/?a$/i.test(t))return;var hay=(r[0]+' '+pair[0]+' '+t).toLowerCase();if(!q||hay.indexOf(q)>=0)out.push({grade:r[0],type:pair[0],text:t});});});
-    $('av-comments').innerHTML=out.length?out.map(function(x){return '<div class="av-comment"><small>'+esc(x.grade)+' · '+esc(x.type)+'</small>'+esc(x.text)+'</div>';}).join(''):'<div class="no-data">No matching substantive comments.</div>';
+    var q=($('av-search')&&$('av-search').value||'').toLowerCase().trim(),a=rows(),out=[];
+    a.forEach(function(r){[['Enjoyed',r[6]],['Suggestion',r[7]]].forEach(function(pair){var t=String(pair[1]||'').replace(/\s+/g,' ').trim();if(!validText(t))return;var s=sentiment(t),hay=(r[0]+' '+pair[0]+' '+t).toLowerCase();if(!q||hay.indexOf(q)>=0)out.push({grade:r[0],type:pair[0],text:t,sentiment:s.label,polarity:s.polarity});});});
+    $('av-comments').innerHTML=out.length?out.map(function(x,i){return '<button type="button" class="av-comment av-comment-button" onclick="window.avCommentDrill('+i+')"><small>'+esc(x.grade)+' · '+esc(x.type)+' · '+esc(x.sentiment)+'</small>'+esc(x.text)+'<span class="av-tap-hint">Tap to expand ↗</span></button>';}).join(''):'<div class="no-data">No matching substantive comments.</div>';
+    window.__avVisibleComments=out;
   }
+  window.avCommentDrill=function(i){var d=(window.__avVisibleComments||[])[i];if(d)openDrill(d.grade+' · '+d.type,'Full parent comment', [d]);};
   async function load(force){
-    if(loading)return;
-    if(loaded&&!force){render();return;}
-    loading=true;
+    if(loading)return;if(loaded&&!force){render();return;}loading=true;
     try{
       var session=null;try{var s=await sb.auth.getSession();session=s&&s.data&&s.data.session;}catch(e){}
       if(!session){window.location.href='login.html';return;}
       var res=await _lazyFetch('auravya',!!force,session,55000);
       if(res.status===401){await sb.auth.signOut();window.location.href='login.html';return;}
-      if(!res.ok)throw new Error('HTTP '+res.status);
+      if(!res.ok){var errBody='';try{errBody=await res.text();}catch(e){}throw new Error('HTTP '+res.status+(errBody?' · '+errBody.slice(0,240):''));}
       var d=await res.json();raw=d&&d.AURAVYA_RAW;
       if(!raw||!Array.isArray(raw.rows))throw new Error('Auravya data was not found in the Apps Script response.');
-      loaded=true;render();
-      $('av-loader').style.display='none';$('av-body').style.display='flex';
+      loaded=true;render();$('av-loader').style.display='none';$('av-body').style.display='flex';
       $('av-status').textContent='Live · '+new Date(raw.generatedAt).toLocaleString();
     }catch(e){
       $('av-loader').innerHTML='<div style="color:var(--r);font-weight:700">Could not load Auravya feedback.</div><div style="font-size:11px;margin-top:6px">'+esc(e.message||e)+'</div><button class="tb" style="margin-top:10px" onclick="window.loadAuravya(true)">Retry</button>';
@@ -42660,10 +42797,10 @@ window.T1 = (function () {
   window.loadAuravya=load;
   window.addEventListener('DOMContentLoaded',function(){
     var search=$('av-search');if(search)search.addEventListener('input',renderComments);
-    var old=window.showTab;
-    window.showTab=function(id,btn){var r=old.apply(this,arguments);if(id==='auravya')load(false);return r;};
-    var sw=window.switchTab;
-    window.switchTab=function(id){var r=sw.apply(this,arguments);if(id==='auravya')load(false);return r;};
+    var modal=$('av-nlp-modal');if(modal){modal.addEventListener('click',function(e){if(e.target===modal)closeDrill();});}
+    document.addEventListener('keydown',function(e){if(e.key==='Escape')closeDrill();});
+    var old=window.showTab;window.showTab=function(id,btn){var r=old.apply(this,arguments);if(id==='auravya')load(false);return r;};
+    var sw=window.switchTab;window.switchTab=function(id){var r=sw.apply(this,arguments);if(id==='auravya')load(false);return r;};
   });
 })();
 </script>
