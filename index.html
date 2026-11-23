@@ -2902,6 +2902,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 .av-drill-item>div{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:11px}
 .av-drill-item>div span{color:var(--txm)}
 .av-drill-item p{font-size:13px;line-height:1.6;margin:8px 0 0;white-space:pre-wrap}
+.av-drill-identity{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0;padding:10px;background:var(--pl);border-radius:8px}
+.av-drill-identity>div{display:flex;flex-direction:column;gap:3px;min-width:0}
+.av-drill-identity b,.av-drill-answer>b{font-size:10px;color:var(--txm);text-transform:uppercase;letter-spacing:.04em}
+.av-drill-identity span{font-size:12px;font-weight:700;overflow-wrap:anywhere}
+.av-drill-scores{display:flex;flex-wrap:wrap;gap:7px;margin:9px 0}
+.av-drill-scores span{font-size:11px;padding:6px 8px;border:1px solid var(--bor);border-radius:7px;background:var(--sur)}
+.av-drill-answer{padding:9px 10px;margin-top:8px;border:1px solid var(--bor);border-radius:8px;background:var(--sur)}
+.av-drill-answer p{font-size:12px;line-height:1.55;margin:5px 0 0;white-space:pre-wrap}
+@media(max-width:600px){.av-drill-identity{grid-template-columns:1fr}}
+
 .av-expanded-chart{height:min(62vh,560px);min-height:320px}
 @media(max-width:760px){.av-nlp-summary-grid{grid-template-columns:1fr}.av-nlp-modal{padding:8px}.av-nlp-modal-body{padding:12px;max-height:80vh}.av-sentiment-cards{gap:5px}.av-sent-card{padding:8px 5px}}
 .av-action{padding:12px 14px;border:1px solid var(--bor);border-left:4px solid var(--a);border-radius:9px;margin:8px 0;background:var(--sur)}
@@ -4515,16 +4525,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
       <div class="au-sec">
         <h3>Parent voice — NLP & sentiment analytics</h3>
-        <div class="sub">Text analysis of the complete written responses in feedback columns 5 and 6. Numerical values are displayed on the charts. Tap a value or chart segment to inspect the underlying parent comments; use Expand for a larger visual.</div>
+        <div class="sub">Question 5 is used only for grouped enjoyment keywords. Question 6 is the sole source for positive/negative sentiment. Every drill-down shows the matched parent, student, contact, ratings and both written answers.</div>
         <div id="av-nlp-kpis" class="au-kpis"></div>
         <div id="av-nlp-summary"></div>
         <div class="av-chart-grid av-nlp-grid">
           <div class="av-chart-card"><div class="av-chart-head"><h4>Overall rating distribution</h4><button type="button" onclick="window.avExpandChart('av-dist-chart')">Expand ↗</button></div><canvas id="av-dist-chart"></canvas></div>
-          <div class="av-chart-card"><div class="av-chart-head"><h4>Sentiment by feedback question</h4><button type="button" onclick="window.avExpandChart('av-sent-chart')">Expand ↗</button></div><canvas id="av-sent-chart"></canvas></div>
-          <div class="av-chart-card"><div class="av-chart-head"><h4>Top keywords — what parents enjoyed</h4><button type="button" onclick="window.avExpandChart('av-enjoy-kw-chart')">Expand ↗</button></div><canvas id="av-enjoy-kw-chart"></canvas></div>
-          <div class="av-chart-card"><div class="av-chart-head"><h4>Top keywords — improvement suggestions</h4><button type="button" onclick="window.avExpandChart('av-suggest-kw-chart')">Expand ↗</button></div><canvas id="av-suggest-kw-chart"></canvas></div>
-          <div class="av-chart-card"><div class="av-chart-head"><h4>Improvement themes (multi-label)</h4><button type="button" onclick="window.avExpandChart('av-theme-chart')">Expand ↗</button></div><canvas id="av-theme-chart"></canvas></div>
-          <div class="av-chart-card"><div class="av-chart-head"><h4>What parents appreciated</h4><button type="button" onclick="window.avExpandChart('av-enjoy-theme-chart')">Expand ↗</button></div><canvas id="av-enjoy-theme-chart"></canvas></div>
+          <div class="av-chart-card"><div class="av-chart-head"><h4>Suggestions sentiment — Question 6 only</h4><button type="button" onclick="window.avExpandChart('av-sent-chart')">Expand ↗</button></div><canvas id="av-sent-chart"></canvas></div>
+          <div class="av-chart-card"><div class="av-chart-head"><h4>What parents enjoyed — keyword groups (Question 5)</h4><button type="button" onclick="window.avExpandChart('av-enjoy-kw-chart')">Expand ↗</button></div><canvas id="av-enjoy-kw-chart"></canvas></div>
         </div>
       </div>
       <div class="au-sec">
@@ -42625,10 +42632,24 @@ window.T1 = (function () {
     var polarity=rawScore/Math.max(1,Math.sqrt(tokens.length));
     return {polarity:polarity,label:polarity>=0.18?'Positive':(polarity<=-0.18?'Negative':'Neutral')};
   }
+  function classifySuggestion(r){
+    var text=String(r&&r[7]||'').replace(/\s+/g,' ').trim();
+    if(!validText(text))return {label:'No comment',polarity:0,reason:'No substantive Question 6 response'};
+    var t=text.toLowerCase();
+    var noChangePattern=/^(nothing|none|nil|no|no suggestions?|no further suggestions?|no changes?|no improvements?|nothing to improve|nothing to change|nothing to add|everything (is |was )?(good|great|fine|excellent)|all (is |was )?(good|fine)|all good|no issues|no complaints|very good|excellent|great|satisfied|happy|keep it up|continue the same)[.!\\s]*$/i;
+    if(noChangePattern.test(t))return {label:'Positive',polarity:1,reason:'Explicit appreciation or no improvement requested'};
+    var improvementPattern=/\b(need|needs|needed|should|must|improve|improvement|better|provide|arrange|arrangements|change|avoid|reduce|increase|more|less|lack|poor|worst|delay|delayed|late|issue|issues|problem|problems|difficult|difficulty|uncomfortable|unsafe|safety|crowd|pushing|food|snack|snacks|breakfast|lunch|water|seating|seat|handover|dispersal|disbursement|timing|timings|schedule|audio|video|microphone|mic|lighting|staff|dress|practice|practise|steps|criteria|quality|confusion|confusing|traffic|parking|not enough|could not|cannot|can't|don't|didn't|never)\b/i;
+    if(improvementPattern.test(t))return {label:'Negative',polarity:-1,reason:'Actionable improvement request or concern'};
+    var lex=sentiment(text);
+    if(lex.label==='Positive')return {label:'Positive',polarity:Math.max(0.25,lex.polarity),reason:'Positive wording in Question 6'};
+    if(lex.label==='Negative')return {label:'Negative',polarity:Math.min(-0.25,lex.polarity),reason:'Negative wording in Question 6'};
+    return {label:'Negative',polarity:-0.2,reason:'Ambiguous substantive suggestion; flagged for human review'};
+  }
   function makeDocs(list,idx,type){
     var out=[];
     list.forEach(function(r,i){var text=String(r[idx]||'').replace(/\s+/g,' ').trim();if(!validText(text))return;
-      var s=sentiment(text);out.push({row:r,rowIndex:i,grade:r[0],band:r[1],type:type,text:text,polarity:s.polarity,sentiment:s.label});
+      var s=(idx===7)?classifySuggestion(r):sentiment(text);
+      out.push({row:r,rowIndex:i,grade:r[0],band:r[1],type:type,text:text,polarity:s.polarity,sentiment:s.label,reason:s.reason||''});
     });
     return out;
   }
@@ -42657,6 +42678,21 @@ window.T1 = (function () {
     return Object.keys(score).filter(function(w){return w.length>2;})
       .map(function(w){return {term:w,score:score[w],count:df[w]};})
       .sort(function(a,b){return b.score-a.score;}).slice(0,limit||12);
+  }
+  var ENJOY_KEYPHRASES=[
+    {label:'Student performances & stage acts',re:/\b(performance|performances|performing|stage act|stage acts|skit|skits|drama|acts)\b/i},
+    {label:'Dance & choreography',re:/\b(dance|dances|dancing|choreography|classical dance|dance performance)\b/i},
+    {label:'Music & songs',re:/\b(song|songs|music|singing|singer|instrumental|melody)\b/i},
+    {label:'Theme & creative concept',re:/\b(theme|concept|era|youngistan|avengers|kashmir|kanyakumari|india|indian|storyline)\b/i},
+    {label:'Guest speeches & addresses',re:/\b(guest|chief guest|speech|speeches|address|speaker|ips|laxminarayan)\b/i},
+    {label:'Student participation & involvement',re:/\b(participat|involvement|every student|all students|each child|everyone performed)\b/i},
+    {label:'Organisation & event arrangements',re:/\b(arrangement|arrangements|organisation|organization|organised|organized|coordination|coordinated|effort|efforts)\b/i}
+  ];
+  function extractEnjoyKeywords(docs){
+    return ENJOY_KEYPHRASES.map(function(k){
+      var matched=docs.filter(function(d){return k.re.test(d.text);});
+      return {label:k.label,count:matched.length,docs:matched,re:k.re};
+    }).filter(function(x){return x.count>0;}).sort(function(a,b){return b.count-a.count;});
   }
   var ENJOY_THEMES=[
     ['Student performances & dance',/\b(performance|performances|performing|dance|dances|dancing|song|songs|skit|skits|stage|acts)\b/i],
@@ -42729,8 +42765,27 @@ window.T1 = (function () {
     docs=docs||[];
     if(modalChart){modalChart.destroy();modalChart=null;}
     $('av-nlp-modal-title').textContent=title;
-    $('av-nlp-modal-sub').textContent=(sub||'')+' · '+docs.length+' matching written responses';
-    body.innerHTML=docs.length?docs.map(function(d){return '<article class="av-drill-item"><div><b>'+esc(d.grade||'Class not recorded')+'</b><span>'+esc(d.type)+' · '+esc(d.sentiment)+' · polarity '+Number(d.polarity).toFixed(2)+'</span></div><p>'+esc(d.text)+'</p></article>';}).join(''):'<div class="no-data">No matching written responses were found.</div>';
+    $('av-nlp-modal-sub').textContent=(sub||'')+' · '+docs.length+' matching parent responses';
+    body.innerHTML=docs.length?docs.map(function(d){
+      var r=d.row||null;
+      var identity=r?(
+        '<div class="av-drill-identity">'+
+          '<div><b>Parent name</b><span>'+esc(r[8]||'Not recorded')+'</span></div>'+
+          '<div><b>Student name</b><span>'+esc(r[9]||'Not recorded')+'</span></div>'+
+          '<div><b>Contact number</b><span>'+esc(r[10]||'Not recorded')+'</span></div>'+
+          '<div><b>Class / section</b><span>'+esc(r[0]||'Not recorded')+'</span></div>'+
+        '</div>'+
+        '<div class="av-drill-scores">'+
+          '<span>Seating: <b>'+esc(r[2]==null?'—':r[2])+'/5</b></span>'+
+          '<span>Student performance: <b>'+esc(r[3]==null?'—':r[3])+'/5</b></span>'+
+          '<span>Staff support: <b>'+esc(r[4]==null?'—':r[4])+'/5</b></span>'+
+          '<span>Overall: <b>'+esc(r[5]==null?'—':r[5])+'/5</b></span>'+
+        '</div>'+
+        '<div class="av-drill-answer"><b>Q5 · What did the parent enjoy?</b><p>'+esc(r[6]||'No response')+'</p></div>'+
+        '<div class="av-drill-answer"><b>Q6 · Suggestions for improvement</b><p>'+esc(r[7]||'No response')+'</p></div>'
+      ):'';
+      return '<article class="av-drill-item"><div><b>'+esc(d.grade||'Class not recorded')+'</b><span>'+esc(d.type||'Parent response')+' · '+esc(d.sentiment||'Not classified')+(d.reason?' · '+esc(d.reason):'')+'</span></div>'+identity+(r?'':'<p>'+esc(d.text||'')+'</p>')+'</article>';
+    }).join(''):'<div class="no-data">No matching parent responses were found.</div>';
     modal.classList.add('on');modal.setAttribute('aria-hidden','false');
   }
   function closeDrill(){var m=$('av-nlp-modal');if(m){m.classList.remove('on');m.setAttribute('aria-hidden','true');}}
@@ -42759,22 +42814,11 @@ window.T1 = (function () {
     // Improvement priority is response-level: parents who rated staff support
     // and coordination 1–3 out of 5. The denominator is ALL submitted responses.
     var improvementRows=a.filter(function(r){var v=score(r[4]);return Number.isFinite(v)&&v<=3;});
-    var enjoySent=['Positive','Neutral','Negative'].map(function(s){return enjoyed.filter(function(d){return d.sentiment===s;}).length;});
-    var suggestSent=['Positive','Neutral','Negative'].map(function(s){return suggestions.filter(function(d){return d.sentiment===s;}).length;});
-    // One sentiment result per parent response, combining Q5 and Q6. This avoids
-    // counting a parent twice when both written-feedback fields are completed.
-    // Responses with no substantive written text are retained as "No text" and
-    // remain in the overall-response denominator, not in positive/negative counts.
-    var parentSentimentDocs=a.map(function(r){
-      var parts=[validText(r[6])?String(r[6]).trim():'',validText(r[7])?String(r[7]).trim():''].filter(Boolean);
-      var text=parts.join(' · ');
-      var s=text?sentiment(text):{polarity:0,label:'No text'};
-      return {row:r,grade:r[0],band:r[1],type:'Combined parent sentiment',text:text||'(No substantive written comment)',sentiment:s.label,polarity:s.polarity};
-    });
-    var positiveParents=parentSentimentDocs.filter(function(d){return d.sentiment==='Positive';});
-    var negativeParents=parentSentimentDocs.filter(function(d){return d.sentiment==='Negative';});
-    var neutralParents=parentSentimentDocs.filter(function(d){return d.sentiment==='Neutral'||d.sentiment==='No text';});
-    var enjoyKw=tfidf(enjoyed,12),suggestKw=tfidf(suggestions,12),improveThemes=themeCounts(suggestions,SUGGEST_THEMES),enjoyThemes=themeCounts(enjoyed,ENJOY_THEMES);
+    // Q6 alone determines sentiment. Each response is counted once; blank Q6
+    // responses remain in the overall-response denominator but not sentiment counts.
+    var positiveParents=suggestions.filter(function(d){return d.sentiment==='Positive';});
+    var negativeParents=suggestions.filter(function(d){return d.sentiment==='Negative';});
+    var enjoyKw=extractEnjoyKeywords(enjoyed),improveThemes=themeCounts(suggestions,SUGGEST_THEMES),enjoyThemes=themeCounts(enjoyed,ENJOY_THEMES);
     $('av-meta').textContent=n+' live parent responses · '+(raw.source||'PBES-All Reports 2026-27')+' · Bachupally';
     $('av-kpis').innerHTML=[
       [n,'RESPONSES','All submitted records',a],
@@ -42785,34 +42829,38 @@ window.T1 = (function () {
       [suggestions.length+' ('+pctOfTotal(suggestions.length)+'%)','SUGGESTION COMMENTS','Column 6 · % of all responses',suggestions]
     ].map(function(k,i){return '<button class="au-kpi av-click-kpi" type="button" onclick="window.avKpiDrill('+i+')" aria-label="Open '+esc(k[1])+' details"><div class="v">'+esc(k[0])+'</div><div class="k">'+esc(k[1])+'</div><div class="d">'+esc(k[2])+'</div><span class="av-tap-hint">Tap to view data ↗</span></button>';}).join('');
     window.__avKpiDocs=[a,a.filter(function(r){return score(r[5])>=4;}),a.filter(function(r){return score(r[3])>=4;}),improvementRows,enjoyed,suggestions];
-    window.avKpiDrill=function(i){var ds=window.__avKpiDocs[i]||[];var docs=ds.length&&ds[0].row?ds:ds.map(function(r){return {grade:r[0],type:'Rating response',text:'Seating '+r[2]+' · Performance '+r[3]+' · Staff '+r[4]+' · Overall '+r[5],sentiment:'Rating record',polarity:0};});openDrill(['All responses','Overall ratings 4–5','Performance ratings 4–5','Staff support ratings 1–3 — improvement priority','Enjoyment comments','Suggestion comments'][i],'Tap a record to inspect the underlying response. Percentages use all '+totalResponses+' submitted responses.',docs);};
+    window.avKpiDrill=function(i){var ds=window.__avKpiDocs[i]||[];var docs=ds.length&&ds[0].row?ds:ds.map(function(r){return {row:r,grade:r[0],type:'Rating response',text:'Seating '+r[2]+' · Performance '+r[3]+' · Staff '+r[4]+' · Overall '+r[5],sentiment:'Rating record',polarity:0};});openDrill(['All responses','Overall ratings 4–5','Performance ratings 4–5','Staff support ratings 1–3 — improvement priority','Enjoyment comments','Suggestion comments'][i],'Tap a record to inspect the underlying response. Percentages use all '+totalResponses+' submitted responses.',docs);};
     $('av-groups').innerHTML='<div class="av-table-wrap"><table class="av-table"><thead><tr><th>Grade group</th><th>Responses</th><th>Seating</th><th>Performances</th><th>Staff support</th><th>Overall</th><th>Overall 4–5</th></tr></thead><tbody>'+
       BAND_ORDER.map(function(b){var x=bs[b],pct=x.overall.length?Math.round(x.overall.filter(function(v){return v>=4;}).length/x.overall.length*100):0;return '<tr class="av-tap-row" tabindex="0" onclick="window.avGroupDrill(\''+b+'\')"><td><b>'+b+'</b></td><td>'+x.n+'</td>'+x.means.map(function(v){return '<td>'+v.toFixed(2)+'</td>';}).join('')+'<td><span class="av-pill">'+pct+'%</span></td></tr>';}).join('')+'</tbody></table></div><div class="av-tap-hint">Tap a grade group to view its underlying feedback.</div>';
-    window.avGroupDrill=function(b){var selected=a.filter(function(r){return r[1]===b;});var ds=selected.map(function(r){var t='Seating: '+(r[2]==null?'—':r[2])+'/5 · Student performances: '+(r[3]==null?'—':r[3])+'/5 · Staff support: '+(r[4]==null?'—':r[4])+'/5 · Overall: '+(r[5]==null?'—':r[5])+'/5\\nEnjoyed: '+(r[6]||'—')+'\\nSuggestion: '+(r[7]||'—');var s=sentiment((r[6]||'')+' '+(r[7]||''));return {grade:r[0],type:'Grade-group response',text:t,sentiment:s.label,polarity:s.polarity};});openDrill(b+' — feedback detail',selected.length+' source records',ds);};
+    window.avGroupDrill=function(b){var selected=a.filter(function(r){return r[1]===b;});var ds=selected.map(function(r){var t='Seating: '+(r[2]==null?'—':r[2])+'/5 · Student performances: '+(r[3]==null?'—':r[3])+'/5 · Staff support: '+(r[4]==null?'—':r[4])+'/5 · Overall: '+(r[5]==null?'—':r[5])+'/5\\nEnjoyed: '+(r[6]||'—')+'\\nSuggestion: '+(r[7]||'—');var s=sentiment((r[6]||'')+' '+(r[7]||''));return {row:r,grade:r[0],type:'Grade-group response',text:t,sentiment:classifySuggestion(r).label,polarity:classifySuggestion(r).polarity};});openDrill(b+' — feedback detail',selected.length+' source records',ds);};
     var dist=[1,2,3,4,5].map(function(s){return overall.filter(function(v){return v===s;}).length;});
-    chart('av-dist-chart','doughnut',{labels:['1 · Needs improvement','2 · Average','3 · Good','4 · Very good','5 · Outstanding'],datasets:[{data:dist,backgroundColor:['#D94848','#E78A43','#E9C34A','#4C9AD8','#15966D']}]},{},function(di,idx){var v=idx+1;return a.filter(function(r){return score(r[5])===v;}).map(function(r){var s=sentiment(r[7]||r[6]);return {grade:r[0],type:'Rating '+v,text:'Enjoyed: '+(r[6]||'—')+' | Suggestion: '+(r[7]||'—'),sentiment:s.label,polarity:s.polarity};});},'Overall rating distribution','Overall event ratings',function(di,idx){if(idx===null)return a.map(function(r){return {grade:r[0],type:'Rating record',text:'Overall rating: '+r[5]+' / 5 · Enjoyed: '+(r[6]||'—')+' · Suggestion: '+(r[7]||'—'),sentiment:'Rating record',polarity:0};});var v=idx+1;return a.filter(function(r){return score(r[5])===v;}).map(function(r){var s=sentiment(r[7]||r[6]);return {grade:r[0],type:'Rating '+v,text:'Enjoyed: '+(r[6]||'—')+' | Suggestion: '+(r[7]||'—'),sentiment:s.label,polarity:s.polarity};});});
-    var sentiments=['Positive','Neutral','Negative'];
-    chart('av-sent-chart','bar',{labels:['Enjoyment (Q5)','Suggestions (Q6)'],datasets:sentiments.map(function(s,i){return {label:s,data:[enjoySent[i],suggestSent[i]],backgroundColor:['#15966D','#94A3B8','#D94848'][i]};})},{scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,ticks:{precision:0}}} },function(di,idx){var field=idx===0?enjoyed:suggestions,lab=sentiments[di];return field.filter(function(d){return d.sentiment===lab;});},'Sentiment by feedback question','Lexicon-based sentiment with negation handling',function(di,idx){var field=idx===0?enjoyed:suggestions;if(di===null)return field;var lab=sentiments[di];return field.filter(function(d){return d.sentiment===lab;});});
-    chart('av-enjoy-kw-chart','bar',{labels:enjoyKw.map(function(x){return x.term;}),datasets:[{label:'TF-IDF relevance',data:enjoyKw.map(function(x){return +x.score.toFixed(3);}),backgroundColor:'#15966D'}]},{indexAxis:'y',scales:{x:{beginAtZero:true}}},function(di,idx){var term=enjoyKw[idx].term;return enjoyed.filter(function(d){return tokenize(d.text).join(' ').indexOf(term)>=0||d.text.toLowerCase().indexOf(term)>=0;});},'Top enjoyed keywords','TF-IDF ranked terms and phrases',function(di,idx){if(idx===null)return enjoyed;var term=enjoyKw[idx].term;return enjoyed.filter(function(d){return d.text.toLowerCase().indexOf(term)>=0;});});
-    chart('av-suggest-kw-chart','bar',{labels:suggestKw.map(function(x){return x.term;}),datasets:[{label:'TF-IDF relevance',data:suggestKw.map(function(x){return +x.score.toFixed(3);}),backgroundColor:'#D58B20'}]},{indexAxis:'y',scales:{x:{beginAtZero:true}}},function(di,idx){var term=suggestKw[idx].term;return suggestions.filter(function(d){return d.text.toLowerCase().indexOf(term)>=0;});},'Top improvement keywords','TF-IDF ranked terms and phrases',function(di,idx){if(idx===null)return suggestions;var term=suggestKw[idx].term;return suggestions.filter(function(d){return d.text.toLowerCase().indexOf(term)>=0;});});
-    chart('av-theme-chart','bar',{labels:improveThemes.map(function(x){return x.label;}),datasets:[{label:'Comments mentioning theme',data:improveThemes.map(function(x){return x.count;}),backgroundColor:'#5278D8'}]},{indexAxis:'y',scales:{x:{beginAtZero:true,ticks:{precision:0}}}},function(di,idx){return improveThemes[idx].docs;},'Improvement themes','Rule-based multi-label theme extraction; comments can appear in more than one theme',function(di,idx){return idx===null?suggestions:improveThemes[idx].docs;});
-    chart('av-enjoy-theme-chart','bar',{labels:enjoyThemes.map(function(x){return x.label;}),datasets:[{label:'Comments mentioning theme',data:enjoyThemes.map(function(x){return x.count;}),backgroundColor:'#15966D'}]},{indexAxis:'y',scales:{x:{beginAtZero:true,ticks:{precision:0}}}},function(di,idx){return enjoyThemes[idx].docs;},'What parents appreciated','Rule-based topic grouping of enjoyment comments',function(di,idx){return idx===null?enjoyed:enjoyThemes[idx].docs;});
-    function sentCards(docs,counts,field){
-      return '<div class="av-sentiment-cards">'+['Positive','Neutral','Negative'].map(function(l,i){var c=counts[i],pct=docs.length?Math.round(c/docs.length*100):0;return '<button type="button" class="av-sent-card av-'+l.toLowerCase()+'" onclick="window.avSentDrill(\''+field+'\',\''+l+'\')"><b>'+c+'</b><span>'+l+' · '+pct+'%</span><small>Tap to inspect comments</small></button>';}).join('')+'</div>';
+    chart('av-dist-chart','doughnut',{labels:['1 · Needs improvement','2 · Average','3 · Good','4 · Very good','5 · Outstanding'],datasets:[{data:dist,backgroundColor:['#D94848','#E78A43','#E9C34A','#4C9AD8','#15966D']}]},{},function(di,idx){var v=idx+1;return a.filter(function(r){return score(r[5])===v;}).map(function(r){var s=classifySuggestion(r);return {row:r,grade:r[0],type:'Overall rating '+v,text:'Enjoyed: '+(r[6]||'—')+' | Suggestion: '+(r[7]||'—'),sentiment:s.label,polarity:s.polarity};});},'Overall rating distribution','Overall event ratings',function(di,idx){if(idx===null)return a.map(function(r){return {row:r,grade:r[0],type:'Rating record',text:'Overall rating: '+r[5]+' / 5 · Enjoyed: '+(r[6]||'—')+' · Suggestion: '+(r[7]||'—'),sentiment:'Rating record',polarity:0};});var v=idx+1;return a.filter(function(r){return score(r[5])===v;}).map(function(r){var s=classifySuggestion(r);return {row:r,grade:r[0],type:'Overall rating '+v,text:'Enjoyed: '+(r[6]||'—')+' | Suggestion: '+(r[7]||'—'),sentiment:s.label,polarity:s.polarity};});});
+    var q6Sentiments=['Positive','Negative'];
+    chart('av-sent-chart','bar',{labels:['Q6 · Suggestions for improvement'],datasets:q6Sentiments.map(function(s,i){return {label:s,data:[i===0?positiveParents.length:negativeParents.length],backgroundColor:i===0?'#15966D':'#D94848'};})},{scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,ticks:{precision:0}}}},function(di,idx){return q6Sentiments[di]==='Positive'?positiveParents:negativeParents;},'Question 6 — parent suggestion sentiment','Q6-only binary classification: positive appreciation / no concern vs negative / improvement requested',function(di,idx){if(di===null)return suggestions;return q6Sentiments[di]==='Positive'?positiveParents:negativeParents;});
+    chart('av-enjoy-kw-chart','bar',{labels:enjoyKw.map(function(x){return x.label;}),datasets:[{label:'Parent comments mentioning keyword group',data:enjoyKw.map(function(x){return x.count;}),backgroundColor:'#15966D'}]},{indexAxis:'y',scales:{x:{beginAtZero:true,ticks:{precision:0}}}},function(di,idx){return enjoyKw[idx].docs;},'Question 5 — what parents enjoyed','Grouped keyphrases with related expressions; counts are comments, not raw word frequency',function(di,idx){return idx===null?enjoyed:enjoyKw[idx].docs;});
+    function q6SentimentCard(label,docs){
+      var pct=totalResponses?((docs.length/totalResponses)*100).toFixed(1):'0.0';
+      return '<button type="button" class="av-sent-card av-'+label.toLowerCase()+'" onclick="window.avQ6SentDrill(\''+label+'\')"><b>'+docs.length+'</b><span>'+label+' · '+pct+'% of all responses</span><small>Tap to view parent records</small></button>';
     }
-    $('av-nlp-summary').innerHTML='<div class="av-nlp-summary-grid"><div><h4>Column 5 · What parents enjoyed</h4><p>'+enjoyed.length+' substantive comments analysed</p>'+sentCards(enjoyed,enjoySent,'enjoy')+'</div><div><h4>Column 6 · Suggestions for improvement</h4><p>'+suggestions.length+' substantive comments analysed</p>'+sentCards(suggestions,suggestSent,'suggest')+'</div></div><div class="av-method-note"><b>Method:</b> sentiment uses a transparent word-lexicon score with a three-token negation window and length normalisation. TF-IDF ranks unigrams and bigrams across comments. Theme counts use multi-label phrase matching; a comment may contribute to more than one theme. Parent-level positive/negative counts combine Q5 and Q6 once per response; responses without substantive text are retained in the denominator but are not labelled positive or negative. This is an assistive text-mining signal, not a human-verified judgement.</div>';
-    window.avSentDrill=function(field,label){var ds=field==='enjoy'?enjoyed:suggestions;openDrill(label+' sentiment · '+(field==='enjoy'?'What parents enjoyed':'Suggestions'), 'Lexicon-based sentiment classification',ds.filter(function(d){return d.sentiment===label;}));};
+    $('av-nlp-summary').innerHTML=
+      '<div class="av-nlp-summary-grid">'+
+        '<div><h4>Question 5 · What parents enjoyed</h4><p>'+enjoyed.length+' substantive responses. Related expressions are grouped into meaningful keyword clusters; one comment may match more than one cluster.</p><div class="av-method-note">Keyword groups include student performances, dance and music, theme and creative concept, guest speeches, student participation, and event arrangements. Click a bar to inspect the exact parent comments.</div></div>'+
+        '<div><h4>Question 6 · Suggestions for improvement — sentiment analysis</h4><p>'+suggestions.length+' substantive responses classified. Percentages use all '+totalResponses+' submitted responses.</p><div class="av-sentiment-cards">'+q6SentimentCard('Positive',positiveParents)+q6SentimentCard('Negative',negativeParents)+'</div></div>'+
+      '</div>'+
+      '<div class="av-method-note"><b>Classification method:</b> Question 6 alone determines sentiment. Explicit appreciation/no-change statements are Positive. Complaints, requests, improvement language and actionable suggestions are Negative / improvement requested. Ambiguous substantive suggestions are conservatively flagged as Negative for human review. Blank or placeholder Q6 answers are excluded from sentiment counts, but remain in the total-response denominator. Ratings and Question 5 are displayed as context in the drill-down; they do not override Q6 sentiment.</div>';
+    window.avQ6SentDrill=function(label){var ds=label==='Positive'?positiveParents:negativeParents;openDrill('Question 6 — '+label+' parent responses','Sentiment is calculated only from the improvement-suggestion column. Percentages use all '+totalResponses+' submitted responses.',ds);};
+    window.avNlpKpi=function(i){var ds=[enjoyed,suggestions,positiveParents,negativeParents][i]||[];openDrill(['Enjoyment comments — Q5','Improvement suggestions — Q6','Positive responses — Q6 only','Negative / improvement-needed responses — Q6 only'][i],'Parent/student details, all four scores, Q5 and Q6 text are shown for each matched response.',ds);};
     $('av-nlp-kpis').innerHTML=[
-      [enjoyed.length+' ('+pctOfTotal(enjoyed.length)+'%)','ENJOYMENT COMMENTS','Column 5 · % of all '+totalResponses+' responses'],
-      [suggestions.length+' ('+pctOfTotal(suggestions.length)+'%)','SUGGESTION COMMENTS','Column 6 · % of all '+totalResponses+' responses'],
-      [positiveParents.length+' ('+pctOfTotal(positiveParents.length)+'%)','POSITIVE PARENTS','Combined Q5 + Q6 sentiment · % of all responses'],
-      [negativeParents.length+' ('+pctOfTotal(negativeParents.length)+'%)','NEGATIVE PARENTS','Combined Q5 + Q6 sentiment · % of all responses']
+      [enjoyed.length+' ('+pctOfTotal(enjoyed.length)+'%)','ENJOYMENT COMMENTS','Q5 · % of all '+totalResponses+' responses'],
+      [suggestions.length+' ('+pctOfTotal(suggestions.length)+'%)','SUGGESTION COMMENTS','Q6 · % of all '+totalResponses+' responses'],
+      [positiveParents.length+' ('+pctOfTotal(positiveParents.length)+'%)','POSITIVE PARENTS','Q6 sentiment only · % of all responses'],
+      [negativeParents.length+' ('+pctOfTotal(negativeParents.length)+'%)','NEGATIVE PARENTS','Q6 sentiment only · % of all responses']
     ].map(function(k,i){return '<button type="button" class="au-kpi av-click-kpi" onclick="window.avNlpKpi('+i+')"><div class="v">'+esc(k[0])+'</div><div class="k">'+esc(k[1])+'</div><div class="d">'+esc(k[2])+'</div><span class="av-tap-hint">Tap to view ↗</span></button>';}).join('');
-    window.avNlpKpi=function(i){var ds=[enjoyed,suggestions,positiveParents,negativeParents][i];openDrill(['Enjoyment comments','Improvement suggestions','Positive parents — combined written feedback','Negative parents — combined written feedback'][i],'One record per parent response. Percentages use all '+totalResponses+' submitted responses.',ds);};
+    window.avNlpKpi=function(i){var ds=[enjoyed,suggestions,positiveParents,negativeParents][i];openDrill(['Enjoyment comments — Q5','Improvement suggestions — Q6','Positive responses — Q6 only','Negative / improvement-needed responses — Q6 only'][i],'Parent and student details, all four scores, Q5 and Q6 text are shown for every matching response.',ds);};
     var cl={};a.forEach(function(r){var k=String(r[0]||'Unspecified').trim(),v=score(r[5]);if(Number.isFinite(v))(cl[k]||(cl[k]=[])).push(v);});
     var cls=Object.keys(cl).map(function(k){return {name:k,n:cl[k].length,avg:mean(cl[k])};}).sort(function(x,y){return y.n-x.n||x.name.localeCompare(y.name);});
     $('av-class-table').innerHTML='<div class="av-table-wrap"><table class="av-table"><thead><tr><th>Class / section</th><th>Responses</th><th>Average overall rating</th></tr></thead><tbody>'+cls.map(function(x){return '<tr class="av-tap-row" tabindex="0" onclick="window.avClassDrill(\''+esc(x.name).replace(/'/g,"\\'")+'\')"><td>'+esc(x.name)+'</td><td>'+x.n+'</td><td>'+x.avg.toFixed(2)+'/5</td></tr>';}).join('')+'</tbody></table></div><div class="av-tap-hint">Tap a class row to inspect its parent comments.</div>';
-    window.avClassDrill=function(name){var selected=a.filter(function(r){return String(r[0]||'').trim()===name;});var ds=selected.map(function(r){var t='Seating: '+(r[2]==null?'—':r[2])+'/5 · Student performances: '+(r[3]==null?'—':r[3])+'/5 · Staff support: '+(r[4]==null?'—':r[4])+'/5 · Overall: '+(r[5]==null?'—':r[5])+'/5\\nEnjoyed: '+(r[6]||'—')+'\\nSuggestion: '+(r[7]||'—');var s=sentiment((r[6]||'')+' '+(r[7]||''));return {grade:r[0],type:'Class response',text:t,sentiment:s.label,polarity:s.polarity};});openDrill(name+' — class feedback','Rating and text responses',ds);};
+    window.avClassDrill=function(name){var selected=a.filter(function(r){return String(r[0]||'').trim()===name;});var ds=selected.map(function(r){var t='Seating: '+(r[2]==null?'—':r[2])+'/5 · Student performances: '+(r[3]==null?'—':r[3])+'/5 · Staff support: '+(r[4]==null?'—':r[4])+'/5 · Overall: '+(r[5]==null?'—':r[5])+'/5\\nEnjoyed: '+(r[6]||'—')+'\\nSuggestion: '+(r[7]||'—');var s=sentiment((r[6]||'')+' '+(r[7]||''));return {row:r,grade:r[0],type:'Class response',text:t,sentiment:classifySuggestion(r).label,polarity:classifySuggestion(r).polarity};});openDrill(name+' — class feedback','Rating and text responses',ds);};
     renderComments();
     var topTheme=improveThemes[0],staffLow=a.filter(function(r){return score(r[4])<=3;}).length;
     $('av-actions').innerHTML=
