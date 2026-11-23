@@ -4520,7 +4520,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div id="av-kpis" class="au-kpis"></div>
       <div class="au-sec">
         <h3>Grade-group analysis</h3>
-        <div class="sub">Prep (EY), Grades 1–2, Grades 3–5 and Grades 6–9. Averages are calculated from the four rating questions, each scored out of five.</div>
+        <div class="sub">Prep (EY classes), Grades 1–3, Grades 4–6 and Grades 7–9. Groups are derived from each student’s Grade and Section response. Averages are calculated from the four rating questions, each scored out of five.</div>
         <div id="av-groups"></div>
       </div>
       <div class="au-sec">
@@ -42593,7 +42593,22 @@ window.T1 = (function () {
 (function(){
   'use strict';
   var raw=null, charts={}, chartMeta={}, modalChart=null, loading=false, loaded=false;
-  var BAND_ORDER=['Prep (EY)','Grades 1–2','Grades 3–5','Grades 6–9'];
+  var BAND_ORDER=['Prep (EY classes)','Grades 1–3','Grades 4–6','Grades 7–9'];
+  /* Derive the group from the actual Grade and Section response, so the
+     dashboard does not depend on an older pre-assigned grade-band label. */
+  function gradeBand(grade){
+    var g=String(grade==null?'':grade).trim().toUpperCase();
+    if(!g)return '';
+    if(/(?:^|[^A-Z])(?:EY\s*\d*|NURSERY|PREP|PRE-PRIMARY|PREPRIMARY|PP\s*\d*|LKG|UKG|KG)(?:$|[^A-Z])/.test(g))return BAND_ORDER[0];
+    var m=g.match(/(?:GRADE|GR\.?|CLASS|STAGE)\s*[-:]?\s*(\d{1,2})/i);
+    if(!m)m=g.match(/^\s*(\d{1,2})\b/);
+    if(!m)return '';
+    var n=parseInt(m[1],10);
+    if(n>=1&&n<=3)return BAND_ORDER[1];
+    if(n>=4&&n<=6)return BAND_ORDER[2];
+    if(n>=7&&n<=9)return BAND_ORDER[3];
+    return '';
+  }
   var DIM_LABELS=['Seating','Student performances','Staff support','Overall event'];
   var POS=new Set(('good great excellent wonderful phenomenal motivated inspired happy satisfied enjoy enjoyed love loved amazing fantastic nice best appreciate appreciated thank thanks beautiful awesome perfect impressive joyful smooth organised organized successful lovely entertaining energetic engaging memorable brilliant outstanding').split(/\s+/));
   var NEG=new Set(('worst bad poor disappointing disappointed unacceptable rude confusion difficult tired hungry waste meaningless useless crowded crowd pushing unsafe uncomfortable delayed delay late problem problems issue issues lack failed failure terrible horrible clumsy exhausting stressful embarrassed careless disorganized disorganised').split(/\s+/));
@@ -42607,7 +42622,7 @@ window.T1 = (function () {
   function mean(a){var x=a.filter(Number.isFinite);return x.length?x.reduce(function(s,v){return s+v;},0)/x.length:0;}
   function bandStats(list){
     var out={};
-    BAND_ORDER.forEach(function(b){var a=list.filter(function(r){return r[1]===b;});out[b]={n:a.length,means:[0,1,2,3].map(function(j){var v=a.map(function(r){return score(r[2+j]);}).filter(Number.isFinite);return v.length?v.reduce(function(x,y){return x+y;},0)/v.length:0;}),overall:a.map(function(r){return score(r[5]);}).filter(Number.isFinite)};});
+    BAND_ORDER.forEach(function(b){var a=list.filter(function(r){return gradeBand(r[0])===b;});out[b]={n:a.length,means:[0,1,2,3].map(function(j){var v=a.map(function(r){return score(r[2+j]);}).filter(Number.isFinite);return v.length?v.reduce(function(x,y){return x+y;},0)/v.length:0;}),overall:a.map(function(r){return score(r[5]);}).filter(Number.isFinite)};});
     return out;
   }
   function validText(v){var t=String(v||'').replace(/\s+/g,' ').trim();return !!t && !['-','na','n/a','nil'].includes(t.toLowerCase());}
@@ -42638,7 +42653,7 @@ window.T1 = (function () {
     var out=[];
     list.forEach(function(r,i){var text=String(r[idx]||'').replace(/\s+/g,' ').trim();if(!validText(text))return;
       var s=(idx===7)?classifySuggestion(r):sentiment(text);
-      out.push({row:r,rowIndex:i,grade:r[0],band:r[1],type:type,text:text,polarity:s.polarity,sentiment:s.label,reason:s.reason||''});
+      out.push({row:r,rowIndex:i,grade:r[0],band:gradeBand(r[0]),type:type,text:text,polarity:s.polarity,sentiment:s.label,reason:s.reason||''});
     });
     return out;
   }
@@ -42821,7 +42836,7 @@ window.T1 = (function () {
     window.avKpiDrill=function(i){var ds=window.__avKpiDocs[i]||[];var docs=ds.length&&ds[0].row?ds:ds.map(function(r){return {row:r,grade:r[0],type:'Rating response',text:'Seating '+r[2]+' · Performance '+r[3]+' · Staff '+r[4]+' · Overall '+r[5],sentiment:'Rating record',polarity:0};});openDrill(['All responses','Overall ratings 4–5','Performance ratings 4–5','Staff support ratings 1–3 — improvement priority','Enjoyment comments','Suggestion comments'][i],'Tap a record to inspect the underlying response. Percentages use all '+totalResponses+' submitted responses.',docs);};
     $('av-groups').innerHTML='<div class="av-table-wrap"><table class="av-table"><thead><tr><th>Grade group</th><th>Responses</th><th>Seating</th><th>Performances</th><th>Staff support</th><th>Overall</th><th>Overall 4–5</th></tr></thead><tbody>'+
       BAND_ORDER.map(function(b){var x=bs[b],pct=x.overall.length?Math.round(x.overall.filter(function(v){return v>=4;}).length/x.overall.length*100):0;return '<tr class="av-tap-row" tabindex="0" onclick="window.avGroupDrill(\''+b+'\')"><td><b>'+b+'</b></td><td>'+x.n+'</td>'+x.means.map(function(v){return '<td>'+v.toFixed(2)+'</td>';}).join('')+'<td><span class="av-pill">'+pct+'%</span></td></tr>';}).join('')+'</tbody></table></div><div class="av-tap-hint">Tap a grade group to view its underlying feedback.</div>';
-    window.avGroupDrill=function(b){var selected=a.filter(function(r){return r[1]===b;});var ds=selected.map(function(r){var t='Seating: '+(r[2]==null?'—':r[2])+'/5 · Student performances: '+(r[3]==null?'—':r[3])+'/5 · Staff support: '+(r[4]==null?'—':r[4])+'/5 · Overall: '+(r[5]==null?'—':r[5])+'/5\\nEnjoyed: '+(r[6]||'—')+'\\nSuggestion: '+(r[7]||'—');var s=sentiment((r[6]||'')+' '+(r[7]||''));return {row:r,grade:r[0],type:'Grade-group response',text:t,sentiment:classifySuggestion(r).label,polarity:classifySuggestion(r).polarity};});openDrill(b+' — feedback detail',selected.length+' source records',ds);};
+    window.avGroupDrill=function(b){var selected=a.filter(function(r){return gradeBand(r[0])===b;});var ds=selected.map(function(r){var t='Seating: '+(r[2]==null?'—':r[2])+'/5 · Student performances: '+(r[3]==null?'—':r[3])+'/5 · Staff support: '+(r[4]==null?'—':r[4])+'/5 · Overall: '+(r[5]==null?'—':r[5])+'/5\\nEnjoyed: '+(r[6]||'—')+'\\nSuggestion: '+(r[7]||'—');var s=sentiment((r[6]||'')+' '+(r[7]||''));return {row:r,grade:r[0],type:'Grade-group response',text:t,sentiment:classifySuggestion(r).label,polarity:classifySuggestion(r).polarity};});openDrill(b+' — feedback detail',selected.length+' source records',ds);};
     var dist=[1,2,3,4,5].map(function(s){return overall.filter(function(v){return v===s;}).length;});
     chart('av-dist-chart','doughnut',{labels:['1 · Needs improvement','2 · Average','3 · Good','4 · Very good','5 · Outstanding'],datasets:[{data:dist,backgroundColor:['#D94848','#E78A43','#E9C34A','#4C9AD8','#15966D']}]},{},function(di,idx){var v=idx+1;return a.filter(function(r){return score(r[5])===v;}).map(function(r){var s=classifySuggestion(r);return {row:r,grade:r[0],type:'Overall rating '+v,text:'Enjoyed: '+(r[6]||'—')+' | Suggestion: '+(r[7]||'—'),sentiment:s.label,polarity:s.polarity};});},'Overall rating distribution','Overall event ratings',function(di,idx){if(idx===null)return a.map(function(r){return {row:r,grade:r[0],type:'Rating record',text:'Overall rating: '+r[5]+' / 5 · Enjoyed: '+(r[6]||'—')+' · Suggestion: '+(r[7]||'—'),sentiment:'Rating record',polarity:0};});var v=idx+1;return a.filter(function(r){return score(r[5])===v;}).map(function(r){var s=classifySuggestion(r);return {row:r,grade:r[0],type:'Overall rating '+v,text:'Enjoyed: '+(r[6]||'—')+' | Suggestion: '+(r[7]||'—'),sentiment:s.label,polarity:s.polarity};});});
     // Q6 keyword analysis: show all eight predefined improvement themes,
