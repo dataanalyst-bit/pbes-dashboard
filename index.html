@@ -1441,6 +1441,38 @@ table.vckt tr.vck-c td.nm{font-weight:600;color:var(--tx)}
 #pane-adm27 .bp-r.cns .bp-t span{color:#BAC6DB}
 #pane-adm27 .bp-r.cns .bp-t b{font-size:15px;color:#FFF}
 #pane-adm27 .bp-ft{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:7px;margin-top:9px}
+#pane-adm27 .bp-yoy{width:100%;min-width:0;padding:9px 11px;border:1px solid #2FA35F;
+  border-radius:11px;background:linear-gradient(90deg,#0F4A2D 0%,#15663C 100%);color:#FFF}
+#pane-adm27 .bp-yoy-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;
+  padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.2)}
+#pane-adm27 .bp-yoy-head strong{font-size:13px;font-weight:900;color:#FFF}
+#pane-adm27 .bp-yoy-head>span{font-size:10px;font-weight:700;color:#D7F5E3}
+#pane-adm27 .bp-yoy-cols,#pane-adm27 .bp-yoy-row{display:grid;
+  grid-template-columns:minmax(105px,.8fr) minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:center}
+#pane-adm27 .bp-yoy-cols{padding:6px 4px 4px;color:#D7F5E3;font-size:9px;font-weight:900;
+  letter-spacing:.045em;text-transform:uppercase}
+#pane-adm27 .bp-yoy-row{padding:5px 4px;border-top:1px solid rgba(255,255,255,.12)}
+#pane-adm27 .bp-yoy-row>strong{font-size:11.5px;color:#FFF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#pane-adm27 .bp-yoy-metric{display:flex;align-items:baseline;gap:5px;min-width:0;white-space:nowrap}
+#pane-adm27 .bp-yoy-metric small{display:none}
+#pane-adm27 .bp-yoy-metric b{font-size:15px;font-weight:900;color:#FACC15;font-variant-numeric:tabular-nums}
+#pane-adm27 .bp-yoy-metric span{font-size:11px;color:#D7F5E3}
+#pane-adm27 .bp-yoy-metric em{font-style:normal;font-size:10px;font-weight:900}
+#pane-adm27 .bp-yoy-metric em.up{color:#86EFAC}
+#pane-adm27 .bp-yoy-metric em.dn{color:#FCA5A5}
+#pane-adm27 .bp-yoy-metric em.flat{color:#E2E8F0}
+#pane-adm27 .bp-yoy-metric em.new{color:#FDE68A}
+#pane-adm27 .bp-yoy-note{padding-top:5px;color:#D7F5E3;font-size:9px;line-height:1.35}
+@media(max-width:620px){
+  #pane-adm27 .bp-yoy-cols{display:none}
+  #pane-adm27 .bp-yoy-row{grid-template-columns:minmax(82px,.7fr) minmax(0,1fr) minmax(0,1fr);gap:5px}
+  #pane-adm27 .bp-yoy-metric{flex-wrap:wrap;gap:2px 4px}
+  #pane-adm27 .bp-yoy-metric small{display:inline;color:#D7F5E3;font-size:8px;font-weight:800}
+  #pane-adm27 .bp-yoy-metric b{font-size:13px}
+  #pane-adm27 .bp-yoy-metric span{font-size:9px}
+  #pane-adm27 .bp-yoy-metric em{font-size:9px}
+}
+
 #pane-adm27 .bp-f{display:flex;align-items:center;gap:11px;min-width:0;padding:7px 12px;border-radius:11px;
   border:1px solid #2FA35F;background:linear-gradient(90deg,#0F4A2D 0%,#15663C 100%);font:inherit;color:#FFF;
   text-align:left}
@@ -29238,45 +29270,53 @@ function _admTrend() {
   });
   h += '</div></div>';
 
-  /* ── the foot: the week for the whole scope, and this year against last ── */
-  var ICO_WK = '<svg class="bp-ic" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">' +
-    '<circle cx="12" cy="8" r="3.1"/><path d="M5.6 19.6c0-3.2 2.8-5.4 6.4-5.4s6.4 2.2 6.4 5.4z"/>' +
-    '<circle cx="5.1" cy="10" r="2.2"/><circle cx="18.9" cy="10" r="2.2"/>' +
-    '<path d="M1.4 19.6c0-2.5 1.6-4.2 3.9-4.5-.8 1.2-1.3 2.7-1.3 4.5zM22.6 19.6c0-2.5-1.6-4.2-3.9-4.5.8 1.2 1.3 2.7 1.3 4.5z"/></svg>';
-  var ICO_YR = '<svg class="bp-ic" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">' +
-    '<path d="M4 18.4h16V20H4zM5.6 11.5h2.8v5.6H5.6zM10.6 7.2h2.8v9.9h-2.8zM15.6 13.4h2.8v3.7h-2.8z"/></svg>';
-  var season = R.season || '', day = -1, lastAy = _admLastSeason(season);
-  if (season) day = Math.round((new Date(todayIso) - new Date(_admYoyStart(season))) / 86400000);
+  /* ── branch-wise season-to-date comparison ──
+     The weekly all-branches KPI is intentionally removed. Current-season
+     counts come from the same filtered tracker rows used above. Prior-season
+     counts come from the dated CRM export, matched branch by branch and
+     measured to the same day of that season. */
+  var season = R.season || '', lastAy = _admLastSeason(season);
   var LD = (typeof LEAD_DATES !== 'undefined' && LEAD_DATES) ? LEAD_DATES : [];
-  var cmp = '';
-  if (lastAy && LD.length && day >= 0) {
+  var yoyHtml = '';
+  if (season && lastAy && LD.length && day >= 0) {
     var la = _admYoyStart(lastAy), lb = _admAddDays(la, day);
     var chan = M.k === 'walk' ? function (r) { return r.Channel === 'Walk-In'; }
              : M.k === 'dig'  ? function (r) { return r.Channel !== 'Walk-In'; }
              : function () { return true; };
-    var lastA = 0, lastL = 0;
+    var keyBranch = function (v) { return String(v || '').trim().toLowerCase(); };
+    var prevA = {}, prevL = {};
     LD.forEach(function (r) {
-      if (!r || !r.Branch || (S.scope && r.Branch !== S.scope) || !chan(r)) return;
-      if (r.Date && r.Date >= la && r.Date <= lb) lastL++;
-      if (_admCrmIn(r, la, lb)) lastA++;
+      if (!r || !r.Branch || (S.scope && keyBranch(r.Branch) !== keyBranch(S.scope)) || !chan(r)) return;
+      var k = keyBranch(r.Branch);
+      if (r.Date && r.Date >= la && r.Date <= lb) prevL[k] = (prevL[k] || 0) + 1;
+      if (_admCrmIn(r, la, lb)) prevA[k] = (prevA[k] || 0) + 1;
     });
-    var pair = function (lab, now, was) {
-      var v = was ? Math.round(100 * (now - was) / was) : null;
-      return '<span class="bp-y"><i>' + lab + '</i><b>' + _admN(now) + '</b><u>vs ' + _admN(was) + '</u>' +
-        (v === null ? '' : '<em class="' + (v > 0 ? 'up' : v < 0 ? 'dn' : '') + '">' +
-          (v > 0 ? '▲ +' : v < 0 ? '▼ ' : '') + v + '%</em>') + '</span>';
+    var change = function (now, was) {
+      if (!was) return now ? '<em class="new">New</em>' : '<em class="flat">0%</em>';
+      var v = Math.round(100 * (now - was) / was);
+      return '<em class="' + (v > 0 ? 'up' : v < 0 ? 'dn' : 'flat') + '">' +
+        (v > 0 ? '▲ +' : v < 0 ? '▼ ' : '') + v + '%</em>';
     };
-    cmp = '<div class="bp-f yr" title="' + _admEsc(season + ': 1 Sep to today. ' + lastAy + ': ' +
-        _admDate(la) + ' to ' + _admDate(lb) + ', the same day of its season.') + '">' + ICO_YR +
-      '<span class="bp-fx"><small>This year vs last year · as on ' + _admDate(todayIso).slice(0, 6) + '</small>' +
-      '<div>' + pair('Admissions', seasonA, lastA) + pair('Leads', seasonL, lastL) + '</div></span></div>';
+    var branchRows = brs.map(function (b) {
+      var k = keyBranch(b), ca = seasonAByBranch[b] || 0, cl = seasonLByBranch[b] || 0;
+      var pa = prevA[k] || 0, pl = prevL[k] || 0;
+      return '<div class="bp-yoy-row"><strong>' + _admEsc(b) + '</strong>' +
+        '<div class="bp-yoy-metric"><small>Admissions</small><b>' + _admN(ca) +
+        '</b><span>vs ' + _admN(pa) + '</span>' + change(ca, pa) + '</div>' +
+        '<div class="bp-yoy-metric"><small>Leads</small><b>' + _admN(cl) +
+        '</b><span>vs ' + _admN(pl) + '</span>' + change(cl, pl) + '</div></div>';
+    }).join('');
+    yoyHtml = '<div class="bp-yoy"><div class="bp-yoy-head"><strong>This year vs last year</strong>' +
+      '<span>Season to date · as on ' + _admDate(todayIso).slice(0, 6) +
+      ' · ' + _admEsc(M.lab) + '</span></div><div class="bp-yoy-cols">' +
+      '<span>Branch</span><span>Admissions · ' + _admEsc(season) + ' vs ' + _admEsc(lastAy) +
+      '</span><span>Leads · ' + _admEsc(season) + ' vs ' + _admEsc(lastAy) +
+      '</span></div>' + branchRows + '<div class="bp-yoy-note">Comparison uses the same elapsed number of days from the start of each season and the selected Walk-in / Digital filter.</div></div>';
+  } else {
+    yoyHtml = '<div class="bp-yoy"><div class="bp-yoy-head"><strong>This year vs last year</strong>' +
+      '<span>Branch-wise comparison is unavailable because dated prior-year records are not available.</span></div></div>';
   }
-  h += '<div class="bp-ft"><' + (aAll || lAll ? 'button onclick="admOpenDayCell(' + q('*|*') + ')"' : 'div') +
-      ' class="bp-f wk">' + ICO_WK + '<span class="bp-fx"><small>Last ' + ADM_STRIP_DAYS + ' days · ' +
-        _admEsc(S.scope || 'all branches') + (M.k === 'all' ? ' total' : ' · ' + _admEsc(M.lab.toLowerCase())) + '</small>' +
-      '<div><span class="bp-y"><b>' + _admN(aAll) + '</b><i>Admissions</i><i class="sl">/</i></span>' +
-      '<span class="bp-y"><b>' + _admN(lAll) + '</b><i>Leads</i></span></div></span></' +
-      (aAll || lAll ? 'button' : 'div') + '>' + cmp + '</div></div>';
+  h += '<div class="bp-ft">' + yoyHtml + '</div></div>';
 
   el.innerHTML = h;
 }
