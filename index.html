@@ -1832,7 +1832,7 @@ window._liveDue=_liveDue; window._liveMark=_liveMark; window._liveLabel=_liveLab
 var FEED_TRIES = 3;
 var FEED_FIX = { syl:'refreshSylCache', audit:'refreshAuditCache', naa:'refreshNaaCache', bio:'refreshBioCache',
   adm27:'refreshAdm27Cache', dm:'refreshDmCache', vchk:'refreshVchkCache', kptm:'refreshKptmCache',
-  term1:'refreshTerm1Cache', pt1:'refreshPT1Cache', ptm:'refreshPTMCache', civil:'refreshCivilCache' };
+  term1:'refreshTerm1Cache', auravya:'refreshAuravyaCache', pt1:'refreshPT1Cache', ptm:'refreshPTMCache', civil:'refreshCivilCache' };
 function _feedErr(short, detail){
   var e = new Error(short); e.feedShort = short; e.feedDetail = detail || ''; e.feedDown = true; return e;
 }
@@ -2452,23 +2452,23 @@ const ROLE_TABS = {
   admin:             ['glance','admin','vigilance','civil','naa','bio'],
   /* Grievance officers — all three grievance roles — also get Syllabus &
      Notebook (28 Sep 2026). */
-  grievance_officer: ['glance','care','grievance','ptm','term1','syl','naa'],
+  grievance_officer: ['glance','care','grievance','ptm','term1','auravya','syl','naa'],
   /* Same as grievance_officer, plus Admissions. Kept as its own role rather
      than widening grievance_officer, because that would silently hand
      Admissions to every other grievance officer at the same time. */
-  grievance_admissions: ['glance','care','grievance','ptm','term1','admissions','kptm','syl','naa'],
-  hr_grievance:      ['glance','hr','observations','care','grievance','ptm','term1','syl','naa','bio'],
+  grievance_admissions: ['glance','care','grievance','ptm','term1','auravya','admissions','kptm','syl','naa'],
+  hr_grievance:      ['glance','hr','observations','care','grievance','ptm','term1','auravya','syl','naa','bio'],
   /* Academic coordinators, own branch only. 28 Sep 2026: Admin Tracker, School
      Audit, Teacher Observations and Consolidated Glance added on request.
      Still NOT given Vigilance, Purchase, HR, Transport or Admissions. */
-  coordinator:       ['glance','care','pt1','ptm','term1','grievance','syl','kptm',
+  coordinator:       ['glance','care','pt1','ptm','term1','auravya','grievance','syl','kptm',
                       'admin','audit','observations','naa','bio'],
   /* 'glance' and 'activity' were added after this table was written, so they
      were invisible to principals — including the Team Activity tab they are
      expected to file their own observations into. Both are branch-filtered
      server-side, so a principal sees only their own campus. */
   principal:         ['overview','glance','admp','care','observations','admissions','grievance',
-                      'transport','it','pt1','audit','ptm','term1','civil','syl','meet','kptm',
+                      'transport','it','pt1','audit','ptm','term1','auravya','civil','syl','meet','kptm',
                       /* A principal is accountable for admin tasks, safety issues and vacancies at
                          their own campus, so they need these three. All are branch-filtered
                          server-side, so they still see only their own. */
@@ -2854,6 +2854,84 @@ document.addEventListener('DOMContentLoaded', async () => {
   }catch(e){}
 })();
 </script>
+
+<style>
+.av-chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:12px}
+.av-chart-card{min-width:0;background:var(--sur);border:1px solid var(--bor);border-radius:12px;padding:14px;min-height:280px}
+.av-chart-card h4{font-size:12px;font-weight:800;margin:0 0 12px;color:var(--tx)}
+.av-chart-card canvas{width:100%!important;height:230px!important}
+.av-table-wrap{overflow:auto;max-height:560px}
+.av-table{width:100%;border-collapse:collapse;font-size:12px}
+.av-table th{position:sticky;top:0;background:var(--pl);color:var(--tx);text-align:left;padding:9px 8px;white-space:nowrap}
+.av-table td{padding:8px;border-bottom:1px solid var(--bor)}
+.av-table tr:hover td{background:var(--bg)}
+.av-pill{display:inline-block;padding:3px 8px;border-radius:20px;background:var(--gl);color:var(--g);font-size:10px;font-weight:800}
+.av-comment{padding:11px 12px;border:1px solid var(--bor);border-radius:10px;margin:7px 0;background:var(--sur)}
+.av-comment small{color:var(--txm);display:block;margin-bottom:5px}
+.av-comment b{font-size:11px;color:var(--p)}
+.av-chart-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.av-chart-head h4{margin:0}
+.av-chart-head button,.av-tap-hint{font-size:10px;color:var(--p);font-weight:700}
+.av-chart-head button{border:1px solid var(--bor);border-radius:7px;padding:5px 8px;background:var(--bg);cursor:pointer;white-space:nowrap}
+.av-click-kpi{border:1px solid var(--bor);text-align:left;cursor:pointer;color:var(--tx);font:inherit;position:relative}
+.av-click-kpi:hover,.av-sent-card:hover,.av-comment-button:hover{border-color:var(--p);transform:translateY(-1px)}
+.av-tap-hint{display:block;margin-top:7px;opacity:.82}
+.av-tap-row{cursor:pointer}
+.av-tap-row:hover td{background:var(--pl)!important}
+.av-nlp-summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:12px 0}
+.av-nlp-summary-grid>div{border:1px solid var(--bor);border-radius:12px;padding:14px;background:var(--sur)}
+.av-nlp-summary-grid h4{font-size:13px;margin:0 0 4px}
+.av-nlp-summary-grid p{font-size:11px;color:var(--txm);margin:0 0 10px}
+.av-sentiment-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.av-sent-card{border:1px solid var(--bor);border-radius:9px;padding:10px 8px;text-align:left;background:var(--bg);cursor:pointer;color:var(--tx);min-width:0}
+.av-sent-card b{display:block;font-size:22px}
+.av-sent-card span{display:block;font-size:10px;font-weight:800}
+.av-sent-card small{display:block;font-size:9px;color:var(--txm);margin-top:5px}
+.av-sent-card.av-positive b{color:#15966D}.av-sent-card.av-negative b{color:#D94848}.av-sent-card.av-neutral b{color:#64748B}
+.av-method-note{font-size:11px;line-height:1.55;color:var(--txm);border-left:3px solid var(--p);background:var(--bg);padding:10px 12px;border-radius:0 8px 8px 0;margin:10px 0 14px}
+.av-comment-button{display:block;width:100%;text-align:left;font:inherit;color:var(--tx);cursor:pointer}
+.av-nlp-modal{display:none;position:fixed;inset:0;z-index:10050;background:rgba(15,23,42,.66);backdrop-filter:blur(3px);padding:20px;overflow:auto;align-items:flex-start;justify-content:center}
+.av-nlp-modal.on{display:flex}
+.av-nlp-modal-card{width:min(1050px,100%);background:var(--sur);border:1px solid var(--bor);border-radius:15px;overflow:hidden;box-shadow:0 20px 70px rgba(0,0,0,.28);margin:auto}
+.av-nlp-modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;padding:16px 20px;background:var(--tx);color:#fff}
+.av-nlp-modal-head h3{margin:0;font-size:17px}
+.av-nlp-modal-head p{margin:4px 0 0;font-size:11px;color:#CBD5E1}
+.av-nlp-modal-head button{width:32px;height:32px;border:1px solid #64748B;border-radius:8px;background:transparent;color:#fff;font-size:23px;line-height:1;cursor:pointer}
+.av-nlp-modal-body{padding:16px 20px;max-height:76vh;overflow:auto}
+.av-drill-item{padding:12px;border:1px solid var(--bor);border-radius:10px;margin:8px 0;background:var(--bg)}
+.av-drill-item>div{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:11px}
+.av-drill-item>div span{color:var(--txm)}
+.av-drill-item p{font-size:13px;line-height:1.6;margin:8px 0 0;white-space:pre-wrap}
+.av-drill-identity{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0;padding:10px;background:var(--pl);border-radius:8px}
+.av-drill-identity>div{display:flex;flex-direction:column;gap:3px;min-width:0}
+.av-drill-identity b,.av-drill-answer>b{font-size:10px;color:var(--txm);text-transform:uppercase;letter-spacing:.04em}
+.av-drill-identity span{font-size:12px;font-weight:700;overflow-wrap:anywhere}
+.av-drill-scores{display:flex;flex-wrap:wrap;gap:7px;margin:9px 0}
+.av-drill-scores span{font-size:11px;padding:6px 8px;border:1px solid var(--bor);border-radius:7px;background:var(--sur)}
+.av-drill-answer{padding:9px 10px;margin-top:8px;border:1px solid var(--bor);border-radius:8px;background:var(--sur)}
+.av-drill-answer p{font-size:12px;line-height:1.55;margin:5px 0 0;white-space:pre-wrap}
+@media(max-width:600px){.av-drill-identity{grid-template-columns:1fr}}
+
+.av-expanded-chart{height:min(62vh,560px);min-height:320px}
+@media(max-width:760px){.av-nlp-summary-grid{grid-template-columns:1fr}.av-nlp-modal{padding:8px}.av-nlp-modal-body{padding:12px;max-height:80vh}.av-sentiment-cards{gap:5px}.av-sent-card{padding:8px 5px}}
+.av-action{padding:12px 14px;border:1px solid var(--bor);border-left:4px solid var(--a);border-radius:9px;margin:8px 0;background:var(--sur)}
+.av-action strong{display:block;margin-bottom:4px}
+@media(max-width:760px){.av-chart-grid{grid-template-columns:1fr}.av-chart-card{min-height:260px}}
+
+/* Auravya dashboard alignment with the Parentz Feedback report */
+.av-nlp-grid .av-chart-card{border-radius:14px;padding:16px 18px}
+.av-nlp-grid .av-chart-head h4{font-family:Inter,sans-serif;font-size:13px;font-weight:800;letter-spacing:0;color:var(--tx)}
+.av-nlp-grid .av-chart-head button{font-family:Inter,sans-serif;font-size:11px;font-weight:700;color:#1E4FD8;border-color:#D7E2F5;background:#F8FAFF}
+.av-q6-keyword-card{min-height:430px}
+.av-q6-keyword-card canvas{height:360px!important;max-height:none}
+.av-nlp-summary-grid h4{font-family:Inter,sans-serif;font-size:13px}
+.av-nlp-summary-grid p{font-family:Inter,sans-serif;font-size:12px;line-height:1.5}
+.av-nlp-grid canvas{font-family:Inter,sans-serif}
+.au-kpis{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media(max-width:1250px){.au-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){.au-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+
 </head>
 <body>
 <header class="hdr">
@@ -4063,7 +4141,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 <!-- ═══ PTM PARENT FEEDBACK ═══ -->
 <div id="pane-ptm" class="pane">
   <div class="au-wrap">
-    <div class="grpsw"><button data-tab="term1" onclick="showTab('term1')">📝 Term 1 Feedback</button><button data-tab="ptm" onclick="showTab('ptm')">💬 PTM Feedback</button><button data-tab="kptm" onclick="showTab('kptm')">⭐ K-Innovative PTM</button></div>
+    <div class="grpsw"><button data-tab="term1" onclick="showTab('term1')">📝 Term 1 Feedback</button><button data-tab="ptm" onclick="showTab('ptm')">💬 PTM Feedback</button><button data-tab="kptm" onclick="showTab('kptm')">⭐ K-Innovative PTM</button><button data-tab="auravya" onclick="showTab('auravya')">🎭 Bachupally Auravya 2026</button></div>
 
     <div class="au-head">
       <div>
@@ -4317,7 +4395,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 <!-- ═══ TERM 1 PARENT FEEDBACK & NPS ═══ -->
 <div id="pane-term1" class="pane">
   <div class="au-wrap">
-    <div class="grpsw"><button data-tab="term1" onclick="showTab('term1')">📝 Term 1 Feedback</button><button data-tab="ptm" onclick="showTab('ptm')">💬 PTM Feedback</button><button data-tab="kptm" onclick="showTab('kptm')">⭐ K-Innovative PTM</button></div>
+    <div class="grpsw"><button data-tab="term1" onclick="showTab('term1')">📝 Term 1 Feedback</button><button data-tab="ptm" onclick="showTab('ptm')">💬 PTM Feedback</button><button data-tab="kptm" onclick="showTab('kptm')">⭐ K-Innovative PTM</button><button data-tab="auravya" onclick="showTab('auravya')">🎭 Bachupally Auravya 2026</button></div>
 
     <div class="au-head">
       <div>
@@ -4418,7 +4496,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 <!-- ═══ K-INNOVATIVE PTM FEEDBACK ═══ -->
 <div id="pane-kptm" class="pane">
   <div class="au-wrap">
-    <div class="grpsw"><button data-tab="term1" onclick="showTab('term1')">📝 Term 1 Feedback</button><button data-tab="ptm" onclick="showTab('ptm')">💬 PTM Feedback</button><button data-tab="kptm" onclick="showTab('kptm')">⭐ K-Innovative PTM</button></div>
+    <div class="grpsw"><button data-tab="term1" onclick="showTab('term1')">📝 Term 1 Feedback</button><button data-tab="ptm" onclick="showTab('ptm')">💬 PTM Feedback</button><button data-tab="kptm" onclick="showTab('kptm')">⭐ K-Innovative PTM</button><button data-tab="auravya" onclick="showTab('auravya')">🎭 Bachupally Auravya 2026</button></div>
     <div class="au-head">
       <div><h2 style="margin:0;font-size:20px;font-weight:800">⭐ K-Innovative PTM Feedback</h2>
         <div style="font-size:12.5px;color:var(--txm);margin-top:3px" id="kp-meta">Loading…</div></div>
@@ -4427,6 +4505,59 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
     </div>
     <div id="kp-body"><div class="no-data">Reading the feedback sheet…</div></div>
+  </div>
+</div>
+
+
+<!-- ═══ BACHUPALLY AURAVYA 2026 PARENT FEEDBACK ═══ -->
+<div id="pane-auravya" class="pane">
+  <div class="au-wrap">
+    <div class="grpsw">
+      <button data-tab="term1" onclick="showTab('term1')">📝 Term 1 Feedback</button>
+      <button data-tab="ptm" onclick="showTab('ptm')">💬 PTM Feedback</button>
+      <button data-tab="kptm" onclick="showTab('kptm')">⭐ K-Innovative PTM</button>
+      <button data-tab="auravya" class="active" onclick="showTab('auravya')">🎭 Bachupally Auravya 2026</button>
+    </div>
+    <div class="au-head">
+      <div>
+        <h2 style="margin:0;font-size:20px;font-weight:800">🎭 Bachupally Auravya 2026 — Parent Feedback</h2>
+        <div id="av-meta" style="font-size:12.5px;color:var(--txm);margin-top:3px">Loading parent responses…</div>
+      </div>
+      <div class="au-ctl">
+        <span class="scope-chip"><i></i>Bachupally · Annual Day</span>
+        <span id="av-status" class="exm-status"></span>
+      </div>
+    </div>
+    <div id="av-loader" class="exm-loader"><div class="sp"></div><div>Analysing Auravya parent feedback…<br><span>Class groups · ratings · parent comments</span></div></div>
+    <div id="av-body" style="display:none;flex-direction:column;gap:16px">
+      <div id="av-kpis" class="au-kpis"></div>
+      <div class="au-sec">
+        <h3>Grade-group analysis</h3>
+        <div class="sub">Prep (EY classes), Grades 1–3, Grades 4–6 and Grades 7–9. Groups are derived from each student’s Grade and Section response. Averages are calculated from the four rating questions, each scored out of five.</div>
+        <div id="av-groups"></div>
+      </div>
+      <div class="au-sec">
+        <h3>Parent voice — NLP & sentiment analytics</h3>
+        <div class="sub">Question 5 is used only for grouped enjoyment keywords. Satisfied/not satisfied is calculated using Seating, Performances, Staff support, Overall ratings and the Question 6 remark. Every drill-down shows the matched parent, student, contact, ratings and both written answers.</div>
+        <div id="av-nlp-summary"></div>
+        <div class="av-chart-grid av-nlp-grid">
+          <div class="av-chart-card"><div class="av-chart-head"><h4>Overall rating distribution</h4><button type="button" onclick="window.avExpandChart('av-dist-chart')">Expand ↗</button></div><canvas id="av-dist-chart"></canvas></div>
+          <div class="av-chart-card av-q6-keyword-card"><div class="av-chart-head"><h4>Question 6 · One primary improvement theme per student</h4><button type="button" onclick="window.avExpandChart('av-q6-kw-chart')">Expand ↗</button></div><canvas id="av-q6-kw-chart"></canvas><div class="av-method-note">Each student/class combination is assigned to one best-fit theme only. Multiple parent submissions for the same student stay in that one category. Unmatched students appear under “Other / general feedback”. Click a bar to view all matching parent records.</div></div>
+          <div class="av-chart-card"><div class="av-chart-head"><h4>What parents enjoyed — keyword groups (Question 5)</h4><button type="button" onclick="window.avExpandChart('av-enjoy-kw-chart')">Expand ↗</button></div><canvas id="av-enjoy-kw-chart"></canvas></div>
+        </div>
+      </div>
+      <div class="au-sec">
+        <h3>Management insights and recommended actions</h3>
+        <div id="av-actions"></div>
+      </div>
+      <div style="font-size:11px;color:var(--txm);padding:4px 2px">Live source: PBES-All Reports 2026-27 → Bachupally AURAVYA 2026. Analytics are recalculated from the current master-sheet responses; parent contact details appear only in the corresponding drill-down records.</div>
+    </div>
+    <div id="av-nlp-modal" class="av-nlp-modal" aria-hidden="true">
+      <div class="av-nlp-modal-card" role="dialog" aria-modal="true" aria-labelledby="av-nlp-modal-title">
+        <div class="av-nlp-modal-head"><div><h3 id="av-nlp-modal-title">Parent feedback detail</h3><p id="av-nlp-modal-sub"></p></div><button type="button" onclick="window.avCloseDrill()" aria-label="Close">×</button></div>
+        <div id="av-nlp-modal-body" class="av-nlp-modal-body"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -19871,6 +20002,15 @@ window.AUDIT = (function () {
   function months() { return VIEW.month ? [VIEW.month] : D.months; }
   function branches() { return VIEW.branch ? [VIEW.branch] : D.branches; }
 
+  /* combine tallies across the months in view */
+  function combine(keyFn) {
+    var t = A.blank(), any = false;
+    months().forEach(function (m) {
+      var x = keyFn(m); if (!x) return;
+      any = true; A.merge(t, x);
+    });
+    return any ? t : null;
+  }
   /* In the scorecard, CAIE and CBSE variants represent one physical branch.
      Keep their source names for filtering and audit detail, but aggregate the
      underlying count tallies before calculating the displayed percentage. */
@@ -19922,11 +20062,7 @@ window.AUDIT = (function () {
   }
   function netCatT(c) { return combine(function (m) { return D.byMC[m + '\u241f' + c]; }); }
   function netGradeT(g) { return combine(function (m) { return D.byMG[m + '\u241f' + g]; }); }
-  function brGradeT(b, g) { return combine(function (m) {
-    return mergeBranchTallies(scorecardMembers(b), function (member) {
-      return D.byBMG[member + '\u241f' + m + '\u241f' + g];
-    });
-  }); }
+  function brGradeT(b, g) { return combine(function (m) { return D.byBMG[b + '\u241f' + m + '\u241f' + g]; }); }
 
   /* ══════════════════ SCOPE ══════════════════
      Branch and month now come from the dashboard's own filter bar, so this only
@@ -40252,14 +40388,13 @@ window.renderCivilTab = function (raw) {
     border-bottom: 1px solid var(--bor, #E2E8F0); pointer-events: none;
   }
 
-  .au-curriculum-switch{display:inline-flex;gap:4px;padding:4px;border:1px solid #DCE5F4;
+.au-curriculum-switch{display:inline-flex;gap:4px;padding:4px;border:1px solid #DCE5F4;
     border-radius:10px;background:#F1F5FB;margin:0 0 12px}
   .au-curriculum-tab{border:0;border-radius:7px;padding:7px 18px;background:transparent;
     color:#475569;font:700 12px/1.2 Inter,Arial,sans-serif;cursor:pointer;min-width:72px}
   .au-curriculum-tab.active{background:#0B6B43;color:#fff;box-shadow:0 1px 3px rgba(15,23,42,.16)}
   .au-curriculum-tab.unavailable,.au-curriculum-tab:disabled{opacity:.35;cursor:not-allowed}
   .au-curriculum-tab:focus-visible{outline:2px solid #2563EB;outline-offset:2px}
-
 </style>
 <script>
 (function(){
@@ -42578,6 +42713,424 @@ window.T1 = (function () {
   };
 })(); 
 
+</script>
+
+
+<script>
+/* ═══ BACHUPALLY AURAVYA 2026 — interactive parent voice + NLP analytics ═══ */
+(function(){
+  'use strict';
+  var raw=null, charts={}, chartMeta={}, modalChart=null, loading=false, loaded=false;
+  var BAND_ORDER=['Prep (EY classes)','Grades 1–3','Grades 4–6','Grades 7–9'];
+  /* Derive the group from the actual Grade and Section response, so the
+     dashboard does not depend on an older pre-assigned grade-band label. */
+  function gradeBand(grade){
+    var g=String(grade==null?'':grade).trim().toUpperCase();
+    if(!g)return '';
+    if(/(?:^|[^A-Z])(?:EY\s*\d*|NURSERY|PREP|PRE-PRIMARY|PREPRIMARY|PP\s*\d*|LKG|UKG|KG)(?:$|[^A-Z])/.test(g))return BAND_ORDER[0];
+    var m=g.match(/(?:GRADE|GR\.?|CLASS|STAGE)\s*[-:]?\s*(\d{1,2})/i);
+    if(!m)m=g.match(/^\s*(\d{1,2})\b/);
+    if(!m)return '';
+    var n=parseInt(m[1],10);
+    if(n>=1&&n<=3)return BAND_ORDER[1];
+    if(n>=4&&n<=6)return BAND_ORDER[2];
+    if(n>=7&&n<=9)return BAND_ORDER[3];
+    return '';
+  }
+  var DIM_LABELS=['Seating','Student performances','Staff support','Overall event'];
+  var POS=new Set(('good great excellent wonderful phenomenal motivated inspired happy satisfied enjoy enjoyed love loved amazing fantastic nice best appreciate appreciated thank thanks beautiful awesome perfect impressive joyful smooth organised organized successful lovely entertaining energetic engaging memorable brilliant outstanding').split(/\s+/));
+  var NEG=new Set(('worst bad poor disappointing disappointed unacceptable rude confusion difficult tired hungry waste meaningless useless crowded crowd pushing unsafe uncomfortable delayed delay late problem problems issue issues lack failed failure terrible horrible clumsy exhausting stressful embarrassed careless disorganized disorganised').split(/\s+/));
+  var NEGATORS=new Set(['not','no','never',"isn't","wasn't","weren't","don't","didn't","cannot","can't","hardly"]);
+  var STOP=new Set(('a an the and or but if then than so because as at by for from in into of on onto to with without about above after again against all am any are as be been before being below between both can could did do does doing down during each few further had has have having he her here hers herself him himself his how i if into is it its itself just me more most my myself no nor not now off once only other our ours ourselves out over own same she should some such than that the their theirs them themselves then there these they this those through too under until up very was we were what when where which while who whom why will would you your yours yourself yourselves').split(/\s+/));
+  ['annual','day','event','events','pallavi','auravya','please','kindly','need','needs','make','would','could','should','also','one','get','got','good','great','everything','nothing','much','many','lot','all','year','last','next','future','parents','parent','children','child','kids','student','students','school','management','team','really','like','well','thank','thanks','yes','sir','overall','every',"it's"].forEach(function(x){STOP.add(x);});
+  function $(id){return document.getElementById(id);}
+  function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function rows(){return raw&&raw.rows?raw.rows:[];}
+  function score(v){if(v===null||v===undefined||v==='')return NaN;var n=Number(v);return Number.isFinite(n)&&n>=1&&n<=5?n:NaN;}
+  function mean(a){var x=a.filter(Number.isFinite);return x.length?x.reduce(function(s,v){return s+v;},0)/x.length:0;}
+  function bandStats(list){
+    var out={};
+    BAND_ORDER.forEach(function(b){var a=list.filter(function(r){return gradeBand(r[0])===b;});out[b]={n:a.length,means:[0,1,2,3].map(function(j){var v=a.map(function(r){return score(r[2+j]);}).filter(Number.isFinite);return v.length?v.reduce(function(x,y){return x+y;},0)/v.length:0;}),overall:a.map(function(r){return score(r[5]);}).filter(Number.isFinite)};});
+    return out;
+  }
+  function validText(v){var t=String(v||'').replace(/\s+/g,' ').trim();return !!t && !['-','na','n/a','nil'].includes(t.toLowerCase());}
+  function sentiment(text){
+    var tokens=String(text||'').toLowerCase().match(/[a-z']+/g)||[], rawScore=0;
+    tokens.forEach(function(w,i){
+      var val=POS.has(w)?1:(NEG.has(w)?-1:0);
+      if(val && tokens.slice(Math.max(0,i-3),i).some(function(x){return NEGATORS.has(x);}))val*=-0.8;
+      rawScore+=val;
+    });
+    var polarity=rawScore/Math.max(1,Math.sqrt(tokens.length));
+    return {polarity:polarity,label:polarity>=0.18?'Positive':(polarity<=-0.18?'Negative':'Neutral')};
+  }
+  function classifySatisfaction(r){
+    var text=String(r&&r[7]||'').replace(/\s+/g,' ').trim();
+    var ratings=[2,3,4,5].map(function(i){return score(r&&r[i]);}).filter(Number.isFinite);
+    var allFour=ratings.length===4;
+    var allHigh=ratings.length>0&&ratings.every(function(v){return v>=4;});
+    var lowCount=ratings.filter(function(v){return v<=3;}).length;
+    var t=text.toLowerCase();
+
+    // Explicit no-problem / no-change wording is positive, even when the
+    // sentence contains words such as "issue" or "improvement".
+    var noConcernPattern=/\b(no|none|nothing|not any)\s+(?:further\s+)?(?:issues?|problems?|complaints?|changes?|improvements?|suggestions?)\b|\bno need to improve\b|\bnothing to (?:improve|change|fix)\b|\beverything (?:is|was) (?:good|great|fine|excellent)\b|\ball good\b|\bkeep it up\b|\bcontinue the same\b/i;
+    if(validText(text)&&noConcernPattern.test(t)){
+      return {label:'Satisfied',polarity:1,reason:'The parent reports no further concerns or changes'};
+    }
+
+    // A clear, specific concern in Q6 overrides high scores because it
+    // identifies a problem the parent still wants addressed.
+    var concernPattern=/\b(technical issue|technical issues|issue|issues|problem|problems|poor|bad|worst|unacceptable|disappoint(?:ed|ing)?|not good|not enough|lack(?:ing)?|need(?:s|ed) to (?:improve|change|fix|provide)|should (?:improve|change|provide|arrange|increase|reduce)|must (?:improve|change|provide)|please (?:improve|fix|change|provide|arrange|increase|reduce)|improvement needed|room for improvement|could improve|delay(?:ed)?|late|difficult(?:y)?|uncomfortable|unsafe|safety concern|crowd(?:ed|ing)?|pushing|confus(?:ion|ing)|not satisfied|cannot|can't|didn't|don't|less sound|sound quality|mic(?:rophone)? issue|projector issue|parking problem)\b/i;
+    if(validText(text)&&concernPattern.test(t)){
+      return {label:'Not satisfied',polarity:-1,reason:'A specific concern or improvement request appears in Question 6'};
+    }
+
+    // Explicit positive remarks should not be incorrectly placed in the
+    // Not satisfied group merely because a neutral word appears in the text.
+    var praisePattern=/\b(enjoy(?:ed|ing)?|phenomenal|wonderful|excellent|amazing|fantastic|great|good|beautiful|lovely|memorable|appreciat(?:e|ed)|satisfied|happy|perfect|awesome|thank(?:s|ful)?|well organised|well organized|smoothly conducted)\b/i;
+    if(validText(text)&&praisePattern.test(t)){
+      return {label:'Satisfied',polarity:1,reason:'Positive appreciation in Question 6'};
+    }
+
+    // Ratings are the primary measure: all four areas must be 4/5 or 5/5
+    // for a rating-based Satisfied result. A 1–3 score in any area is a
+    // Not satisfied signal unless Q6 clearly records positive appreciation.
+    if(allHigh)return {label:'Satisfied',polarity:1,reason:allFour?'All four ratings are 4/5 or 5/5':'All available ratings are 4/5 or 5/5'};
+    if(ratings.length){
+      return {label:'Not satisfied',polarity:-1,reason:lowCount+' of '+ratings.length+' available rating areas are 1–3 out of 5'};
+    }
+
+    if(!validText(text))return {label:'Not classified',polarity:0,reason:'No ratings or Question 6 comment'};
+    var lex=sentiment(text);
+    if(lex.label==='Positive')return {label:'Satisfied',polarity:Math.max(0.25,lex.polarity),reason:'Positive wording in Question 6'};
+    if(lex.label==='Negative')return {label:'Not satisfied',polarity:Math.min(-0.25,lex.polarity),reason:'Negative wording in Question 6'};
+    return {label:'Not satisfied',polarity:-0.2,reason:'Substantive suggestion; review recommended'};
+  }
+  function makeSatisfactionDocs(list){
+    return list.map(function(r,i){
+      var s=classifySatisfaction(r);
+      return {row:r,rowIndex:i,grade:r[0],band:gradeBand(r[0]),type:'Overall satisfaction',text:validText(r[7])?String(r[7]):'No Question 6 comment',polarity:s.polarity,sentiment:s.label,reason:s.reason};
+    });
+  }
+  function makeDocs(list,idx,type){
+    var out=[];
+    list.forEach(function(r,i){var text=String(r[idx]||'').replace(/\s+/g,' ').trim();if(!validText(text))return;
+      var s=(idx===7)?classifySatisfaction(r):sentiment(text);
+      out.push({row:r,rowIndex:i,grade:r[0],band:gradeBand(r[0]),type:type,text:text,polarity:s.polarity,sentiment:s.label,reason:s.reason||''});
+    });
+    return out;
+  }
+  function tokenize(text){
+    return (String(text||'').toLowerCase().match(/[a-z][a-z']{1,}/g)||[]).filter(function(w){return !STOP.has(w)&&w.length>2;});
+  }
+  /* Corpus-level TF-IDF: term frequency per comment × smoothed inverse document
+     frequency. Unigrams and adjacent bigrams are ranked separately by field. */
+  function tfidf(docs,limit){
+    var df={},score={},docsTerms=[];
+    docs.forEach(function(d){
+      var t=tokenize(d.text), terms=t.slice();
+      for(var i=0;i<t.length-1;i++)terms.push(t[i]+' '+t[i+1]);
+      var counts={};terms.forEach(function(w){counts[w]=(counts[w]||0)+1;});
+      docsTerms.push({terms:terms,counts:counts});
+      Object.keys(counts).forEach(function(w){df[w]=(df[w]||0)+1;});
+    });
+    var N=docs.length||1;
+    docsTerms.forEach(function(d){
+      var denom=Math.max(1,d.terms.length);
+      Object.keys(d.counts).forEach(function(w){
+        var tf=d.counts[w]/denom, idf=Math.log(1+(N/(1+df[w])))+1;
+        score[w]=(score[w]||0)+tf*idf;
+      });
+    });
+    return Object.keys(score).filter(function(w){return w.length>2;})
+      .map(function(w){return {term:w,score:score[w],count:df[w]};})
+      .sort(function(a,b){return b.score-a.score;}).slice(0,limit||12);
+  }
+  var ENJOY_KEYPHRASES=[
+    {label:'Student performances & stage acts',re:/\b(performance|performances|performing|stage act|stage acts|skit|skits|drama|acts)\b/i},
+    {label:'Dance & choreography',re:/\b(dance|dances|dancing|choreography|classical dance|dance performance)\b/i},
+    {label:'Music & songs',re:/\b(song|songs|music|singing|singer|instrumental|melody)\b/i},
+    {label:'Theme & creative concept',re:/\b(theme|concept|era|youngistan|avengers|kashmir|kanyakumari|india|indian|storyline)\b/i},
+    {label:'Guest speeches & addresses',re:/\b(guest|chief guest|speech|speeches|address|speaker|ips|laxminarayan)\b/i},
+    {label:'Student participation & involvement',re:/\b(participat|involvement|every student|all students|each child|everyone performed)\b/i},
+    {label:'Organisation & event arrangements',re:/\b(arrangement|arrangements|organisation|organization|organised|organized|coordination|coordinated|effort|efforts)\b/i}
+  ];
+  function extractEnjoyKeywords(docs){
+    return ENJOY_KEYPHRASES.map(function(k){
+      var matched=docs.filter(function(d){return k.re.test(d.text);});
+      return {label:k.label,count:matched.length,docs:matched,re:k.re};
+    }).filter(function(x){return x.count>0;}).sort(function(a,b){return b.count-a.count;});
+  }
+  var ENJOY_THEMES=[
+    ['Student performances & dance',/\b(performance|performances|performing|dance|dances|dancing|song|songs|skit|skits|stage|acts)\b/i],
+    ['Theme & creative presentation',/\b(theme|concept|era|india|avengers|youngistan|kashmir|decoration|costume|dress)\b/i],
+    ['Guest speeches & addresses',/\b(guest|speech|speaker|address|ips|sir)\b/i],
+    ['Organisation & coordination',/\b(arrangement|arrangements|organis|coordination|coordinated|management|effort|efforts)\b/i],
+    ['Overall enjoyment / positive experience',/\b(enjoy|enjoyed|wonderful|phenomenal|motivated|inspired|excellent|good|great|nice|happy|satisfied)\b/i]
+  ];
+  var SUGGEST_THEMES=[
+    ['Performance, practice & choreography',/\b(performance|performances|dance|steps|choreography|practice|practise|criteria|formation|song|songs|costume|dress)\b/i],
+    ['Food, water & refreshments',/\b(food|snack|snacks|breakfast|lunch|dinner|refreshment|refreshments|water|canteen|stall|stalls|eat|eating|hungry|meal|meals)\b/i],
+    ['Timing & programme schedule',/\b(time|timing|timings|delay|delayed|late|early|schedule|weekday|weekend|friday|morning|evening|duration|hours|start|started|finish|ending)\b/i],
+    ['Child safety, handover & dispersal',/\b(handover|handing|dispersal|disbursement|collect|collecting|pickup|pick up|pick-up|security|safe|safety|crowd|pushing|lost|left behind|class teacher)\b/i],
+    ['Seating & venue',/\b(seat|seating|balcony|venue|parking|space|floor|stairs|view|viewing|arrangement|arrangements|access|location|distance|traffic)\b/i],
+    ['Staff coordination & communication',/\b(staff|teacher|teachers|coordination|coordinat|communication|instructions|organis|management|responsibility|responsible|response|rude|security staff)\b/i],
+    ['Sound, lighting & AV',/\b(sound|audio|video|mic|microphone|projector|screen|lighting|light|noise|volume|speaker|editing|visual|visibility|announcement|announcing)\b/i],
+    ['Parent availability / event format',/\b(weekday|weekend|friday|working hours|corporate|leave|availability|working professionals|two halves|both slots|morning schedule)\b/i]
+  ];
+  function themeCounts(docs,rules){
+    return rules.map(function(rule){
+      var matched=docs.filter(function(d){return rule[1].test(d.text);});
+      return {label:rule[0],count:matched.length,docs:matched};
+    }).filter(function(x){return x.count;}).sort(function(a,b){return b.count-a.count;});
+  }
+  function chart(id,type,data,options,pointHandler,title,sub,docsProvider){
+    if(charts[id])charts[id].destroy();
+    var el=$(id);if(!el||!window.Chart)return;
+    var supplied=options||{};
+    var isHorizontal=supplied.indexAxis==='y';
+    var isStacked=!!(supplied.scales&&((supplied.scales.x&&supplied.scales.x.stacked)||(supplied.scales.y&&supplied.scales.y.stacked)));
+    var labelDefaults={
+      display:function(ctx){
+        var v=Number(ctx.dataset.data[ctx.dataIndex]||0);
+        if(!Number.isFinite(v)||v===0)return false;
+        // Very small stacked sentiment slices cannot hold legible text.
+        if(isStacked && v<12)return false;
+        return true;
+      },
+      color:(type==='doughnut'||type==='pie'||isStacked)?'#FFFFFF':'#263449',
+      anchor:(type==='doughnut'||type==='pie')?'end':(isHorizontal?'end':'end'),
+      align:(type==='doughnut'||type==='pie')?'end':(isStacked?'center':'end'),
+      offset:(type==='doughnut'||type==='pie')?5:4,
+      clamp:true,
+      clip:false,
+      font:{family:'Inter, sans-serif',size:11,weight:'700'},
+      textStrokeColor:(type==='doughnut'||type==='pie'||isStacked)?'rgba(15,23,42,.28)':'rgba(255,255,255,.92)',
+      textStrokeWidth:(type==='doughnut'||type==='pie'||isStacked)?2:3,
+      formatter:function(value,ctx){
+        var v=Number(value);
+        if(!Number.isFinite(v)||v===0)return '';
+        if(type==='doughnut'||type==='pie')return String(Math.round(v));
+        return Number.isInteger(v)?String(v):v.toFixed(2);
+      }
+    };
+    var defaultPlugins={
+      legend:{display:type==='doughnut'||type==='pie'||type==='bar'&&isHorizontal,position:'bottom'},
+      tooltip:{enabled:true},
+      datalabels:labelDefaults
+    };
+    var opts=Object.assign({responsive:true,maintainAspectRatio:false},supplied);
+    opts.plugins=Object.assign({},defaultPlugins,supplied.plugins||{});
+    opts.plugins.datalabels=Object.assign({},labelDefaults,(supplied.plugins&&supplied.plugins.datalabels)||{});
+    if(pointHandler)opts.onClick=function(evt,els,instance){if(!els||!els.length)return;var hit=els[0],docs=pointHandler(hit.datasetIndex,hit.index)||[];var label=(data.labels||[])[hit.index]||'';openDrill((title||id)+(label?' · '+label:''),sub||'Selected visual segment',docs);};
+    charts[id]=new Chart(el.getContext('2d'),{type:type,data:data,options:opts});
+    chartMeta[id]={type:type,data:data,options:opts,title:title||id,sub:sub||'',docsProvider:docsProvider||function(){return[];},pointHandler:pointHandler};
+  }
+  function openDrill(title,sub,docs){
+    var modal=$('av-nlp-modal'),body=$('av-nlp-modal-body');
+    if(!modal||!body)return;
+    docs=docs||[];
+    if(modalChart){modalChart.destroy();modalChart=null;}
+    $('av-nlp-modal-title').textContent=title;
+    $('av-nlp-modal-sub').textContent=(sub||'')+' · '+docs.length+' matching parent responses';
+    body.innerHTML=docs.length?docs.map(function(d){
+      var r=d.row||null;
+      var identity=r?(
+        '<div class="av-drill-identity">'+
+          '<div><b>Parent name</b><span>'+esc(r[8]||'Not recorded')+'</span></div>'+
+          '<div><b>Student name</b><span>'+esc(r[9]||'Not recorded')+'</span></div>'+
+          '<div><b>Contact number</b><span>'+esc(r[10]||'Not recorded')+'</span></div>'+
+          '<div><b>Class / section</b><span>'+esc(r[0]||'Not recorded')+'</span></div>'+
+        '</div>'+
+        '<div class="av-drill-scores">'+
+          '<span>Seating: <b>'+esc(r[2]==null?'—':r[2])+'/5</b></span>'+
+          '<span>Student performance: <b>'+esc(r[3]==null?'—':r[3])+'/5</b></span>'+
+          '<span>Staff support: <b>'+esc(r[4]==null?'—':r[4])+'/5</b></span>'+
+          '<span>Overall: <b>'+esc(r[5]==null?'—':r[5])+'/5</b></span>'+
+        '</div>'+
+        '<div class="av-drill-answer"><b>Q5 · What did the parent enjoy?</b><p>'+esc(r[6]||'No response')+'</p></div>'+
+        '<div class="av-drill-answer"><b>Q6 · Suggestions for improvement</b><p>'+esc(r[7]||'No response')+'</p></div>'
+      ):'';
+      return '<article class="av-drill-item"><div><b>'+esc(d.grade||'Class not recorded')+'</b><span>'+esc(d.type||'Parent response')+' · '+esc(d.sentiment||'Not classified')+(d.reason?' · '+esc(d.reason):'')+'</span></div>'+identity+(r?'':'<p>'+esc(d.text||'')+'</p>')+'</article>';
+    }).join(''):'<div class="no-data">No matching parent responses were found.</div>';
+    modal.classList.add('on');modal.setAttribute('aria-hidden','false');
+  }
+  function closeDrill(){var m=$('av-nlp-modal');if(m){m.classList.remove('on');m.setAttribute('aria-hidden','true');}}
+  function expandChart(id){
+    var m=chartMeta[id];if(!m)return;
+    if(modalChart){modalChart.destroy();modalChart=null;}
+    var modal=$('av-nlp-modal'),body=$('av-nlp-modal-body');
+    $('av-nlp-modal-title').textContent=m.title+' — expanded view';
+    $('av-nlp-modal-sub').textContent='Tap a chart segment or bar to inspect the matching parent comments.';
+    body.innerHTML='<div class="av-expanded-chart"><canvas id="av-nlp-expanded-canvas"></canvas></div><button class="tb" style="margin-top:12px" onclick="window.avShowChartData(\''+id+'\')">View underlying comments and records</button>';
+    modal.classList.add('on');modal.setAttribute('aria-hidden','false');
+    var ctx=$('av-nlp-expanded-canvas').getContext('2d');
+    modalChart=new Chart(ctx,{type:m.type,data:m.data,options:Object.assign({},m.options,{maintainAspectRatio:false,onClick:function(evt,els){if(!els||!els.length)return;var hit=els[0];openDrill(m.title+' · '+(m.data.labels[hit.index]||''),'Selected chart segment',m.docsProvider(hit.datasetIndex,hit.index));}})});
+  }
+  window.avExpandChart=expandChart;
+  window.avShowChartData=function(id){var m=chartMeta[id];if(m)openDrill(m.title,'All source comments represented in this visual',m.docsProvider(null,null));};
+  window.avCloseDrill=closeDrill;
+  function docsForGroup(b){return makeDocs(rows(),6,'Enjoyed').concat(makeDocs(rows(),7,'Suggestion')).filter(function(d){return d.band===b;});}
+  function render(){
+    var a=rows(),n=a.length;if(!n)throw new Error('The Auravya feed returned no responses.');
+    var bs=bandStats(a),allScores=[0,1,2,3].map(function(j){return mean(a.map(function(r){return score(r[2+j]);}));});
+    var overall=a.map(function(r){return score(r[5]);}).filter(Number.isFinite),good=overall.filter(function(v){return v>=4;}).length,low=overall.filter(function(v){return v<=2;}).length;
+    var enjoyed=makeDocs(a,6,'Enjoyed'),suggestions=makeDocs(a,7,'Suggestion');
+    var totalResponses=a.length;
+    var pctOfTotal=function(count){return totalResponses?((count/totalResponses)*100).toFixed(1):'0.0';};
+    // Improvement priority is response-level: parents who rated staff support
+    // and coordination 1–3 out of 5. The denominator is ALL submitted responses.
+    var improvementRows=a.filter(function(r){var v=score(r[4]);return Number.isFinite(v)&&v<=3;});
+    // Satisfaction uses all four rating areas plus the Q6 remark. Every
+    // submitted parent response is evaluated once; percentages use all records.
+    var satisfactionDocs=makeSatisfactionDocs(a);
+    var positiveParents=satisfactionDocs.filter(function(d){return d.sentiment==='Satisfied';});
+    var negativeParents=satisfactionDocs.filter(function(d){return d.sentiment==='Not satisfied';});
+    var enjoyKw=extractEnjoyKeywords(enjoyed),improveThemes=themeCounts(suggestions,SUGGEST_THEMES),enjoyThemes=themeCounts(enjoyed,ENJOY_THEMES);
+    $('av-meta').textContent=n+' live parent responses · '+(raw.source||'PBES-All Reports 2026-27')+' · Bachupally';
+    var dimensionMeans=[
+      mean(a.map(function(r){return score(r[2]);})), // Seating
+      mean(a.map(function(r){return score(r[4]);})), // Staff support
+      mean(a.map(function(r){return score(r[3]);})), // Performances
+      mean(a.map(function(r){return score(r[5]);}))  // Overall
+    ];
+    var averageRating=mean(dimensionMeans);
+    var averageRatingPct=averageRating===null?null:(averageRating/5*100);
+    var ratedRows=a.filter(function(r){return [2,3,4,5].some(function(i){return Number.isFinite(score(r[i]));});});
+    var seatingRows=a.filter(function(r){return Number.isFinite(score(r[2]));});
+    var staffRows=a.filter(function(r){return Number.isFinite(score(r[4]));});
+    var performanceRows=a.filter(function(r){return Number.isFinite(score(r[3]));});
+    var overallRows=a.filter(function(r){return Number.isFinite(score(r[5]));});
+    $('av-kpis').innerHTML=[
+      [n,'RESPONSES','All submitted records',a],
+      [dimensionMeans[0]===null?'—':dimensionMeans[0].toFixed(2)+'/5','SEATING','Average seating rating',seatingRows],
+      [dimensionMeans[1]===null?'—':dimensionMeans[1].toFixed(2)+'/5','STAFF SUPPORT','Average staff support rating',staffRows],
+      [dimensionMeans[2]===null?'—':dimensionMeans[2].toFixed(2)+'/5','PERFORMANCE','Average student performance rating',performanceRows],
+      [dimensionMeans[3]===null?'—':dimensionMeans[3].toFixed(2)+'/5','OVERALL','Average overall event rating',overallRows],
+      [averageRatingPct===null?'—':averageRatingPct.toFixed(1)+'%','AVERAGE OF RATING',
+        averageRating===null?'Average across four rating areas':averageRating.toFixed(2)+'/5 across four rating areas',ratedRows],
+      [improvementRows.length+' ('+pctOfTotal(improvementRows.length)+'%)','IMPROVEMENT PRIORITY','Staff support rated 1–3 · % of all responses',improvementRows],
+      [enjoyed.length+' ('+pctOfTotal(enjoyed.length)+'%)','ENJOYMENT COMMENTS','Column 5 · % of all responses',enjoyed],
+      [suggestions.length+' ('+pctOfTotal(suggestions.length)+'%)','SUGGESTION COMMENTS','Column 6 · % of all responses',suggestions]
+    ].map(function(k,i){return '<button class="au-kpi av-click-kpi" type="button" onclick="window.avKpiDrill('+i+')" aria-label="Open '+esc(k[1])+' details"><div class="v">'+esc(k[0])+'</div><div class="k">'+esc(k[1])+'</div><div class="d">'+esc(k[2])+'</div><span class="av-tap-hint">Tap to view data ↗</span></button>';}).join('');
+    window.__avKpiDocs=[a,seatingRows,staffRows,performanceRows,overallRows,ratedRows,improvementRows,enjoyed,suggestions];
+    window.avKpiDrill=function(i){
+      var ds=window.__avKpiDocs[i]||[];
+      var docs=ds.map(function(r){return {row:r,grade:r[0],type:'Rating response',
+        text:'Seating '+(r[2]==null?'—':r[2])+' · Staff support '+(r[4]==null?'—':r[4])+
+          ' · Performance '+(r[3]==null?'—':r[3])+' · Overall '+(r[5]==null?'—':r[5]),
+        sentiment:classifySatisfaction(r).label,polarity:classifySatisfaction(r).polarity};});
+      openDrill(['All responses','Seating ratings','Staff support ratings','Performance ratings','Overall ratings','Average of Rating — source records','Staff support ratings 1–3 — improvement priority','Enjoyment comments','Suggestion comments'][i],
+        'Tap a record to inspect the underlying response.',docs);
+    };
+    $('av-groups').innerHTML='<div class="av-table-wrap"><table class="av-table"><thead><tr><th>Grade group</th><th>Responses</th><th>Seating</th><th>Performances</th><th>Staff support</th><th>Overall</th><th>Overall 4–5</th></tr></thead><tbody>'+
+      BAND_ORDER.map(function(b){var x=bs[b],pct=x.overall.length?Math.round(x.overall.filter(function(v){return v>=4;}).length/x.overall.length*100):0;return '<tr class="av-tap-row" tabindex="0" onclick="window.avGroupDrill(\''+b+'\')"><td><b>'+b+'</b></td><td>'+x.n+'</td>'+x.means.map(function(v){return '<td>'+v.toFixed(2)+'</td>';}).join('')+'<td><span class="av-pill">'+pct+'%</span></td></tr>';}).join('')+'</tbody></table></div><div class="av-tap-hint">Tap a grade group to view its underlying feedback.</div>';
+    window.avGroupDrill=function(b){var selected=a.filter(function(r){return gradeBand(r[0])===b;});var ds=selected.map(function(r){var t='Seating: '+(r[2]==null?'—':r[2])+'/5 · Student performances: '+(r[3]==null?'—':r[3])+'/5 · Staff support: '+(r[4]==null?'—':r[4])+'/5 · Overall: '+(r[5]==null?'—':r[5])+'/5\\nEnjoyed: '+(r[6]||'—')+'\\nSuggestion: '+(r[7]||'—');var s=sentiment((r[6]||'')+' '+(r[7]||''));return {row:r,grade:r[0],type:'Grade-group response',text:t,sentiment:classifySatisfaction(r).label,polarity:classifySatisfaction(r).polarity};});openDrill(b+' — feedback detail',selected.length+' source records',ds);};
+    var dist=[1,2,3,4,5].map(function(s){return overall.filter(function(v){return v===s;}).length;});
+    chart('av-dist-chart','doughnut',{labels:['1 · Needs improvement','2 · Average','3 · Good','4 · Very good','5 · Outstanding'],datasets:[{data:dist,backgroundColor:['#D94848','#E78A43','#E9C34A','#4C9AD8','#15966D']}]},{plugins:{
+      legend:{position:'bottom',labels:{color:'#263449',padding:18,boxWidth:14,boxHeight:14,font:{family:'Plus Jakarta Sans, Inter, sans-serif',size:13,weight:'700'}}},
+      datalabels:{display:function(ctx){return Number(ctx.dataset.data[ctx.dataIndex]||0)>0;},color:'#FFFFFF',anchor:'center',align:'center',font:{family:'Plus Jakarta Sans, Inter, sans-serif',size:14,weight:'800'},textStrokeColor:'rgba(15,23,42,.45)',textStrokeWidth:3,formatter:function(v){return Number(v)>0?String(v):'';}}
+    }},function(di,idx){var v=idx+1;return a.filter(function(r){return score(r[5])===v;}).map(function(r){var s=classifySatisfaction(r);return {row:r,grade:r[0],type:'Overall rating '+v,text:'Enjoyed: '+(r[6]||'—')+' | Suggestion: '+(r[7]||'—'),sentiment:s.label,polarity:s.polarity};});},'Overall rating distribution','Overall event ratings',function(di,idx){if(idx===null)return a.map(function(r){return {row:r,grade:r[0],type:'Rating record',text:'Overall rating: '+r[5]+' / 5 · Enjoyed: '+(r[6]||'—')+' · Suggestion: '+(r[7]||'—'),sentiment:'Rating record',polarity:0};});var v=idx+1;return a.filter(function(r){return score(r[5])===v;}).map(function(r){var s=classifySatisfaction(r);return {row:r,grade:r[0],type:'Overall rating '+v,text:'Enjoyed: '+(r[6]||'—')+' | Suggestion: '+(r[7]||'—'),sentiment:s.label,polarity:s.polarity};});});
+    // Q6 keyword analysis: group by student + class first, then assign each
+    // student to ONE best-fit theme. Multiple parent submissions for the same
+    // student stay together in one bar; the drill-down retains every source row.
+    // Theme selection uses the greatest number of keyword hits; ties use the
+    // fixed theme order. Unmatched students are placed under Other.
+    var q6ThemeRules=SUGGEST_THEMES.concat([['Other / general feedback',/$^/]]);
+    var q6KeywordGroups=q6ThemeRules.map(function(rule){return {label:rule[0],count:0,docs:[]};});
+    var q6StudentMap={};
+    suggestions.forEach(function(d){
+      var student=String(d.row&&d.row[9]||'').trim().toLowerCase();
+      var grade=String(d.row&&d.row[0]||'').trim().toLowerCase();
+      var key=student?(grade+'|'+student):('__response__'+d.rowIndex);
+      if(!q6StudentMap[key])q6StudentMap[key]={text:'',docs:[]};
+      q6StudentMap[key].text+=' '+d.text;
+      q6StudentMap[key].docs.push(d);
+    });
+    Object.keys(q6StudentMap).forEach(function(key){
+      var studentGroup=q6StudentMap[key],bestIndex=q6ThemeRules.length-1,bestScore=0;
+      q6ThemeRules.slice(0,-1).forEach(function(rule,i){
+        var flags=rule[1].flags.replace(/g/g,'').replace(/y/g,'');
+        var re=new RegExp(rule[1].source,flags+'g');
+        var hits=studentGroup.text.match(re);
+        var score=hits?hits.length:0;
+        if(score>bestScore){bestScore=score;bestIndex=i;}
+      });
+      q6KeywordGroups[bestIndex].count++;
+      Array.prototype.push.apply(q6KeywordGroups[bestIndex].docs,studentGroup.docs);
+    });
+    chart('av-q6-kw-chart','bar',
+      {labels:q6KeywordGroups.map(function(x){return x.label;}),
+       datasets:[{label:'Unique students assigned to primary theme',
+         data:q6KeywordGroups.map(function(x){return x.count;}),
+         backgroundColor:'#1E4FD8',borderColor:'#1E4FD8',
+         borderRadius:7,maxBarThickness:32,barPercentage:0.88,categoryPercentage:0.82}]},
+      {indexAxis:'y',interaction:{mode:'nearest',intersect:true},
+       layout:{padding:{left:14,right:30,top:12,bottom:10}},
+       plugins:{legend:{display:false},
+         datalabels:{display:function(ctx){return Number(ctx.dataset.data[ctx.dataIndex]||0)>0;},
+           font:{family:'Inter, sans-serif',size:12,weight:'700'},
+           color:'#1E293B',anchor:'end',align:'end',offset:7,clamp:true,clip:false}},
+       scales:{
+         x:{beginAtZero:true,grace:'10%',ticks:{precision:0,color:'#475569',
+           font:{family:'Inter, sans-serif',size:11,weight:'600'},padding:7},
+           grid:{color:'rgba(148,163,184,.20)'},border:{display:false}},
+         y:{ticks:{autoSkip:false,color:'#334155',
+           font:{family:'Inter, sans-serif',size:12,weight:'600'},padding:10},
+           grid:{display:false},border:{display:false}}
+       }},
+      function(di,idx){return q6KeywordGroups[idx]?q6KeywordGroups[idx].docs:[];},
+      'Question 6 — one primary improvement theme per student',
+      'Each student/class combination is counted once. All parent submissions for that student remain available in the drill-down.',
+      function(di,idx){return idx===null?suggestions:(q6KeywordGroups[idx]?q6KeywordGroups[idx].docs:[]);}
+    );
+    chart('av-enjoy-kw-chart','bar',{labels:enjoyKw.map(function(x){return x.label;}),datasets:[{label:'Parent comments mentioning keyword group',data:enjoyKw.map(function(x){return x.count;}),backgroundColor:'#15966D'}]},{indexAxis:'y',scales:{x:{beginAtZero:true,ticks:{precision:0}}}},function(di,idx){return enjoyKw[idx].docs;},'Question 5 — what parents enjoyed','Grouped keyphrases with related expressions; counts are comments, not raw word frequency',function(di,idx){return idx===null?enjoyed:enjoyKw[idx].docs;});
+    function q6SentimentCard(label,docs){
+      var pct=totalResponses?((docs.length/totalResponses)*100).toFixed(1):'0.0';
+      var css=label==='Satisfied'?'av-positive':'av-negative';
+      return '<button type="button" class="av-sent-card '+css+'" onclick="window.avQ6SentDrill(\''+label+'\')"><b>'+docs.length+'</b><span>'+label+' · '+pct+'% of all responses</span><small>Tap to view parent records</small></button>';
+    }
+    $('av-nlp-summary').innerHTML=
+      '<div class="av-nlp-summary-grid">'+
+        '<div><h4>Question 5 · What parents enjoyed</h4><p>'+enjoyed.length+' substantive responses. Related expressions are grouped into meaningful keyword clusters; one comment may match more than one cluster.</p></div>'+
+        '<div><h4>Overall parent satisfaction — four ratings and remarks</h4><p>'+satisfactionDocs.filter(function(d){return d.sentiment!=="Not classified";}).length+' responses classified using all four ratings and Question 6 remarks. Percentages use all '+totalResponses+' submitted responses.</p><div class="av-sentiment-cards">'+q6SentimentCard('Satisfied',positiveParents)+q6SentimentCard('Not satisfied',negativeParents)+'</div></div>'+
+      '</div>'+
+      '';
+    window.avQ6SentDrill=function(label){var ds=label==='Satisfied'?positiveParents:negativeParents;openDrill('Overall parent satisfaction — '+label+' records','Classification uses all four rating areas and the Question 6 remark. One record per submitted response.',ds);};
+    var topTheme=improveThemes[0],staffLow=a.filter(function(r){return score(r[4])<=3;}).length;
+    $('av-actions').innerHTML=
+      '<div class="av-action"><strong>1. Preserve the strongest experience — student performances</strong>Performance and dance were the most frequently identified enjoyment topic ('+enjoyThemes.filter(function(x){return x.label==='Student performances & dance';}).reduce(function(s,x){return s+x.count;},0)+' comments matched this theme). Retain student participation and stage opportunities.</div>'+
+      '<div class="av-action"><strong>2. First planning priority — '+(topTheme?topTheme.label:'parent suggestions')+'</strong>'+(topTheme?topTheme.count+' of '+suggestions.length+' substantive suggestions matched this theme. Review it with the event committee and assign an accountable owner.':'Review all suggestions with the event committee.')+'</div>'+
+      '<div class="av-action"><strong>3. Safety and child handover deserve explicit review</strong>'+((improveThemes.find(function(x){return x.label.indexOf('Child safety')===0;})||{count:0}).count)+' suggestions matched child safety, handover or dispersal language. Audit the collection protocol, class-wise holding areas, signage and staff roles.</div>'+
+      '<div class="av-action"><strong>4. Improve parent logistics</strong>Food and refreshments, scheduling, seating and venue access appear repeatedly in the written feedback. Review these as separate operational workstreams rather than one general event-arrangement issue.</div>'+
+      '<div class="av-action"><strong>5. Validate sentiment and themes with human review</strong>Use the clickable comments to check context before taking action. Lexicon sentiment and phrase-based themes can misread sarcasm, mixed comments and short phrases.</div>';
+  }
+  async function load(force){
+    if(loading)return;if(loaded&&!force){render();return;}loading=true;
+    try{
+      var session=null;try{var s=await sb.auth.getSession();session=s&&s.data&&s.data.session;}catch(e){}
+      if(!session){window.location.href='login.html';return;}
+      var res=await _lazyFetch('auravya',!!force,session,55000);
+      if(res.status===401){await sb.auth.signOut();window.location.href='login.html';return;}
+      if(!res.ok){var errBody='';try{errBody=await res.text();}catch(e){}throw new Error('HTTP '+res.status+(errBody?' · '+errBody.slice(0,240):''));}
+      var d=await res.json();raw=d&&d.AURAVYA_RAW;
+      if(!raw||!Array.isArray(raw.rows))throw new Error('Auravya data was not found in the Apps Script response.');
+      loaded=true;render();$('av-loader').style.display='none';$('av-body').style.display='flex';
+      $('av-status').textContent='Live · '+new Date(raw.generatedAt).toLocaleString();
+    }catch(e){
+      $('av-loader').innerHTML='<div style="color:var(--r);font-weight:700">Could not load Auravya feedback.</div><div style="font-size:11px;margin-top:6px">'+esc(e.message||e)+'</div><button class="tb" style="margin-top:10px" onclick="window.loadAuravya(true)">Retry</button>';
+      $('av-status').textContent='Feed error';
+    }finally{loading=false;}
+  }
+  window.loadAuravya=load;
+  window.addEventListener('DOMContentLoaded',function(){
+    var modal=$('av-nlp-modal');if(modal){modal.addEventListener('click',function(e){if(e.target===modal)closeDrill();});}
+    document.addEventListener('keydown',function(e){if(e.key==='Escape')closeDrill();});
+    var old=window.showTab;window.showTab=function(id,btn){var r=old.apply(this,arguments);if(id==='auravya')load(false);return r;};
+    var sw=window.switchTab;window.switchTab=function(id){var r=sw.apply(this,arguments);if(id==='auravya')load(false);return r;};
+  });
+})();
 </script>
 
 </body>
