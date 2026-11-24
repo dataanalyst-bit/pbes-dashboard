@@ -1461,6 +1461,9 @@ table.vckt tr.vck-c td.nm{font-weight:600;color:var(--tx)}
 #pane-adm27 .bp-yoy-metric em.up{color:#86EFAC}
 #pane-adm27 .bp-yoy-metric em.dn{color:#FCA5A5}
 #pane-adm27 .bp-yoy-metric em.flat{color:#E2E8F0}
+#pane-adm27 .bp-yoy-total{border-top:2px solid rgba(255,255,255,.34);font-weight:900}
+#pane-adm27 .bp-yoy-total>strong{color:#FDE68A}
+
 #pane-adm27 .bp-yoy-metric em.new{color:#FDE68A}
 #pane-adm27 .bp-yoy-metric em{display:inline-block;font-size:10px;font-weight:900;
   white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -29281,122 +29284,101 @@ function _admTrend() {
   });
   h += '</div></div>';
 
-  /* ── branch-wise season-to-date comparison ──
-     Current AY 2026-27 is read from Touched Leads (_admSet().rows).
-       Admissions: stage admitted, dated by _admWonDay().
-       Leads: all rows, dated by Created On (r.d), with the Walk-in/Digital
-       selector applied through the same ADM_DAY_METRICS filter as the strip.
-     Earlier AYs are read from Overall Admissions:
-       Admissions: student rows in R.hist / All AY Admissions, dated by r.d.
-       Leads: grouped day indexes in R.leadHist / All Enquiries.
-     The historical student register has no lead-channel field. Therefore
-     admission comparison is all-source in either toggle; the lead comparison
-     follows the selected Walk-in / Digital toggle. */
-  var season = R.season || '';
-  var lastAy = _admLastSeason(season);
-  var seasonStart = season ? _admYoyStart(season) : '';
-  var priorStart = lastAy ? _admYoyStart(lastAy) : '';
-  var elapsedDay = -1;
+  /* ── branch-wise 2027-28 vs 2026-27, as on today's date ──
+     2027-28: current admissions tracker (S.rows).
+       Admissions = admitted rows, dated by the current tracker admission date.
+       Leads = every row, dated by Created On (r.d).
+     2026-27: Touched Leads export (LEAD_DATES).
+       Admissions = stage 08 rows, dated ONLY by Updated On (r.Updated).
+       Leads = every row, dated by Created On (r.Date).
+     Both seasons are cut to the same elapsed day from 1 October. All channels
+     are included: this comparison is overall admissions and total leads, not
+     the Walk-in / Digital toggle used by the daily strip. */
+  var season = R.season || '2027-28';
+  var lastAy = '2026-27';
+  var seasonStart = _admSeasonStart(season);
+  var priorStart = _admSeasonStart(lastAy);
+  var elapsedDay = seasonStart && todayIso ? _admLyDays(seasonStart, todayIso) : -1;
+  var currentEnd = todayIso;
+  var priorEnd = elapsedDay >= 0 ? _admAddDays(priorStart, elapsedDay) : '';
 
-  if (seasonStart && todayIso) {
-    elapsedDay = _admLyDays(seasonStart, todayIso);
-  }
+  var branchKey = function (v) { return String(v || '').trim().toLowerCase(); };
+  var inWindow = function (d, a0, b0) {
+    d = String(d || '').slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(d) && d >= a0 && d <= b0;
+  };
+  var nowA = {}, nowL = {}, wasA = {}, wasL = {};
+  brs.forEach(function (b) {
+    var k = branchKey(b);
+    nowA[k] = 0; nowL[k] = 0; wasA[k] = 0; wasL[k] = 0;
+  });
 
-  var yoyHtml = '';
-  if (season && lastAy && seasonStart && priorStart && elapsedDay >= 0) {
-    var priorEnd = _admAddDays(priorStart, elapsedDay);
-    var branchKey = function (v) { return String(v || '').trim().toLowerCase(); };
-    var inWindow = function (d, a, b) {
-      d = String(d || '').slice(0, 10);
-      return !!d && d >= a && d <= b;
-    };
-    var nowA = {}, nowL = {}, wasA = {}, wasL = {};
-    brs.forEach(function (b) {
-      var k = branchKey(b);
-      nowA[k] = 0; nowL[k] = 0; wasA[k] = 0; wasL[k] = 0;
-    });
+  /* Current 2027-28 tracker: all leads, with admissions counted separately. */
+  S.rows.forEach(function (r) {
+    if (!r || !r.b) return;
+    var k = branchKey(r.b);
+    if (nowA[k] === undefined) return;
+    if (inWindow(r.d, seasonStart, currentEnd)) nowL[k]++;
+    if (_admIsWon(r) && inWindow(_admWonDay(r), seasonStart, currentEnd)) nowA[k]++;
+  });
 
-    /* Current-year admissions: all completed rows, regardless of channel. */
-    S.rows.forEach(function (r) {
-      if (!r || !r.b) return;
-      var k = branchKey(r.b);
-      if (S.scope && k !== branchKey(S.scope)) return;
-      if (nowA[k] === undefined) return;
-      if (_admIsWon(r) && inWindow(_admWonDay(r), seasonStart, todayIso)) {
-        nowA[k]++;
-      }
-      /* Current-year leads: apply the same Walk-in / Digital selector as
-         the daily circles, but count the lead on its Created On date. */
-      if (M.f(r) && inWindow(r.d, seasonStart, todayIso)) {
-        nowL[k]++;
-      }
-    });
+  /* Previous 2026-27 Touched Leads:
+     - admissions: Stage 08 + Updated On date (not Created On);
+     - leads: every row + Created On date.
+     Do not use All AY Admissions / All Enquiries for this year. */
+  var priorRows = (typeof LEAD_DATES !== 'undefined' && Array.isArray(LEAD_DATES))
+    ? LEAD_DATES : [];
+  priorRows.forEach(function (r) {
+    if (!r || !r.Branch) return;
+    var k = branchKey(r.Branch);
+    if (wasA[k] === undefined) return;
 
-    /* Previous-year admissions: Overall Admissions > All AY Admissions. */
-    (S.hist || []).forEach(function (r) {
-      if (!r || r.ay !== lastAy || !r.b || !inWindow(r.d, priorStart, priorEnd)) return;
-      var k = branchKey(r.b);
-      if (wasA[k] !== undefined) wasA[k]++;
-    });
+    if (inWindow(r.Date, priorStart, priorEnd)) wasL[k]++;
 
-    /* Previous-year leads: Overall Admissions > All Enquiries.
-       All Enquiries is pre-grouped by branch, AY and channel:
-       x[0] branch index, x[1] AY index, x[2] channel index
-       (0 = Walk-in, 1 = Digital), x[5] = season-day indexes. */
-    var leadHist = R.leadHist || null;
-    if (leadHist && Array.isArray(leadHist.g)) {
-      leadHist.g.forEach(function (x) {
-        if (!Array.isArray(x) || !Array.isArray(x[5])) return;
-        var bName = (leadHist.branches || [])[x[0]];
-        var ayName = (leadHist.ays || [])[x[1]];
-        if (ayName !== lastAy || !bName) return;
-        var k = branchKey(bName);
-        if (wasL[k] === undefined) return;
-        var channelIndex = Number(x[2]);
-        if (M.k === 'walk' && channelIndex !== 0) return;
-        if (M.k === 'dig' && channelIndex !== 1) return;
-        x[5].forEach(function (seasonDay) {
-          var d = Number(seasonDay);
-          if (Number.isFinite(d) && d >= 0 && d <= elapsedDay) wasL[k]++;
-        });
-      });
-    }
+    var stage = String(r.Stage || '').trim().toLowerCase();
+    var admitted = stage === '08-admission completed' ||
+                   stage === 'admission completed' ||
+                   stage === 'admitted';
+    /* Updated is the requested 2026-27 admission date column. */
+    if (admitted && inWindow(r.Updated, priorStart, priorEnd)) wasA[k]++;
+  });
 
-    var pct = function (current, previous) {
-      if (!previous) {
-        if (current > 0) return '<em class="new">New</em>';
-        return '<em class="flat">—</em>';
-      }
-      var value = Math.round((current - previous) * 100 / previous);
-      return '<em class="' + (value > 0 ? 'up' : value < 0 ? 'dn' : 'flat') + '">' +
-        (value > 0 ? '▲ +' : value < 0 ? '▼ ' : '') + value + '%</em>';
-    };
-    var branchRows = brs.map(function (b) {
-      var k = branchKey(b);
-      var ca = nowA[k] || 0, pa = wasA[k] || 0;
-      var cl = nowL[k] || 0, pl = wasL[k] || 0;
-      return '<div class="bp-yoy-row"><strong>' + _admEsc(b) + '</strong>' +
-        '<div class="bp-yoy-metric"><b>' + _admN(ca) + '</b><span>vs ' + _admN(pa) +
-        '</span>' + pct(ca, pa) + '</div>' +
-        '<div class="bp-yoy-metric"><b>' + _admN(cl) + '</b><span>vs ' + _admN(pl) +
-        '</span>' + pct(cl, pl) + '</div></div>';
-    }).join('');
+  var pct = function (current, previous) {
+    if (!previous) return '<em class="flat">—</em>';
+    var value = ((current - previous) / previous) * 100;
+    var rounded = Math.round(value * 10) / 10;
+    return '<em class="' + (rounded > 0 ? 'up' : rounded < 0 ? 'dn' : 'flat') + '">' +
+      (rounded > 0 ? '▲ +' : rounded < 0 ? '▼ ' : '') + rounded.toFixed(1) + '%</em>';
+  };
+  var branchRows = brs.map(function (b) {
+    var k = branchKey(b);
+    var ca = nowA[k] || 0, pa = wasA[k] || 0;
+    var cl = nowL[k] || 0, pl = wasL[k] || 0;
+    return '<div class="bp-yoy-row"><strong>' + _admEsc(b) + '</strong>' +
+      '<div class="bp-yoy-metric"><b>' + _admN(ca) + '</b><span>vs ' + _admN(pa) +
+      '</span>' + pct(ca, pa) + '</div>' +
+      '<div class="bp-yoy-metric"><b>' + _admN(cl) + '</b><span>vs ' + _admN(pl) +
+      '</span>' + pct(cl, pl) + '</div></div>';
+  }).join('');
 
-    var leadFilterLabel = M.k === 'walk' ? 'Walk-in leads' :
-                          M.k === 'dig' ? 'Digital leads' : 'All leads';
-    var endLabel = _admDate(todayIso);
-    yoyHtml = '<div class="bp-yoy"><div class="bp-yoy-head"><strong>This year vs last year</strong>' +
-      '<span>Same elapsed period · as on ' + _admEsc(endLabel) + '</span></div>' +
-      '<div class="bp-yoy-cols"><span>Branch</span><span>Admissions · all sources</span>' +
-      '<span>Leads · ' + _admEsc(leadFilterLabel) + '</span></div>' + branchRows +
-      '<div class="bp-yoy-note">Current year: Touched Leads. Admissions count completed records by admission date; ' +
-      'leads count Created On dates. Previous years: Overall Admissions — All AY Admissions and All Enquiries. ' +
-      'Admission percentages are all-source because the historical student register does not record channel. ' +
-      'Lead percentages follow the Walk-in / Digital selection.</div></div>';
-  } else {
-    yoyHtml = '<div class="bp-yoy"><div class="bp-yoy-head"><strong>This year vs last year</strong>' +
-      '<span>Season dates are not available for this comparison.</span></div></div>';
-  }
+  var totalA = brs.reduce(function (n, b) { return n + (nowA[branchKey(b)] || 0); }, 0);
+  var totalPA = brs.reduce(function (n, b) { return n + (wasA[branchKey(b)] || 0); }, 0);
+  var totalL = brs.reduce(function (n, b) { return n + (nowL[branchKey(b)] || 0); }, 0);
+  var totalPL = brs.reduce(function (n, b) { return n + (wasL[branchKey(b)] || 0); }, 0);
+  var totalRow = '<div class="bp-yoy-row bp-yoy-total"><strong>All branches</strong>' +
+    '<div class="bp-yoy-metric"><b>' + _admN(totalA) + '</b><span>vs ' + _admN(totalPA) +
+    '</span>' + pct(totalA, totalPA) + '</div>' +
+    '<div class="bp-yoy-metric"><b>' + _admN(totalL) + '</b><span>vs ' + _admN(totalPL) +
+    '</span>' + pct(totalL, totalPL) + '</div></div>';
+
+  yoyHtml = '<div class="bp-yoy"><div class="bp-yoy-head"><strong>2027-28 vs 2026-27 · Overall</strong>' +
+    '<span>Same elapsed period · as on ' + _admEsc(_admDate(todayIso)) + '</span></div>' +
+    '<div class="bp-yoy-cols"><span>Branch</span><span>Admissions · all sources</span>' +
+    '<span>Total leads · all channels</span></div>' + branchRows + totalRow +
+    '<div class="bp-yoy-note">2027-28: current admissions tracker. 2026-27: Touched Leads. ' +
+    'Admissions are counted by Updated On for 2026-27; leads are counted by Created On. ' +
+    'Both years include all channels and are compared from 1 October through the same elapsed date.</div></div>';
+
   h += '<div class="bp-ft">' + yoyHtml + '</div></div>';
 
   el.innerHTML = h;
