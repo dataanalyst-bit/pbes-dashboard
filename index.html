@@ -15710,7 +15710,12 @@ document.body.insertAdjacentHTML('beforeend', `
         <input id="modal-search" type="text" placeholder="🔍 Search records..." 
           style="padding:7px 14px;border-radius:8px;border:1.5px solid rgba(255,255,255,.3);background:rgba(255,255,255,.15);color:#fff;font-size:12.5px;font-family:Inter,sans-serif;outline:none;min-width:200px;"
           oninput="filterModalTable(this.value)">
-        <button onclick="exportModalCSV()" title="Download these records as CSV" style="background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.35);color:#fff;border-radius:8px;padding:7px 14px;cursor:pointer;font-weight:700;font-family:Inter,sans-serif;font-size:12.5px;">⬇ Export CSV</button>
+        <button id="modal-export-csv" onclick="exportModalCSV()" title="Download these records as CSV" style="background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.35);color:#fff;border-radius:8px;padding:7px 14px;cursor:pointer;font-weight:700;font-family:Inter,sans-serif;font-size:12.5px;">⬇ Export CSV</button>
+        <div id="ex-export-actions" style="display:none;align-items:center;gap:6px;flex-wrap:wrap;">
+          <button type="button" onclick="exExportCSV()" title="Download all records as CSV" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:8px;padding:7px 10px;cursor:pointer;font:700 12px Inter,sans-serif;">⬇ CSV</button>
+          <button type="button" onclick="exExportExcel()" title="Download an Excel-compatible workbook" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:8px;padding:7px 10px;cursor:pointer;font:700 12px Inter,sans-serif;">▦ Excel</button>
+          <button type="button" onclick="exExportPDF()" title="Print or save this report as PDF" style="background:#fff;border:1px solid #fff;color:#1E4FD8;border-radius:8px;padding:7px 10px;cursor:pointer;font:800 12px Inter,sans-serif;">▤ PDF</button>
+        </div>
         <button onclick="closeModal()" style="background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.3);color:#fff;border-radius:8px;padding:7px 14px;cursor:pointer;font-weight:600;font-family:Inter,sans-serif;font-size:12.5px;">✕ Close</button>
       </div>
     </div>
@@ -16036,6 +16041,11 @@ function fxPct(done, total, cap){
      note — what is included or excluded, where that is not obvious
    Callers that pass nothing get the modal exactly as before. */
 function openModal(title, sub, rows, columns, fx) {
+  var exActions = document.getElementById('ex-export-actions');
+  if (exActions) exActions.style.display = 'none';
+  var normalCsv = document.getElementById('modal-export-csv');
+  if (normalCsv) normalCsv.style.display = '';
+  window.__exExportState = null;
   modalAllRows = rows;
   modalPage = 1;
   modalSearchVal = '';
@@ -16061,6 +16071,11 @@ function openModal(title, sub, rows, columns, fx) {
 
 // Open the modal with arbitrary HTML (used for accordion / grouped / report views).
 function openHTMLModal(title, sub, html, fx){
+  var exActions = document.getElementById('ex-export-actions');
+  if (exActions) exActions.style.display = 'none';
+  var normalCsv = document.getElementById('modal-export-csv');
+  if (normalCsv) normalCsv.style.display = '';
+  window.__exExportState = null;
   document.getElementById('modal-title').textContent = title;
   document.getElementById('modal-sub').textContent = sub || '';
   showModalFx(fx);
@@ -18430,6 +18445,80 @@ function exSetCur(v) {
 function exToggle(key) { _exOpen[key] = !_exOpen[key]; _exRenderCompare(); }
 function exToggleBand(br) { exToggle('branch|' + br); }          /* kept: older markup calls it */
 
+
+/* Examination Result drill-down exports. These controls are enabled only by
+   exView / exOpenPending, so other dashboard tabs keep their existing modal UI. */
+window.__exExportState = null;
+function exEnableExports(title, sub, rows, columns) {
+  window.__exExportState = {
+    title: String(title || 'Examination Result'),
+    sub: String(sub || ''),
+    rows: Array.isArray(rows) ? rows : [],
+    columns: Array.isArray(columns) ? columns : []
+  };
+  var normalCsv = document.getElementById('modal-export-csv');
+  if (normalCsv) normalCsv.style.display = 'none';
+  var actions = document.getElementById('ex-export-actions');
+  if (actions) actions.style.display = 'inline-flex';
+}
+function exExportCell(v) {
+  if (v === null || v === undefined || v === '') return '';
+  if (typeof v === 'object') return JSON.stringify(v);
+  return String(v);
+}
+function exExportFileName(ext) {
+  var s = (window.__exExportState && window.__exExportState.title || 'examination-result')
+    .replace(/[^\w\-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 70);
+  return (s || 'examination-result') + '.' + ext;
+}
+function exDownloadBlob(blob, filename) {
+  var url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = filename; a.style.display = 'none';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+}
+function exExportCSV() {
+  var s = window.__exExportState; if (!s) return;
+  var q = function (v) { return '"' + exExportCell(v).replace(/"/g, '""') + '"'; };
+  var lines = [s.columns.map(function (c) { return q(c.label); }).join(',')];
+  s.rows.forEach(function (r) {
+    lines.push(s.columns.map(function (c) { return q(r[c.key]); }).join(','));
+  });
+  var content = '\uFEFF' + lines.join('\r\n');
+  exDownloadBlob(new Blob([content], {type:'text/csv;charset=utf-8;'}), exExportFileName('csv'));
+}
+function exExportExcel() {
+  var s = window.__exExportState; if (!s) return;
+  var esc = function (v) { return exExportCell(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+  var table = '<table border="1"><thead><tr>' + s.columns.map(function (c) {
+    return '<th>' + esc(c.label) + '</th>';
+  }).join('') + '</tr></thead><tbody>' + s.rows.map(function (r) {
+    return '<tr>' + s.columns.map(function (c) { return '<td>' + esc(r[c.key]) + '</td>'; }).join('') + '</tr>';
+  }).join('') + '</tbody></table>';
+  var doc = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><title>' +
+    esc(s.title) + '</title></head><body><h2>' + esc(s.title) + '</h2><p>' + esc(s.sub) +
+    '</p>' + table + '</body></html>';
+  exDownloadBlob(new Blob(['\uFEFF', doc], {type:'application/vnd.ms-excel;charset=utf-8;'}), exExportFileName('xls'));
+}
+function exExportPDF() {
+  var s = window.__exExportState; if (!s) return;
+  var w = window.open('', '_blank');
+  if (!w) { alert('Please allow pop-ups to print or save this report as PDF.'); return; }
+  var esc = function (v) { return exExportCell(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+  var table = '<table><thead><tr>' + s.columns.map(function (c) {
+    return '<th>' + esc(c.label) + '</th>';
+  }).join('') + '</tr></thead><tbody>' + s.rows.map(function (r) {
+    return '<tr>' + s.columns.map(function (c) { return '<td>' + esc(r[c.key]) + '</td>'; }).join('') + '</tr>';
+  }).join('') + '</tbody></table>';
+  w.document.open();
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>' + esc(s.title) +
+    '</title><style>@page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{font:11px Arial,sans-serif;color:#172033}h1{font-size:18px;margin:0 0 5px}p{font-size:10px;color:#526176;margin:0 0 14px}table{width:100%;border-collapse:collapse}th{background:#EAF0FB;color:#173A75;font-weight:700;text-align:left}th,td{border:1px solid #D5DCE8;padding:5px 6px;vertical-align:top}tr{break-inside:avoid}thead{display:table-header-group}tfoot{display:table-footer-group}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body><h1>' +
+    esc(s.title) + '</h1><p>' + esc(s.sub) + ' · Generated ' + new Date().toLocaleString() +
+    ' · ' + s.rows.length.toLocaleString('en-IN') + ' records</p>' + table +
+    '<script>window.onload=function(){window.focus();window.print();};<\/script></body></html>');
+  w.document.close();
+}
+
 /* ── THE CHILDREN BEHIND A ROW ──
    One sitting's children with their own percentage. There is no movement
    column and there cannot be: nobody here is paired with anybody in the other
@@ -18532,14 +18621,34 @@ function exView(id) {
   var e = function (v) { return String(v == null ? '' : v).replace(/[&<>"]/g, function (m) {
     return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]; }); };
   if (P.units) {
+    var unitRows = P.units.map(function (x) {
+      return {
+        Group: x.full || x.k || '',
+        'Class teacher': String(_exWho(x, '') || '').replace(/<[^>]*>/g, '').trim(),
+        'Subject teacher': x.sj ? String(_exWho(x, x.sj) || '').replace(/<[^>]*>/g, '').trim() : '',
+        'PT-1 children': x.na,
+        'PT-1 average %': x.pa == null ? '' : x.pa.toFixed(1),
+        'Half yearly children': x.nb,
+        'Half yearly average %': x.pb == null ? '' : x.pb.toFixed(1),
+        'Change (points)': x.ch == null ? '' : (x.ch > 0 ? '+' : '') + x.ch.toFixed(1)
+      };
+    });
+    var unitCols = ['Group','Class teacher','Subject teacher','PT-1 children','PT-1 average %',
+      'Half yearly children','Half yearly average %','Change (points)'].map(function (k) { return {key:k,label:k}; });
     openHTMLModal(P.title, P.units.length + ' ' + (P.noun || 'groups'), _exUnitList(P.units));
+    exEnableExports(P.title, P.units.length + ' ' + (P.noun || 'groups'), unitRows, unitCols);
     return;
   }
   if (P.gap) {
+    var gapRows = P.gap.map(function (r) {
+      return {'Child':r.nm || '(no name)','Admission no.':r.id || '',Grade:r.gr || '',
+        Section:r.sec0 || '',Sitting:r.side === 'pt1' ? 'PT-1 only' : 'Half yearly only'};
+    });
+    var gapCols = ['Child','Admission no.','Grade','Section','Sitting'].map(function (k) { return {key:k,label:k}; });
     openHTMLModal(P.title, P.gap.length.toLocaleString('en-IN') + ' children · ' + P.sub,
       '<div style="overflow-x:auto"><table class="au-tbl" style="min-width:620px"><thead><tr>' +
       '<th>Child</th><th>Admission no.</th><th>Grade</th><th>Section</th><th>Sat</th>' +
-      '</tr></thead><tbody>' + P.gap.slice(0, 400).map(function (r) {
+      '</tr></thead><tbody>' + P.gap.map(function (r) {
         return '<tr><td style="font-weight:700">' + e(r.nm || '(no name)') + '</td>' +
           '<td style="color:var(--txm)">' + e(r.id || '–') + '</td>' +
           '<td style="color:var(--txm)">' + e(r.gr) + '</td>' +
@@ -18548,17 +18657,41 @@ function exView(id) {
       }).join('') + '</tbody></table></div>' +
       '<div class="au-note">Either the other sitting was never held for this class, or it was ' +
       'never entered. Both are put right in the mark sheet, not here.</div>');
+    exEnableExports(P.title, P.sub || '', gapRows, gapCols);
     return;
   }
   var hd = function (t, n, p) {
-    return '<h4 style="margin:18px 0 8px;font-size:15px;font-weight:800;color:var(--tx)">' + t +
+    return '<h4 style="margin:18px 0 8px;font-size:15px;font-weight:800;color:var(--tx)">' + e(t) +
       ' <span style="font-weight:600;color:var(--txm)">· ' + n.toLocaleString('en-IN') +
       ' children · average ' + (p == null ? '–' : p.toFixed(1) + '%') + '</span></h4>';
   };
   var a = P.a || [], b = P.b || [];
+  var subjects = [];
+  a.concat(b).forEach(function (r) {
+    Object.keys(r.per || {}).forEach(function (sj) { if (subjects.indexOf(sj) < 0) subjects.push(sj); });
+  });
+  var studentRows = [];
+  function addSittingRows(rows, sitting) {
+    rows.forEach(function (r) {
+      var x = {Sitting:sitting,Branch:r.br || '',Curriculum:r.cu || '',Student:r.nm || '',
+        'Admission no.':r.id || '',Grade:r.gr || '',Section:r.sec0 || '',
+        'Class teacher':r.tch || '',Subjects:r.k || 0,'Average %':r.pct == null ? '' : Number(r.pct).toFixed(1)};
+      subjects.forEach(function (sj) { x[sj + ' %'] = r.per && r.per[sj] != null ? Number(r.per[sj]).toFixed(1) : ''; });
+      x['Subject teacher(s)'] = subjects.map(function (sj) {
+        return _exTeachLabel([r], sj);
+      }).filter(Boolean).join('; ');
+      studentRows.push(x);
+    });
+  }
+  addSittingRows(a, 'October · PT-1');
+  addSittingRows(b, 'December · Half yearly');
+  var studentKeys = ['Sitting','Branch','Curriculum','Student','Admission no.','Grade','Section',
+    'Class teacher','Subject teacher(s)','Subjects','Average %'].concat(subjects.map(function (sj) { return sj + ' %'; }));
+  var studentCols = studentKeys.map(function (k) { return {key:k,label:k}; });
   openHTMLModal(P.title, (P.sub ? P.sub + ' · ' : '') + 'both sittings',
     hd('October · PT-1', a.length, P.pa) + _exRollTable(a, P.sj) +
     hd('December · Half yearly', b.length, P.pb) + _exRollTable(b, P.sj));
+  exEnableExports(P.title, (P.sub ? P.sub + ' · ' : '') + 'both sittings', studentRows, studentCols);
 }
 
 function _admNum(n) { return (n == null ? 0 : n).toLocaleString('en-IN'); }
@@ -19236,8 +19369,17 @@ function exOpenPending(){
       'Pocharam and Gowdavalli that column holds the class roll number (1\u201340), which cannot identify a child '+
       'across sections.</div>';
   }
-  if(typeof openHTMLModal==='function')
+  if(typeof openHTMLModal==='function') {
     openHTMLModal('Results not yet received', S.label+' \u00b7 '+rows.length.toLocaleString('en-IN')+' students', h);
+    var pendingExportRows = rows.map(function(r){return {
+      Branch:r.branch || '',Grade:r.grade || '',Section:r.section || '',
+      Student:r.name || '', 'Admission no.':r.id || '', 'Roll no.':r.roll || '',
+      Reason:r.why || '', 'Matched on':r.basis || ''
+    };});
+    var pendingExportCols = ['Branch','Grade','Section','Student','Admission no.','Roll no.','Reason','Matched on']
+      .map(function(k){return {key:k,label:k};});
+    exEnableExports('Results not yet received', S.label+' · '+rows.length+' students', pendingExportRows, pendingExportCols);
+  }
 }
 /* ── A percentage above 100 is not a result ─────────────────────────
    The review averages whatever it is given. If a subject’s maximum is entered
