@@ -1389,7 +1389,7 @@ table.vckt tr.vck-c td.nm{font-weight:600;color:var(--tx)}
 #pane-adm27 .bp-scroll{overflow-x:auto;flex:1 1 auto;display:flex}
 #pane-adm27 .bp-grid{display:flex;flex-direction:column;gap:6px;min-width:470px;width:100%}
 #pane-adm27 .bp-r{display:grid;align-items:center;gap:3px;flex:1 1 auto;
-  grid-template-columns:minmax(150px,1.8fr) repeat(7,minmax(34px,1fr)) minmax(84px,1.15fr);
+  grid-template-columns:minmax(138px,1.65fr) repeat(7,minmax(34px,1fr)) minmax(84px,1.15fr);
   padding:4px 7px 4px 10px;background:linear-gradient(180deg,#13233F 0%,#0F1C36 100%);
   border:1px solid #25395F;border-left:5px solid var(--bc,#25395F);border-radius:11px}
 #pane-adm27 .bp-r.bp-days{flex:0 0 auto;padding-top:3px;padding-bottom:3px;background:#101D38;
@@ -1400,14 +1400,15 @@ table.vckt tr.vck-c td.nm{font-weight:600;color:var(--tx)}
   white-space:nowrap}
 #pane-adm27 .bp-d small{display:block;font-size:10px;font-weight:500;color:#9FB0CC}
 #pane-adm27 .bp-d.sun{opacity:.75}
-#pane-adm27 .bp-n{display:flex;align-items:center;gap:5px;min-width:0;border:0;background:none;padding:0;
-  font:inherit;font-size:14.5px;font-weight:800;letter-spacing:-.01em;color:#FFF;text-align:left;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
-#pane-adm27 .bp-branch-label{overflow:hidden;text-overflow:ellipsis;min-width:0}
+#pane-adm27 .bp-n{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;
+  min-width:0;border:0;background:none;padding:0;font:inherit;font-size:14.5px;font-weight:800;
+  letter-spacing:-.01em;color:#FFF;text-align:left;white-space:normal;overflow:visible;cursor:pointer}
+#pane-adm27 .bp-branch-title{display:flex;align-items:center;gap:5px;min-width:0;max-width:100%}
+#pane-adm27 .bp-branch-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 #pane-adm27 .bp-branch-total{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;
-  margin-left:3px;padding:3px 6px;border:1px solid rgba(255,255,255,.32);border-radius:7px;
-  background:rgba(255,255,255,.12);color:#FDE68A;font-size:10px;font-weight:900;
-  letter-spacing:.01em;line-height:1.1;font-variant-numeric:tabular-nums}
+  margin-left:14px;padding:2px 6px;border:1px solid rgba(255,255,255,.32);border-radius:7px;
+  background:rgba(255,255,255,.12);color:#FDE68A;font-size:9.5px;font-weight:900;
+  letter-spacing:.01em;line-height:1.15;font-variant-numeric:tabular-nums}
 
 #pane-adm27 button.bp-n:hover{color:#FACC15}
 #pane-adm27 .bp-n i{font-style:normal;flex:0 0 9px;font-size:9px;color:#8FA2C2}
@@ -1546,8 +1547,8 @@ table.vckt tr.vck-c td.nm{font-weight:600;color:var(--tx)}
    held to a narrow fixed measure, since it is five rows and three tiles and
    reads better compact than stretched. Both stretch to the taller of the two,
    so the row has one bottom edge rather than a step in the middle. */
-#pane-adm27 .amb-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
-  gap:16px;align-items:stretch}
+#pane-adm27 .amb-row{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);
+  gap:14px;align-items:stretch}
 #pane-adm27 .amb-row>#adm-trend>.amt,
 #pane-adm27 .amb-row>#adm-month>.amb{height:100%}
 #pane-adm27 .amb-row>#adm-month>.amb{display:flex;flex-direction:column}
@@ -29134,9 +29135,9 @@ function _admTrend() {
 
   var M = ADM_DAY_METRICS.filter(function (m) { return m.k === _admDayMetric; })[0]
        || ADM_DAY_METRICS[0];
-  var DAYS = _admLastDays(ADM_STRIP_DAYS).reverse(), brs = _admBranches(S);   // oldest first
+  var DAYS = _admLastDays(ADM_STRIP_DAYS), brs = _admBranches(S);   // newest first
   var pos = {}; DAYS.forEach(function (d, i) { pos[d] = i; });
-  var todayIso = DAYS[DAYS.length - 1];
+  var todayIso = DAYS[0];
 
   /* One pass for both halves. A lead is placed on the day it arrived — the
      Created column — and an admission on the day it was completed, which the
@@ -29202,10 +29203,11 @@ function _admTrend() {
     var name = sub
       ? '<span class="bp-n">' + _admEsc(label) + '</span>'
       : '<button class="bp-n" onclick="admDayToggle(' + q(b) + ')" aria-expanded="' + open + '" title="' +
-          (open ? 'Close' : 'Open this branch by counsellor') + '"><i>' +
-          (open ? '▾' : '▸') + '</i><span class="bp-branch-label">' + _admEsc(label) + '</span>' +
+          (open ? 'Close' : 'Open this branch by counsellor') + '">' +
+          '<span class="bp-branch-title"><i>' + (open ? '▾' : '▸') + '</i><span class="bp-branch-label">' +
+          _admEsc(label) + '</span></span>' +
           '<span class="bp-branch-total" title="' + _admEsc('Overall season-to-date ' + M.lab + ' admissions / leads') + '">' +
-          _admN(seasonAByBranch[key] || 0) + ' / ' + _admN(seasonLByBranch[key] || 0) + '</span></button>';
+          'Overall: ' + _admN(seasonAByBranch[key] || 0) + ' / ' + _admN(seasonLByBranch[key] || 0) + '</span></button>';
     return '<div class="bp-r' + (sub ? ' cns' : '') + '" style="--bc:' + col + '">' + name +
       DAYS.map(function (d) {
         return disc(A[key + '|' + d] || 0, L[key + '|' + d] || 0, key + '|' + d, label + ' · ' + _admDate(d));
