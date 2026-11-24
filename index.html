@@ -21349,25 +21349,64 @@ window.AUDIT = (function () {
   }
   function closeModal() { $('au-modal').classList.remove('on'); document.body.style.overflow = ''; }
 
-  function branchModal(b) {
-    var t = brT(b), sc = t ? A.score(t) : null;
+  function branchModal(b, mode) {
+    mode = (mode || 'ALL').toUpperCase();
+    var members = scorecardMembers(b);
+    var cbseMembers = members.filter(function (name) {
+      return !/\s+CAIE$/i.test(name);
+    });
+    var caieMembers = members.filter(function (name) {
+      return /\s+CAIE$/i.test(name);
+    });
+    var selectedMembers = mode === 'CBSE' ? cbseMembers :
+      mode === 'CAIE' ? caieMembers : members;
+    if (!selectedMembers.length) selectedMembers = members;
+    var tallyForMembers = function (getter) {
+      return combine(function (m) {
+        return mergeBranchTallies(selectedMembers, function (member) {
+          return getter(member, m);
+        });
+      });
+    };
+    var t = tallyForMembers(function (member, m) {
+      return D.byBM[member + '\u241f' + m];
+    });
+    var sc = t ? A.score(t) : null;
     var cats = D.cats.map(function (c) {
-      var x = brCatT(b, c);
+      var x = tallyForMembers(function (member, m) {
+        return D.byBMC[member + '\u241f' + m + '\u241f' + c];
+      });
       return { c: c, v: x ? A.score(x) : null, t: x };
-    }).sort(function (a, z) { return (a.v === null ? 999 : a.v) - (z.v === null ? 999 : z.v); });
-
+    }).sort(function (a, z) {
+      return (a.v === null ? 999 : a.v) - (z.v === null ? 999 : z.v);
+    });
     var stages = A.GRADES.map(function (g) {
-      var x = brGradeT(b, g);
+      var x = tallyForMembers(function (member, m) {
+        return D.byBMG[member + '\u241f' + m + '\u241f' + g];
+      });
       return { g: g, v: x ? A.score(x) : null };
     });
-    var members = scorecardMembers(b);
-    var chronic = D.chronic.filter(function (x) { return members.indexOf(x.branch) >= 0; });
-
-    var members = scorecardMembers(b);
-    var groupNote = members.length > 1
-      ? '<p class="au-note"><b>Combined branch:</b> ' + members.map(esc).join(' + ') +
-        '. Counts are pooled before the compliance percentage is recalculated.</p>' : '';
-    var html = groupNote +
+    var chronic = D.chronic.filter(function (x) {
+      return selectedMembers.indexOf(x.branch) >= 0;
+    });
+    var tabs = [
+      ['CBSE', cbseMembers.length],
+      ['CAIE', caieMembers.length],
+      ['ALL', members.length]
+    ];
+    var switchHtml = '<div class="au-curriculum-switch" role="group" aria-label="Choose curriculum view">' +
+      tabs.map(function (tab) {
+        var active = mode === tab[0];
+        var disabled = tab[1] === 0;
+        return '<button type="button" class="au-curriculum-tab' + (active ? ' active' : '') +
+          (disabled ? ' unavailable' : '') + '" ' + (disabled ? 'disabled' : '') +
+          ' data-mode="' + tab[0] + '">' + tab[0] + '</button>';
+      }).join('') + '</div>';
+    var html = switchHtml +
+      '<p class="au-note"><b>' + esc(mode === 'ALL' ? 'All curricula' : mode) +
+      ' view:</b> ' + (selectedMembers.length ? selectedMembers.map(esc).join(' + ') :
+      'No source branch is available for this curriculum') +
+      '. Counts are pooled within this selection before the compliance percentage is recalculated.</p>' +
       '<div class="au-stats">' +
       '<div class="au-st"><div class="v" style="color:' + A.colorFor(sc) + '">' + pc(sc) + '</div><div class="l">Compliance</div></div>' +
       '<div class="au-st"><div class="v">' + (t ? A.scored(t) : 0) + '</div><div class="l">Cells scored</div></div>' +
@@ -21402,7 +21441,17 @@ window.AUDIT = (function () {
             pc(x.from, 0) + ' then ' + pc(x.to, 0) + '</li>';
         }).join('') + '</ul>' : '');
 
-    modal(b, (VIEW.month || 'All audited months') + ' · ' + (t ? A.scored(t) : 0) + ' cells scored · ' + pill(sc), html);
+    window.auBranchCurriculumView = function (branchName, nextMode) {
+      branchModal(branchName, nextMode);
+    };
+    var viewLabel = mode === 'ALL' ? 'All curricula' : mode;
+    modal(b, viewLabel + ' · ' + (VIEW.month || 'All audited months') + ' · ' +
+      (t ? A.scored(t) : 0) + ' cells scored · ' + pill(sc), html);
+    $('au-mod-body').querySelectorAll('.au-curriculum-tab:not(:disabled)').forEach(function (button) {
+      button.addEventListener('click', function () {
+        branchModal(b, button.getAttribute('data-mode'));
+      });
+    });
   }
 
   function cellModal(b, c) {
@@ -40202,6 +40251,15 @@ window.renderCivilTab = function (raw) {
     content: ''; position: absolute; left: 0; right: 0; bottom: -1px;
     border-bottom: 1px solid var(--bor, #E2E8F0); pointer-events: none;
   }
+
+  .au-curriculum-switch{display:inline-flex;gap:4px;padding:4px;border:1px solid #DCE5F4;
+    border-radius:10px;background:#F1F5FB;margin:0 0 12px}
+  .au-curriculum-tab{border:0;border-radius:7px;padding:7px 18px;background:transparent;
+    color:#475569;font:700 12px/1.2 Inter,Arial,sans-serif;cursor:pointer;min-width:72px}
+  .au-curriculum-tab.active{background:#0B6B43;color:#fff;box-shadow:0 1px 3px rgba(15,23,42,.16)}
+  .au-curriculum-tab.unavailable,.au-curriculum-tab:disabled{opacity:.35;cursor:not-allowed}
+  .au-curriculum-tab:focus-visible{outline:2px solid #2563EB;outline-offset:2px}
+
 </style>
 <script>
 (function(){
