@@ -1392,6 +1392,18 @@ table.vckt tr.vck-c td.nm{font-weight:600;color:var(--tx)}
   grid-template-columns:minmax(138px,1.65fr) repeat(7,minmax(34px,1fr)) minmax(84px,1.15fr);
   padding:4px 7px 4px 10px;background:linear-gradient(180deg,#13233F 0%,#0F1C36 100%);
   border:1px solid #25395F;border-left:5px solid var(--bc,#25395F);border-radius:11px}
+
+#pane-adm27 .bp-week-grid .bp-r{
+  grid-template-columns:minmax(138px,1.65fr) repeat(5,minmax(88px,1fr)) minmax(84px,1.15fr);
+}
+#pane-adm27 .bp-week-grid .bp-d.bp-week-head{
+  white-space:normal;font-size:10.5px;line-height:1.2;padding:2px 1px;
+}
+#pane-adm27 .bp-week-grid .bp-d.bp-week-head small{
+  font-size:9px;color:#9FB0CC;margin-top:3px;
+}
+#pane-adm27 .bp-period-bar{margin-left:8px}
+
 #pane-adm27 .bp-r.bp-days{flex:0 0 auto;padding-top:3px;padding-bottom:3px;background:#101D38;
   border-left-color:#25395F}
 #pane-adm27 .bp-r.cns{flex:0 0 auto;margin-left:14px;padding-top:4px;padding-bottom:4px;
@@ -29121,7 +29133,10 @@ function admOpenDayCell(key) {
   ad.concat(ld).forEach(function (r) { if (seen[r.id]) return; seen[r.id] = 1; rows.push(r); });
   var p = key.split('|'), whoP = p[0].split('\u241f'), day = p[1];
   var lab = (whoP[0] === '*' ? 'All branches' : whoP[0]) + (whoP[1] ? ' \u00b7 ' + whoP[1] : '');
-  _admModal(lab + ' \u00b7 ' + (day === '*' ? 'the last ' + ADM_STRIP_DAYS + ' days' : _admDate(day)) +
+  var periodName = day === '*'
+    ? (ADM_STRIP_PERIOD === 'week' ? 'the last 5 calendar weeks' : 'the last ' + ADM_STRIP_DAYS + ' days')
+    : (String(day).indexOf('W:') === 0 ? _admWeekLabel(day) : _admDate(day));
+  _admModal(lab + ' \u00b7 ' + periodName +
       (B.lab === 'Total' ? '' : ' \u00b7 ' + B.lab),
     _admN(ad.length) + ' admission' + (ad.length === 1 ? '' : 's') + ' completed \u00b7 ' +
     _admN(ld.length) + ' lead' + (ld.length === 1 ? '' : 's') + ' arrived',
@@ -29174,6 +29189,37 @@ function _admDayHead(iso) {
    tracker; last year is the CRM export, a lead on its Created date and an
    admission on the day it was marked completed. */
 var ADM_STRIP_DAYS = 7;
+var ADM_STRIP_PERIOD = 'day'; /* default: daily view */
+function admSetStripPeriod(mode) {
+  ADM_STRIP_PERIOD = mode === 'week' ? 'week' : 'day';
+  _admTrend();
+}
+function _admWeekStart(iso) {
+  var p = String(iso || '').slice(0, 10).split('-');
+  if (p.length !== 3) return '';
+  var d = new Date(+p[0], +p[1] - 1, +p[2]);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); /* Monday */
+  return _admIso(d);
+}
+function _admLastWeeks(n) {
+  var monday = _admWeekStart(_admIso(new Date()));
+  var p = monday.split('-'), d = new Date(+p[0], +p[1] - 1, +p[2]), out = [];
+  for (var i = 0; i < n; i++) {
+    var x = new Date(d); x.setDate(x.getDate() - 7 * i);
+    out.push('W:' + _admIso(x));
+  }
+  return out;
+}
+function _admWeekLabel(key) {
+  var p = String(key || '').replace(/^W:/, '').split('-');
+  if (p.length !== 3) return String(key || '');
+  var a = new Date(+p[0], +p[1] - 1, +p[2]), b = new Date(a);
+  b.setDate(b.getDate() + 6);
+  var fmt = function (d) {
+    return d.getDate() + ' ' + ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
+  };
+  return fmt(a) + '–' + fmt(b);
+}
 function _admTrend() {
   var el = document.getElementById('adm-trend'); if (!el) return;
   var S = _admSet(), R = _admRaw;
@@ -29181,9 +29227,16 @@ function _admTrend() {
 
   var M = ADM_DAY_METRICS.filter(function (m) { return m.k === _admDayMetric; })[0]
        || ADM_DAY_METRICS[0];
-  var DAYS = _admLastDays(ADM_STRIP_DAYS), brs = _admBranches(S);   // newest first
+  var brs = _admBranches(S);
+  var todayIso = _admIso(new Date());
+  var WEEK_MODE = ADM_STRIP_PERIOD === 'week';
+  var DAYS = WEEK_MODE ? _admLastWeeks(5) : _admLastDays(ADM_STRIP_DAYS);
   var pos = {}; DAYS.forEach(function (d, i) { pos[d] = i; });
-  var todayIso = DAYS[0];
+  var bucketFor = function (date) {
+    var d = String(date || '').slice(0, 10);
+    return WEEK_MODE ? ('W:' + _admWeekStart(d)) : d;
+  };
+  var bucketLabel = function (key) { return WEEK_MODE ? _admWeekLabel(key) : _admDate(key); };
 
   /* One pass for both halves. A lead is placed on the day it arrived — the
      Created column — and an admission on the day it was completed, which the
@@ -29221,8 +29274,10 @@ function _admTrend() {
        window: a counsellor with a row of empty discs is the thing a branch
        head is looking for, and dropping them for having nothing would hide it */
     (who[r.b] || (who[r.b] = {}))[c] = 1;
-    if (cre && pos[cre] !== undefined) { bump(L, lTot, r.b, c, cre, bagL, r); lAll++; }
-    if (won && pos[won] !== undefined) { bump(A, aTot, r.b, c, won, bagA, r); aAll++; }
+    var creBucket = cre ? bucketFor(cre) : '';
+    var wonBucket = won ? bucketFor(won) : '';
+    if (creBucket && pos[creBucket] !== undefined) { bump(L, lTot, r.b, c, creBucket, bagL, r); lAll++; }
+    if (wonBucket && pos[wonBucket] !== undefined) { bump(A, aTot, r.b, c, wonBucket, bagA, r); aAll++; }
   });
   window._DAY_BAG = { a: bagA, l: bagL, lab: M.lab };
 
@@ -29238,8 +29293,8 @@ function _admTrend() {
   var total = function (a, l, key, lab) {
     var has = a || l;
     return '<' + (has ? 'button onclick="admOpenDayCell(' + q(key) + ')"' : 'span') +
-      ' class="bp-t" title="' + _admEsc(lab + ' — the last ' + ADM_STRIP_DAYS + ' days' +
-        (has ? ' · click to view them' : '')) + '"><small>' + ADM_STRIP_DAYS + '-day total</small>' +
+      ' class="bp-t" title="' + _admEsc(lab + ' — ' + (WEEK_MODE ? 'the last 5 calendar weeks' : 'the last ' + ADM_STRIP_DAYS + ' days') +
+        (has ? ' · click to view them' : '')) + '"><small>' + (WEEK_MODE ? '5-week total' : ADM_STRIP_DAYS + '-day total') + '</small>' +
       '<span><b>' + _admN(a) + '</b> / ' + _admN(l) + '</span></' + (has ? 'button' : 'span') + '>';
   };
   var strip = function (key, label, sub, open, b) {
@@ -29256,18 +29311,26 @@ function _admTrend() {
           'Overall: ' + _admN(seasonAByBranch[key] || 0) + ' / ' + _admN(seasonLByBranch[key] || 0) + '</span></button>';
     return '<div class="bp-r' + (sub ? ' cns' : '') + '" style="--bc:' + col + '">' + name +
       DAYS.map(function (d) {
-        return disc(A[key + '|' + d] || 0, L[key + '|' + d] || 0, key + '|' + d, label + ' · ' + _admDate(d));
+        return disc(A[key + '|' + d] || 0, L[key + '|' + d] || 0, key + '|' + d, label + ' · ' + bucketLabel(d));
       }).join('') + total(aTot[key] || 0, lTot[key] || 0, key + '|*', label) + '</div>';
   };
 
   var h = '<div class="amt bp"><div class="bp-hd"><div>' +
-      '<div class="amt-h"><span class="bp-bolt">⚡</span>Branch Performance — Last ' + ADM_STRIP_DAYS + ' Days</div>' +
+      '<div class="amt-h"><span class="bp-bolt">⚡</span>Branch Performance — ' +
+        (WEEK_MODE ? 'Last 5 Calendar Weeks' : 'Last ' + ADM_STRIP_DAYS + ' Days') + '</div>' +
       '<div class="bp-sub">Admissions / Leads</div></div>' +
     '<div class="amt-bar">' + ADM_DAY_METRICS.map(function (m) {
       return '<button class="amt-b' + (m.k === M.k ? ' on' : '') + '" aria-pressed="' + (m.k === M.k) +
         '" onclick="admSetDayMetric(\'' + m.k + '\')">' + m.lab + '</button>'; }).join('') +
-    '</div></div><div class="bp-scroll"><div class="bp-grid">' +
+    '</div><div class="amt-bar bp-period-bar">' +
+      '<button class="amt-b' + (!WEEK_MODE ? ' on' : '') + '" aria-pressed="' + (!WEEK_MODE) +
+      '" onclick="admSetStripPeriod(\'day\')">Day</button>' +
+      '<button class="amt-b' + (WEEK_MODE ? ' on' : '') + '" aria-pressed="' + (WEEK_MODE) +
+      '" onclick="admSetStripPeriod(\'week\')">Week</button>' +
+    '</div></div><div class="bp-scroll"><div class="bp-grid ' + (WEEK_MODE ? 'bp-week-grid' : '') + '">' +
     '<div class="bp-r bp-days"><span></span>' + DAYS.map(function (d) {
+      if (WEEK_MODE) return '<span class="bp-d bp-week-head">' + _admEsc(bucketLabel(d)) +
+        '<small>Mon–Sun</small></span>';
       var H = _admDayHead(d), p = d.split('-');
       return '<span class="bp-d' + (d === todayIso ? ' now' : '') + (H.sun ? ' sun' : '') + '">' +
         (+p[2]) + '<span class="mo"> ' + _admDate(d).slice(3, 6) + '</span><small>' + H.w + '</small></span>';
