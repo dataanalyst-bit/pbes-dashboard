@@ -27841,9 +27841,14 @@ async function loadAdm27(force) {
                                    : _liveLabel(raw.generatedAt));
   } catch (err) {
     if (_admLoaded) {
-      /* figures are on screen: keep them, and say when they were read in the
-         ordinary colour — the live cycle asks again by itself (19 Nov 2026) */
-      try { console.warn('[PBES] admissions feed \u2014 ' + _feedDetail(err)); } catch (e) {}
+      /* Keep existing figures if already painted. If the first paint failed,
+         show a diagnostic instead of leaving the reader on an endless spinner. */
+      try { console.warn('[PBES] admissions feed/render — ' + _feedDetail(err)); } catch (e) {}
+      var admBody = document.getElementById('adm-body');
+      if (admBody && admBody.style.display === 'none') {
+        var admLoader = document.getElementById('adm-loader');
+        if (admLoader) admLoader.innerHTML = _feedFailBox('Could not render Admissions 2027-28', err, 'loadAdm27');
+      }
       _admStatus(_feedKept(_admRaw && _admRaw.generatedAt));
     } else {
       _admStatus(_feedShort(err), true);
@@ -29271,50 +29276,112 @@ function _admTrend() {
   h += '</div></div>';
 
   /* ── branch-wise season-to-date comparison ──
-     The weekly all-branches KPI is intentionally removed. Current-season
-     counts come from the same filtered tracker rows used above. Prior-season
-     counts come from the dated CRM export, matched branch by branch and
-     measured to the same day of that season. */
-  var season = R.season || '', lastAy = _admLastSeason(season);
-  var LD = (typeof LEAD_DATES !== 'undefined' && LEAD_DATES) ? LEAD_DATES : [];
+     Current season: Touched Leads (main dashboard feed).
+       Leads use Created On (Date); admissions use Updated On (Updated)
+       and Stage = 08-Admission Completed.
+     Previous season: Overall Admissions workbook.
+       Leads use All Enquiries (R.leadHist); admissions use
+       All AY Admissions (R.hist).
+     Historical admissions have no lead-channel field, so admission totals
+     are all-source; the Walk-in/Digital switch filters lead totals only. */
+  var season = R.season || '', lastAy = _admLastSeason(R.season || '');
+  var currentLeadRows = (typeof LEAD_DATES !== 'undefined' && Array.isArray(LEAD_DATES))
+    ? LEAD_DATES : [];
+  var seasonStart = season ? _admYoyStart(season) : '';
+  var priorStart = lastAy ? _admYoyStart(lastAy) : '';
+  var elapsedDay = -1;
+  if (seasonStart && todayIso) {
+    elapsedDay = Math.round(
+      (new Date(todayIso + 'T00:00:00').getTime() -
+       new Date(seasonStart + 'T00:00:00').getTime()) / 86400000
+    );
+  }
   var yoyHtml = '';
-  if (season && lastAy && LD.length && day >= 0) {
-    var la = _admYoyStart(lastAy), lb = _admAddDays(la, day);
-    var chan = M.k === 'walk' ? function (r) { return r.Channel === 'Walk-In'; }
-             : M.k === 'dig'  ? function (r) { return r.Channel !== 'Walk-In'; }
-             : function () { return true; };
-    var keyBranch = function (v) { return String(v || '').trim().toLowerCase(); };
-    var prevA = {}, prevL = {};
-    LD.forEach(function (r) {
-      if (!r || !r.Branch || (S.scope && keyBranch(r.Branch) !== keyBranch(S.scope)) || !chan(r)) return;
-      var k = keyBranch(r.Branch);
-      if (r.Date && r.Date >= la && r.Date <= lb) prevL[k] = (prevL[k] || 0) + 1;
-      if (_admCrmIn(r, la, lb)) prevA[k] = (prevA[k] || 0) + 1;
+  if (season && lastAy && priorStart && elapsedDay >= 0) {
+    var priorEnd = _admAddDays(priorStart, elapsedDay);
+    var branchKey = function (v) { return String(v || '').trim().toLowerCase(); };
+    var inWindow = function (d, a, b) { return !!d && d >= a && d <= b; };
+    var leadChannelMatch = function (channel) {
+      var c = String(channel || '').trim().toLowerCase();
+      if (M.k === 'walk') return c === 'walk-in' || c === 'walk in' || c === 'walkin';
+      if (M.k === 'dig') return c === 'digital';
+      return true;
+    };
+    var nowA = {}, nowL = {}, wasA = {}, wasL = {};
+    brs.forEach(function (b) {
+      var k = branchKey(b);
+      nowA[k] = 0; nowL[k] = 0; wasA[k] = 0; wasL[k] = 0;
     });
-    var change = function (now, was) {
-      if (!was) return now ? '<em class="new">New</em>' : '<em class="flat">0%</em>';
+
+    /* Current-year leads and completed admissions from Touched Leads. */
+    currentLeadRows.forEach(function (r) {
+      if (!r || !r.Branch) return;
+      var k = branchKey(r.Branch);
+      if (S.scope && k !== branchKey(S.scope)) return;
+      if (nowA[k] === undefined) return;
+      if (r.Stage === '08-Admission Completed' &&
+          inWindow(r.Updated, seasonStart, todayIso)) nowA[k]++;
+      if (leadChannelMatch(r.Channel) &&
+          inWindow(r.Date, seasonStart, todayIso)) nowL[k]++;
+    });
+
+    /* Previous-year actual admissions from Overall Admissions > All AY Admissions. */
+    (Array.isArray(R.hist) ? R.hist : []).forEach(function (r) {
+      if (!r || r.ay !== lastAy || !r.b || !inWindow(r.d, priorStart, priorEnd)) return;
+      var k = branchKey(r.b);
+      if (wasA[k] !== undefined) wasA[k]++;
+    });
+
+    /* Previous-year leads from Overall Admissions > All Enquiries.
+       Each group is [branchIndex, AYIndex, categoryIndex, subIndex,
+       sourceIndex, [day-index values...]]. */
+    var leadHist = R.leadHist || null;
+    if (leadHist && Array.isArray(leadHist.g)) {
+      leadHist.g.forEach(function (g) {
+        if (!Array.isArray(g) || !Array.isArray(g[5])) return;
+        var bName = (leadHist.branches || [])[g[0]];
+        var ayName = (leadHist.ays || [])[g[1]];
+        if (ayName !== lastAy || !bName) return;
+        var k = branchKey(bName);
+        if (wasL[k] === undefined) return;
+        var catName = String(((leadHist.cats || [])[g[2]]) || '').toLowerCase();
+        if (M.k === 'walk' && catName.indexOf('walk') < 0) return;
+        if (M.k === 'dig' && catName.indexOf('digital') < 0) return;
+        g[5].forEach(function (dayIndex) {
+          if (Number(dayIndex) >= 0 && Number(dayIndex) <= elapsedDay) wasL[k]++;
+        });
+      });
+    }
+
+    var changeLabel = function (now, was) {
+      if (!was) return now ? '<em class="new">New</em>' : '<em class="flat">—</em>';
       var v = Math.round(100 * (now - was) / was);
       return '<em class="' + (v > 0 ? 'up' : v < 0 ? 'dn' : 'flat') + '">' +
         (v > 0 ? '▲ +' : v < 0 ? '▼ ' : '') + v + '%</em>';
     };
     var branchRows = brs.map(function (b) {
-      var k = keyBranch(b), ca = seasonAByBranch[b] || 0, cl = seasonLByBranch[b] || 0;
-      var pa = prevA[k] || 0, pl = prevL[k] || 0;
+      var k = branchKey(b);
       return '<div class="bp-yoy-row"><strong>' + _admEsc(b) + '</strong>' +
-        '<div class="bp-yoy-metric"><small>Admissions</small><b>' + _admN(ca) +
-        '</b><span>vs ' + _admN(pa) + '</span>' + change(ca, pa) + '</div>' +
-        '<div class="bp-yoy-metric"><small>Leads</small><b>' + _admN(cl) +
-        '</b><span>vs ' + _admN(pl) + '</span>' + change(cl, pl) + '</div></div>';
+        '<div class="bp-yoy-metric"><b>' + _admN(nowA[k] || 0) + '</b>' +
+        '<span>vs ' + _admN(wasA[k] || 0) + '</span>' +
+        changeLabel(nowA[k] || 0, wasA[k] || 0) + '</div>' +
+        '<div class="bp-yoy-metric"><b>' + _admN(nowL[k] || 0) + '</b>' +
+        '<span>vs ' + _admN(wasL[k] || 0) + '</span>' +
+        changeLabel(nowL[k] || 0, wasL[k] || 0) + '</div></div>';
     }).join('');
+
+    var leadFilterLabel = M.k === 'walk' ? 'Walk-in leads' :
+                          M.k === 'dig' ? 'Digital leads' : 'All leads';
     yoyHtml = '<div class="bp-yoy"><div class="bp-yoy-head"><strong>This year vs last year</strong>' +
-      '<span>Season to date · as on ' + _admDate(todayIso).slice(0, 6) +
-      ' · ' + _admEsc(M.lab) + '</span></div><div class="bp-yoy-cols">' +
-      '<span>Branch</span><span>Admissions · ' + _admEsc(season) + ' vs ' + _admEsc(lastAy) +
-      '</span><span>Leads · ' + _admEsc(season) + ' vs ' + _admEsc(lastAy) +
-      '</span></div>' + branchRows + '<div class="bp-yoy-note">Comparison uses the same elapsed number of days from the start of each season and the selected Walk-in / Digital filter.</div></div>';
+      '<span>Same elapsed period · as on ' + _admEsc(_admDate(todayIso)) + '</span></div>' +
+      '<div class="bp-yoy-cols"><span>Branch</span><span>Admissions · all sources</span>' +
+      '<span>Leads · ' + _admEsc(leadFilterLabel) + '</span></div>' + branchRows +
+      '<div class="bp-yoy-note">Current: Touched Leads — admissions use Updated On at Stage 08; leads use Created On. ' +
+      'Previous: Overall Admissions — All AY Admissions and All Enquiries. Historical admissions are all-source ' +
+      'because the student register does not record the lead channel.</div></div>';
   } else {
     yoyHtml = '<div class="bp-yoy"><div class="bp-yoy-head"><strong>This year vs last year</strong>' +
-      '<span>Branch-wise comparison is unavailable because dated prior-year records are not available.</span></div></div>';
+      '<span>Comparison dates or season information are not available yet.</span></div></div>';
   }
   h += '<div class="bp-ft">' + yoyHtml + '</div></div>';
 
