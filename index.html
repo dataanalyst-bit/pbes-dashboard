@@ -2917,6 +2917,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 .av-action{padding:12px 14px;border:1px solid var(--bor);border-left:4px solid var(--a);border-radius:9px;margin:8px 0;background:var(--sur)}
 .av-action strong{display:block;margin-bottom:4px}
 @media(max-width:760px){.av-chart-grid{grid-template-columns:1fr}.av-chart-card{min-height:260px}}
+
+/* Auravya dashboard alignment with the Parentz Feedback report */
+.av-nlp-grid .av-chart-card{border-radius:14px;padding:16px 18px}
+.av-nlp-grid .av-chart-head h4{font-family:Inter,sans-serif;font-size:13px;font-weight:800;letter-spacing:0;color:var(--tx)}
+.av-nlp-grid .av-chart-head button{font-family:Inter,sans-serif;font-size:11px;font-weight:700;color:#1E4FD8;border-color:#D7E2F5;background:#F8FAFF}
+.av-q6-keyword-card{min-height:430px}
+.av-q6-keyword-card canvas{height:360px!important;max-height:none}
+.av-nlp-summary-grid h4{font-family:Inter,sans-serif;font-size:13px}
+.av-nlp-summary-grid p{font-family:Inter,sans-serif;font-size:12px;line-height:1.5}
+.av-nlp-grid canvas{font-family:Inter,sans-serif}
+.au-kpis{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media(max-width:1250px){.au-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){.au-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
 
 </head>
@@ -42860,16 +42873,41 @@ window.T1 = (function () {
     var negativeParents=satisfactionDocs.filter(function(d){return d.sentiment==='Not satisfied';});
     var enjoyKw=extractEnjoyKeywords(enjoyed),improveThemes=themeCounts(suggestions,SUGGEST_THEMES),enjoyThemes=themeCounts(enjoyed,ENJOY_THEMES);
     $('av-meta').textContent=n+' live parent responses · '+(raw.source||'PBES-All Reports 2026-27')+' · Bachupally';
+    var dimensionMeans=[
+      mean(a.map(function(r){return score(r[2]);})), // Seating
+      mean(a.map(function(r){return score(r[4]);})), // Staff support
+      mean(a.map(function(r){return score(r[3]);})), // Performances
+      mean(a.map(function(r){return score(r[5]);}))  // Overall
+    ];
+    var averageRating=mean(dimensionMeans);
+    var averageRatingPct=averageRating===null?null:(averageRating/5*100);
+    var ratedRows=a.filter(function(r){return [2,3,4,5].some(function(i){return Number.isFinite(score(r[i]));});});
+    var seatingRows=a.filter(function(r){return Number.isFinite(score(r[2]));});
+    var staffRows=a.filter(function(r){return Number.isFinite(score(r[4]));});
+    var performanceRows=a.filter(function(r){return Number.isFinite(score(r[3]));});
+    var overallRows=a.filter(function(r){return Number.isFinite(score(r[5]));});
     $('av-kpis').innerHTML=[
       [n,'RESPONSES','All submitted records',a],
-      [allScores[3].toFixed(2)+'/5','OVERALL RATING',Math.round(good/Math.max(1,overall.length)*100)+'% rated 4 or 5',a.filter(function(r){return score(r[5])>=4;})],
-      [allScores[1].toFixed(2)+'/5','BEST DIMENSION','Student performances',a.filter(function(r){return score(r[3])>=4;})],
+      [dimensionMeans[0]===null?'—':dimensionMeans[0].toFixed(2)+'/5','SEATING','Average seating rating',seatingRows],
+      [dimensionMeans[1]===null?'—':dimensionMeans[1].toFixed(2)+'/5','STAFF SUPPORT','Average staff support rating',staffRows],
+      [dimensionMeans[2]===null?'—':dimensionMeans[2].toFixed(2)+'/5','PERFORMANCE','Average student performance rating',performanceRows],
+      [dimensionMeans[3]===null?'—':dimensionMeans[3].toFixed(2)+'/5','OVERALL','Average overall event rating',overallRows],
+      [averageRatingPct===null?'—':averageRatingPct.toFixed(1)+'%','AVERAGE OF RATING',
+        averageRating===null?'Average across four rating areas':averageRating.toFixed(2)+'/5 across four rating areas',ratedRows],
       [improvementRows.length+' ('+pctOfTotal(improvementRows.length)+'%)','IMPROVEMENT PRIORITY','Staff support rated 1–3 · % of all responses',improvementRows],
       [enjoyed.length+' ('+pctOfTotal(enjoyed.length)+'%)','ENJOYMENT COMMENTS','Column 5 · % of all responses',enjoyed],
       [suggestions.length+' ('+pctOfTotal(suggestions.length)+'%)','SUGGESTION COMMENTS','Column 6 · % of all responses',suggestions]
     ].map(function(k,i){return '<button class="au-kpi av-click-kpi" type="button" onclick="window.avKpiDrill('+i+')" aria-label="Open '+esc(k[1])+' details"><div class="v">'+esc(k[0])+'</div><div class="k">'+esc(k[1])+'</div><div class="d">'+esc(k[2])+'</div><span class="av-tap-hint">Tap to view data ↗</span></button>';}).join('');
-    window.__avKpiDocs=[a,a.filter(function(r){return score(r[5])>=4;}),a.filter(function(r){return score(r[3])>=4;}),improvementRows,enjoyed,suggestions];
-    window.avKpiDrill=function(i){var ds=window.__avKpiDocs[i]||[];var docs=ds.length&&ds[0].row?ds:ds.map(function(r){return {row:r,grade:r[0],type:'Rating response',text:'Seating '+r[2]+' · Performance '+r[3]+' · Staff '+r[4]+' · Overall '+r[5],sentiment:'Rating record',polarity:0};});openDrill(['All responses','Overall ratings 4–5','Performance ratings 4–5','Staff support ratings 1–3 — improvement priority','Enjoyment comments','Suggestion comments'][i],'Tap a record to inspect the underlying response. Percentages use all '+totalResponses+' submitted responses.',docs);};
+    window.__avKpiDocs=[a,seatingRows,staffRows,performanceRows,overallRows,ratedRows,improvementRows,enjoyed,suggestions];
+    window.avKpiDrill=function(i){
+      var ds=window.__avKpiDocs[i]||[];
+      var docs=ds.map(function(r){return {row:r,grade:r[0],type:'Rating response',
+        text:'Seating '+(r[2]==null?'—':r[2])+' · Staff support '+(r[4]==null?'—':r[4])+
+          ' · Performance '+(r[3]==null?'—':r[3])+' · Overall '+(r[5]==null?'—':r[5]),
+        sentiment:classifySatisfaction(r).label,polarity:classifySatisfaction(r).polarity};});
+      openDrill(['All responses','Seating ratings','Staff support ratings','Performance ratings','Overall ratings','Average of Rating — source records','Staff support ratings 1–3 — improvement priority','Enjoyment comments','Suggestion comments'][i],
+        'Tap a record to inspect the underlying response.',docs);
+    };
     $('av-groups').innerHTML='<div class="av-table-wrap"><table class="av-table"><thead><tr><th>Grade group</th><th>Responses</th><th>Seating</th><th>Performances</th><th>Staff support</th><th>Overall</th><th>Overall 4–5</th></tr></thead><tbody>'+
       BAND_ORDER.map(function(b){var x=bs[b],pct=x.overall.length?Math.round(x.overall.filter(function(v){return v>=4;}).length/x.overall.length*100):0;return '<tr class="av-tap-row" tabindex="0" onclick="window.avGroupDrill(\''+b+'\')"><td><b>'+b+'</b></td><td>'+x.n+'</td>'+x.means.map(function(v){return '<td>'+v.toFixed(2)+'</td>';}).join('')+'<td><span class="av-pill">'+pct+'%</span></td></tr>';}).join('')+'</tbody></table></div><div class="av-tap-hint">Tap a grade group to view its underlying feedback.</div>';
     window.avGroupDrill=function(b){var selected=a.filter(function(r){return gradeBand(r[0])===b;});var ds=selected.map(function(r){var t='Seating: '+(r[2]==null?'—':r[2])+'/5 · Student performances: '+(r[3]==null?'—':r[3])+'/5 · Staff support: '+(r[4]==null?'—':r[4])+'/5 · Overall: '+(r[5]==null?'—':r[5])+'/5\\nEnjoyed: '+(r[6]||'—')+'\\nSuggestion: '+(r[7]||'—');var s=sentiment((r[6]||'')+' '+(r[7]||''));return {row:r,grade:r[0],type:'Grade-group response',text:t,sentiment:classifySatisfaction(r).label,polarity:classifySatisfaction(r).polarity};});openDrill(b+' — feedback detail',selected.length+' source records',ds);};
@@ -42906,25 +42944,31 @@ window.T1 = (function () {
       q6KeywordGroups[bestIndex].count++;
       Array.prototype.push.apply(q6KeywordGroups[bestIndex].docs,studentGroup.docs);
     });
-    chart('av-q6-kw-chart','bar',{labels:q6KeywordGroups.map(function(x){return x.label;}),datasets:[{label:'Unique students assigned to primary theme',data:q6KeywordGroups.map(function(x){return x.count;}),backgroundColor:'#2563EB',borderRadius:6,maxBarThickness:24}]},{indexAxis:'y',layout:{padding:{left:8,right:22,top:8,bottom:4}},font:{family:'Plus Jakarta Sans, Inter, system-ui, sans-serif',size:13,weight:'600'},plugins:{legend:{display:false},datalabels:{font:{family:'Plus Jakarta Sans, Inter, system-ui, sans-serif',size:12,weight:'800'},color:'#1E293B',anchor:'end',align:'end',offset:5}},scales:{x:{beginAtZero:true,grace:'8%',ticks:{precision:0,color:'#475569',font:{family:'Plus Jakarta Sans, Inter, system-ui, sans-serif',size:11,weight:'600'}},grid:{color:'rgba(148,163,184,.18)'}},y:{ticks:{autoSkip:false,color:'#334155',font:{family:'Plus Jakarta Sans, Inter, system-ui, sans-serif',size:12,weight:'700'},padding:8},grid:{display:false}}}},null,'Question 6 — one primary improvement theme per student','Each student/class combination is counted once. All parent submissions for that student remain available in the drill-down.',function(di,idx){return idx===null?suggestions:(q6KeywordGroups[idx]?q6KeywordGroups[idx].docs:[]);});
-    (function wireQ6DirectBarClick(){
-      var canvas=$('av-q6-kw-chart');
-      if(!canvas||canvas.dataset.q6DirectClickBound==='1')return;
-      canvas.dataset.q6DirectClickBound='1';
-      canvas.style.cursor='pointer';
-      canvas.addEventListener('click',function(evt){
-        var activeChart=charts['av-q6-kw-chart'];
-        if(!activeChart||typeof activeChart.getElementsAtEventForMode!=='function')return;
-        var hits=activeChart.getElementsAtEventForMode(evt,'nearest',{intersect:true},true);
-        if(!hits||!hits.length)return;
-        var index=hits[0].index;
-        var group=q6KeywordGroups[index];
-        if(!group||!group.docs.length)return;
-        openDrill('Question 6 — '+group.label,
-          'One primary improvement theme per student. All parent submissions for students in this theme are shown.',
-          group.docs);
-      });
-    })();
+    chart('av-q6-kw-chart','bar',
+      {labels:q6KeywordGroups.map(function(x){return x.label;}),
+       datasets:[{label:'Unique students assigned to primary theme',
+         data:q6KeywordGroups.map(function(x){return x.count;}),
+         backgroundColor:'#1E4FD8',borderColor:'#1E4FD8',
+         borderRadius:7,maxBarThickness:32,barPercentage:0.88,categoryPercentage:0.82}]},
+      {indexAxis:'y',interaction:{mode:'nearest',intersect:true},
+       layout:{padding:{left:14,right:30,top:12,bottom:10}},
+       plugins:{legend:{display:false},
+         datalabels:{display:function(ctx){return Number(ctx.dataset.data[ctx.dataIndex]||0)>0;},
+           font:{family:'Inter, sans-serif',size:12,weight:'700'},
+           color:'#1E293B',anchor:'end',align:'end',offset:7,clamp:true,clip:false}},
+       scales:{
+         x:{beginAtZero:true,grace:'10%',ticks:{precision:0,color:'#475569',
+           font:{family:'Inter, sans-serif',size:11,weight:'600'},padding:7},
+           grid:{color:'rgba(148,163,184,.20)'},border:{display:false}},
+         y:{ticks:{autoSkip:false,color:'#334155',
+           font:{family:'Inter, sans-serif',size:12,weight:'600'},padding:10},
+           grid:{display:false},border:{display:false}}
+       }},
+      function(di,idx){return q6KeywordGroups[idx]?q6KeywordGroups[idx].docs:[];},
+      'Question 6 — one primary improvement theme per student',
+      'Each student/class combination is counted once. All parent submissions for that student remain available in the drill-down.',
+      function(di,idx){return idx===null?suggestions:(q6KeywordGroups[idx]?q6KeywordGroups[idx].docs:[]);}
+    );
     chart('av-enjoy-kw-chart','bar',{labels:enjoyKw.map(function(x){return x.label;}),datasets:[{label:'Parent comments mentioning keyword group',data:enjoyKw.map(function(x){return x.count;}),backgroundColor:'#15966D'}]},{indexAxis:'y',scales:{x:{beginAtZero:true,ticks:{precision:0}}}},function(di,idx){return enjoyKw[idx].docs;},'Question 5 — what parents enjoyed','Grouped keyphrases with related expressions; counts are comments, not raw word frequency',function(di,idx){return idx===null?enjoyed:enjoyKw[idx].docs;});
     function q6SentimentCard(label,docs){
       var pct=totalResponses?((docs.length/totalResponses)*100).toFixed(1):'0.0';
