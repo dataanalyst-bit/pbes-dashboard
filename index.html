@@ -4525,7 +4525,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
       <div class="au-sec">
         <h3>Parent voice — NLP & sentiment analytics</h3>
-        <div class="sub">Question 5 is used only for grouped enjoyment keywords. Question 6 is the sole source for satisfied/not satisfied classification. Every drill-down shows the matched parent, student, contact, ratings and both written answers.</div>
+        <div class="sub">Question 5 is used only for grouped enjoyment keywords. Satisfied/not satisfied is calculated using Seating, Performances, Staff support, Overall ratings and the Question 6 remark. Every drill-down shows the matched parent, student, contact, ratings and both written answers.</div>
         <div id="av-nlp-summary"></div>
         <div class="av-chart-grid av-nlp-grid">
           <div class="av-chart-card"><div class="av-chart-head"><h4>Overall rating distribution</h4><button type="button" onclick="window.avExpandChart('av-dist-chart')">Expand ↗</button></div><canvas id="av-dist-chart"></canvas></div>
@@ -42635,34 +42635,59 @@ window.T1 = (function () {
     var polarity=rawScore/Math.max(1,Math.sqrt(tokens.length));
     return {polarity:polarity,label:polarity>=0.18?'Positive':(polarity<=-0.18?'Negative':'Neutral')};
   }
-  function classifySuggestion(r){
+  function classifySatisfaction(r){
     var text=String(r&&r[7]||'').replace(/\s+/g,' ').trim();
-    if(!validText(text))return {label:'No comment',polarity:0,reason:'No substantive Question 6 response'};
+    var ratings=[2,3,4,5].map(function(i){return score(r&&r[i]);}).filter(Number.isFinite);
+    var allFour=ratings.length===4;
+    var allHigh=ratings.length>0&&ratings.every(function(v){return v>=4;});
+    var lowCount=ratings.filter(function(v){return v<=3;}).length;
     var t=text.toLowerCase();
 
-    // First identify explicit dissatisfaction or a clear request for change.
-    // Neutral topic words (arrangement, food, seating, staff, audio/video) are
-    // not negative by themselves; they need an actual concern/request context.
-    var concernPattern=/\b(technical issues?|issues?|problems?|poor|bad|worst|unacceptable|disappoint(?:ed|ing)?|not good|not enough|lack(?:ing)?|need(?:s|ed)?|should|must|please (?:improve|provide|arrange|change|increase|reduce)|improv(?:e|ement)|better|provide|arrange for|change|avoid|reduce|increase|more|less|delay(?:ed)?|late|difficult(?:y)?|uncomfortable|unsafe|safety concern|crowd(?:ed|ing)?|pushing|confus(?:ion|ing)|traffic|parking problem|not satisfied|cannot|can't|didn't|don't)\b/i;
-    if(concernPattern.test(t))return {label:'Not satisfied',polarity:-1,reason:'Question 6 contains a clear concern or improvement request'};
+    // Explicit no-problem / no-change wording is positive, even when the
+    // sentence contains words such as "issue" or "improvement".
+    var noConcernPattern=/\b(no|none|nothing|not any)\s+(?:further\s+)?(?:issues?|problems?|complaints?|changes?|improvements?|suggestions?)\b|\bno need to improve\b|\bnothing to (?:improve|change|fix)\b|\beverything (?:is|was) (?:good|great|fine|excellent)\b|\ball good\b|\bkeep it up\b|\bcontinue the same\b/i;
+    if(validText(text)&&noConcernPattern.test(t)){
+      return {label:'Satisfied',polarity:1,reason:'The parent reports no further concerns or changes'};
+    }
 
-    // Appreciation and positive experience take precedence over neutral topic
-    // words. This correctly handles praise that mentions event arrangements.
-    var praisePattern=/\b(enjoy(?:ed|ing)?|phenomenal|wonderful|excellent|amazing|fantastic|great|good|beautiful|lovely|memorable|appreciat(?:e|ed)|satisfied|happy|perfect|awesome|thank(?:s|ful)?)\b/i;
-    if(praisePattern.test(t))return {label:'Satisfied',polarity:1,reason:'Positive appreciation in Question 6'};
+    // A clear, specific concern in Q6 overrides high scores because it
+    // identifies a problem the parent still wants addressed.
+    var concernPattern=/\b(technical issue|technical issues|issue|issues|problem|problems|poor|bad|worst|unacceptable|disappoint(?:ed|ing)?|not good|not enough|lack(?:ing)?|need(?:s|ed) to (?:improve|change|fix|provide)|should (?:improve|change|provide|arrange|increase|reduce)|must (?:improve|change|provide)|please (?:improve|fix|change|provide|arrange|increase|reduce)|improvement needed|room for improvement|could improve|delay(?:ed)?|late|difficult(?:y)?|uncomfortable|unsafe|safety concern|crowd(?:ed|ing)?|pushing|confus(?:ion|ing)|not satisfied|cannot|can't|didn't|don't|less sound|sound quality|mic(?:rophone)? issue|projector issue|parking problem)\b/i;
+    if(validText(text)&&concernPattern.test(t)){
+      return {label:'Not satisfied',polarity:-1,reason:'A specific concern or improvement request appears in Question 6'};
+    }
 
-    var noChangePattern=/^(nothing|none|nil|no|no suggestions?|no further suggestions?|no changes?|no improvements?|nothing to improve|nothing to change|nothing to add|everything (is |was )?(good|great|fine|excellent)|all (is |was )?(good|fine)|all good|no issues|no complaints|very good|excellent|great|satisfied|happy|keep it up|continue the same)[.!\\s]*$/i;
-    if(noChangePattern.test(t))return {label:'Satisfied',polarity:1,reason:'No improvement requested'};
+    // Explicit positive remarks should not be incorrectly placed in the
+    // Not satisfied group merely because a neutral word appears in the text.
+    var praisePattern=/\b(enjoy(?:ed|ing)?|phenomenal|wonderful|excellent|amazing|fantastic|great|good|beautiful|lovely|memorable|appreciat(?:e|ed)|satisfied|happy|perfect|awesome|thank(?:s|ful)?|well organised|well organized|smoothly conducted)\b/i;
+    if(validText(text)&&praisePattern.test(t)){
+      return {label:'Satisfied',polarity:1,reason:'Positive appreciation in Question 6'};
+    }
 
+    // Ratings are the primary measure: all four areas must be 4/5 or 5/5
+    // for a rating-based Satisfied result. A 1–3 score in any area is a
+    // Not satisfied signal unless Q6 clearly records positive appreciation.
+    if(allHigh)return {label:'Satisfied',polarity:1,reason:allFour?'All four ratings are 4/5 or 5/5':'All available ratings are 4/5 or 5/5'};
+    if(ratings.length){
+      return {label:'Not satisfied',polarity:-1,reason:lowCount+' of '+ratings.length+' available rating areas are 1–3 out of 5'};
+    }
+
+    if(!validText(text))return {label:'Not classified',polarity:0,reason:'No ratings or Question 6 comment'};
     var lex=sentiment(text);
     if(lex.label==='Positive')return {label:'Satisfied',polarity:Math.max(0.25,lex.polarity),reason:'Positive wording in Question 6'};
     if(lex.label==='Negative')return {label:'Not satisfied',polarity:Math.min(-0.25,lex.polarity),reason:'Negative wording in Question 6'};
     return {label:'Not satisfied',polarity:-0.2,reason:'Substantive suggestion; review recommended'};
   }
+  function makeSatisfactionDocs(list){
+    return list.map(function(r,i){
+      var s=classifySatisfaction(r);
+      return {row:r,rowIndex:i,grade:r[0],band:gradeBand(r[0]),type:'Overall satisfaction',text:validText(r[7])?String(r[7]):'No Question 6 comment',polarity:s.polarity,sentiment:s.label,reason:s.reason};
+    });
+  }
   function makeDocs(list,idx,type){
     var out=[];
     list.forEach(function(r,i){var text=String(r[idx]||'').replace(/\s+/g,' ').trim();if(!validText(text))return;
-      var s=(idx===7)?classifySuggestion(r):sentiment(text);
+      var s=(idx===7)?classifySatisfaction(r):sentiment(text);
       out.push({row:r,rowIndex:i,grade:r[0],band:gradeBand(r[0]),type:type,text:text,polarity:s.polarity,sentiment:s.label,reason:s.reason||''});
     });
     return out;
@@ -42828,10 +42853,11 @@ window.T1 = (function () {
     // Improvement priority is response-level: parents who rated staff support
     // and coordination 1–3 out of 5. The denominator is ALL submitted responses.
     var improvementRows=a.filter(function(r){var v=score(r[4]);return Number.isFinite(v)&&v<=3;});
-    // Q6 alone determines sentiment. Each response is counted once; blank Q6
-    // responses remain in the overall-response denominator but not sentiment counts.
-    var positiveParents=suggestions.filter(function(d){return d.sentiment==='Satisfied';});
-    var negativeParents=suggestions.filter(function(d){return d.sentiment==='Not satisfied';});
+    // Satisfaction uses all four rating areas plus the Q6 remark. Every
+    // submitted parent response is evaluated once; percentages use all records.
+    var satisfactionDocs=makeSatisfactionDocs(a);
+    var positiveParents=satisfactionDocs.filter(function(d){return d.sentiment==='Satisfied';});
+    var negativeParents=satisfactionDocs.filter(function(d){return d.sentiment==='Not satisfied';});
     var enjoyKw=extractEnjoyKeywords(enjoyed),improveThemes=themeCounts(suggestions,SUGGEST_THEMES),enjoyThemes=themeCounts(enjoyed,ENJOY_THEMES);
     $('av-meta').textContent=n+' live parent responses · '+(raw.source||'PBES-All Reports 2026-27')+' · Bachupally';
     $('av-kpis').innerHTML=[
@@ -42846,9 +42872,12 @@ window.T1 = (function () {
     window.avKpiDrill=function(i){var ds=window.__avKpiDocs[i]||[];var docs=ds.length&&ds[0].row?ds:ds.map(function(r){return {row:r,grade:r[0],type:'Rating response',text:'Seating '+r[2]+' · Performance '+r[3]+' · Staff '+r[4]+' · Overall '+r[5],sentiment:'Rating record',polarity:0};});openDrill(['All responses','Overall ratings 4–5','Performance ratings 4–5','Staff support ratings 1–3 — improvement priority','Enjoyment comments','Suggestion comments'][i],'Tap a record to inspect the underlying response. Percentages use all '+totalResponses+' submitted responses.',docs);};
     $('av-groups').innerHTML='<div class="av-table-wrap"><table class="av-table"><thead><tr><th>Grade group</th><th>Responses</th><th>Seating</th><th>Performances</th><th>Staff support</th><th>Overall</th><th>Overall 4–5</th></tr></thead><tbody>'+
       BAND_ORDER.map(function(b){var x=bs[b],pct=x.overall.length?Math.round(x.overall.filter(function(v){return v>=4;}).length/x.overall.length*100):0;return '<tr class="av-tap-row" tabindex="0" onclick="window.avGroupDrill(\''+b+'\')"><td><b>'+b+'</b></td><td>'+x.n+'</td>'+x.means.map(function(v){return '<td>'+v.toFixed(2)+'</td>';}).join('')+'<td><span class="av-pill">'+pct+'%</span></td></tr>';}).join('')+'</tbody></table></div><div class="av-tap-hint">Tap a grade group to view its underlying feedback.</div>';
-    window.avGroupDrill=function(b){var selected=a.filter(function(r){return gradeBand(r[0])===b;});var ds=selected.map(function(r){var t='Seating: '+(r[2]==null?'—':r[2])+'/5 · Student performances: '+(r[3]==null?'—':r[3])+'/5 · Staff support: '+(r[4]==null?'—':r[4])+'/5 · Overall: '+(r[5]==null?'—':r[5])+'/5\\nEnjoyed: '+(r[6]||'—')+'\\nSuggestion: '+(r[7]||'—');var s=sentiment((r[6]||'')+' '+(r[7]||''));return {row:r,grade:r[0],type:'Grade-group response',text:t,sentiment:classifySuggestion(r).label,polarity:classifySuggestion(r).polarity};});openDrill(b+' — feedback detail',selected.length+' source records',ds);};
+    window.avGroupDrill=function(b){var selected=a.filter(function(r){return gradeBand(r[0])===b;});var ds=selected.map(function(r){var t='Seating: '+(r[2]==null?'—':r[2])+'/5 · Student performances: '+(r[3]==null?'—':r[3])+'/5 · Staff support: '+(r[4]==null?'—':r[4])+'/5 · Overall: '+(r[5]==null?'—':r[5])+'/5\\nEnjoyed: '+(r[6]||'—')+'\\nSuggestion: '+(r[7]||'—');var s=sentiment((r[6]||'')+' '+(r[7]||''));return {row:r,grade:r[0],type:'Grade-group response',text:t,sentiment:classifySatisfaction(r).label,polarity:classifySatisfaction(r).polarity};});openDrill(b+' — feedback detail',selected.length+' source records',ds);};
     var dist=[1,2,3,4,5].map(function(s){return overall.filter(function(v){return v===s;}).length;});
-    chart('av-dist-chart','doughnut',{labels:['1 · Needs improvement','2 · Average','3 · Good','4 · Very good','5 · Outstanding'],datasets:[{data:dist,backgroundColor:['#D94848','#E78A43','#E9C34A','#4C9AD8','#15966D']}]},{},function(di,idx){var v=idx+1;return a.filter(function(r){return score(r[5])===v;}).map(function(r){var s=classifySuggestion(r);return {row:r,grade:r[0],type:'Overall rating '+v,text:'Enjoyed: '+(r[6]||'—')+' | Suggestion: '+(r[7]||'—'),sentiment:s.label,polarity:s.polarity};});},'Overall rating distribution','Overall event ratings',function(di,idx){if(idx===null)return a.map(function(r){return {row:r,grade:r[0],type:'Rating record',text:'Overall rating: '+r[5]+' / 5 · Enjoyed: '+(r[6]||'—')+' · Suggestion: '+(r[7]||'—'),sentiment:'Rating record',polarity:0};});var v=idx+1;return a.filter(function(r){return score(r[5])===v;}).map(function(r){var s=classifySuggestion(r);return {row:r,grade:r[0],type:'Overall rating '+v,text:'Enjoyed: '+(r[6]||'—')+' | Suggestion: '+(r[7]||'—'),sentiment:s.label,polarity:s.polarity};});});
+    chart('av-dist-chart','doughnut',{labels:['1 · Needs improvement','2 · Average','3 · Good','4 · Very good','5 · Outstanding'],datasets:[{data:dist,backgroundColor:['#D94848','#E78A43','#E9C34A','#4C9AD8','#15966D']}]},{plugins:{
+      legend:{position:'bottom',labels:{color:'#263449',padding:18,boxWidth:14,boxHeight:14,font:{family:'Plus Jakarta Sans, Inter, sans-serif',size:13,weight:'700'}}},
+      datalabels:{display:function(ctx){return Number(ctx.dataset.data[ctx.dataIndex]||0)>0;},color:'#FFFFFF',anchor:'center',align:'center',font:{family:'Plus Jakarta Sans, Inter, sans-serif',size:14,weight:'800'},textStrokeColor:'rgba(15,23,42,.45)',textStrokeWidth:3,formatter:function(v){return Number(v)>0?String(v):'';}}
+    }},function(di,idx){var v=idx+1;return a.filter(function(r){return score(r[5])===v;}).map(function(r){var s=classifySatisfaction(r);return {row:r,grade:r[0],type:'Overall rating '+v,text:'Enjoyed: '+(r[6]||'—')+' | Suggestion: '+(r[7]||'—'),sentiment:s.label,polarity:s.polarity};});},'Overall rating distribution','Overall event ratings',function(di,idx){if(idx===null)return a.map(function(r){return {row:r,grade:r[0],type:'Rating record',text:'Overall rating: '+r[5]+' / 5 · Enjoyed: '+(r[6]||'—')+' · Suggestion: '+(r[7]||'—'),sentiment:'Rating record',polarity:0};});var v=idx+1;return a.filter(function(r){return score(r[5])===v;}).map(function(r){var s=classifySatisfaction(r);return {row:r,grade:r[0],type:'Overall rating '+v,text:'Enjoyed: '+(r[6]||'—')+' | Suggestion: '+(r[7]||'—'),sentiment:s.label,polarity:s.polarity};});});
     // Q6 keyword analysis: group by student + class first, then assign each
     // student to ONE best-fit theme. Multiple parent submissions for the same
     // student stay together in one bar; the drill-down retains every source row.
@@ -42887,10 +42916,10 @@ window.T1 = (function () {
     $('av-nlp-summary').innerHTML=
       '<div class="av-nlp-summary-grid">'+
         '<div><h4>Question 5 · What parents enjoyed</h4><p>'+enjoyed.length+' substantive responses. Related expressions are grouped into meaningful keyword clusters; one comment may match more than one cluster.</p></div>'+
-        '<div><h4>Question 6 · Suggestions for improvement — satisfaction analysis</h4><p>'+suggestions.length+' substantive responses classified. Percentages use all '+totalResponses+' submitted responses.</p><div class="av-sentiment-cards">'+q6SentimentCard('Satisfied',positiveParents)+q6SentimentCard('Not satisfied',negativeParents)+'</div></div>'+
+        '<div><h4>Overall parent satisfaction — four ratings and remarks</h4><p>'+satisfactionDocs.filter(function(d){return d.sentiment!=="Not classified";}).length+' responses classified using all four ratings and Question 6 remarks. Percentages use all '+totalResponses+' submitted responses.</p><div class="av-sentiment-cards">'+q6SentimentCard('Satisfied',positiveParents)+q6SentimentCard('Not satisfied',negativeParents)+'</div></div>'+
       '</div>'+
       '';
-    window.avQ6SentDrill=function(label){var ds=label==='Satisfied'?positiveParents:negativeParents;openDrill('Question 6 — '+label+' parent responses','Question 6 responses only.',ds);};
+    window.avQ6SentDrill=function(label){var ds=label==='Satisfied'?positiveParents:negativeParents;openDrill('Overall parent satisfaction — '+label+' records','Classification uses all four rating areas and the Question 6 remark. One record per submitted response.',ds);};
     var topTheme=improveThemes[0],staffLow=a.filter(function(r){return score(r[4])<=3;}).length;
     $('av-actions').innerHTML=
       '<div class="av-action"><strong>1. Preserve the strongest experience — student performances</strong>Performance and dance were the most frequently identified enjoyment topic ('+enjoyThemes.filter(function(x){return x.label==='Student performances & dance';}).reduce(function(s,x){return s+x.count;},0)+' comments matched this theme). Retain student participation and stage opportunities.</div>'+
