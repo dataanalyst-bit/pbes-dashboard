@@ -18505,16 +18505,69 @@ function exExportPDF() {
   var w = window.open('', '_blank');
   if (!w) { alert('Please allow pop-ups to print or save this report as PDF.'); return; }
   var esc = function (v) { return exExportCell(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
-  var table = '<table><thead><tr>' + s.columns.map(function (c) {
-    return '<th>' + esc(c.label) + '</th>';
-  }).join('') + '</tr></thead><tbody>' + s.rows.map(function (r) {
-    return '<tr>' + s.columns.map(function (c) { return '<td>' + esc(r[c.key]) + '</td>'; }).join('') + '</tr>';
-  }).join('') + '</tbody></table>';
+  var cmp = s.pdfComparison;
+  var table = '';
+  var reportNote = '';
+
+  if (cmp && Array.isArray(cmp.rows) && Array.isArray(cmp.subjects)) {
+    var subjects = cmp.subjects;
+    var ptCols = ['Average %'].concat(subjects.map(function (sj) { return sj + ' %'; }));
+    var hyCols = ['Average %'].concat(subjects.map(function (sj) { return sj + ' %'; }));
+    var fixed = [
+      {key:'student',label:'Student'},
+      {key:'admission',label:'Admission no.'},
+      {key:'grade',label:'Grade'},
+      {key:'section',label:'Section'},
+      {key:'teacher',label:'Class teacher'}
+    ];
+    var headTop = '<tr>' + fixed.map(function (c) {
+      return '<th rowspan="2" class="fixed">' + esc(c.label) + '</th>';
+    }).join('') +
+      '<th colspan="' + ptCols.length + '" class="ptgroup">PT-1</th>' +
+      '<th colspan="' + hyCols.length + '" class="hygroup">Half Yearly / Mid Term</th></tr>';
+    var headBottom = '<tr>' +
+      ptCols.map(function (c) { return '<th class="ptsub">' + esc(c) + '</th>'; }).join('') +
+      hyCols.map(function (c) { return '<th class="hysub">' + esc(c) + '</th>'; }).join('') +
+      '</tr>';
+    var pct = function (r, key) {
+      if (!r) return '—';
+      var val = key === 'Average %' ? r.pct : (r.per && r.per[key.replace(/ %$/, '')]);
+      return val == null || val === '' || !isFinite(Number(val)) ? '—' : Number(val).toFixed(1) + '%';
+    };
+    var bodyRows = cmp.rows.map(function (r) {
+      var cells = [
+        '<td class="student">' + esc(r.student) + '</td>',
+        '<td>' + esc(r.admission || '—') + '</td>',
+        '<td>' + esc(r.grade || '—') + '</td>',
+        '<td>' + esc(r.section || '—') + '</td>',
+        '<td>' + esc(r.teacher || '—') + '</td>'
+      ];
+      ptCols.forEach(function (c) { cells.push('<td class="ptval">' + esc(pct(r.pt1, c)) + '</td>'); });
+      hyCols.forEach(function (c) { cells.push('<td class="hyval">' + esc(pct(r.half, c)) + '</td>'); });
+      return '<tr>' + cells.join('') + '</tr>';
+    }).join('');
+    var pctColCount = ptCols.length + hyCols.length;
+    var pctColWidth = (58 / pctColCount).toFixed(3);
+    var colgroup = '<colgroup><col style="width:17%"><col style="width:7%"><col style="width:5%"><col style="width:5%"><col style="width:8%">' +
+      Array(pctColCount).fill('<col style="width:' + pctColWidth + '%">').join('') + '</colgroup>';
+    table = '<table class="paired">' + colgroup + '<thead>' + headTop + headBottom + '</thead><tbody>' + bodyRows + '</tbody></table>';
+    reportNote = '<div class="method">Paired by admission number where available. Where an admission number is missing in one sitting, a unique child-name + grade + section match is used. Ambiguous or unmatched records are shown separately with the other sitting left blank; no marks are inferred.</div>';
+  } else {
+    table = '<table><thead><tr>' + s.columns.map(function (c) {
+      return '<th>' + esc(c.label) + '</th>';
+    }).join('') + '</tr></thead><tbody>' + s.rows.map(function (r) {
+      return '<tr>' + s.columns.map(function (c) { return '<td>' + esc(r[c.key]) + '</td>'; }).join('') + '</tr>';
+    }).join('') + '</tbody></table>';
+  }
+
+  var countLine = cmp
+    ? 'PT-1: ' + cmp.ptCount + ' · Half yearly: ' + cmp.halfCount + ' · Matched students: ' + cmp.matchedCount + ' · Comparison rows: ' + cmp.rows.length
+    : s.rows.length.toLocaleString('en-IN') + ' records';
   w.document.open();
   w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>' + esc(s.title) +
-    '</title><style>@page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{font:11px Arial,sans-serif;color:#172033}h1{font-size:18px;margin:0 0 5px}p{font-size:10px;color:#526176;margin:0 0 14px}table{width:100%;border-collapse:collapse}th{background:#EAF0FB;color:#173A75;font-weight:700;text-align:left}th,td{border:1px solid #D5DCE8;padding:5px 6px;vertical-align:top}tr{break-inside:avoid}thead{display:table-header-group}tfoot{display:table-footer-group}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body><h1>' +
+    '</title><style>@page{size:A3 landscape;margin:9mm}*{box-sizing:border-box}body{font:8px Arial,sans-serif;color:#172033}h1{font-size:17px;margin:0 0 4px}p{font-size:9px;color:#526176;margin:0 0 10px}.method{font-size:7px;color:#526176;margin:8px 0 0;line-height:1.35}table{width:100%;border-collapse:collapse;table-layout:fixed}th{background:#EAF0FB;color:#173A75;font-weight:700;text-align:center}th,td{border:1px solid #D5DCE8;padding:3px 3px;vertical-align:middle;overflow-wrap:anywhere}tr{break-inside:avoid}thead{display:table-header-group}tbody tr:nth-child(even){background:#F7F9FC}.paired{font-size:7px}.paired th{font-size:7px}.paired td{text-align:center;white-space:nowrap}.paired td.student{text-align:left;font-weight:700;white-space:normal}.paired th.fixed{text-align:left}.paired .ptgroup,.paired .ptsub{background:#E8F1FF;color:#16458B}.paired .hygroup,.paired .hysub{background:#E8F5EE;color:#176344}.paired td.ptval{background:#F7FAFF}.paired td.hyval{background:#F5FBF7}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body><h1>' +
     esc(s.title) + '</h1><p>' + esc(s.sub) + ' · Generated ' + new Date().toLocaleString() +
-    ' · ' + s.rows.length.toLocaleString('en-IN') + ' records</p>' + table +
+    ' · ' + esc(countLine) + '</p>' + table + reportNote +
     '<script>window.onload=function(){window.focus();window.print();};<\/script></body></html>');
   w.document.close();
 }
@@ -18558,8 +18611,8 @@ function _exRollTable(rows, sj) {
 
    Both sittings sit under ONE set of names, because there is one roster. The
    Class & Subject Teachers tab and the PT-1 mark sheet are current snapshots,
-   not a record of who taught in October and who taught in December, so an
-   October column beside a December one would invent a change the data cannot
+   not a record of who taught in PT-1 sitting and who taught in Half Yearly / Mid Term sitting, so an
+   PT-1 sitting column beside a Half Yearly / Mid Term sitting one would invent a change the data cannot
    see \u2014 and "A \u2192 B" printed next to a fall is how a teacher gets blamed for
    a handover that never happened. A branch or a stage covers too many rooms to
    name, so past four it says how many. */
@@ -18586,8 +18639,8 @@ function _exUnitList(units) {
 
      Both sittings are shown under ONE set of names, because there is one
      roster — the Class & Subject Teachers tab is a current snapshot, not a
-     record of who taught in October and who taught in December. Printing an
-     October column beside a December one would therefore invent a change
+     record of who taught in PT-1 sitting and who taught in Half Yearly / Mid Term sitting. Printing an
+     PT-1 sitting column beside a Half Yearly / Mid Term sitting one would therefore invent a change
      the data cannot see, and a row reading "A \u2192 B" next to a fall is
      exactly the sort of thing that gets a teacher blamed for a handover that
      never happened. A class-level row can still cover more rooms in one
@@ -18683,15 +18736,78 @@ function exView(id) {
       studentRows.push(x);
     });
   }
-  addSittingRows(a, 'October · PT-1');
-  addSittingRows(b, 'December · Half yearly');
+  addSittingRows(a, 'PT-1');
+  addSittingRows(b, 'Half Yearly / Mid Term');
   var studentKeys = ['Sitting','Branch','Curriculum','Student','Admission no.','Grade','Section',
     'Class teacher','Subject teacher(s)','Subjects','Average %'].concat(subjects.map(function (sj) { return sj + ' %'; }));
   var studentCols = studentKeys.map(function (k) { return {key:k,label:k}; });
   openHTMLModal(P.title, (P.sub ? P.sub + ' · ' : '') + 'both sittings',
-    hd('October · PT-1', a.length, P.pa) + _exRollTable(a, P.sj) +
-    hd('December · Half yearly', b.length, P.pb) + _exRollTable(b, P.sj));
+    hd('PT-1', a.length, P.pa) + _exRollTable(a, P.sj) +
+    hd('Half Yearly / Mid Term', b.length, P.pb) + _exRollTable(b, P.sj));
   exEnableExports(P.title, (P.sub ? P.sub + ' · ' : '') + 'both sittings', studentRows, studentCols);
+
+  /* PDF-only paired comparison: one child per row, with PT-1 and Half-yearly
+     subject percentages in adjacent columns. Pair by admission number where
+     available; if one sitting has no admission number, use a unique
+     normalized name + grade + section match. Never guess an ambiguous match. */
+  function normStudentPart(v) {
+    return String(v == null ? '' : v).toUpperCase()
+      .replace(/[^A-Z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  function studentMatchKey(r) {
+    return [normStudentPart(r.nm), normStudentPart(r.gr), normStudentPart(r.sec0)].join('|');
+  }
+  var halfById = {}, halfByName = {};
+  b.forEach(function (r, ix) {
+    var id = String(r.id == null ? '' : r.id).trim();
+    if (id) (halfById[id] || (halfById[id] = [])).push(ix);
+    var nk = studentMatchKey(r);
+    if (nk.replace(/\|/g, '')) (halfByName[nk] || (halfByName[nk] = [])).push(ix);
+  });
+  var usedHalf = {};
+  var pairedRows = [];
+  function makePairRow(left, right) {
+    var row = {
+      student: (left && left.nm) || (right && right.nm) || '(no name)',
+      admission: (left && left.id) || (right && right.id) || '',
+      grade: (left && left.gr) || (right && right.gr) || '',
+      section: (left && left.sec0) || (right && right.sec0) || '',
+      teacher: (left && left.tch) || (right && right.tch) || '',
+      pt1: left || null,
+      half: right || null
+    };
+    return row;
+  }
+  a.forEach(function (left) {
+    var matchIx = -1;
+    var id = String(left.id == null ? '' : left.id).trim();
+    if (id && halfById[id]) {
+      var idChoices = halfById[id].filter(function (ix) { return !usedHalf[ix]; });
+      if (idChoices.length === 1) matchIx = idChoices[0];
+    }
+    if (matchIx < 0) {
+      var nameChoices = (halfByName[studentMatchKey(left)] || [])
+        .filter(function (ix) {
+          if (usedHalf[ix]) return false;
+          var rightId = String(b[ix].id == null ? '' : b[ix].id).trim();
+          return !id || !rightId;
+        });
+      if (nameChoices.length === 1) matchIx = nameChoices[0];
+    }
+    var right = matchIx >= 0 ? b[matchIx] : null;
+    if (matchIx >= 0) usedHalf[matchIx] = true;
+    pairedRows.push(makePairRow(left, right));
+  });
+  b.forEach(function (right, ix) {
+    if (!usedHalf[ix]) pairedRows.push(makePairRow(null, right));
+  });
+  window.__exExportState.pdfComparison = {
+    rows: pairedRows,
+    subjects: subjects.slice(),
+    ptCount: a.length,
+    halfCount: b.length,
+    matchedCount: pairedRows.filter(function (r) { return r.pt1 && r.half; }).length
+  };
 }
 
 function _admNum(n) { return (n == null ? 0 : n).toLocaleString('en-IN'); }
@@ -19073,7 +19189,7 @@ function _exRenderCompare() {
     'Section', { what: 'Section' });
 
   /* 4 · SUBJECT.
-     A subject sat by 20 children in October and 1,398 in December is not a
+     A subject sat by 20 children in PT-1 sitting and 1,398 in Half Yearly / Mid Term sitting is not a
      subject that improved, it is a subject that was barely entered the first
      time — and left in the ranking it heads the table as the school's biggest
      gain. Those are held out and named underneath instead. */
@@ -19102,8 +19218,8 @@ function _exRenderCompare() {
   if (subThin.length) {
     h += '<div class="au-note" style="margin:-8px 0 14px;padding:0 4px"><b>Left out of the subject ' +
       'table:</b> ' + subThin.map(function (x) {
-        return e(x.k) + ' (' + _admNum(x.na) + ' children in October, ' + _admNum(x.nb) +
-               ' in December)'; }).join(' · ') +
+        return e(x.k) + ' (' + _admNum(x.na) + ' children in PT-1 sitting, ' + _admNum(x.nb) +
+               ' in Half Yearly / Mid Term sitting)'; }).join(' · ') +
       '. Fewer than half as many children sat it at one sitting as at the other, so the two ' +
       'averages are not describing the same thing and the change between them would be ' +
       'misleading.</div>';
