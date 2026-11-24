@@ -18529,10 +18529,14 @@ function exExportPDF() {
       ptCols.map(function (c) { return '<th class="ptsub">' + esc(c) + '</th>'; }).join('') +
       hyCols.map(function (c) { return '<th class="hysub">' + esc(c) + '</th>'; }).join('') +
       '</tr>';
-    var pct = function (r, key) {
-      if (!r) return '—';
+    var pctNumber = function (r, key) {
+      if (!r) return null;
       var val = key === 'Average %' ? r.pct : (r.per && r.per[key.replace(/ %$/, '')]);
-      return val == null || val === '' || !isFinite(Number(val)) ? '—' : Number(val).toFixed(1) + '%';
+      return val == null || val === '' || !isFinite(Number(val)) ? null : Number(val);
+    };
+    var pct = function (r, key) {
+      var val = pctNumber(r, key);
+      return val == null ? '—' : val.toFixed(1) + '%';
     };
     var bodyRows = cmp.rows.map(function (r) {
       var cells = [
@@ -18542,8 +18546,19 @@ function exExportPDF() {
         '<td>' + esc(r.section || '—') + '</td>',
         '<td>' + esc(r.teacher || '—') + '</td>'
       ];
-      ptCols.forEach(function (c) { cells.push('<td class="ptval">' + esc(pct(r.pt1, c)) + '</td>'); });
-      hyCols.forEach(function (c) { cells.push('<td class="hyval">' + esc(pct(r.half, c)) + '</td>'); });
+      ptCols.forEach(function (c) {
+        cells.push('<td class="ptval">' + esc(pct(r.pt1, c)) + '</td>');
+      });
+      hyCols.forEach(function (c) {
+        var before = pctNumber(r.pt1, c);
+        var after = pctNumber(r.half, c);
+        var trend = before == null || after == null ? 'no-compare'
+          : after > before ? 'improved'
+          : after < before ? 'declined' : 'unchanged';
+        var delta = before == null || after == null ? ''
+          : ' title="Change from PT-1: ' + (after - before > 0 ? '+' : '') + (after - before).toFixed(1) + ' percentage points"';
+        cells.push('<td class="hyval ' + trend + '"' + delta + '>' + esc(pct(r.half, c)) + '</td>');
+      });
       return '<tr>' + cells.join('') + '</tr>';
     }).join('');
     var pctColCount = ptCols.length + hyCols.length;
@@ -18551,7 +18566,7 @@ function exExportPDF() {
     var colgroup = '<colgroup><col style="width:17%"><col style="width:7%"><col style="width:5%"><col style="width:5%"><col style="width:8%">' +
       Array(pctColCount).fill('<col style="width:' + pctColWidth + '%">').join('') + '</colgroup>';
     table = '<table class="paired">' + colgroup + '<thead>' + headTop + headBottom + '</thead><tbody>' + bodyRows + '</tbody></table>';
-    reportNote = '<div class="method">Paired by admission number where available. Where an admission number is missing in one sitting, a unique child-name + grade + section match is used. Ambiguous or unmatched records are shown separately with the other sitting left blank; no marks are inferred.</div>';
+    reportNote = '<div class="legend"><strong>Half Yearly / Mid Term compared with PT-1:</strong><span><i class="green"></i> Higher score</span><span><i class="red"></i> Lower score</span><span><i class="grey"></i> Same / not comparable</span></div><div class="method">Green means the Half Yearly / Mid Term percentage is higher than the same student\'s PT-1 percentage for that measure. Red means it is lower. This comparison is shown for the average and each subject. Unmatched or missing marks are not colour-rated.</div><div class="method">Paired by admission number where available. Where an admission number is missing in one sitting, a unique child-name + grade + section match is used. Ambiguous or unmatched records are shown separately; no marks are inferred.</div>';
   } else {
     table = '<table><thead><tr>' + s.columns.map(function (c) {
       return '<th>' + esc(c.label) + '</th>';
@@ -18565,7 +18580,7 @@ function exExportPDF() {
     : s.rows.length.toLocaleString('en-IN') + ' records';
   w.document.open();
   w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>' + esc(s.title) +
-    '</title><style>@page{size:A3 landscape;margin:9mm}*{box-sizing:border-box}body{font:8px Arial,sans-serif;color:#172033}h1{font-size:17px;margin:0 0 4px}p{font-size:9px;color:#526176;margin:0 0 10px}.method{font-size:7px;color:#526176;margin:8px 0 0;line-height:1.35}table{width:100%;border-collapse:collapse;table-layout:fixed}th{background:#EAF0FB;color:#173A75;font-weight:700;text-align:center}th,td{border:1px solid #D5DCE8;padding:3px 3px;vertical-align:middle;overflow-wrap:anywhere}tr{break-inside:avoid}thead{display:table-header-group}tbody tr:nth-child(even){background:#F7F9FC}.paired{font-size:7px}.paired th{font-size:7px}.paired td{text-align:center;white-space:nowrap}.paired td.student{text-align:left;font-weight:700;white-space:normal}.paired th.fixed{text-align:left}.paired .ptgroup,.paired .ptsub{background:#E8F1FF;color:#16458B}.paired .hygroup,.paired .hysub{background:#E8F5EE;color:#176344}.paired td.ptval{background:#F7FAFF}.paired td.hyval{background:#F5FBF7}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body><h1>' +
+    '</title><style>@page{size:A3 landscape;margin:9mm}*{box-sizing:border-box}body{font:8px Arial,sans-serif;color:#172033}h1{font-size:17px;margin:0 0 4px}p{font-size:9px;color:#526176;margin:0 0 10px}.method{font-size:7px;color:#526176;margin:8px 0 0;line-height:1.35}table{width:100%;border-collapse:collapse;table-layout:fixed}th{background:#EAF0FB;color:#173A75;font-weight:700;text-align:center}th,td{border:1px solid #D5DCE8;padding:3px 3px;vertical-align:middle;overflow-wrap:anywhere}tr{break-inside:avoid}thead{display:table-header-group}tbody tr:nth-child(even){background:#F7F9FC}.paired{font-size:7px}.paired th{font-size:7px}.paired td{text-align:center;white-space:nowrap}.paired td.student{text-align:left;font-weight:700;white-space:normal}.paired th.fixed{text-align:left}.paired .ptgroup,.paired .ptsub{background:#E8F1FF;color:#16458B}.paired .hygroup,.paired .hysub{background:#E8F5EE;color:#176344}.paired td.ptval{background:#F7FAFF;color:#334155}\n.paired td.hyval{background:#F5FBF7;font-weight:800}\n.paired td.hyval.improved{color:#047857;background:#DCFCE7}\n.paired td.hyval.declined{color:#B91C1C;background:#FEE2E2}\n.paired td.hyval.unchanged{color:#475569;background:#F1F5F9}\n.paired td.hyval.no-compare{color:#64748B;background:#F8FAFC}\n.legend{display:flex;gap:14px;align-items:center;font-size:8px;margin:0 0 8px;color:#475569}\n.legend span{display:inline-flex;align-items:center;gap:4px}\n.legend i{display:inline-block;width:9px;height:9px;border-radius:2px}\n.legend .green{background:#16A34A}.legend .red{background:#DC2626}.legend .grey{background:#94A3B8}\n@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body><h1>' +
     esc(s.title) + '</h1><p>' + esc(s.sub) + ' · Generated ' + new Date().toLocaleString() +
     ' · ' + esc(countLine) + '</p>' + table + reportNote +
     '<script>window.onload=function(){window.focus();window.print();};<\/script></body></html>');
