@@ -29296,6 +29296,14 @@ function _admTrend() {
      the Walk-in / Digital toggle used by the daily strip. */
   var season = R.season || '2027-28';
   var lastAy = '2026-27';
+  var compareChannelLabel = M.k === 'walk' ? 'Walk-in' : 'Digital';
+  var priorChannelMatch = function (r) {
+    /* Touched Leads already supplies the normalized Channel column used by
+       the Admissions 2026-27 comparison elsewhere in this dashboard. */
+    return M.k === 'walk'
+      ? String(r.Channel || '').trim().toLowerCase() === 'walk-in'
+      : String(r.Channel || '').trim().toLowerCase() !== 'walk-in';
+  };
   var seasonStart = _admSeasonStart(season);
   var priorStart = _admSeasonStart(lastAy);
   var elapsedDay = seasonStart && todayIso ? _admLyDays(seasonStart, todayIso) : -1;
@@ -29315,9 +29323,10 @@ function _admTrend() {
 
   /* Current 2027-28 tracker: all leads, with admissions counted separately. */
   S.rows.forEach(function (r) {
-    if (!r || !r.b) return;
+    if (!r || !r.b || !M.f(r)) return;
     var k = branchKey(r.b);
     if (nowA[k] === undefined) return;
+    /* Same channel filter for both current-year measures. */
     if (inWindow(r.d, seasonStart, currentEnd)) nowL[k]++;
     if (_admIsWon(r) && inWindow(_admWonDay(r), seasonStart, currentEnd)) nowA[k]++;
   });
@@ -29329,14 +29338,16 @@ function _admTrend() {
   var priorRows = (typeof LEAD_DATES !== 'undefined' && Array.isArray(LEAD_DATES))
     ? LEAD_DATES : [];
   priorRows.forEach(function (r) {
-    if (!r || !r.Branch) return;
+    if (!r || !r.Branch || !priorChannelMatch(r)) return;
     var k = branchKey(r.Branch);
     if (wasA[k] === undefined) return;
 
+    /* Channel filter applies to leads and admissions, not just the strip. */
     if (inWindow(r.Date, priorStart, priorEnd)) wasL[k]++;
 
     var stage = String(r.Stage || '').trim().toLowerCase();
     var admitted = stage === '08-admission completed' ||
+                   stage === '08-admission completed'.toLowerCase() ||
                    stage === 'admission completed' ||
                    stage === 'admitted';
     /* Updated is the requested 2026-27 admission date column. */
@@ -29371,13 +29382,13 @@ function _admTrend() {
     '<div class="bp-yoy-metric"><b>' + _admN(totalL) + '</b><span>vs ' + _admN(totalPL) +
     '</span>' + pct(totalL, totalPL) + '</div></div>';
 
-  yoyHtml = '<div class="bp-yoy"><div class="bp-yoy-head"><strong>2027-28 vs 2026-27 · Overall</strong>' +
+  yoyHtml = '<div class="bp-yoy"><div class="bp-yoy-head"><strong>2027-28 vs 2026-27 · ' + compareChannelLabel + '</strong>' +
     '<span>Same elapsed period · as on ' + _admEsc(_admDate(todayIso)) + '</span></div>' +
     '<div class="bp-yoy-cols"><span>Branch</span><span>Admissions · all sources</span>' +
     '<span>Total leads · all channels</span></div>' + branchRows + totalRow +
     '<div class="bp-yoy-note">2027-28: current admissions tracker. 2026-27: Touched Leads. ' +
-    'Admissions are counted by Updated On for 2026-27; leads are counted by Created On. ' +
-    'Both years include all channels and are compared from 1 October through the same elapsed date.</div></div>';
+    'Admissions use Updated On for 2026-27; leads use Created On. ' +
+    'Both years are filtered to ' + compareChannelLabel + ' and compared from 1 October through the same elapsed date.</div></div>';
 
   h += '<div class="bp-ft">' + yoyHtml + '</div></div>';
 
