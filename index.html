@@ -3610,7 +3610,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   <!-- 3. Branch × Month Observation Comparison -->
   <div class="card" style="margin-bottom:16px;"><div class="ch"><h3>📊 Branch × Month Observation Comparison</h3><span class="fnote" id="obs-fn">All Branches · All Months</span></div>
     <div class="cb-0" style="overflow-x:auto"><table class="cdt" id="obs-cdt"><thead><tr>
-      <th>Branch</th><th>Month</th><th>Total Obs</th><th>Principal</th><th>VP</th><th>HM</th><th>HODs</th><th>Coordinators</th><th>Excellent (≥4)</th><th>Satisfactory (3–4)</th><th>Needs Imp (&lt;3)</th><th>Avg Score</th>
+      <th>Branch</th><th>Month</th><th>Total Obs</th><th>Principal</th><th>VP</th><th>HM</th><th>HODs</th><th>Coordinators</th><th>Done</th><th>Shortfall</th><th>Completion %</th><th>Scoring below 3</th>
     </tr></thead><tbody id="obs-tbody"></tbody></table></div>
   </div>
   <div style="margin-bottom:14px;">
@@ -7236,38 +7236,79 @@ function renderObservations(){
     ALLOBS.some(r => r.Month === MO_MAP[name]));
   const tableBranches=fBranch==='ALL'?bBranches:[fBranch];
   const tableMonths=fMonth==='ALL'?MONTHS_OBS:[fMonth];
+
+  // Required observations use the same rule as the Observer Completion chart:
+  // leadership roles = 2 per working day; HODs = 1 per working day.
+  const MC_TABLE=(typeof MONTH_CONFIG!=='undefined'&&MONTH_CONFIG)?MONTH_CONFIG:{};
+  const quotaTable=k=>k==='hods'?1:2;
+  const roleTypesByBranch={};
+  bBranches.forEach(b=>{
+    roleTypesByBranch[b]={principal:new Set(),vp:new Set(),hm:new Set(),hods:new Set(),coords:new Set()};
+    ALLOBS.filter(r=>r.Branch===b).forEach(r=>{
+      const ot=String(r.ObsType||'').trim();
+      if(!ot||ot==='–'||/^nan$/i.test(ot))return;
+      roleTypesByBranch[b][classifyObserver(ot)].add(ot);
+    });
+  });
+
+  // Build a branch + teacher lookup for former employees. Their historical
+  // observation rows remain visible, but they are not included in the
+  // "Scoring below 3" active-teacher count.
+  const AT_LEFT=(typeof ALL_TEACHER!=='undefined'&&Array.isArray(ALL_TEACHER))?ALL_TEACHER:[];
+  const leftTeacherKeys=new Set(AT_LEFT.filter(isLeftTeacher).map(r=>
+    String(r.Branch||'').trim().toLowerCase()+'|'+String(r.Teacher||'').trim().toLowerCase()
+  ));
+  const isActiveObservation=r=>{
+    const key=String(r.Branch||'').trim().toLowerCase()+'|'+String(r.Teacher||'').trim().toLowerCase();
+    return !leftTeacherKeys.has(key);
+  };
+
   let tR=[];
   tableBranches.forEach(b=>{
     tableMonths.forEach(m=>{
-      const br=ALLOBS.filter(r=>r.Branch===b&&r.Month===MO_MAP[m]);
+      const monthKey=MO_MAP[m];
+      const br=ALLOBS.filter(r=>r.Branch===b&&r.Month===monthKey);
       if(br.length===0)return;
-      const brSc=br.filter(r=>r.Score!=='–'&&!isNaN(parseFloat(r.Score)));
+
       const counts={principal:0,vp:0,hm:0,hods:0,coords:0};
       br.forEach(r=>counts[classifyObserver(r.ObsType)]++);
-      const avgScore=brSc.length>0?+(brSc.reduce((a,r)=>a+ +r.Score,0)/brSc.length).toFixed(2):0;
+
+      const cfg=MC_TABLE[b]||{};
+      const roleTypes=roleTypesByBranch[b]||{principal:new Set(),vp:new Set(),hm:new Set(),hods:new Set(),coords:new Set()};
+      let required=0;
+      Object.keys(roleTypes).forEach(roleKey=>{
+        roleTypes[roleKey].forEach(observerType=>{
+          const workingDays=mcRoleWD(cfg,monthKey,observerType);
+          if(workingDays>0) required += workingDays*quotaTable(roleKey);
+        });
+      });
+
+      const done=br.length;
+      const shortfall=Math.max(0,required-done);
+      const completion=required>0?+(done/required*100).toFixed(1):0;
+      const below3=br.filter(r=>
+        isActiveObservation(r)&&r.Score!=='–'&&!isNaN(parseFloat(r.Score))&&parseFloat(r.Score)<3
+      ).length;
+
       tR.push({
         branch:b,month:m,total:br.length,
         principal:counts.principal,vp:counts.vp,hm:counts.hm,hods:counts.hods,coords:counts.coords,
-        excel:brSc.filter(r=>+r.Score>=4).length,
-        sat:brSc.filter(r=>+r.Score>=3&&+r.Score<4).length,
-        ni:brSc.filter(r=>+r.Score<3).length,
-        avg:avgScore
+        done:done,shortfall:shortfall,completion:completion,below3:below3
       });
     });
   });
 
   const tbody=document.getElementById('obs-tbody');
   if(tR.length===0){tbody.innerHTML='<tr><td colspan="12" class="no-data">No observation data for selected filter</td></tr>';return;}
-  const maxA=Math.max(...tR.map(r=>r.avg)), minA=Math.min(...tR.map(r=>r.avg));
   tbody.innerHTML=tR.map(r=>{
-    const scls=r.avg===maxA&&tR.length>1?' class="best"':r.avg===minA&&tR.length>1?' class="worst"':'';
+    const completionColor=r.completion>=80?'#059669':r.completion>=50?'#D97706':'#DC2626';
     return `<tr><td><span class="bd b${r.branch}"></span> ${r.branch}</td><td>${r.month}</td>
       <td><strong>${r.total}</strong></td>
       <td>${r.principal}</td><td>${r.vp}</td><td>${r.hm}</td><td>${r.hods}</td><td>${r.coords}</td>
-      <td style="color:#059669;font-weight:700">${r.excel}</td>
-      <td style="color:#D97706;font-weight:700">${r.sat}</td>
-      <td style="color:#DC2626;font-weight:700">${r.ni}</td>
-      <td${scls} style="font-weight:800;color:${scColor(r.avg)}">${r.avg}</td></tr>`;
+      <td style="color:#059669;font-weight:700">${r.done}</td>
+      <td style="color:#DC2626;font-weight:700">${r.shortfall}</td>
+      <td style="color:${completionColor};font-weight:800">${r.completion}%</td>
+      <td style="color:#DC2626;font-weight:700">${r.below3}</td></tr>`;
   }).join('');
 
   // ── Observer COMPLETION by Type — Working Days × required/day vs Actual done ──
