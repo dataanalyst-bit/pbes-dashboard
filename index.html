@@ -13191,25 +13191,69 @@ function _trMileDate(d) {
 }
 var _trMileOpen = {};
 
-/* The Transport mileage report follows the same Month dropdown as the rest
-   of the dashboard. Fuel register dates are normalised to YYYY-MM-DD; accept
-   common display-date forms as a fallback. Undated entries cannot be assigned
-   to a selected month, so they are excluded when a specific month is chosen. */
+/* The Transport mileage report follows the global Month dropdown.
+   The dropdown values are month names (e.g. "October"), while the selected
+   option text carries the year (e.g. "October 2026"). */
 function _trMileMonthMatch(r) {
-  if (typeof fMonth === 'undefined' || fMonth === 'ALL') return true;
-  var names = ['january','february','march','april','may','june',
-               'july','august','september','october','november','december'];
-  var wanted = names.indexOf(String(fMonth || '').trim().toLowerCase());
-  if (wanted < 0) return true;
-  var raw = String(r && r.Date != null ? r.Date : '').trim();
+  if (typeof fMonth === 'undefined' || String(fMonth).toUpperCase() === 'ALL') return true;
+
+  var monthNames = ['january','february','march','april','may','june',
+                    'july','august','september','october','november','december'];
+  var selectedMonth = String(fMonth || '').trim().toLowerCase();
+  var wantedMonth = monthNames.indexOf(selectedMonth);
+  if (wantedMonth < 0) wantedMonth = monthNames.findIndex(function (m) {
+    return m.slice(0, 3) === selectedMonth.slice(0, 3);
+  });
+  if (wantedMonth < 0) return true;
+
+  var wantedYear = null;
+  var monthSelect = document.getElementById('sel-month');
+  if (monthSelect && monthSelect.selectedIndex >= 0) {
+    var selectedLabel = monthSelect.options[monthSelect.selectedIndex].text || '';
+    var yearMatch = selectedLabel.match(/\b(20\d{2})\b/);
+    if (yearMatch) wantedYear = Number(yearMatch[1]);
+  }
+  if (wantedYear == null) {
+    wantedYear = wantedMonth <= 1 ? 2027 : 2026;
+  }
+
+  var rawValue = r && r.Date != null ? r.Date : '';
+  if (rawValue instanceof Date && !isNaN(rawValue.getTime())) {
+    return rawValue.getMonth() === wantedMonth && rawValue.getFullYear() === wantedYear;
+  }
+
+  var raw = String(rawValue).trim();
   if (!raw) return false;
-  var iso = raw.match(/^(\\d{4})-(\\d{1,2})-(\\d{1,2})/);
-  if (iso) return (+iso[2] - 1) === wanted;
+
+  var year, month;
+  var iso = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) {
+    year = Number(iso[1]); month = Number(iso[2]) - 1;
+    return month === wantedMonth && year === wantedYear;
+  }
+
+  /* Fuel sheets may also contain day-first dates such as 31/10/2026. */
+  var dayFirst = raw.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
+  if (dayFirst) {
+    year = Number(dayFirst[3]); month = Number(dayFirst[2]) - 1;
+    return month === wantedMonth && year === wantedYear;
+  }
+
+  /* Numeric Google Sheets serial date, if a source row reaches the browser raw. */
+  if (/^\d{4,6}(?:\.\d+)?$/.test(raw)) {
+    var serialDate = new Date(Date.UTC(1899, 11, 30) + Number(raw) * 86400000);
+    return serialDate.getUTCMonth() === wantedMonth && serialDate.getUTCFullYear() === wantedYear;
+  }
+
   var parsed = Date.parse(raw);
-  if (!isNaN(parsed)) return new Date(parsed).getMonth() === wanted;
-  var monthText = raw.toLowerCase();
-  return monthText.indexOf(names[wanted]) >= 0 ||
-         monthText.indexOf(names[wanted].slice(0, 3)) === 0;
+  if (!isNaN(parsed)) {
+    var parsedDate = new Date(parsed);
+    return parsedDate.getMonth() === wantedMonth && parsedDate.getFullYear() === wantedYear;
+  }
+
+  var lower = raw.toLowerCase();
+  return lower.indexOf(monthNames[wantedMonth]) >= 0 &&
+         lower.indexOf(String(wantedYear)) >= 0;
 }
 function _trMileMonthRows(rows) {
   return (rows || []).filter(_trMileMonthMatch);
