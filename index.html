@@ -2505,19 +2505,19 @@ const ROLE_TABS = {
   auditor:           null,   // Academic Auditor — every tab, every branch
   /* 28 Sep 2026: Consolidated Glance added to every role. management and
      auditor already see every tab; principal already had it. */
-  admin_manager:     ['glance','admin','vigilance','civil','purchase','transport','it','naa','bio'],
+  admin_manager:     ['glance','admin','vigilance','civil','purchase','transport','it','naa','bio','pt1'],
   vigilance_officer: ['glance','admin','vigilance','civil','naa'],
   // ── branch roles ──
   hr:                ['glance','hr','observations','naa','bio'],
   admin:             ['glance','admin','vigilance','civil','naa','bio'],
   /* Grievance officers — all three grievance roles — also get Syllabus &
      Notebook (28 Sep 2026). */
-  grievance_officer: ['glance','care','grievance','ptm','term1','auravya','syl','naa'],
+  grievance_officer: ['glance','care','grievance','ptm','term1','auravya','syl','naa','pt1'],
   /* Same as grievance_officer, plus Admissions. Kept as its own role rather
      than widening grievance_officer, because that would silently hand
      Admissions to every other grievance officer at the same time. */
-  grievance_admissions: ['glance','care','grievance','ptm','term1','auravya','admissions','kptm','syl','naa'],
-  hr_grievance:      ['glance','hr','observations','care','grievance','ptm','term1','auravya','syl','naa','bio'],
+  grievance_admissions: ['glance','care','grievance','ptm','term1','auravya','admissions','kptm','syl','naa','pt1'],
+  hr_grievance:      ['glance','hr','observations','care','grievance','ptm','term1','auravya','syl','naa','bio','pt1'],
   /* Academic coordinators, own branch only. 28 Sep 2026: Admin Tracker, School
      Audit, Teacher Observations and Consolidated Glance added on request.
      Still NOT given Vigilance, Purchase, HR, Transport or Admissions. */
@@ -2570,6 +2570,13 @@ function applyRoleAccess(){
     // than waved through — an unknown role must never mean unrestricted access
     allowed = ROLE_TABS.principal;
   }
+  // Pocharam Grievance Officer is the only branch grievance account that
+  // receives the 2027–28 Admissions tab. Other branches retain their current access.
+  if ((role === 'grievance_officer' || role === 'grievance_admissions') &&
+      String(branch || '').trim().toLowerCase() === 'pocharam') {
+    allowed = (allowed || []).concat('adm27');
+  }
+
   // no role and no branch → management-level full access (allowed stays null)
   if(branch && !ROLE_ALL_BRANCH[role]) lockBranch = branch;
 
