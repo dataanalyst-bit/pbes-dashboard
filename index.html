@@ -7128,7 +7128,7 @@ function renderObservations(){
   // Needs Improvement (<3) = UNIQUE teachers whose GRAND AVERAGE < 3 (from All_Teacher sheet),
   // not individual observation rows. Grand avg is month-independent, so only branch filter applies.
   const _ATni=(typeof ALL_TEACHER!=='undefined'&&Array.isArray(ALL_TEACHER))?ALL_TEACHER:[];
-  const _niScope=_ATni.filter(r=>(fBranch==='ALL'||r.Branch===fBranch)).filter(r=>{const v=parseFloat(r.GrandAvg);return !isNaN(v)&&v>0;});
+  const _niScope=_ATni.filter(r=>(fBranch==='ALL'||r.Branch===fBranch)&&!isLeftTeacher(r)).filter(r=>{const v=parseFloat(r.GrandAvg);return !isNaN(v)&&v>0;});
   const uniqNI=_niScope.filter(r=>parseFloat(r.GrandAvg)<3).length;
   document.getElementById('obs-ni').textContent=uniqNI||'0';
   document.getElementById('obs-ni-s').textContent=_niScope.length>0?fp((uniqNI/_niScope.length)*100)+' of teachers':'–';
@@ -7700,6 +7700,12 @@ function viewObsTypeBranch(otype,branch){
 }
 
 
+// A non-empty Left marker in All_Teacher identifies a former employee.
+// These teachers are counted separately and never included in score bands.
+function isLeftTeacher(r){
+  return String(r && r.Left != null ? r.Left : '').trim().toLowerCase() === 'left';
+}
+
 // ════════════════════════════════════════════
 // TEACHER GRAND AVERAGE SCORE DISTRIBUTION (All_Teacher sheet)
 // ════════════════════════════════════════════
@@ -7707,29 +7713,30 @@ function renderTeacherGrandAvg(){
   const el=document.getElementById('teacher-grandavg-chart');
   if(!el) return;
   const AT=(typeof ALL_TEACHER!=='undefined'&&Array.isArray(ALL_TEACHER))?ALL_TEACHER:[];
-  // Respect branch filter (this sheet has no month dimension)
+  // Respect branch filter (this sheet has no month dimension).
   const rows=AT.filter(r=>(fBranch==='ALL'||r.Branch===fBranch));
-  // Rating bands by score RANGE:
-  //   5.0       → Exemplary
-  //   4.0–4.9   → Proficient
-  //   3.0–3.9   → Developing
-  //   0–2.9     → Inadequate
+  // Former employees are excluded from every active-teacher score band.
+  const activeRows=rows.filter(r=>!isLeftTeacher(r));
   const BANDS=[
     {key:'Exemplary',  label:'Exemplary',  range:'5.0',     color:'#059669', test:v=>v>=4.95},
     {key:'Proficient', label:'Proficient', range:'4.0–4.9', color:'#22C55E', test:v=>v>=4.0&&v<4.95},
     {key:'Developing', label:'Developing', range:'3.0–3.9', color:'#D97706', test:v=>v>=3.0&&v<4.0},
     {key:'Inadequate', label:'Inadequate', range:'0–2.9',   color:'#DC2626', test:v=>v>0&&v<3.0},
+    {key:'Left',       label:'Left Teachers', range:'employment status', color:'#64748B', test:null},
   ];
   const valOf=r=>{ const v=parseFloat(r.GrandAvg); return isNaN(v)?null:v; };
-  const counts=BANDS.map(b=>rows.filter(r=>{const v=valOf(r);return v!==null&&b.test(v);}).length);
+  const counts=[
+    ...BANDS.slice(0,4).map(b=>activeRows.filter(r=>{const v=valOf(r);return v!==null&&b.test(v);}).length),
+    rows.filter(isLeftTeacher).length
+  ];
   window._GA_BANDS=BANDS.map(b=>b.key);
   mkChart('teacher-grandavg-chart',{type:'bar',
-    data:{labels:BANDS.map(b=>b.label+'  ('+b.range+')'),datasets:[{label:'Teachers',data:counts,
+    data:{labels:BANDS.map(b=>b.key==='Left'?b.label:b.label+'  ('+b.range+')'),datasets:[{label:'Teachers',data:counts,
       backgroundColor:BANDS.map(b=>b.color),borderRadius:6,maxBarThickness:70}]},
     options:{responsive:true,maintainAspectRatio:false,
       onClick:(evt,els)=>{ if(!els||!els.length)return; viewTeacherGrandAvg(window._GA_BANDS[els[0].index]); },
       plugins:{legend:{display:false},
-        tooltip:{callbacks:{label:c=>c.parsed.y+' teachers — '+BANDS[c.dataIndex].label+' ('+BANDS[c.dataIndex].range+')'}},
+        tooltip:{callbacks:{label:c=>c.parsed.y+' teachers — '+(BANDS[c.dataIndex].key==='Left'?'marked Left':BANDS[c.dataIndex].label+' ('+BANDS[c.dataIndex].range+')')}},
         datalabels:{display:true,anchor:'end',align:'top',color:'#1E293B',font:{size:14,weight:'bold'},
           formatter:v=>v>0?v:''}},
       scales:{y:{beginAtZero:true,title:{display:true,text:'Number of Teachers'},grid:{color:'#E0E8FF'},ticks:{precision:0}},
@@ -7783,17 +7790,23 @@ function viewTeacherGrandAvg(bandKey){
     Inadequate: v=>v>0&&v<3.0,
   };
   const ranges={Exemplary:'5.0',Proficient:'4.0–4.9',Developing:'3.0–3.9',Inadequate:'0–2.9'};
-  const test=tests[bandKey]||(()=>false);
-  const rows=AT.filter(r=>{const v=parseFloat(r.GrandAvg);return !isNaN(v)&&test(v)&&(fBranch==='ALL'||r.Branch===fBranch);})
-    .sort((a,b)=>parseFloat(b.GrandAvg)-parseFloat(a.GrandAvg))
-    .map(r=>({Branch:r.Branch,Teacher:r.Teacher,Designation:r.Designation,Subject:r.Subject,
-      GrandAvg:r.GrandAvg,Observations:_obsLink(r.Branch,r.Teacher)}));
+  const leftView=bandKey==='Left';
+  let selected=AT.filter(r=>(fBranch==='ALL'||r.Branch===fBranch) &&
+    (leftView ? isLeftTeacher(r) : !isLeftTeacher(r) && (()=>{const v=parseFloat(r.GrandAvg);return !isNaN(v)&&!!tests[bandKey]&&tests[bandKey](v);})()));
+  selected.sort((a,b)=>{
+    const av=parseFloat(a.GrandAvg),bv=parseFloat(b.GrandAvg);
+    if(leftView && (isNaN(av)||isNaN(bv))) return String(a.Teacher||'').localeCompare(String(b.Teacher||''));
+    return (isNaN(bv)?-1:bv)-(isNaN(av)?-1:av);
+  });
+  const rows=selected.map(r=>({Branch:r.Branch,Teacher:r.Teacher,Designation:r.Designation,Subject:r.Subject,
+    GrandAvg:r.GrandAvg,Status:r.Left||'',Observations:_obsLink(r.Branch,r.Teacher)}));
   const bl=fBranch==='ALL'?'All Branches':fBranch;
   const cols=[{key:'Branch',label:'Branch'},{key:'Teacher',label:'Teacher',maxW:'200px'},
     {key:'Designation',label:'Designation',maxW:'160px'},{key:'Subject',label:'Subject'},
-    {key:'GrandAvg',label:'Grand Avg Score',score:true},
+    {key:'GrandAvg',label:'Grand Avg Score',score:true},{key:'Status',label:'Status'},
     {key:'Observations',label:'Total Observations'}];
-  openModal(`📊 ${bandKey} (${ranges[bandKey]||''}) — Teachers`,`${rows.length} teachers · ${bl} · click a Total Observations count for full records`,rows,cols);
+  const title=leftView?'Left Teachers':'📊 '+bandKey+' ('+(ranges[bandKey]||'')+') — Teachers';
+  openModal(title,`${rows.length} teachers · ${bl}${leftView?' · excluded from active score bands':''} · click a Total Observations count for full records`,rows,cols);
 }
 
 
@@ -16681,7 +16694,7 @@ function viewObsRecords(filter){
   if(filter==='NeedsImprovement'){
     // Unique teachers whose GRAND AVERAGE < 3 (from All_Teacher sheet), branch-filtered.
     const AT=(typeof ALL_TEACHER!=='undefined'&&Array.isArray(ALL_TEACHER))?ALL_TEACHER:[];
-    let tRows=AT.filter(r=>{const v=parseFloat(r.GrandAvg);return !isNaN(v)&&v>0&&v<3;});
+    let tRows=AT.filter(r=>!isLeftTeacher(r)&&(()=>{const v=parseFloat(r.GrandAvg);return !isNaN(v)&&v>0&&v<3;})());
     if(branch!=='ALL') tRows=tRows.filter(r=>r.Branch===branch);
     tRows=tRows.map(r=>({Branch:r.Branch,Teacher:r.Teacher,Designation:r.Designation,Subject:r.Subject,
       GrandAvg:r.GrandAvg,Observations:_obsLink(r.Branch,r.Teacher)}))
