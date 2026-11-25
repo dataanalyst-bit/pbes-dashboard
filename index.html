@@ -13191,9 +13191,33 @@ function _trMileDate(d) {
 }
 var _trMileOpen = {};
 
+/* The Transport mileage report follows the same Month dropdown as the rest
+   of the dashboard. Fuel register dates are normalised to YYYY-MM-DD; accept
+   common display-date forms as a fallback. Undated entries cannot be assigned
+   to a selected month, so they are excluded when a specific month is chosen. */
+function _trMileMonthMatch(r) {
+  if (typeof fMonth === 'undefined' || fMonth === 'ALL') return true;
+  var names = ['january','february','march','april','may','june',
+               'july','august','september','october','november','december'];
+  var wanted = names.indexOf(String(fMonth || '').trim().toLowerCase());
+  if (wanted < 0) return true;
+  var raw = String(r && r.Date != null ? r.Date : '').trim();
+  if (!raw) return false;
+  var iso = raw.match(/^(\\d{4})-(\\d{1,2})-(\\d{1,2})/);
+  if (iso) return (+iso[2] - 1) === wanted;
+  var parsed = Date.parse(raw);
+  if (!isNaN(parsed)) return new Date(parsed).getMonth() === wanted;
+  var monthText = raw.toLowerCase();
+  return monthText.indexOf(names[wanted]) >= 0 ||
+         monthText.indexOf(names[wanted].slice(0, 3)) === 0;
+}
+function _trMileMonthRows(rows) {
+  return (rows || []).filter(_trMileMonthMatch);
+}
+
 function renderMileageReport() {
   var host = document.getElementById('tr-mile-report'); if (!host) return;
-  var rows = _trFilt(_trData().mileage || []);
+  var rows = _trMileMonthRows(_trFilt(_trData().mileage || []));
   var brs = (fBranch === 'ALL' ? TR_BRANCHES : [fBranch]).filter(function (b) {
     return rows.some(function (r) { return r.Branch === b; }); });
   /* a branch spelled in the fuel book but not in the branch list is still fuel */
@@ -13244,6 +13268,8 @@ function renderMileageReport() {
     '<th class="n" title="The share of fuel entries that carry a distance reading at all">Distance logged</th></tr></thead>' +
     '<tbody>' + body + (brs.length > 1 ? line('', tot, 1) : '') + '</tbody></table></div>' +
     '<div style="font-size:11.5px;color:var(--txm);line-height:1.65;margin:10px 2px 0">' +
+      (typeof fMonth !== 'undefined' && fMonth !== 'ALL'
+        ? '<b>Month filter:</b> ' + _escAttr(fMonth) + ' · ' : '') +
       '<b>KM / litre</b> is kilometres ÷ litres over the entries that record both, leaving out readings outside ' +
       TR_MILE_MIN + '–' + TR_MILE_MAX + ' KM/L as not believable' +
       (tot.doubt ? ' (' + tot.doubt + ' set aside — they are listed, marked, inside each vehicle)' : '') +
@@ -13268,7 +13294,7 @@ function trMileTog(k) {
 }
 function _trMilePaint(keepScroll) {
   var branch = window._TR_MILE_BR;
-  var T = _trData(), rows = (T.mileage || []).filter(function (r) { return r.Branch === branch; });
+  var T = _trData(), rows = _trMileMonthRows(_trFilt(T.mileage || [])).filter(function (r) { return r.Branch === branch; });
   var reg = {};
   (T.vehicles || []).forEach(function (v) { reg[_trMileKey(v.VehicleNo)] = v; });
   var by = {};
